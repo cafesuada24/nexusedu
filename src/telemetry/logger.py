@@ -59,22 +59,23 @@ class IndustryLogger:
         if self.logger.hasHandlers():
             self.logger.handlers.clear()
 
-        if not os.path.exists(log_dir):
-            os.makedirs(log_dir)
+        # Skip directory creation and file handlers on read-only environments like Vercel
+        # is_vercel = os.getenv("VERCEL") == "1"
 
         formatter = JSONFormatter()
 
-        # File Handler
-        # log_file = os.path.join(log_dir, f'{datetime.now().strftime("%Y-%m-%d")}.log')
-        # file_handler = logging.FileHandler(log_file)
-        # file_handler.setFormatter(formatter)
-
-        # Console Handler (stdout is better for cloud logging than stderr)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
-
-        # self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
+
+        # if not is_vercel and not os.path.exists(log_dir):
+        #     os.makedirs(log_dir, exist_ok=True)
+
+            # File Handler (Optional, disabled if you want to avoid file writing entirely)
+            # log_file = os.path.join(log_dir, f'{datetime.now().strftime("%Y-%m-%d")}.log')
+            # file_handler = logging.FileHandler(log_file)
+            # file_handler.setFormatter(formatter)
+            # self.logger.addHandler(file_handler)
 
     @staticmethod
     def set_context(context: dict[str, object]) -> None:
