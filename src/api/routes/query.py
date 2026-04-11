@@ -55,7 +55,7 @@ async def process_query(
         # To support multiple tables (as per plural industry standard),
         # we wrap it in a list.
         final_data = final_state.get("final_data")
-        tables = [final_data] if final_data else None
+        tables = [final_data[0]["data"]] if final_data else None
 
         # 3. Visualization JSON (List of Plotly objects)
         viz_raw = final_state.get("viz_json")
