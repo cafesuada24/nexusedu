@@ -20,11 +20,18 @@ def last_value_reducer(x: Any, y: Any) -> Any:
     return y
 
 
+def results_reducer(current: list[dict], next_val: list[dict] | None) -> list[dict]:
+    """Merge results from workers, or clear if None is received."""
+    if next_val is None:
+        return []
+    return (current or []) + next_val
+
+
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     worker_states: dict[str, Any]
     tasks: list[dict]
-    results: Annotated[list[dict], operator.add]
+    results: Annotated[list[dict], results_reducer]
     final_data: Annotated[list[dict] | None, last_value_reducer]
     viz_json: Annotated[dict | str | None, last_value_reducer]
     decision_log: Annotated[list[dict], operator.add]  # Track agent reasoning

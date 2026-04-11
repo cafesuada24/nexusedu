@@ -1,11 +1,6 @@
-import json
-import os
-from pathlib import Path
 import re
-from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langgraph.constants import END
 from langgraph.types import Send
 
 from src.agents.llms import (
@@ -25,7 +20,13 @@ from src.agents.schemas import (
 from src.agents.state import AgentState, SQLTask
 from src.agents.utils import ResultSummarizer, extract_json_from_markdown
 from src.telemetry.logger import logger
-from src.tools.db import describe_table, execute_sql, get_db_list, get_db_schema, list_tables
+from src.tools.db import (
+    describe_table,
+    execute_sql,
+    get_db_list,
+    get_db_schema,
+    list_tables,
+)
 
 
 # Prompt loading logic
@@ -65,21 +66,26 @@ def planner(state: AgentState) -> dict:
         discovery_info = f'\n\n<discovery_context>\n{state["discovery_context"]}\n</discovery_context>'
         logger.debug(f'Discovery Context Length: {len(state["discovery_context"])}')
 
-    messages = [SystemMessage(content=PLANNER_SYSTEM_PROMPT + discovery_info)] + state.get(
-        'messages', []
-    )
+    messages = [
+        SystemMessage(content=PLANNER_SYSTEM_PROMPT + discovery_info)
+    ] + state.get('messages', [])
 
     # 2. Invoke the model (it returns a RouterPlan because of with_structured_output in llms.py)
     logger.debug('Planner: Invoking LLM...')
     plan: RouterPlan = planner_llm.invoke(messages)
 
     logger.info(f'Planner Path Decision: {plan.path}')
-    logger.log_event('planner_output', {
-        'path': plan.path,
-        'tasks_count': len(plan.tasks) if plan.tasks else 0,
-        'discovery_requests_count': len(plan.discovery_requests) if plan.discovery_requests else 0,
-        'has_direct_response': bool(plan.direct_response_draft)
-    })
+    logger.log_event(
+        'planner_output',
+        {
+            'path': plan.path,
+            'tasks_count': len(plan.tasks) if plan.tasks else 0,
+            'discovery_requests_count': len(plan.discovery_requests)
+            if plan.discovery_requests
+            else 0,
+            'has_direct_response': bool(plan.direct_response_draft),
+        },
+    )
 
     update = {
         'routing_metadata': {
@@ -88,6 +94,13 @@ def planner(state: AgentState) -> dict:
             'discovery_requests': plan.discovery_requests or [],
         },
     }
+
+    # Reset results and data if this is a fresh query (not a follow-up loop)
+    if state.get('next_step') != 'follow_up':
+        logger.info('Planner: Fresh query detected, resetting results.')
+        update['results'] = None
+    else:
+        logger.info('Planner: Follow-up iteration, preserving existing results.')
 
     if plan.path == 'SQL_EXECUTION' and plan.tasks:
         logger.debug(f'Planner Tasks: {plan.tasks}')
@@ -110,9 +123,13 @@ def discovery_node(state: AgentState) -> dict:
         # Check if it's a DiscoveryRequest object or a dict
         tool_name = req.tool_name if hasattr(req, 'tool_name') else req.get('tool_name')
         db_id = req.db_id if hasattr(req, 'db_id') else req.get('db_id')
-        table_name = req.table_name if hasattr(req, 'table_name') else req.get('table_name')
+        table_name = (
+            req.table_name if hasattr(req, 'table_name') else req.get('table_name')
+        )
 
-        logger.info(f'Discovery Task {i+1}: Calling {tool_name} for {db_id or "root"}/{table_name or "none"}')
+        logger.info(
+            f'Discovery Task {i + 1}: Calling {tool_name} for {db_id or "root"}/{table_name or "none"}'
+        )
 
         try:
             if tool_name == 'get_db_list':
@@ -124,12 +141,18 @@ def discovery_node(state: AgentState) -> dict:
                     new_context_parts.append(res)
             elif tool_name == 'describe_table':
                 if db_id and table_name:
-                    res = describe_table.invoke({'db_id': db_id, 'table_name': table_name})
+                    res = describe_table.invoke(
+                        {'db_id': db_id, 'table_name': table_name}
+                    )
                     new_context_parts.append(res)
-            
-            logger.debug(f'Discovery Task {i+1} Result: {new_context_parts[-1] if new_context_parts else "No result"}')
+
+            logger.debug(
+                f'Discovery Task {i + 1} Result: {new_context_parts[-1] if new_context_parts else "No result"}'
+            )
         except Exception as e:
-            logger.error(f'Discovery Task {i+1} ({tool_name}) failed: {e}', exc_info=True)
+            logger.error(
+                f'Discovery Task {i + 1} ({tool_name}) failed: {e}', exc_info=True
+            )
 
     current_context = state.get('discovery_context') or ''
     updated_context = current_context + '\n\n' + '\n\n'.join(new_context_parts)
@@ -138,7 +161,10 @@ def discovery_node(state: AgentState) -> dict:
 
     return {
         'discovery_context': updated_context,
-        'routing_metadata': {**routing, 'discovery_requests': []},  # Clear processed requests but keep path
+        'routing_metadata': {
+            **routing,
+            'discovery_requests': [],
+        },  # Clear processed requests but keep path
     }
 
 
@@ -153,7 +179,9 @@ def responder_node(state: AgentState) -> dict:
     viz_json = state.get('viz_json')
     discovery_context = state.get('discovery_context')
 
-    logger.info(f'Responder Context: results={bool(results)}, draft={bool(direct_draft)}, viz={bool(viz_json)}, discovery={bool(discovery_context)}')
+    logger.info(
+        f'Responder Context: results={bool(results)}, draft={bool(direct_draft)}, viz={bool(viz_json)}, discovery={bool(discovery_context)}'
+    )
 
     context_parts = []
     if results:
@@ -173,7 +201,9 @@ def responder_node(state: AgentState) -> dict:
         )
 
     # Use the last human message or first one as user intent
-    human_messages = [m for m in state.get('messages', []) if isinstance(m, HumanMessage)]
+    human_messages = [
+        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
+    ]
     user_intent = human_messages[-1].content if human_messages else 'No intent found'
 
     messages = [
@@ -185,7 +215,7 @@ def responder_node(state: AgentState) -> dict:
 
     logger.debug('Responder: Invoking LLM for final synthesis...')
     response = sql_gen_llm.invoke(messages)  # Use any LLM for final response
-    
+
     logger.info('Responder: Response generated.')
     logger.debug(f'Final Response: {response.content[:500]}...')
 
@@ -193,10 +223,10 @@ def responder_node(state: AgentState) -> dict:
 
 
 def sql_worker(state: SQLTask) -> dict:
-    db_id = state["db_id"]
+    db_id = state['db_id']
     logger.info(f'SQL_Worker [{db_id}]: Starting task...')
     logger.debug(f'SQL_Worker [{db_id}] Intent: {state["query_intent"]}')
-    
+
     prompt = [SystemMessage(content=SQL_GENERATOR_SYSTEM_PROMPT), state['message']]
 
     # Use structured output for SQL generation
@@ -211,9 +241,11 @@ def sql_worker(state: SQLTask) -> dict:
         # Fallback to standard invoke if needed
         response = sql_gen_llm.invoke(prompt)
         content = response.content
-        
+
         # Try to extract SQL from markdown if present
-        sql_match = re.search(r'```sql\s*(.*?)\s*```', content, re.DOTALL | re.IGNORECASE)
+        sql_match = re.search(
+            r'```sql\s*(.*?)\s*```', content, re.DOTALL | re.IGNORECASE
+        )
         if sql_match:
             sql_query = sql_match.group(1).strip()
         else:
@@ -222,7 +254,9 @@ def sql_worker(state: SQLTask) -> dict:
 
     if not sql_query:
         logger.error(f'SQL_Worker [{db_id}]: Failed to generate SQL query.')
-        return {'results': [{'db': db_id, 'data': [{'error': 'Failed to generate SQL'}]}]}
+        return {
+            'results': [{'db': db_id, 'data': [{'error': 'Failed to generate SQL'}]}]
+        }
 
     logger.info(f'SQL_Worker [{db_id}]: Generated SQL: {sql_query}')
     logger.log_event('sql_generated', {'db_id': db_id, 'sql': sql_query})
@@ -230,8 +264,12 @@ def sql_worker(state: SQLTask) -> dict:
     try:
         logger.info(f'SQL_Worker [{db_id}]: Executing query...')
         raw_data = execute_sql(db_id, sql_query)
-        logger.info(f'SQL_Worker [{db_id}]: Execution successful. Rows: {len(raw_data)}')
-        logger.log_event('sql_execution_success', {'db_id': db_id, 'rows': len(raw_data)})
+        logger.info(
+            f'SQL_Worker [{db_id}]: Execution successful. Rows: {len(raw_data)}'
+        )
+        logger.log_event(
+            'sql_execution_success', {'db_id': db_id, 'rows': len(raw_data)}
+        )
     except Exception as e:
         logger.error(f'Execution error on {db_id}: {e}', exc_info=True)
         raw_data = [{'error': str(e)}]
@@ -247,10 +285,12 @@ def determiner(state: AgentState):
     results = state.get('results', [])
     summary = ResultSummarizer.summarize(results)
     logger.debug(f'Determiner: Data summary length: {len(summary)}')
-    
-    human_messages = [m for m in state.get('messages', []) if isinstance(m, HumanMessage)]
+
+    human_messages = [
+        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
+    ]
     user_intent = human_messages[-1].content if human_messages else 'No intent found'
-    
+
     system_prompt = (
         'You are an expert data orchestrator. Analyze the provided data summary '
         'and the original user intent to decide the most appropriate next step.'
@@ -267,17 +307,20 @@ def determiner(state: AgentState):
     except Exception as e:
         logger.error(f'Determiner failed: {e}', exc_info=True)
         # Safe fallback
-        from src.agents.schemas import DeterminerDecision as DD # Import locally to avoid issues if not in scope
+        from src.agents.schemas import (
+            DeterminerDecision as DD,
+        )  # Import locally to avoid issues if not in scope
+
         decision = DD(reasoning=f'Error in determination: {e}', next_step='finish')
 
     logger.info(
         f'Determiner Decision: {decision.next_step}',
     )
     logger.debug(f'Determiner Reasoning: {decision.reasoning}')
-    logger.log_event('determiner_decision', {
-        'next_step': decision.next_step,
-        'reasoning': decision.reasoning
-    })
+    logger.log_event(
+        'determiner_decision',
+        {'next_step': decision.next_step, 'reasoning': decision.reasoning},
+    )
 
     update = {
         'final_data': results,
@@ -287,11 +330,11 @@ def determiner(state: AgentState):
         ],
         'next_step': decision.next_step,
     }
-    
+
     # Only set viz_json to NONE if we aren't going to visualize
     if decision.next_step != 'visualize':
         update['viz_json'] = 'NONE'
-        
+
     return update
 
 
@@ -299,7 +342,7 @@ def visualization_agent(state: AgentState):
     if state.get('viz_json') == 'NONE':
         logger.info('Visualization Agent: Skipped (viz_json is NONE)')
         return {'viz_json': 'NONE'}
-    
+
     logger.info('Visualization Agent: Generating charts...')
 
     results = state.get('results')
@@ -308,9 +351,13 @@ def visualization_agent(state: AgentState):
         return {'viz_json': 'NONE'}
 
     distilled_data = ResultSummarizer.to_distilled_csv(results)
-    logger.debug(f'Visualization Agent: Distilled data for Plotly (CSV length: {len(distilled_data)})')
-    
-    human_messages = [m for m in state.get('messages', []) if isinstance(m, HumanMessage)]
+    logger.debug(
+        f'Visualization Agent: Distilled data for Plotly (CSV length: {len(distilled_data)})'
+    )
+
+    human_messages = [
+        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
+    ]
     user_intent = human_messages[-1].content if human_messages else 'No intent found'
 
     prompt = (
@@ -407,11 +454,15 @@ def route_planner(state: AgentState):
         return 'responder'
 
     if not state.get('tasks'):
-        logger.warning('Routing (Planner): Path was SQL_EXECUTION but no tasks found. Routing to responder.')
+        logger.warning(
+            'Routing (Planner): Path was SQL_EXECUTION but no tasks found. Routing to responder.'
+        )
         return 'responder'
 
-    logger.info(f'Routing (Planner): Sending tasks to {len(state["tasks"])} SQL workers.')
-    
+    logger.info(
+        f'Routing (Planner): Sending tasks to {len(state["tasks"])} SQL workers.'
+    )
+
     sends = [
         Send(
             'sql_worker',
@@ -433,6 +484,6 @@ def route_planner(state: AgentState):
         )
         for task in state['tasks']
     ]
-    
+
     logger.debug(f'Routing (Planner): Send operations: {sends}')
     return sends
