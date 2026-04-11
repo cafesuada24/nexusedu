@@ -622,3 +622,74 @@ td.risk-low {
     justify-content: center;
     font-size: 24px;
 }
+
+/* ══ MARKDOWN STYLES ══ */
+.markdown-body {
+    line-height: 1.6;
+}
+
+.markdown-body p:not(:last-child) {
+    margin-bottom: 12px;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+    padding-left: 20px;
+    margin-bottom: 12px;
+}
+
+.markdown-body li {
+    margin-bottom: 4px;
+}
+
+.markdown-body code {
+    background: rgba(108, 142, 255, 0.15);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9em;
+    color: var(--accent3);
+}
+
+.markdown-body pre {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    margin: 12px 0;
+}
+
+.markdown-body pre code {
+    background: transparent;
+    padding: 0;
+    color: var(--text-hi);
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+    margin: 16px 0 8px;
+    font-family: "Syne", sans-serif;
+    color: var(--text-hi);
+}
+
+.markdown-body h1 {
+    font-size: 1.4em;
+}
+.markdown-body h2 {
+    font-size: 1.25em;
+}
+.markdown-body h3 {
+    font-size: 1.1em;
+}
+
+.markdown-body blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 14px;
+    color: var(--text-mid);
+    font-style: italic;
+    margin: 12px 0;
+}
+

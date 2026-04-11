@@ -1,8 +1,26 @@
 {
+  "builds": [
+    {
+      "src": "src/api/main.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "src/**",
+      "use": "@vercel/static"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/main.py"
+      "destination": "src/api/main.py"
+    },
+    {
+      "source": "/",
+      "destination": "src/ui.html"
+    },
+    {
+      "source": "/(.*)\\.(js|css|json|svg|png|jpg|jpeg|gif|ico|txt)",
+      "destination": "src/$1.$2"
     }
   ]
 }

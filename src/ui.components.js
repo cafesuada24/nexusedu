@@ -132,3 +132,12 @@ export function Arrow(dir) {
       : e("polyline", { points: "15 18 9 12 15 6" }),
   );
 }
+
+export function Markdown({ content }) {
+  if (!content) return null;
+  const html = marked.parse(content, { breaks: true, gfm: true });
+  return e("div", {
+    className: "markdown-body",
+    dangerouslySetInnerHTML: { __html: html },
+  });
+}

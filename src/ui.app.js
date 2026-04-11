@@ -1,5 +1,5 @@
 import { normalizePayload, hasDashContent } from "./ui.payload.js";
-import { DashContent, Arrow } from "./ui.components.js";
+import { DashContent, Arrow, Markdown } from "./ui.components.js";
 import { renderChart } from "./ui.charts.js";
 import { registerModelPayloadHandler, askModel } from "./ui.api.js";
 
@@ -117,7 +117,7 @@ export function App() {
                     "div",
                     { key: i, className: "bubble bubble-ai" },
                     e("span", { className: "ai-label" }, "AI"),
-                    m.text,
+                    e(Markdown, { content: m.text }),
                   )
                 : e("div", { key: i, className: "bubble bubble-user" }, m.text),
             ),
