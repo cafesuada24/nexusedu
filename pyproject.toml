@@ -1,0 +1,100 @@
+[project]
+name = "a20-app-007"
+version = "0.1.0"
+description = "An agent assistant."
+readme = "README.md"
+requires-python = ">=3.11" # ">=3.12"
+dependencies = [
+    "duckdb>=1.5.1",
+    "grandalf>=0.8",
+    "langchain>=1.2.15",
+    "langchain-google-genai>=4.2.1",
+    "langchain-openai>=1.1.12",
+    "pandas>=3.0.2",
+    "plotly>=6.7.0",
+    "python-dotenv>=1.2.2",
+    "tabulate>=0.10.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+    "fastapi>=0.135.3",
+    "uvicorn>=0.44.0",
+]
+# dependencies = []
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint.per-file-ignores]
+# "**/{tests,docs,tools}/*" = ["E402"]
+"**/tests/*" = ["S101"]
+
+[tool.ruff.format]
+# 5. Use single quotes in `ruff format`.
+quote-style = "single"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 72
+
+[tool.ruff.lint]
+# select = [
+#     "ALL",
+# ]
+select = [
+    "F",      # pyflakes (runtime errors, unused imports/variables)
+    "E", "W", # pycodestyle (style and whitespace)
+    "I",      # isort (import sorting)
+    "N",      # pep8-naming
+    "UP",     # pyupgrade (modernize syntax)
+    "B",      # flake8-bugbear (common bugs & best practices)
+    "SIM",    # flake8-simplify (code simplification)
+    "C4",     # flake8-comprehensions (list/set/dict comprehension help)
+    "TC",     # flake8-type-checking (move typing imports to `if TYPE_CHECKING`)
+    "PL",     # flake8-unused-arguments
+    "RET",    # flake8-return (return statement issues)
+    "ARG",    # pylint rules (a subset)
+    "ANN",    # type annotations enforcement
+    "COM",    # flake8-commas
+    "C90",    # maccabe complexity
+    "D",      # pydocstyle
+    "A",      # flake8-builtins
+
+    # "YTT",
+    # "DTZ",
+    # "ISC",
+    # "ICN",
+    # "INP",
+    # "PIE",
+    # "PT",
+    # "TID",
+    # "PLC",
+    # "PLE",
+    # "PLR",
+    # "PLW",
+    # "RUF",
+    # "PYI",
+]
+
+ignore = [
+    'Q000',   # Double quote
+    'ERA001', # Code comment
+    'E501',   # line too long
+    'F841',   # pyright already supports this
+    'F401',   
+    'D416',   # numpydocstyle does not use colon in section name
+]
+
+fixable = ['ALL']
+unfixable = []
+
+[tool.ruff.lint.pydocstyle]
+# Use Google-style docstrings.
+convention = "google"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.15.10",
+]

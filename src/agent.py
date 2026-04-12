@@ -1,112 +1,99 @@
-"""
-Basic agent loop using the Anthropic Claude API.
-Receives user input, calls tools as needed, and returns results.
-"""
+import json
+import uuid
 
-import logging
-from anthropic import Anthropic
-from .config import ANTHROPIC_API_KEY, DEFAULT_MODEL, LOG_LEVEL
-from .tools import get_tool_schemas, execute_tool
+from langchain_core.messages import HumanMessage
+from langgraph.graph import END, StateGraph
 
-logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
+# from src.agents.llms import email_tools, export_tools,
+from src.agents.nodes import (
+    determiner,
+    discovery_node,
+    planner,
+    responder_node,
+    route_determiner,
+    route_planner,
+    sql_worker,
+    visualization_agent,
+)
+from src.agents.state import AgentState
+from src.agents.utils import extract_json_from_markdown
+from src.telemetry.logger import logger
 
-SYSTEM_PROMPT = """You are an intelligent AI assistant.
-You can use the provided tools to complete tasks.
-Think step by step and use tools when necessary."""
+workflow = StateGraph(AgentState)
 
+# Add Nodes
+workflow.add_node('planner', planner)
+workflow.add_node('discovery', discovery_node)
+workflow.add_node('responder', responder_node)
+workflow.add_node('sql_worker', sql_worker)  # Parallel node
+workflow.add_node('determiner', determiner)
+workflow.add_node('viz_agent', visualization_agent)
 
-def create_agent():
-    """Create an agent with the Anthropic client."""
-    if not ANTHROPIC_API_KEY:
-        raise ValueError("ANTHROPIC_API_KEY is not configured. Check your .env file")
-    return Anthropic(api_key=ANTHROPIC_API_KEY)
+workflow.set_entry_point('planner')
 
+workflow.add_conditional_edges(
+    'planner',
+    route_planner,
+    ['discovery', 'sql_worker', 'responder'],
+)
 
-def run_agent_loop(client: Anthropic, user_input: str, max_turns: int = 10) -> str:
-    """
-    Run the agent loop: send message -> receive response -> call tool -> repeat.
+workflow.add_edge('discovery', 'planner')
+workflow.add_edge('sql_worker', 'determiner')
 
-    Args:
-        client: Anthropic client
-        user_input: User's question or request
-        max_turns: Maximum number of tool-calling turns
+workflow.add_conditional_edges(
+    'determiner',
+    route_determiner,
+    {
+        'visualize': 'viz_agent',
+        'follow_up': 'planner',
+        'finish': 'responder',
+    },
+)
 
-    Returns:
-        The agent's final response
-    """
-    messages = [{"role": "user", "content": user_input}]
-    tools = get_tool_schemas()
+workflow.add_edge('viz_agent', 'responder')
+workflow.add_edge('responder', END)
 
-    for turn in range(max_turns):
-        logger.info(f"Turn {turn + 1}/{max_turns}")
+# Compile with Batching Throttle
+app = workflow.compile()
 
-        response = client.messages.create(
-            model=DEFAULT_MODEL,
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            tools=tools,
-            messages=messages,
+if __name__ == '__main__':
+    # Set session context for correlation
+    session_id = str(uuid.uuid4())
+    logger.set_context({'session_id': session_id})
+    logger.info('Graph: Initializing execution', session_id=session_id)
+
+    # Invoke with max_concurrency of 3
+    config = {'recursion_limit': 50, 'configurable': {'max_concurrency': 3}}
+    app.get_graph().print_ascii()
+
+    user_query = "Analyze the relationship between student demographics and performance. Specifically, compare the average assessment scores from the LMS database against the different 'region' categories found in the SIS database. Provide a summary of the findings and a bar chart comparing the scores by region."
+
+    logger.log_event('graph_start', {'user_query': user_query})
+
+    try:
+        final_result = app.invoke(
+            {'messages': [HumanMessage(content=user_query)]},
+            config=config,
         )
+        logger.info('Graph: Execution completed successfully')
+        logger.debug(f'Final Result State keys: {list(final_result.keys())}')
 
-        # If agent stops (no more tool calls)
-        if response.stop_reason == "end_turn":
-            final_text = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    final_text += block.text
-            return final_text
+        viz = final_result.get('viz_json', 'NONE')
+        viz = extract_json_from_markdown(viz)
 
-        # Handle tool calls
-        tool_results = []
-        has_tool_use = False
+        if viz:
+            logger.info('Graph: Displaying visualization')
+            import plotly.io as pio
 
-        for block in response.content:
-            if block.type == "tool_use":
-                has_tool_use = True
-                logger.info(f"Calling tool: {block.name}({block.input})")
-                result = execute_tool(block.name, block.input)
-                logger.info(f"Result: {result[:200]}")
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                })
+            try:
+                pio.from_json(json.dumps(viz)).show()
+            except Exception as e:
+                logger.error(f'Error displaying visualization: {e}')
+        else:
+            logger.info('No visualization to display.')
 
-        if not has_tool_use:
-            # No tool calls, return text
-            final_text = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    final_text += block.text
-            return final_text
-
-        # Add assistant response and tool results to messages
-        messages.append({"role": "assistant", "content": response.content})
-        messages.append({"role": "user", "content": tool_results})
-
-    return "Agent reached the maximum number of processing turns."
-
-
-def main():
-    """Interactive loop - enter a prompt and receive results."""
-    client = create_agent()
-    print("Agentic App (type 'quit' to exit)")
-    print("-" * 50)
-
-    while True:
-        user_input = input("\nYou: ").strip()
-        if not user_input or user_input.lower() in ("quit", "exit", "q"):
-            print("Bye!")
-            break
-
-        try:
-            response = run_agent_loop(client, user_input)
-            print(f"\nAgent: {response}")
-        except Exception as e:
-            logger.error(f"Error: {e}")
-            print(f"\nError: {e}")
-
-
-if __name__ == "__main__":
-    main()
+    except Exception as e:
+        logger.error(f'Graph execution failed: {e}', exc_info=True)
+    finally:
+        logger.info('Graph: Finished session')
+        logger.clear_context()
