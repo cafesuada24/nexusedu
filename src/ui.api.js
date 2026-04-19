@@ -24,7 +24,7 @@ export const fetchModelPayload = async (url) => {
 export const askModel = async (
   query,
   threadId,
-  url = "http://localhost:8000/api/v1",
+  url = "/api/v1/query",
 ) => {
   const res = await fetch(url, {
     method: "POST",

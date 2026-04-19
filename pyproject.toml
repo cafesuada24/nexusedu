@@ -1,9 +1,24 @@
 [project]
 name = "a20-app-007"
 version = "0.1.0"
-description = "Add your description here"
+description = "An agent assistant."
 readme = "README.md"
 requires-python = ">=3.11" # ">=3.12"
+dependencies = [
+    "duckdb>=1.5.1",
+    "grandalf>=0.8",
+    "langchain>=1.2.15",
+    "langchain-google-genai>=4.2.1",
+    "langchain-openai>=1.1.12",
+    "pandas>=3.0.2",
+    "plotly>=6.7.0",
+    "python-dotenv>=1.2.2",
+    "tabulate>=0.10.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+    "fastapi>=0.135.3",
+    "uvicorn>=0.44.0",
+]
 # dependencies = []
 
 [tool.ruff]
@@ -76,3 +91,10 @@ unfixable = []
 [tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings.
 convention = "google"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.15.10",
+]

@@ -6,14 +6,14 @@ inspect, and query multiple database sources (LMS, SIS) via DuckDB.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 from langchain_core.tools import tool
 
 # Thư mục chứa các file .duckdb — resolve từ gốc project
-DATA_DIR = Path(__file__).resolve().parent.parent / 'data'
+DATA_DIR = 'data'
 
 # ============================================================================
 # DATABASE REGISTRY
@@ -78,45 +78,36 @@ class DatabaseManager:
             raise FileNotFoundError(msg)
         return path
 
-    def get_schema(self, db_id: str) -> str:
-        """Read live schema from DuckDB file.
-
-        Returns a semantically enriched schema summary
-        designed for high-accuracy SQL generation.
-        """
+    def list_tables(self, db_id: str) -> list[str]:
+        """List all tables in the specified database."""
         path = self._get_path(db_id)
         conn = duckdb.connect(str(path), read_only=True)
-
         try:
             tables = conn.execute('SHOW TABLES').fetchdf()
-            schema_parts = [
-                f'### DATABASE: {db_id.upper()}\n'
-                f'Dialect: DuckDB (SQL standard)\n'
-            ]
+            return tables['name'].tolist()
+        finally:
+            conn.close()
 
-            for table_name in tables['name']:
-                cols = conn.execute(f'DESCRIBE {table_name}').fetchdf()
+    def get_table_schema(self, db_id: str, table_name: str) -> str:
+        """Get the schema and sample data for a specific table."""
+        path = self._get_path(db_id)
+        conn = duckdb.connect(str(path), read_only=True)
+        try:
+            cols = conn.execute(f'DESCRIBE {table_name}').fetchdf()
+            sample = conn.execute(f'SELECT * FROM {table_name} LIMIT 3').fetchdf()
 
-                # Sample 3 rows
-                sample = conn.execute(
-                    f'SELECT * FROM {table_name} LIMIT 3'
-                ).fetchdf()
-
-                col_lines = []
-                for _, col in cols.iterrows():
-                    nullable = 'NULLABLE' if col['null'] == 'YES' else 'NOT NULL'
-                    col_lines.append(
-                        f'    - {col["column_name"]} ({col["column_type"]}, {nullable})'
-                    )
-
-                schema_parts.append(
-                    f'\n#### TABLE: {table_name}\n'
-                    f'- Columns:\n' + '\n'.join(col_lines) +
-                    f'\n- Sample data:\n```\n{sample.to_string(index=False)}\n```'
+            col_lines = []
+            for _, col in cols.iterrows():
+                nullable = 'NULLABLE' if col['null'] == 'YES' else 'NOT NULL'
+                col_lines.append(
+                    f'    - {col["column_name"]} ({col["column_type"]}, {nullable})'
                 )
 
-            return '\n'.join(schema_parts)
-
+            return (
+                f'#### TABLE: {table_name}\n'
+                f'- Columns:\n' + '\n'.join(col_lines) +
+                f'\n- Sample data:\n```\n{sample.to_string(index=False)}\n```'
+            )
         finally:
             conn.close()
 
@@ -188,6 +179,38 @@ def get_db_list() -> str:
 
 
 @tool
+def list_tables(db_id: str) -> str:
+    """List all tables available in the specified database.
+
+    Use this after get_db_list to narrow down which tables to inspect.
+
+    Args:
+        db_id: The database ID (e.g., 'lms_db', 'sis_db').
+    """
+    try:
+        tables = db_manager.list_tables(db_id)
+        return f"Tables in {db_id}: " + ", ".join(tables)
+    except FileNotFoundError as e:
+        return f"Error: {e}"
+
+
+@tool
+def describe_table(db_id: str, table_name: str) -> str:
+    """Get the detailed schema and sample data for a specific table.
+
+    Use this tool only after you have identified a specific table of interest
+    using list_tables.
+
+    Args:
+        db_id: The database ID (e.g., 'lms_db', 'sis_db').
+        table_name: The name of the table to describe.
+    """
+    try:
+        return db_manager.get_table_schema(db_id, table_name)
+    except Exception as e:
+        return f"Error describing table {table_name}: {e}"
+
+
 def get_db_schema(db_id: str) -> str:
     """Get the detailed schema of a specific database.
 
@@ -198,31 +221,21 @@ def get_db_schema(db_id: str) -> str:
         db_id: The database ID from get_db_list (e.g., 'lms_db' or 'sis_db').
     """
     try:
-        return db_manager.get_schema(db_id)
+        tables = db_manager.list_tables(db_id)
+        schemas = [db_manager.get_table_schema(db_id, t) for t in tables]
+        return f"### DATABASE: {db_id.upper()}\n" + "\n\n".join(schemas)
     except FileNotFoundError as e:
-        return f'Error: {e}'
+        return f"Error: {e}"
 
 
-@tool
-def execute_sql(db_id: str, sql: str) -> str:
+def execute_sql(db_id: str, sql: str) -> list[dict]:
     """Execute a SQL query on a specific database and return results.
 
-    Must call get_db_schema first to understand the table structure.
+    Must call list_tables/describe_table first to understand the table structure.
     Only SELECT queries are allowed. Use LIMIT to control output size.
 
     Args:
         db_id: The database ID (e.g., 'lms_db' or 'sis_db').
         sql: A valid SQL SELECT query.
     """
-    results = db_manager.execute(db_id, sql)
-
-    if not results:
-        return 'Query returned no results.'
-
-    if len(results) == 1 and 'error' in results[0]:
-        return results[0]['error']
-
-    # Format as markdown table for LLM readability
-    import pandas as pd
-    df = pd.DataFrame(results)
-    return df.to_markdown(index=False)
+    return db_manager.execute(db_id, sql)
