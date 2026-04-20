@@ -1,67 +1,65 @@
-# PRD: Project "Pulse" – The Early Warning Engine
+# PRD: The Activation Engine
 
-## 1. Problem Definition: The "Context Gap"
+## 1. Định nghĩa Vấn đề: The Activation Gap
 
-Academic advisors in universities are facing **Intervention Lag**. They operate in a **reactive** state. By the time an advisor manually merges a Learning Management System (LMS) report (showing low engagement) with a Student Information System (SIS) report (showing financial aid probation), the "at-risk" student has usually already checked out mentally or failed their midterms. 
+Vấn đề cốt lõi của các trường đại học không phải là thiếu dữ liệu track sinh viên, mà là **thiếu hành động**. Hiện tại, vòng lặp can thiệp đang bị đứt gãy:
 
-A hard-coded dashboard is insufficient as it requires efforts of filtering, and looking back to past data to find out, for example, if the student's is "at-risk" or just a normal bad week. Instead, an AI integrated system do not provide charts, it provides insights, and judgements.
+*   **Cố vấn học tập (AA):** Nhận danh sách sinh viên rủi ro quá dài, không có thời gian "cold-call" từng người, dẫn đến tâm lý chờ đợi sinh viên tự tìm đến.
+*   **Sinh viên:** Không nhận thức được mình đang trượt dốc (vì điểm chưa quá tệ) hoặc cảm thấy xấu hổ, sợ hãi khi phải chủ động xin giúp đỡ.
+*   **Hệ thống cũ:** Gửi các email cảnh báo hàng loạt (Spray-and-pray) khô khan, khiến sinh viên lo lắng và né tránh thay vì hành động.
 
-Hypothesis: Helping advisors moving from **Retrospective Reporting**  (what happened?) to **Proactive Intervention** (who need help *right now*?) would improve students engagement.
-
----
-
-## 2. Examples of Paint Points
-
-* **Example A: The "Silent Slider"** A student has a 3.8 GPA (SIS data). However, their LMS login frequency has dropped by 70% in the last 14 days (LMS data). Because these data points live in different tabs, the advisor congratulates the student on their GPA while missing the looming mental health crisis or burnout.
-* **Example B: The "Prerequisite Trap"** An advisor has 15 minutes per student during registration. They miss the fact that a student is enrolling in "Organic Chemistry II" despite a "D" in the prerequisite two years ago, because that grade is buried in a 10-page transcript PDF while the current schedule is in a web portal.
-* **Example C: The Monday Morning Rush** After a weekend of failed quizzes, an advisor needs to prioritize which 10 out of 300 students to call. Currently, they spend Monday morning (4 hours) "cleaning data." By the time they start calling on Tuesday, the window for a "course-correct" conversation has shrunk.
+**Giả thuyết:** Nếu chúng ta biến sinh viên thành **người chủ động khởi đầu** cuộc hội thoại bằng cách gửi cho họ những thông tin thấu cảm, cá nhân hóa về chính xu hướng của họ (Pattern-based), chúng ta sẽ chuyển đổi "danh sách rủi ro bị động" thành "nhu cầu hỗ trợ chủ động". Cố vấn chỉ cần làm việc với những người thực sự muốn được giúp đỡ.
 
 ---
 
-## 3. Core Value Proposition
-1.  **Instant Synthesis:** Eliminate the "Merge & Pivot Table" workflow. Move from data gathering to "Actionable Insights" in a few minutes.
-2.  **Risk Prioritization:** Automatically rank students based on multi-source red flags (e.g., Low LMS activity + Financial Aid Warning + Historic low grade in current subject).
+## 2. Core Value Proposition
+
+1.  **Student-Activated Intervention:** Sinh viên nhận được phân tích về chính mình ("Điểm Quiz tuần này của bạn thấp hơn 30% so với thông lệ - đây là điều bất thường"), thúc đẩy sự tự nhận thức và tự nguyện tìm đến cố vấn.
+2.  **Zero-Friction cho Cố vấn:** Loại bỏ hoàn toàn công việc phân tích dữ liệu thủ công. Cố vấn không còn phải tìm sinh viên mà chỉ tiếp nhận những lịch hẹn đã được chốt sẵn kèm **bản tóm tắt bối cảnh rủi ro** do AI soạn.
+3.  **Cá nhân hóa theo Baseline cá nhân:** AI không so sánh sinh viên với trung bình lớp, mà so sánh sinh viên với **chính lịch sử của họ** để phát hiện những sự "trượt dốc thầm lặng".
 
 ---
 
-## 4. Business Metrics (Success Criteria)
-* **Time-to-Insight (TTI):** Reduce the time taken to identify "Top 10 At-Risk Students" from **4 hours to 5 minutes.**
-* **Intervention Lead Time:** Increase the average number of days between "Risk Detection" and "Student Outreach."
-* **Advisor Satisfaction Score:** A binary "Yes/No" on whether the AI-generated "Student Brief" was accurate enough to lead a 1:1 session without checking Excel.
+## 3. Workflow
+
+Hệ thống hoạt động theo vòng lặp 4 bước tự động:
+
+1.  **AI Ingest:** Nhận file CSV từ LMS (Canvas/Moodle) và SIS (Hệ thống điểm).
+2.  **Pattern Detection:** AI xác định "Baseline" (ngưỡng bình thường) của từng sinh viên và gắn cờ khi có sự lệch chuẩn (vd: Bình thường nộp bài 100%, 2 tuần nay chỉ nộp 40%).
+3.  **The Nudge (Lời nhắc thấu cảm):** AI soạn và gửi email cá nhân hóa (AA duyệt 1-click). Email không trừng phạt mà mang tính tò mò/hỗ trợ kèm link đặt lịch (Calendly).
+4.  **AA Action (Can thiệp tập trung):** AA nhận lịch hẹn kèm một **Student Brief** (3 câu tóm tắt vấn đề cốt lõi) để sẵn sàng giải quyết ca khó trong 30 giây chuẩn bị.
 
 ---
 
-## 5. Functional Requirements
+## 4. Functional Requirements
 
+### 4.1. Động cơ Nhận diện Xu hướng (Pattern Recognition Engine)
+*   **Baseline Detection:** AI tự động thiết lập ngưỡng hoạt động bình thường cho từng cá nhân sinh viên.
+*   **Deviation Flagging:** Gắn cờ khi dữ liệu mới lệch khỏi ngưỡng (điểm quiz giảm, tần suất login LMS tụt sâu, bỏ lỡ bài tập).
+*   **Insight Generation:** Viết 2-3 câu giải thích rõ: "Bạn đang thay đổi như thế nào so với chính bạn tuần trước/tháng trước".
 
+### 4.2. Hệ thống Nudge & Phê duyệt (Admin Dashboard)
+*   **Review Mode:** AA có một màn hình "Hàng đợi" để xem nhanh 50 email AI đã soạn và bấm "Duyệt tất cả" hoặc chỉnh sửa nhanh.
+*   **Tone Control:** Đảm bảo giọng văn luôn là "Hỗ trợ/Tò mò" (Curiosity-based), tuyệt đối không dùng từ ngữ "Cảnh báo/Học vụ/Rủi ro" để tránh gây áp lực tâm lý.
 
-### 5.1. The "Unified Feed" (RAG-based)
-The application allows advisors to **upload CSV exports** from their SIS and LMS. 
-* **AI Agent:** Processes the CSVs using a RAG (Retrieval-Augmented Generation) pattern.
-* **The "So What?" Layer:** The agent doesn't just show data; it writes a 3-sentence summary for each student: *"GPA is high, but quiz scores dropped 40% this week. This is a new pattern for this student."*
-
-### 5.2. Natural Language Query (The "Socratic" Advisor)
-A chat interface where the advisor asks:
-* *"Who has a GPA below 2.0 but hasn't logged into the LMS in 5 days?"*
-* *"Summarize the academic hurdles for [Student Name] based on their history."*
-
----
-
-## 6. Development Plan
-
-**Team Composition:**
-1.  **Lead Dev:** Backend, LLM Prompt Engineering, Data Parsing.
-2.  **Product/Frontend:** UI/UX, Data Mapping, CSV Sanitization.
-3.  **Data/QA:** Prompt Validation, Logic Testing, Documentation.
-
-| Week | Focus | Deliverable |
-| :--- | :--- | :--- |
-| **Week 1** | **The Pipeline** | Build CSV parsers for common LMS/SIS formats (Canvas/Banner). Set up the Vector DB. |
-| **Week 2** | **The Reasoning** | Develop the "Risk Logic" prompt. Create the agent that can "cross-reference" two different files. |
-| **Week 3** | **The Interface** | Build a clean, "Zero-Training" UI. Run a "Stress Test" with 1,000 student rows. |
+### 4.3. Action Inbox cho Cố vấn (Advisor Interface)
+*   Thay thế Dashboard phức tạp bằng một **Action Queue** tối giản.
+*   Chỉ hiển thị các sinh viên đã phản hồi hoặc đã đặt lịch.
+*   **AI Student Brief:** Tóm tắt 3 câu về bối cảnh (vd: "Mai thường học giỏi nhưng 2 tuần nay bỏ 3 bài quiz môn Lý, có dấu hiệu burnout").
 
 ---
 
-## 7. Technical Feasibility & Constraints
-* **Feasibility:** High. By using LLMs (GPT-4o or Claude 3.5) with structured data (CSV), we bypass the need for expensive API integrations with legacy University systems.
-* **Constraint:** Data Privacy. All PII (Personally Identifiable Information) must be anonymized or handled via local LLM processing to ensure FERPA compliance (for the MVP, we use "Student ID" instead of "Full Name").
+## 5. Success Metrics
+
+*   **Tỉ lệ Sinh viên Tự kết nối (Self-Referral Rate):** % sinh viên rủi ro tự đặt lịch hẹn sau khi nhận Nudge (Target: >25%).
+*   **Hiệu suất Họp Cố vấn (Meeting Efficiency):** % các cuộc hẹn dẫn đến hành động thực tế, thay vì các cuộc hẹn "báo động giả" (Target: >70%).
+*   **Tỉ lệ Can thiệp Sớm:** % sinh viên được can thiệp trước tuần thứ 10 của học kỳ.
+*   **Nudge Open/Click Rate:** Tỉ lệ mở và click vào link hỗ trợ trong email.
+
+---
+
+## 6. Ràng buộc Kỹ thuật & Bảo mật
+
+*   **Quyền riêng tư (FERPA):** Dữ liệu sinh viên chỉ xử lý phía server, không lộ thông tin nhạy cảm qua URL hoặc Client-side JS.
+*   **Kiểm soát Tần suất:** Tối đa 1 Nudge/sinh viên/tuần để tránh gây "mệt mỏi vì thông báo" (Alert fatigue).
+*   **Khả năng mở rộng:** Hệ thống xử lý CSV linh hoạt để không phụ thuộc vào việc tích hợp API trực tiếp với hệ thống cũ của trường trong giai đoạn MVP.
