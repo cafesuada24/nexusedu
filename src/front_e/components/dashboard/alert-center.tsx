@@ -1,10 +1,11 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
-  Wallet,
+  GraduationCap,
   BookOpen,
-  CalendarX,
+  TrendingDown,
   Send,
   Pencil,
   Trash2,
@@ -12,6 +13,7 @@ import {
   Filter,
   Search,
   Mail,
+  Upload,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -23,159 +25,218 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar"
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group"
+import { Skeleton } from "@/components/ui/skeleton"
 import { EmailEditorDialog } from "@/components/dashboard/email-editor-dialog"
-
-type Problem = "financial" | "grades" | "absence"
+import { useDataset } from "@/hooks/use-dataset"
+import {
+  describeProblem,
+  problemLabels,
+  type Problem,
+  type StudentRow,
+  type TestRow,
+} from "@/lib/csv"
 
 type Alert = {
   id: string
   name: string
   mssv: string
-  faculty: string
+  email: string
   problem: Problem
   summary: string
   severity: "high" | "medium"
   subject: string
   body: string
+  /** 0 = chưa từng liên hệ, >0 = đã liên hệ (Unix seconds). */
+  lastContactedAt: number | null
 }
-
-const seed: Alert[] = [
-  {
-    id: "a1",
-    name: "Nguyễn Minh An",
-    mssv: "20215032",
-    faculty: "CNTT",
-    problem: "financial",
-    summary: "Học phí quá hạn 14 ngày",
-    severity: "high",
-    subject: "NexusEdu · Thầy nhắn An một chút nhé",
-    body: `Chào An,
-
-Thầy tình cờ thấy khoản học phí kỳ này của em vẫn chưa được cập nhật. Thầy hiểu đôi khi có những trục trặc ngoài ý muốn, nên muốn hỏi xem em có đang gặp khó khăn gì không.
-
-Nếu em cần, mình có thể gặp 15 phút để cùng xem các phương án — trả góp, học bổng khẩn cấp, hoặc chỉ là lắng nghe. Em cứ đặt lịch theo link này nhé:
-→ nexusedu.app/booking/le-ha
-
-Thầy luôn ở đây,
-TS. Lê Hà`,
-  },
-  {
-    id: "a2",
-    name: "Trần Hoàng Bình",
-    mssv: "20215098",
-    faculty: "CNTT",
-    problem: "grades",
-    summary: "Điểm giữa kỳ < 4.0 ở 3 môn",
-    severity: "high",
-    subject: "NexusEdu · Cùng nhìn lại kỳ này nhé Bình",
-    body: `Chào Bình,
-
-Thầy xem kết quả giữa kỳ và thấy em đang gặp một chút khó khăn ở vài môn. Không sao cả — đây là thời điểm tốt để mình điều chỉnh, và vẫn còn đủ thời gian để cải thiện.
-
-Em thử đặt một buổi 20 phút với thầy để mình cùng xem lộ trình học, và có thể kết nối em với nhóm hỗ trợ của khoa nhé.
-→ nexusedu.app/booking/le-ha
-
-Thầy tin ở em,
-TS. Lê Hà`,
-  },
-  {
-    id: "a3",
-    name: "Phạm Thu Hà",
-    mssv: "20215172",
-    faculty: "Kinh tế",
-    problem: "absence",
-    summary: "Vắng 6/10 buổi gần nhất",
-    severity: "medium",
-    subject: "NexusEdu · Hà có khoẻ không?",
-    body: `Chào Hà,
-
-Cô thấy em vắng khá nhiều buổi gần đây. Cô không muốn làm phiền, chỉ muốn hỏi thăm xem em có ổn không — sức khoẻ, gia đình, hoặc bất cứ điều gì.
-
-Khi nào em sẵn sàng, mình có thể trò chuyện 15 phút nhé.
-→ nexusedu.app/booking/le-ha
-
-Chăm sóc bản thân nhé Hà,
-TS. Lê Hà`,
-  },
-  {
-    id: "a4",
-    name: "Lê Quốc Huy",
-    mssv: "20215211",
-    faculty: "CNTT",
-    problem: "grades",
-    summary: "Điểm TB giảm 2 kỳ liên tiếp",
-    severity: "medium",
-    subject: "NexusEdu · Cùng nhìn lại lộ trình của em nhé",
-    body: `Chào Huy,
-
-Thầy nhận thấy điểm trung bình của em giảm đều 2 kỳ gần đây. Thầy nghĩ mình có thể nói chuyện để hiểu rõ hơn điều em đang gặp phải và cùng tìm hướng đi phù hợp.
-
-Em đặt lịch khi nào thuận tiện nhé:
-→ nexusedu.app/booking/le-ha
-
-Thân mến,
-TS. Lê Hà`,
-  },
-  {
-    id: "a5",
-    name: "Võ Thảo Nguyên",
-    mssv: "20215384",
-    faculty: "Kinh tế",
-    problem: "financial",
-    summary: "Chưa hoàn tất học phí, gần hạn",
-    severity: "medium",
-    subject: "NexusEdu · Một lời nhắc nhỏ cho Nguyên",
-    body: `Chào Nguyên,
-
-Chỉ là một lời nhắc nhẹ: học phí kỳ này sắp tới hạn. Nếu em đang có bất kỳ khó khăn nào, đừng ngại nhắn cô nhé — có nhiều phương án em có thể chưa biết.
-
-→ nexusedu.app/booking/le-ha
-
-Thân mến,
-TS. Lê Hà`,
-  },
-]
 
 const problemMeta: Record<
   Problem,
   { label: string; icon: React.ElementType; tone: string }
 > = {
-  financial: {
-    label: "Học phí",
-    icon: Wallet,
+  failed_final: {
+    label: problemLabels.failed_final,
+    icon: GraduationCap,
     tone: "bg-destructive/10 text-destructive ring-destructive/20",
   },
-  grades: {
-    label: "Điểm số",
+  failed_midterm: {
+    label: problemLabels.failed_midterm,
     icon: BookOpen,
     tone: "bg-warning/15 text-warning ring-warning/25",
   },
-  absence: {
-    label: "Vắng học",
-    icon: CalendarX,
+  low_average: {
+    label: problemLabels.low_average,
+    icon: TrendingDown,
     tone: "bg-primary/10 text-primary ring-primary/20",
   },
 }
 
+function getInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n) => n[0]?.toUpperCase() ?? "")
+    .slice(-2)
+    .join("")
+}
+
+function firstName(name: string) {
+  const parts = name.trim().split(/\s+/)
+  return parts[parts.length - 1] || name
+}
+
+function pickMainProblem(s: StudentRow): Problem {
+  if (s.hasFailedFinal) return "failed_final"
+  if (s.hasFailedMidterm) return "failed_midterm"
+  return "low_average"
+}
+
+function summarizeStudent(s: StudentRow): string {
+  return describeProblem(s)
+}
+
+function formatCourseList(tests: TestRow[]): string {
+  const names = Array.from(
+    new Set(tests.map((t) => t.courseName).filter(Boolean)),
+  )
+  if (names.length === 0) return "các môn kỳ này"
+  if (names.length === 1) return `môn ${names[0]}`
+  if (names.length === 2) return `hai môn ${names[0]} và ${names[1]}`
+  return `các môn ${names.slice(0, -1).join(", ")} và ${names[names.length - 1]}`
+}
+
+function draftEmail(s: StudentRow): { subject: string; body: string } {
+  const fn = firstName(s.name)
+  const problem = pickMainProblem(s)
+  const avg = s.averageScore.toFixed(1)
+  const courses = formatCourseList(s.tests)
+
+  if (problem === "failed_final") {
+    const failed = s.tests.filter(
+      (t) => t.testType === "final_semester" && t.score < 50,
+    )
+    const failedCourses =
+      failed.length > 0
+        ? Array.from(new Set(failed.map((t) => t.courseName).filter(Boolean)))
+        : []
+    const courseLine =
+      failedCourses.length > 0
+        ? `ở ${failedCourses.join(", ")}`
+        : `ở ${courses}`
+    return {
+      subject: `NexusEdu · Cùng nhìn lại kỳ này nhé ${fn}`,
+      body: `Chào ${fn},
+
+Thầy xem kết quả kỳ vừa rồi và thấy em gặp khó khăn trong bài thi cuối kỳ ${courseLine}. Thầy hiểu đây là lúc khá áp lực, nên muốn dành cho em một khoảng để cùng nhìn lại — xem mình có thể điều chỉnh gì cho kỳ tới.
+
+Em đặt một buổi 20 phút với thầy nhé, mình sẽ cùng xem lộ trình học và các phương án thi lại nếu cần.
+→ nexusedu.app/booking/le-ha
+
+Thầy tin ở em,
+TS. Lê Hà`,
+    }
+  }
+
+  if (problem === "failed_midterm") {
+    const failed = s.tests.filter(
+      (t) => t.testType === "middle_semester" && t.score < 50,
+    )
+    const failedCourses =
+      failed.length > 0
+        ? Array.from(new Set(failed.map((t) => t.courseName).filter(Boolean)))
+        : []
+    const courseLine =
+      failedCourses.length > 0
+        ? `ở ${failedCourses.join(", ")}`
+        : `ở ${courses}`
+    return {
+      subject: `NexusEdu · Vẫn còn thời gian để xoay ${fn} ơi`,
+      body: `Chào ${fn},
+
+Cô thấy bài giữa kỳ ${courseLine} của em chưa được như kỳ vọng. Không sao cả — giữa kỳ chỉ là một cột mốc, và vẫn còn đủ thời gian để cải thiện trước bài cuối kỳ.
+
+Mình hẹn nhau một buổi ngắn để cùng xem đề bài, phương pháp ôn tập và kết nối em với nhóm hỗ trợ của khoa nếu cần nhé.
+→ nexusedu.app/booking/le-ha
+
+Thân mến,
+TS. Lê Hà`,
+    }
+  }
+
+  return {
+    subject: `NexusEdu · Một buổi trò chuyện ngắn với ${fn}?`,
+    body: `Chào ${fn},
+
+Thầy tổng hợp lại kết quả của em kỳ này — điểm trung bình hiện tại đang ở mức ${avg}/100 qua ${s.tests.length} bài kiểm tra ${courses}. Không phải là con số quá tệ, nhưng thầy nghĩ mình có thể làm tốt hơn nếu cùng nhau điều chỉnh sớm.
+
+Em thử đặt một buổi 15 phút với thầy nhé, mình chỉ trò chuyện để hiểu em đang gặp gì thôi.
+→ nexusedu.app/booking/le-ha
+
+Thầy luôn ở đây,
+TS. Lê Hà`,
+  }
+}
+
+function buildAlerts(students: StudentRow[]): Alert[] {
+  // Chỉ lấy sinh viên nguy cơ cao để số email cần gửi khớp với số "Nguy cơ cao".
+  return students
+    .filter((s) => s.severity === "high")
+    .sort((a, b) => {
+      // Never-contacted first, then lowest average score.
+      const ac = a.lastContactedAt ? 1 : 0
+      const bc = b.lastContactedAt ? 1 : 0
+      if (ac !== bc) return ac - bc
+      return a.averageScore - b.averageScore
+    })
+    .map((s) => {
+      const { subject, body } = draftEmail(s)
+      return {
+        id: s.id,
+        name: s.name,
+        mssv: s.id.slice(0, 8).toUpperCase(),
+        email: s.email,
+        problem: pickMainProblem(s),
+        summary: summarizeStudent(s),
+        severity: "high" as const,
+        subject,
+        body,
+        lastContactedAt: s.lastContactedAt,
+      }
+    })
+}
+
 export function AlertCenter() {
+  const { dataset, isLoading } = useDataset()
   const [filter, setFilter] = React.useState<"all" | Problem>("all")
   const [query, setQuery] = React.useState("")
-  const [alerts, setAlerts] = React.useState(seed)
+  const [alerts, setAlerts] = React.useState<Alert[]>([])
   const [editing, setEditing] = React.useState<Alert | null>(null)
+  const [hasInitialized, setHasInitialized] = React.useState(false)
+
+  // Rebuild alerts whenever the underlying dataset changes.
+  // We compare by filename + upload time so edits in this session aren't
+  // blown away on every re-render.
+  const datasetStamp = dataset
+    ? `${dataset.fileName}:${dataset.uploadedAt}:${dataset.totalStudents}`
+    : null
+
+  React.useEffect(() => {
+    if (!dataset) {
+      setAlerts([])
+      setHasInitialized(false)
+      return
+    }
+    setAlerts(buildAlerts(dataset.students))
+    setHasInitialized(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasetStamp])
 
   const filtered = alerts.filter((a) => {
     const matchesFilter = filter === "all" || a.problem === filter
@@ -183,15 +244,20 @@ export function AlertCenter() {
     const matchesQuery =
       !q ||
       a.name.toLowerCase().includes(q) ||
-      a.mssv.includes(q) ||
+      a.mssv.toLowerCase().includes(q) ||
+      a.email.toLowerCase().includes(q) ||
       a.summary.toLowerCase().includes(q)
     return matchesFilter && matchesQuery
   })
 
+  const countFor = (p: Problem) => alerts.filter((a) => a.problem === p).length
+
   const send = (a: Alert) => {
     setAlerts((arr) => arr.filter((x) => x.id !== a.id))
     toast.success(`Đã gửi email tới ${a.name}`, {
-      description: "Sinh viên sẽ nhận được lời nhắn ấm áp trong giây lát.",
+      description: a.email
+        ? `Gửi đến ${a.email} — sinh viên sẽ nhận lời nhắn trong giây lát.`
+        : "Sinh viên sẽ nhận được lời nhắn ấm áp trong giây lát.",
     })
   }
 
@@ -206,6 +272,48 @@ export function AlertCenter() {
     toast.success("Đã lưu chỉnh sửa email")
   }
 
+  if (isLoading || !hasInitialized) {
+    return (
+      <Card className="rounded-2xl border-border/60">
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-72" />
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (!dataset) {
+    return (
+      <Card className="rounded-2xl border-dashed border-border/60">
+        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+          <span className="grid size-12 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Upload className="size-5" />
+          </span>
+          <div>
+            <p className="font-serif text-lg font-semibold">
+              Chưa có dữ liệu để phân tích
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Hãy nhập file CSV điểm sinh viên để AI soạn sẵn email cảnh báo.
+            </p>
+          </div>
+          <Button asChild className="rounded-xl">
+            <Link href="/dashboard/import">
+              <Upload className="size-4" />
+              Nhập CSV ngay
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <>
       <Card className="rounded-2xl border-border/60">
@@ -216,7 +324,9 @@ export function AlertCenter() {
                 Danh sách cảnh báo
               </CardTitle>
               <CardDescription>
-                Bản nháp email do AI soạn — con người là người quyết định gửi.
+                Bản nháp email do AI soạn từ{" "}
+                <span className="font-mono text-xs">{dataset.fileName}</span>{" "}
+                — con người là người quyết định gửi.
               </CardDescription>
             </div>
             <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -225,7 +335,7 @@ export function AlertCenter() {
                   <Search className="size-4 text-muted-foreground" />
                 </InputGroupAddon>
                 <InputGroupInput
-                  placeholder="Tìm theo tên, MSSV..."
+                  placeholder="Tìm theo tên, MSSV, email..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   aria-label="Tìm cảnh báo"
@@ -243,14 +353,14 @@ export function AlertCenter() {
                 <Filter className="size-3.5" />
                 Tất cả ({alerts.length})
               </TabsTrigger>
-              <TabsTrigger value="financial" className="rounded-lg">
-                Học phí
+              <TabsTrigger value="failed_final" className="rounded-lg">
+                {problemLabels.failed_final} ({countFor("failed_final")})
               </TabsTrigger>
-              <TabsTrigger value="grades" className="rounded-lg">
-                Điểm số
+              <TabsTrigger value="failed_midterm" className="rounded-lg">
+                {problemLabels.failed_midterm} ({countFor("failed_midterm")})
               </TabsTrigger>
-              <TabsTrigger value="absence" className="rounded-lg">
-                Vắng học
+              <TabsTrigger value="low_average" className="rounded-lg">
+                {problemLabels.low_average} ({countFor("low_average")})
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -261,10 +371,14 @@ export function AlertCenter() {
             <div className="rounded-xl border border-dashed border-border p-10 text-center">
               <Mail className="mx-auto size-10 text-muted-foreground" />
               <p className="mt-3 font-serif text-lg font-semibold">
-                Không có cảnh báo phù hợp
+                {alerts.length === 0
+                  ? "Không có sinh viên nào cần cảnh báo"
+                  : "Không có cảnh báo phù hợp"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Tuyệt vời — hoặc thử thay đổi bộ lọc / từ khoá tìm kiếm.
+                {alerts.length === 0
+                  ? "Tất cả sinh viên trong file đều trong ngưỡng an toàn."
+                  : "Thử thay đổi bộ lọc hoặc từ khoá tìm kiếm."}
               </p>
             </div>
           )}
@@ -280,24 +394,28 @@ export function AlertCenter() {
                   <div className="flex items-start gap-3 md:min-w-64">
                     <Avatar className="size-11">
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {a.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .slice(-2)
-                          .join("")}
+                        {getInitials(a.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold">{a.name}</p>
+                        <p className="truncate font-semibold">{a.name}</p>
                         {a.severity === "high" && (
-                          <Badge className="h-5 rounded-md bg-destructive/15 text-destructive hover:bg-destructive/15">
+                          <Badge className="h-5 shrink-0 rounded-md bg-destructive/15 text-destructive hover:bg-destructive/15">
                             Nguy cơ cao
                           </Badge>
                         )}
+                        {a.lastContactedAt === null && (
+                          <Badge
+                            variant="outline"
+                            className="h-5 shrink-0 rounded-md border-primary/30 text-primary"
+                          >
+                            Chưa liên hệ
+                          </Badge>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        MSSV {a.mssv} · Khoa {a.faculty}
+                      <p className="truncate font-mono text-[11px] text-muted-foreground">
+                        {a.email || `MSSV ${a.mssv}`}
                       </p>
                       <Badge
                         variant="outline"
@@ -318,7 +436,7 @@ export function AlertCenter() {
                       {a.subject}
                     </p>
                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                      {a.body.split("\n\n")[1]}
+                      {a.body.split("\n\n")[1] ?? a.body}
                     </p>
                   </div>
                 </div>
@@ -346,6 +464,8 @@ export function AlertCenter() {
                     size="sm"
                     className="rounded-lg"
                     onClick={() => send(a)}
+                    disabled={!a.email}
+                    title={!a.email ? "Sinh viên chưa có email trong CSV" : undefined}
                   >
                     <Send className="size-4" />
                     Gửi ngay
