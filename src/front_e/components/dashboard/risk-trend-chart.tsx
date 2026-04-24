@@ -1,63 +1,48 @@
-"use client";
+"use client"
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  LabelList,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@/components/ui/chart";
-import type { Problem } from "@/lib/csv";
+} from "@/components/ui/chart"
+import type { Problem } from "@/lib/csv"
 
 type Props = {
-  problemCounts: Record<Problem, number>;
-};
+  problemCounts: Record<Problem, number>
+}
 
 const config = {
   count: { label: "Sinh viên", color: "var(--chart-1)" },
   failed_final: { label: "Rớt cuối kỳ", color: "var(--chart-1)" },
   failed_midterm: { label: "Rớt giữa kỳ", color: "var(--chart-2)" },
   low_average: { label: "Điểm TB thấp", color: "var(--chart-4)" },
-} satisfies ChartConfig;
+} satisfies ChartConfig
 
 export function RiskTrendChart({ problemCounts }: Props) {
-  // Accept possibly-undefined `problemCounts` at runtime (e.g. stale/missing dataset)
-  // and fall back to safe zeroed defaults so the component doesn't crash.
-  const counts: Record<Problem, number> = problemCounts ?? {
-    failed_final: 0,
-    failed_midterm: 0,
-    low_average: 0,
-  };
-
   const data = [
     {
       key: "failed_final" as const,
       label: "Rớt cuối kỳ",
-      count: counts.failed_final,
+      count: problemCounts.failed_final,
       fill: "var(--color-failed_final)",
     },
     {
       key: "failed_midterm" as const,
       label: "Rớt giữa kỳ",
-      count: counts.failed_midterm,
+      count: problemCounts.failed_midterm,
       fill: "var(--color-failed_midterm)",
     },
     {
       key: "low_average" as const,
       label: "Điểm TB thấp",
-      count: counts.low_average,
+      count: problemCounts.low_average,
       fill: "var(--color-low_average)",
     },
-  ];
+  ]
 
-  const total = data.reduce((s, d) => s + d.count, 0);
+  const total = data.reduce((s, d) => s + d.count, 0)
 
   if (total === 0) {
     return (
@@ -72,12 +57,15 @@ export function RiskTrendChart({ problemCounts }: Props) {
           </p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <ChartContainer config={config} className="h-[280px] w-full">
-      <BarChart data={data} margin={{ left: 4, right: 8, top: 16, bottom: 4 }}>
+      <BarChart
+        data={data}
+        margin={{ left: 4, right: 8, top: 16, bottom: 4 }}
+      >
         <CartesianGrid
           strokeDasharray="3 3"
           vertical={false}
@@ -114,5 +102,5 @@ export function RiskTrendChart({ problemCounts }: Props) {
         </Bar>
       </BarChart>
     </ChartContainer>
-  );
+  )
 }

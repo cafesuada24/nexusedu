@@ -1,6 +1,6 @@
-"use client";
+"use client"
 
-import Link from "next/link";
+import Link from "next/link"
 import {
   Users,
   AlertTriangle,
@@ -11,100 +11,79 @@ import {
   FileSpreadsheet,
   RefreshCw,
   type LucideIcon,
-} from "lucide-react";
+} from "lucide-react"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { RiskTrendChart } from "@/components/dashboard/risk-trend-chart";
-import { RecentAlerts } from "@/components/dashboard/recent-alerts";
-import { OverviewEmptyState } from "@/components/dashboard/overview-empty-state";
-import { useDataset, type Dataset } from "@/hooks/use-dataset";
+} from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { RiskTrendChart } from "@/components/dashboard/risk-trend-chart"
+import { RecentAlerts } from "@/components/dashboard/recent-alerts"
+import { PendingEmails } from "@/components/dashboard/pending-emails"
+import { OverviewEmptyState } from "@/components/dashboard/overview-empty-state"
+import { useDataset, type Dataset } from "@/hooks/use-dataset"
 
 type Stat = {
-  label: string;
-  value: string;
-  hint: string;
-  icon: LucideIcon;
-  tone?: "default" | "destructive";
-};
+  label: string
+  value: string
+  hint: string
+  icon: LucideIcon
+  tone?: "default" | "destructive"
+}
 
 function buildStats(d: Dataset): Stat[] {
-  // Defensive defaults in case stored dataset is missing numeric fields.
-  const totalStudents =
-    typeof d.totalStudents === "number" && Number.isFinite(d.totalStudents)
-      ? d.totalStudents
-      : 0;
-  const totalTests =
-    typeof d.totalTests === "number" && Number.isFinite(d.totalTests)
-      ? d.totalTests
-      : 0;
-  const highRisk =
-    typeof d.highRisk === "number" && Number.isFinite(d.highRisk)
-      ? d.highRisk
-      : 0;
-  const draftEmails =
-    typeof d.draftEmails === "number" && Number.isFinite(d.draftEmails)
-      ? d.draftEmails
-      : 0;
-  const averageScore =
-    typeof d.averageScore === "number" && Number.isFinite(d.averageScore)
-      ? d.averageScore
-      : 0;
-
   const highPct =
-    totalStudents > 0 ? Math.round((highRisk / totalStudents) * 100) : 0;
+    d.totalStudents > 0 ? Math.round((d.highRisk / d.totalStudents) * 100) : 0
   // Rough estimate: ~15 minutes saved per AI-drafted follow-up email.
-  const savedHours = Math.round((draftEmails * 15) / 60);
+  const savedHours = Math.round((d.draftEmails * 15) / 60)
 
   return [
     {
       label: "Tổng sinh viên",
-      value: totalStudents.toLocaleString("vi-VN"),
-      hint: `${totalTests.toLocaleString("vi-VN")} bài kiểm tra`,
+      value: d.totalStudents.toLocaleString("vi-VN"),
+      hint: `${d.totalTests.toLocaleString("vi-VN")} bài kiểm tra`,
       icon: Users,
     },
     {
       label: "Nguy cơ cao",
-      value: highRisk.toLocaleString("vi-VN"),
+      value: d.highRisk.toLocaleString("vi-VN"),
       hint: `${highPct}% tổng số sinh viên`,
       icon: AlertTriangle,
-      tone: highRisk > 0 ? "destructive" : "default",
+      tone: d.highRisk > 0 ? "destructive" : "default",
     },
     {
       label: "Email cần gửi",
-      value: draftEmails.toLocaleString("vi-VN"),
-      hint: "chưa từng liên hệ",
+      value: d.draftEmails.toLocaleString("vi-VN"),
+      hint: "sinh viên nguy cơ cao",
       icon: MailCheck,
     },
     {
       label: "Điểm TB toàn lớp",
-      value: averageScore.toFixed(2),
+      value: d.averageScore.toFixed(1),
       hint: `${savedHours}h tiết kiệm dự kiến`,
       icon: Clock,
     },
-  ];
+  ]
 }
 
 function formatTimeAgo(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "vừa xong";
-  if (mins < 60) return `${mins} phút trước`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} giờ trước`;
-  const days = Math.floor(hours / 24);
-  return `${days} ngày trước`;
+  const diffMs = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diffMs / 60000)
+  if (mins < 1) return "vừa xong"
+  if (mins < 60) return `${mins} phút trước`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} giờ trước`
+  const days = Math.floor(hours / 24)
+  return `${days} ngày trước`
 }
 
 export default function OverviewPage() {
-  const { dataset, isLoading } = useDataset();
+  const { dataset, isLoading } = useDataset()
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -113,14 +92,9 @@ export default function OverviewPage() {
           <h1 className="font-serif text-2xl font-bold tracking-tight md:text-3xl">
             Xin chào, TS. Lê Hà
           </h1>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             {isLoading ? (
-              // Use a span to avoid block-level elements inside text containers,
-              // but keep Skeleton visually similar. If Skeleton renders a div,
-              // wrapping it in a span prevents illegal <div> inside <p>.
-              <span className="inline-block align-middle">
-                <Skeleton className="inline-block h-4 w-64 align-middle" />
-              </span>
+              <Skeleton className="inline-block h-4 w-64 align-middle" />
             ) : dataset ? (
               <>
                 Tuần này có{" "}
@@ -132,7 +106,7 @@ export default function OverviewPage() {
             ) : (
               "Hãy nhập danh sách sinh viên để bắt đầu theo dõi."
             )}
-          </div>
+          </p>
         </div>
         <div className="flex gap-2">
           {dataset ? (
@@ -284,10 +258,35 @@ export default function OverviewPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="rounded-2xl border-border/60">
+            <CardHeader>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="font-serif text-xl">
+                    Email cần gửi
+                  </CardTitle>
+                  <CardDescription>
+                    Mỗi sinh viên nguy cơ cao — AI đã soạn sẵn bản nháp.
+                  </CardDescription>
+                </div>
+                <Badge
+                  variant="secondary"
+                  className="w-fit rounded-md bg-primary/10 text-primary hover:bg-primary/10"
+                >
+                  <MailCheck className="size-3" />
+                  {dataset.draftEmails.toLocaleString("vi-VN")} đang chờ
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <PendingEmails students={dataset.students} />
+            </CardContent>
+          </Card>
         </>
       )}
     </div>
-  );
+  )
 }
 
 function OverviewSkeleton() {
@@ -303,5 +302,5 @@ function OverviewSkeleton() {
         <Skeleton className="h-80 rounded-2xl" />
       </div>
     </div>
-  );
+  )
 }

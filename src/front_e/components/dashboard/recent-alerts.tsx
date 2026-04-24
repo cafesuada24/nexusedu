@@ -1,26 +1,26 @@
-"use client";
+"use client"
 
-import { BookOpen, GraduationCap, TrendingDown } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { describeProblem, type Problem, type StudentRow } from "@/lib/csv";
+import { BookOpen, GraduationCap, TrendingDown } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { describeProblem, type Problem, type StudentRow } from "@/lib/csv"
 
 type Props = {
-  students?: StudentRow[];
-  limit?: number;
-};
+  students: StudentRow[]
+  limit?: number
+}
 
 const iconFor: Record<Problem, typeof BookOpen> = {
   failed_final: GraduationCap,
   failed_midterm: BookOpen,
   low_average: TrendingDown,
-};
+}
 
 const toneFor: Record<Problem, string> = {
   failed_final: "bg-destructive/10 text-destructive",
   failed_midterm: "bg-warning/15 text-warning",
   low_average: "bg-primary/10 text-primary",
-};
+}
 
 function getInitials(name: string) {
   return name
@@ -28,22 +28,21 @@ function getInitials(name: string) {
     .filter(Boolean)
     .map((n) => n[0]?.toUpperCase() ?? "")
     .slice(-2)
-    .join("");
+    .join("")
 }
 
 export function RecentAlerts({ students, limit = 4 }: Props) {
-  const safeStudents = students ?? [];
-  const ranked = [...safeStudents]
+  const ranked = [...students]
     .filter((s) => s.severity !== "low")
     .sort((a, b) => {
-      const sev = (s: StudentRow["severity"]) => (s === "high" ? 2 : 1);
+      const sev = (s: StudentRow["severity"]) => (s === "high" ? 2 : 1)
       if (sev(b.severity) !== sev(a.severity)) {
-        return sev(b.severity) - sev(a.severity);
+        return sev(b.severity) - sev(a.severity)
       }
       // Lower average score = more urgent.
-      return a.averageScore - b.averageScore;
+      return a.averageScore - b.averageScore
     })
-    .slice(0, limit);
+    .slice(0, limit)
 
   if (ranked.length === 0) {
     return (
@@ -53,14 +52,14 @@ export function RecentAlerts({ students, limit = 4 }: Props) {
           Không sinh viên nào vượt ngưỡng rủi ro trong dữ liệu hiện tại.
         </p>
       </div>
-    );
+    )
   }
 
   return (
     <ul className="space-y-2">
       {ranked.map((s) => {
-        const main: Problem = s.problems[0] ?? "low_average";
-        const Icon = iconFor[main];
+        const main: Problem = s.problems[0] ?? "low_average"
+        const Icon = iconFor[main]
         return (
           <li
             key={s.id}
@@ -84,8 +83,8 @@ export function RecentAlerts({ students, limit = 4 }: Props) {
               <Icon className="size-3" />
             </Badge>
           </li>
-        );
+        )
       })}
     </ul>
-  );
+  )
 }
