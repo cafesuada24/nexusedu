@@ -31,7 +31,7 @@ sql_gen_llm = ChatGoogleGenerativeAI(
 )
 
 determiner_model = os.getenv(
-    'DETERMINER_MODEL', os.getenv('PLANNER_MODEL', 'gemini-1.5-flash-latest')
+    'DETERMINER_MODEL', os.getenv('PLANNER_MODEL', 'gemini-3.1-flash-lite-preview')
 )
 logger.info(f'Initializing Determiner LLM: {determiner_model}')
 determiner_llm = ChatGoogleGenerativeAI(
