@@ -2,24 +2,21 @@ import os
 
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
 
 from src.agents.schemas import RouterPlan
-from src.tools.db import get_db_list
-
-# from src.tools.email import EMAIL_TOOLS
-# from src.tools.export_data_tool import export_data
-
 from src.telemetry.logger import logger
 
 load_dotenv()
 
-planner_model = os.getenv('PLANNER_MODEL', 'gemini-1.5-flash-latest')
+planner_model = os.getenv('PLANNER_MODEL', 'gemini-3.1-flash-lite-preview')
 logger.info(f'Initializing Planner LLM: {planner_model}')
 planner_llm = ChatGoogleGenerativeAI(
     model=planner_model,
-).with_structured_output(RouterPlan)
-
+    max_retries=6,
+).with_structured_output(RouterPlan).with_retry(
+    wait_exponential_jitter=True,
+    stop_after_attempt=6,
+)
 sql_gen_model = os.getenv(
     'SQL_GENERATOR_MODEL',
     os.getenv('PLANNER_MODEL', 'gemini-1.5-flash-latest'),
@@ -27,8 +24,10 @@ sql_gen_model = os.getenv(
 logger.info(f'Initializing SQL Generator LLM: {sql_gen_model}')
 sql_gen_llm = ChatGoogleGenerativeAI(
     model=sql_gen_model,
-    # base_url=os.getenv('OLLAMA_BASE_URL'),
-    # api_key=os.getenv('OLLAMA_API_KEY'),
+    max_retries=6,
+).with_retry(
+    wait_exponential_jitter=True,
+    stop_after_attempt=6,
 )
 
 determiner_model = os.getenv(
@@ -37,6 +36,10 @@ determiner_model = os.getenv(
 logger.info(f'Initializing Determiner LLM: {determiner_model}')
 determiner_llm = ChatGoogleGenerativeAI(
     model=determiner_model,
+    max_retries=6,
+).with_retry(
+    wait_exponential_jitter=True,
+    stop_after_attempt=6,
 )
 
 # email_tools = EMAIL_TOOLS

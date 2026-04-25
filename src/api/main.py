@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import FastAPI, Request, Response, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import health, query
+from src.api.routes import health, query, data, alerts
 from src.telemetry.logger import logger
 
 app = FastAPI(
@@ -66,6 +66,8 @@ async def root() -> dict[str, str]:
 # Include routers into the versioned API router
 api_v1_router.include_router(health.router)
 api_v1_router.include_router(query.router)
+api_v1_router.include_router(data.router)
+api_v1_router.include_router(alerts.router)
 
 # Include the versioned API router into the app
 app.include_router(api_v1_router)

@@ -1,6 +1,6 @@
 """Request models for the Agent Assistant API."""
 
-from typing import Any
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,3 +20,48 @@ class QueryRequest(BaseModel):
             },
         },
     )
+
+
+class SISRecord(BaseModel):
+    """Student information system record."""
+    student_id: str = Field(..., alias="sid", description="Unique student identifier.")
+    name: str = Field(..., alias="student_name", description="Student full name.")
+    email: str = Field(..., description="Student email address.")
+    last_notified_timestamp: Optional[float] = Field(0, description="Timestamp of last nudge.")
+    last_notified_satisfaction: Optional[int] = Field(0, description="Satisfaction score of last intervention.")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class LMSRecord(BaseModel):
+    """Learning management system activity record."""
+    student_id: str = Field(..., alias="sid", description="Unique student identifier.")
+    course_id: str = Field(..., description="Course identifier.")
+    course_name: str = Field(..., description="Full course name.")
+    test_type: str = Field(..., description="Type of assessment.")
+    score: float = Field(..., description="Numeric score achieved.")
+    timestamp: float = Field(..., description="UNIX timestamp of activity.")
+    academic_year: int = Field(..., description="Academic year (1-4).")
+    semester: int = Field(..., description="Semester (1-2).")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CustomDataSource(BaseModel):
+    """Flexible schema for custom data sources."""
+    source_type: Literal["custom"]
+    table_name: str = Field(..., pattern="^[a-zA-Z0-9_]+$", description="Name of the target table.")
+    records: List[Dict[str, Any]] = Field(..., description="List of arbitrary key-value pairs.")
+
+
+class CoreDataSource(BaseModel):
+    """Wrapper for core SIS or LMS data."""
+    source_type: Literal["sis", "lms"]
+    records: Union[List[SISRecord], List[LMSRecord]] = Field(..., description="List of validated core records.")
+
+
+class DataIngestionRequest(BaseModel):
+    """Request schema for uploading flexible CSV data as JSON."""
+    batch_id: str = Field(..., description="Unique identifier for the upload batch.")
+    upload_timestamp: str = Field(..., description="ISO timestamp of the upload.")
+    data_sources: List[Union[CoreDataSource, CustomDataSource]] = Field(..., description="List of data sources to ingest.")

@@ -15,11 +15,11 @@
     3. **Query Construction**: Write a single, performant SQL query. Use Common Table Expressions (CTEs) for complex logic to ensure readability.
     4. **Output Preparation**: Wrap the final SQL in a structured format for the Aggregator node.
   </workflow_protocol>
-
-  <sql_engineering_rules>
-    - **Safety First**: Only generate `SELECT` statements. Strictly forbid `INSERT`, `UPDATE`, `DELETE`, `DROP`, or `TRUNCATE`.
-    - **No Hallucination**: Only use tables and columns confirmed via `get_db_schema` or provided in the `schema_hint`.
-    - **Performance**: Avoid `SELECT *`. Explicitly name all required columns.
+<sql_engineering_rules>
+  - **Safety First**: Only generate `SELECT` statements. Strictly forbid `INSERT`, `UPDATE`, `DELETE`, `DROP`, or `TRUNCATE`.
+  - **Risk Tracking**: In `sis_db`, use the `student_status_history` table to track performance drops over time. It provides `z_score` and `anomaly_flag` columns pre-calculated against a student's personal baseline. The `students` table also contains `intervention_status` which tracks the Kanban state (`new`, `sent`, `booked`, `supporting`, `resolved`, `expired`).
+  - **PII Compliance**: When generating summaries or emails, never include student names or emails in the database query results if the user intent is purely analytical or for draft generation. Only retrieve `sid` and performance metrics unless explicitly asked for contact details.  - **No Hallucination**: Only use tables and columns confirmed via `get_db_schema` or provided in the `schema_hint`.
+...    - **Performance**: Avoid `SELECT *`. Explicitly name all required columns.
     - **Readability**: Use meaningful table aliases (e.g., `students AS s` instead of `table1 AS t1`).
     - **Formatting**: Ensure the SQL is properly indented.
   </sql_engineering_rules>

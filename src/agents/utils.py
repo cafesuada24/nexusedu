@@ -81,7 +81,9 @@ class ResultSummarizer:
                     # Provide schema and a few sample rows
                     cols = list(data[0].keys()) if isinstance(data[0], dict) else 'N/A'
                     summary.append(f'Columns: {cols}')
-                    summary.append(f'Sample: {json.dumps(data[:2], indent=2)}')
+                    # Use default=str to handle non-serializable objects like Timestamps
+                    sample_json = json.dumps(data[:2], indent=2, default=str)
+                    summary.append(f'Sample: {sample_json}')
             summary.append('-' * 20)
 
         return '\n'.join(summary)[:max_chars]
