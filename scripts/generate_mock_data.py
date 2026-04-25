@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import time
 import uuid
@@ -115,6 +116,7 @@ def generate_mock_data() -> pd.DataFrame:
 
 # Execute and Save
 data = generate_mock_data()
+os.makedirs('data', exist_ok=True)
 data.to_csv('data/mock_student_scores.csv', index=False)
 
 # Output snippet
