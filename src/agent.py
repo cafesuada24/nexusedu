@@ -8,6 +8,7 @@ from langgraph.graph import END, StateGraph
 from src.agents.nodes import (
     determiner,
     discovery_node,
+    email_agent_node,
     planner,
     responder_node,
     route_determiner,
@@ -28,6 +29,7 @@ workflow.add_node('responder', responder_node)
 workflow.add_node('sql_worker', sql_worker)  # Parallel node
 workflow.add_node('determiner', determiner)
 workflow.add_node('viz_agent', visualization_agent)
+workflow.add_node('email_agent', email_agent_node)
 
 workflow.set_entry_point('planner')
 
@@ -47,10 +49,12 @@ workflow.add_conditional_edges(
         'visualize': 'viz_agent',
         'follow_up': 'planner',
         'finish': 'responder',
+        'email_agent': 'email_agent',
     },
 )
 
 workflow.add_edge('viz_agent', 'responder')
+workflow.add_edge('email_agent', 'responder')
 workflow.add_edge('responder', END)
 
 # Compile with Batching Throttle

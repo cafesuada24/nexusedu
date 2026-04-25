@@ -50,6 +50,10 @@ SQL_GENERATOR_SYSTEM_PROMPT = load_prompt(
     'src/prompts/v1/sql_generator/system.txt',
     fallback='You are a SQL expert. Generate SQL for the given task.',
 )
+EMAIL_GENERATOR_SYSTEM_PROMPT = load_prompt(
+    'src/prompts/v1/email_generator/system.txt',
+    fallback='You are an email specialist. Draft an empathetic nudge email for the student.',
+)
 VISUALIZATION_GENERATOR_SYSTEM_PROMPT = load_prompt(
     'src/prompts/v1/visualization_generator/system.txt',
 )
@@ -293,7 +297,8 @@ def determiner(state: AgentState):
 
     system_prompt = (
         'You are an expert data orchestrator. Analyze the provided data summary '
-        'and the original user intent to decide the most appropriate next step.'
+        'and the original user intent to decide the most appropriate next step. '
+        'Options: finish (general answer), visualize (charts), email_draft (nudge emails), follow_up (more data needed).'
     )
     prompt = f'User Intent: {user_intent}\n\nData Summary:\n{summary}'
 
@@ -391,27 +396,30 @@ def visualization_agent(state: AgentState):
         return {'viz_json': 'NONE'}
 
 
-# def email_agent_node(state: AgentState):
-# ... (rest of the file)
-#     logger.info('Email Agent: Sending email...')
-#     last_decision = state['decision_log'][-1]
-#     metadata = last_decision.get('metadata', {})
-#     prompt = (
-#         f'Final Data: {state["final_data"]}\n'
-#         f'Metadata: {metadata}\n'
-#         'Please send the email as requested.'
-#     )
-#     messages = (
-#         [
-#             SystemMessage(
-#                 content='You are an email specialist. Use the provided data to send emails.',
-#             ),
-#         ]
-#         + state['messages']
-#         + [HumanMessage(content=prompt)]
-#     )
-#     response = email_llm.invoke(messages)
-#     return {'messages': [response]}
+def email_agent_node(state: AgentState) -> dict:
+    """Dedicated node for generating personalized email drafts."""
+    logger.info('Email Agent: Generating draft...')
+
+    results = state.get('results', [])
+    summary = ResultSummarizer.summarize(results)
+
+    human_messages = [
+        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
+    ]
+    user_intent = human_messages[-1].content if human_messages else 'Generate nudge email'
+
+    messages = [
+        SystemMessage(content=EMAIL_GENERATOR_SYSTEM_PROMPT),
+        HumanMessage(
+            content=f'User Intent: {user_intent}\n\nContext:\n{summary}',
+        ),
+    ]
+
+    logger.debug('Email Agent: Invoking LLM for email drafting...')
+    response = sql_gen_llm.invoke(messages)
+
+    logger.info('Email Agent: Draft generated.')
+    return {'messages': [response]}
 
 
 # def export_agent_node(state: AgentState):
@@ -439,6 +447,11 @@ def visualization_agent(state: AgentState):
 def route_determiner(state: AgentState):
     next_step = state.get('next_step', 'visualize')
     logger.info(f'Routing (Determiner): Choosing path "{next_step}"')
+    
+    # Map next_step to node name if different
+    if next_step == 'email_draft':
+        return 'email_agent'
+        
     return next_step
 
 
