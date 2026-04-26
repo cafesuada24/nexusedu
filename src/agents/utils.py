@@ -1,70 +1,39 @@
 import json
 import re
-from src.telemetry.logger import logger
+
+import yaml
+
+from src.agents.state import ResultList
+# from src.models import Event, Thread
+# from src.telemetry.logger import logger
 
 
-def extract_json_from_markdown(text: str) -> dict:
-    """Extracts JSON from markdown code blocks or raw text."""
-    if not text or text == 'NONE':
-        return {}
+def stringifyToYaml(obj: object) -> str:
+    data = obj if isinstance(obj, dict) else vars(obj)
+    dumped_yaml = yaml.safe_dump(
+        data,
+        sort_keys=False,
+        allow_unicode=True,
+    )
+    return '\n'.join('  ' + line for line in dumped_yaml.splitlines())
 
-    # If already a dict, return it
-    if isinstance(text, dict):
-        return text
-
-    # Try to find JSON in code blocks
-    pattern = r'```json\s*(.*?)\s*```'
-    match = re.search(pattern, text, re.DOTALL)
-    if match:
-        json_string = match.group(1)
-    else:
-        # Fallback: find the first '{' and last '}'
-        start = text.find('{')
-        end = text.rfind('}')
-        if start != -1 and end != -1 and end > start:
-            json_string = text[start : end + 1]
-        else:
-            json_string = text
-
-    try:
-        return json.loads(json_string)
-    except json.JSONDecodeError as e:
-        logger.error(f'Invalid JSON format: {e}. Text: {text[:100]}...')
-        return {}
+#
+# def event_to_prompt(event: Event) -> str:
+#     """Convert an event to XML tag format."""
+#     data = event.data if isinstance(event.data, str) else stringifyToYaml(event.data)
+#     return f'<{event.type.value}>\n{data}\n</{event.type.value}>'
+#
+#
+# def thread_to_prompt(thread: Thread) -> str:
+#     """Convert a thread to XML tag format."""
+#     return '\n\n'.join(event_to_prompt(event) for event in thread.events)
 
 
 class ResultSummarizer:
-    @staticmethod
-    def to_distilled_csv(results: list[dict]) -> str:
-        """Converts multiple DB results into a compact CSV-like format for LLM consumption."""
-        output = []
-        for res in results:
-            db_id = res.get('db', 'unknown')
-            data = res.get('data', [])
-
-            if not isinstance(data, list) or len(data) == 0:
-                continue
-
-            output.append(f'### Data from: {db_id}')
-            # Filter out internal keys like '_truncated'
-            clean_data = [
-                {k: v for k, v in row.items() if not k.startswith('_')}
-                for row in data
-                if isinstance(row, dict)
-            ]
-
-            if clean_data:
-                import pandas as pd
-
-                df = pd.DataFrame(clean_data)
-                output.append(df.to_csv(index=False))
-            output.append('-' * 10)
-
-        return '\n'.join(output)
 
     @staticmethod
-    def summarize(results: list[dict], max_chars: int = 4000) -> str:
-        summary = []
+    def summarize(results: ResultList, max_chars: int = 4000) -> str:
+        summary: list[str] = []
         for res in results:
             db_id = res.get('db', 'unknown')
             data = res.get('data', [])
@@ -87,3 +56,29 @@ class ResultSummarizer:
             summary.append('-' * 20)
 
         return '\n'.join(summary)[:max_chars]
+
+
+# if __name__ == '__main__':
+#     import uuid
+#     from models import EmailMessage, EventType
+#
+#     thread = Thread(ticket_id=uuid.uuid4())
+#     thread.events = [
+#         Event(
+#             thread_id=thread.id,
+#             type=EventType.EMAIL_MESSAGE,
+#             data=EmailMessage(
+#                 user_email='123',
+#                 content="""
+#             lskjfklasjfkdjfkajfkafk
+#             aksfjlksjflkds
+#
+#
+#             asfkksadlk;fjksldfjas
+#             kasfjsljkdl
+#             """,
+#             ),
+#         )
+#     ]
+#
+#     print(thread_to_prompt(thread))

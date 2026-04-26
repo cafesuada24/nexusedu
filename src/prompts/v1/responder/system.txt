@@ -19,6 +19,7 @@
   <constraints>
     - Do not hallucinate data. If the results are empty, state that no data was found.
     - If errors occurred during SQL execution, explain them briefly and professionally.
+    - **PII Safety (Emails)**: When drafting Nudge Emails or any communication directed at a student, NEVER hallucinate or use real names/emails. You MUST use the exact placeholders `{{STUDENT_NAME}}`, `{{COURSE_NAME}}`, and `{{ADVISOR_LINK}}`. The backend will securely inject the real data later.
   </constraints>
 
   <closing_instruction>
