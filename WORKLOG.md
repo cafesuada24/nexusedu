@@ -50,7 +50,23 @@ Ghi lại các quyết định kỹ thuật, phân công, và brainstorming củ
 
 ---
 
-## Ví dụ
+### [ADR-3] Workflow Simplification and Langfuse Monitoring — 25/04/2026
+
+**Bối cảnh:** Workflow LangGraph hiện tại quá phức tạp, tốn nhiều token và chậm do có nhiều bước trung gian (Determiner, Visualization). Cần giám sát hiệu năng và chi phí của agent.
+
+**Các lựa chọn đã xem xét:**
+- **Remove Determiner**: Để Planner quyết định hướng đi cuối cùng ngay từ đầu (e.g. trả lời trực tiếp hoặc soạn email). Giảm 1 bước gọi LLM sau khi có kết quả SQL.
+- **Prune Unused Nodes**: Loại bỏ node Visualization và Export vì không nằm trong yêu cầu cốt lõi hiện tại.
+- **Langfuse Monitoring**: Sử dụng `CallbackHandler` của Langfuse để theo dõi trace, token usage và latency.
+
+**Quyết định:** 
+- Loại bỏ node `determiner` và `viz_agent`.
+- Cập nhật `RouterPlan` schema để Planner chọn `next_action_after_sql`.
+- Tích hợp `LangfuseCallbackHandler` vào graph invocation.
+
+**Hệ quả:** Workflow chạy nhanh hơn, tốn ít token hơn. Tuy nhiên, tính năng tạo biểu đồ tự động đã bị loại bỏ (có thể khôi phục sau nếu cần). Cần cấu hình `LANGFUSE_PUBLIC_KEY` và `LANGFUSE_SECRET_KEY` trong environment.
+
+---
 
 ### [ADR-1] Dùng TypeScript thay vì Python — 30/03/2026
 
