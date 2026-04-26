@@ -15,23 +15,24 @@ from src.agents.schemas import (
 @pytest.fixture
 def mock_llms():
     with (
-        patch('src.agents.nodes.planner_llm') as mock_planner,
-        patch('src.agents.nodes.sql_gen_llm') as mock_sql_gen,
+        patch('src.agents.nodes.planner.planner_llm') as mock_planner,
+        patch('src.agents.nodes.sql_worker.sql_gen_llm') as mock_sql_gen_worker,
+        patch('src.agents.nodes.responder.sql_gen_llm') as mock_sql_gen_responder,
+        patch('src.agents.nodes.email_agent.sql_gen_llm') as mock_sql_gen_email,
     ):
-        # In nodes.py, planner_llm is already the structured LLM
-        # sql_gen_llm is NOT structured yet in llms.py, but nodes.py calls .with_structured_output
         mock_sql_gen_structured = MagicMock()
-        mock_sql_gen.with_structured_output.return_value = mock_sql_gen_structured
+        mock_sql_gen_worker.with_structured_output.return_value = mock_sql_gen_structured
 
         yield {
             'planner': mock_planner,
-            'sql_gen': mock_sql_gen,
+            'sql_gen': mock_sql_gen_responder, # Tests use sql_gen for responder
             'sql_gen_structured': mock_sql_gen_structured,
         }
 
 
 def test_direct_answer_flow(mock_llms):
     """Test the DIRECT_ANSWER path."""
+    # ... (rest of the function)
     # 1. Mock Planner: Choose DIRECT_ANSWER
     mock_llms['planner'].invoke.return_value = RouterPlan(
         path='DIRECT_ANSWER',
@@ -54,7 +55,7 @@ def test_direct_answer_flow(mock_llms):
 
 def test_sql_execution_flow(mock_llms):
     """Test the SQL_EXECUTION path."""
-    with patch('src.agents.nodes.execute_sql') as mock_execute:
+    with patch('src.agents.nodes.sql_worker.execute_sql') as mock_execute:
         # Mock database results
         mock_execute.return_value = [{'id': 1, 'name': 'Jane Doe'}]
         

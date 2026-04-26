@@ -7,14 +7,14 @@ as a FastAPI dependency.
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
-from src.agent import workflow
+from src.agents.agent import create_graph
 from src.agents.state import AgentState
 
 # Initialize MemorySaver for thread-level persistence
 memory = MemorySaver()
 
 # Compile the workflow with the checkpointer for the API
-agent_with_memory = workflow.compile(checkpointer=memory)
+agent_with_memory = create_graph(checkpointer=memory)
 
 def get_agent() -> CompiledStateGraph[AgentState, None, AgentState, AgentState]:
     """Dependency provider for the compiled LangGraph agent.

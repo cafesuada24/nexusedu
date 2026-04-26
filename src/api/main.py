@@ -4,13 +4,17 @@ This module initializes the FastAPI application, configures middleware,
 and includes the API routers for the agent's functionality.
 """
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import time
 from typing import Any
 
-from fastapi import FastAPI, Request, Response, APIRouter
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import health, query, data, alerts
+from src.api.routes import alerts, data, health, query
 from src.telemetry.logger import logger
 
 app = FastAPI(

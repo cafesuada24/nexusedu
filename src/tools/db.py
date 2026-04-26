@@ -311,10 +311,10 @@ class DatabaseManager:
         try:
             with self._get_connection(db_id, read_only=True) as conn:
                 result = conn.execute(sql).fetchdf()
-                if len(result) > 50:
-                    return result.head(50).to_dict(orient='records') + [
-                        {'_truncated': f'Showing 50 of {len(result)} rows.'},
-                    ]
+                # if len(result) > 50:
+                #     return result.head(50).to_dict(orient='records') + [
+                #         {'_truncated': f'Showing 50 of {len(result)} rows.'},
+                #     ]
                 return result.to_dict(orient='records')
         except Exception as e:
             return [{'error': str(e)}]
