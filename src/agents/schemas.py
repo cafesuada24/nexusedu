@@ -3,25 +3,6 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-class DecisionLogEntry(BaseModel):
-    """A log entry for a determiner's decision."""
-
-    reasoning: str = Field(description='The reasoning behind the decision.')
-    next_step: Literal['visualize', 'follow_up', 'finish', 'email_draft'] = Field(
-        description='The next step to take.',
-    )
-    metadata: dict[str, object] = Field(
-        default_factory=dict,
-        description='Additional metadata for the next step (e.g., recipient for email, format for export).',
-    )
-
-
-class DeterminerDecision(BaseModel):
-    """The structured output for the determiner LLM's decision."""
-
-    decision: DecisionLogEntry
-
-
 class PlannerTask(BaseModel):
     """A single task for a SQL worker."""
 
@@ -80,6 +61,10 @@ class RouterPlan(BaseModel):
     tasks: list[PlannerTask] | None = Field(
         None,
         description='The list of parallel SQL tasks to execute (required if path is SQL_EXECUTION).',
+    )
+    next_action_after_sql: Literal['RESPOND', 'EMAIL_DRAFT'] | None = Field(
+        'RESPOND',
+        description='The next step to take after SQL execution (e.g., RESPOND or EMAIL_DRAFT).',
     )
     direct_response_draft: str | None = Field(
         None,

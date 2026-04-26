@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.agents.utils import extract_json_from_markdown
 from src.api.dependencies.agent import get_agent
 from src.api.models.request import QueryRequest
 from src.api.models.response import QueryResponse
@@ -48,32 +47,23 @@ async def process_query(
         # Extract values from state
         # 1. Answer (last message from the agent)
         messages = final_state.get("messages", [])
-        answer = messages[-1].content[-1]['text'] if messages else "No response generated."
+        if messages:
+            last_message = messages[-1]
+            if hasattr(last_message, 'content'):
+                answer = last_message.content
+            else:
+                answer = str(last_message)
+        else:
+            answer = "No response generated."
 
         # 2. Tabular Data (Tables)
-        # AgentState stores this in final_data which is a list[dict]
-        # To support multiple tables (as per plural industry standard),
-        # we wrap it in a list.
         final_data = final_state.get("final_data")
-        tables = [final_data[0]["data"]] if final_data else None
-
-        # 3. Visualization JSON (List of Plotly objects)
-        viz_raw = final_state.get("viz_json")
-        visualizations = None
-        if viz_raw and viz_raw != "NONE":
-            viz_obj = None
-            if isinstance(viz_raw, str):
-                viz_obj = extract_json_from_markdown(viz_raw)
-            else:
-                viz_obj = viz_raw
-
-            if viz_obj:
-                visualizations = [viz_obj]
+        tables = [final_data[0]["data"]] if final_data and len(final_data) > 0 else None
 
         return QueryResponse(
             answer=answer,
             tables=tables,
-            visualizations=visualizations,
+            visualizations=None,
             session_id=session_id,
         )
 

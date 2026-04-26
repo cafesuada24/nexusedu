@@ -4,21 +4,17 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.types import Send
 
 from src.agents.llms import (
-    determiner_llm,
-    # email_llm,
-    # export_llm,
     planner_llm,
     sql_gen_llm,
 )
 from src.agents.schemas import (
-    DeterminerDecision,
     DiscoveryRequest,
     PlannerOutput,
     RouterPlan,
     SQLGeneration,
 )
 from src.agents.state import AgentState, SQLTask
-from src.agents.utils import ResultSummarizer, extract_json_from_markdown
+from src.agents.utils import ResultSummarizer
 from src.telemetry.logger import logger
 from src.tools.db import (
     describe_table,
@@ -53,9 +49,6 @@ SQL_GENERATOR_SYSTEM_PROMPT = load_prompt(
 EMAIL_GENERATOR_SYSTEM_PROMPT = load_prompt(
     'src/prompts/v1/email_generator/system.txt',
     fallback='You are an email specialist. Draft an empathetic nudge email for the student.',
-)
-VISUALIZATION_GENERATOR_SYSTEM_PROMPT = load_prompt(
-    'src/prompts/v1/visualization_generator/system.txt',
 )
 
 
@@ -96,6 +89,7 @@ def planner(state: AgentState) -> dict:
             'path': plan.path,
             'direct_response_draft': plan.direct_response_draft,
             'discovery_requests': plan.discovery_requests or [],
+            'next_action_after_sql': plan.next_action_after_sql or 'RESPOND',
         },
     }
 
@@ -180,11 +174,10 @@ def responder_node(state: AgentState) -> dict:
     results = state.get('results', [])
     routing = state.get('routing_metadata', {})
     direct_draft = routing.get('direct_response_draft')
-    viz_json = state.get('viz_json')
     discovery_context = state.get('discovery_context')
 
     logger.info(
-        f'Responder Context: results={bool(results)}, draft={bool(direct_draft)}, viz={bool(viz_json)}, discovery={bool(discovery_context)}'
+        f'Responder Context: results={bool(results)}, draft={bool(direct_draft)}, discovery={bool(discovery_context)}'
     )
 
     context_parts = []
@@ -198,11 +191,6 @@ def responder_node(state: AgentState) -> dict:
         context_parts.append(f'Discovery Information:\n{discovery_context}')
 
     context = '\n\n'.join(context_parts)
-
-    if viz_json and viz_json != 'NONE':
-        context += (
-            f'\n\nNote: A visualization was also generated. Mention it in the response.'
-        )
 
     # Use the last human message or first one as user intent
     human_messages = [
@@ -284,118 +272,6 @@ def sql_worker(state: SQLTask) -> dict:
     }
 
 
-def determiner(state: AgentState):
-    logger.info('Determiner: Analyzing aggregated results...')
-    results = state.get('results', [])
-    summary = ResultSummarizer.summarize(results)
-    logger.debug(f'Determiner: Data summary length: {len(summary)}')
-
-    human_messages = [
-        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
-    ]
-    user_intent = human_messages[-1].content if human_messages else 'No intent found'
-
-    system_prompt = (
-        'You are an expert data orchestrator. Analyze the provided data summary '
-        'and the original user intent to decide the most appropriate next step. '
-        'Options: finish (general answer), visualize (charts), email_draft (nudge emails), follow_up (more data needed).'
-    )
-    prompt = f'User Intent: {user_intent}\n\nData Summary:\n{summary}'
-
-    logger.debug('Determiner: Invoking LLM for decision...')
-    structured_llm = determiner_llm.with_structured_output(DeterminerDecision)
-    try:
-        decision_resp = structured_llm.invoke(
-            [SystemMessage(content=system_prompt), HumanMessage(content=prompt)],
-        )
-        decision = decision_resp.decision
-    except Exception as e:
-        logger.error(f'Determiner failed: {e}', exc_info=True)
-        # Safe fallback
-        from src.agents.schemas import (
-            DeterminerDecision as DD,
-        )  # Import locally to avoid issues if not in scope
-
-        decision = DD(reasoning=f'Error in determination: {e}', next_step='finish')
-
-    logger.info(
-        f'Determiner Decision: {decision.next_step}',
-    )
-    logger.debug(f'Determiner Reasoning: {decision.reasoning}')
-    logger.log_event(
-        'determiner_decision',
-        {'next_step': decision.next_step, 'reasoning': decision.reasoning},
-    )
-
-    update = {
-        'final_data': results,
-        'decision_log': [decision.model_dump()],
-        'messages': [
-            AIMessage(content=f'Decision: {decision.next_step}. {decision.reasoning}'),
-        ],
-        'next_step': decision.next_step,
-    }
-
-    # Only set viz_json to NONE if we aren't going to visualize
-    if decision.next_step != 'visualize':
-        update['viz_json'] = 'NONE'
-
-    return update
-
-
-def visualization_agent(state: AgentState):
-    if state.get('viz_json') == 'NONE':
-        logger.info('Visualization Agent: Skipped (viz_json is NONE)')
-        return {'viz_json': 'NONE'}
-
-    logger.info('Visualization Agent: Generating charts...')
-
-    results = state.get('results')
-    if not results:
-        logger.warning('Visualization Agent: No results found to visualize.')
-        return {'viz_json': 'NONE'}
-
-    distilled_data = ResultSummarizer.to_distilled_csv(results)
-    logger.debug(
-        f'Visualization Agent: Distilled data for Plotly (CSV length: {len(distilled_data)})'
-    )
-
-    human_messages = [
-        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
-    ]
-    user_intent = human_messages[-1].content if human_messages else 'No intent found'
-
-    prompt = (
-        f'Original User Intent: {user_intent}\n\n'
-        f'Distilled Data (CSV Format):\n{distilled_data}\n\n'
-        'Please generate a Plotly JSON object for this data.'
-    )
-
-    try:
-        logger.debug('Visualization Agent: Invoking LLM for chart generation...')
-        response = sql_gen_llm.invoke(
-            [
-                SystemMessage(
-                    content='You are a data visualization expert. Generate a Plotly JSON object based on the data provided.'
-                ),
-                HumanMessage(content=prompt),
-            ]
-        )
-
-        # Handle response content robustly
-        content = response.content
-        if isinstance(content, list):
-            content = ''.join([part['text'] for part in content if 'text' in part])
-
-        logger.info('Visualization Agent: Chart JSON generated.')
-        logger.debug(f'Visualization Agent: Output JSON: {content[:500]}...')
-        logger.log_event('visualization_generated', {'status': 'success'})
-        return {'viz_json': content}
-    except Exception as e:
-        logger.error(f'Visualization Agent failed: {e}', exc_info=True)
-        return {'viz_json': 'NONE'}
-
-
 def email_agent_node(state: AgentState) -> dict:
     """Dedicated node for generating personalized email drafts."""
     logger.info('Email Agent: Generating draft...')
@@ -406,7 +282,9 @@ def email_agent_node(state: AgentState) -> dict:
     human_messages = [
         m for m in state.get('messages', []) if isinstance(m, HumanMessage)
     ]
-    user_intent = human_messages[-1].content if human_messages else 'Generate nudge email'
+    user_intent = (
+        human_messages[-1].content if human_messages else 'Generate nudge email'
+    )
 
     messages = [
         SystemMessage(content=EMAIL_GENERATOR_SYSTEM_PROMPT),
@@ -422,37 +300,16 @@ def email_agent_node(state: AgentState) -> dict:
     return {'messages': [response]}
 
 
-# def export_agent_node(state: AgentState):
-#     logger.info('Export Agent: Exporting data...')
-#     last_decision = state['decision_log'][-1]
-#     metadata = last_decision.get('metadata', {})
-#     prompt = (
-#         f'Final Data: {state["final_data"]}\n'
-#         f'Metadata: {metadata}\n'
-#         'Please export the data as requested.'
-#     )
-#     messages = (
-#         [
-#             SystemMessage(
-#                 content='You are an export specialist. Use the provided data to export to files.',
-#             ),
-#         ]
-#         + state['messages']
-#         + [HumanMessage(content=prompt)]
-#     )
-#     response = export_llm.invoke(messages)
-#     return {'messages': [response]}
-
-
-def route_determiner(state: AgentState):
-    next_step = state.get('next_step', 'visualize')
-    logger.info(f'Routing (Determiner): Choosing path "{next_step}"')
+def route_after_sql(state: AgentState):
+    routing = state.get('routing_metadata', {})
+    next_action = routing.get('next_action_after_sql', 'RESPOND')
     
-    # Map next_step to node name if different
-    if next_step == 'email_draft':
+    logger.info(f'Routing (After SQL): Choosing path "{next_action}"')
+    
+    if next_action == 'EMAIL_DRAFT':
         return 'email_agent'
         
-    return next_step
+    return 'responder'
 
 
 def route_planner(state: AgentState):

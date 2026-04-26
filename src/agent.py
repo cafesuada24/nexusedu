@@ -3,21 +3,19 @@ import uuid
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
+from langfuse.langchain import CallbackHandler
 
 # from src.agents.llms import email_tools, export_tools,
 from src.agents.nodes import (
-    determiner,
     discovery_node,
     email_agent_node,
     planner,
     responder_node,
-    route_determiner,
+    route_after_sql,
     route_planner,
     sql_worker,
-    visualization_agent,
 )
 from src.agents.state import AgentState
-from src.agents.utils import extract_json_from_markdown
 from src.telemetry.logger import logger
 
 workflow = StateGraph(AgentState)
@@ -27,8 +25,6 @@ workflow.add_node('planner', planner)
 workflow.add_node('discovery', discovery_node)
 workflow.add_node('responder', responder_node)
 workflow.add_node('sql_worker', sql_worker)  # Parallel node
-workflow.add_node('determiner', determiner)
-workflow.add_node('viz_agent', visualization_agent)
 workflow.add_node('email_agent', email_agent_node)
 
 workflow.set_entry_point('planner')
@@ -40,24 +36,17 @@ workflow.add_conditional_edges(
 )
 
 workflow.add_edge('discovery', 'planner')
-workflow.add_edge('sql_worker', 'determiner')
 
 workflow.add_conditional_edges(
-    'determiner',
-    route_determiner,
-    {
-        'visualize': 'viz_agent',
-        'follow_up': 'planner',
-        'finish': 'responder',
-        'email_agent': 'email_agent',
-    },
+    'sql_worker',
+    route_after_sql,
+    ['email_agent', 'responder'],
 )
 
-workflow.add_edge('viz_agent', 'responder')
 workflow.add_edge('email_agent', 'responder')
 workflow.add_edge('responder', END)
 
-# Compile with Batching Throttle
+# Compile
 app = workflow.compile()
 
 if __name__ == '__main__':
@@ -66,11 +55,18 @@ if __name__ == '__main__':
     logger.set_context({'session_id': session_id})
     logger.info('Graph: Initializing execution', session_id=session_id)
 
-    # Invoke with max_concurrency of 3
-    config = {'recursion_limit': 50, 'configurable': {'max_concurrency': 3}}
+    # Initialize Langfuse Callback
+    langfuse_handler = CallbackHandler()
+
+    # Invoke with max_concurrency of 3 and Langfuse callbacks
+    config = {
+        'recursion_limit': 50, 
+        'configurable': {'max_concurrency': 3},
+        'callbacks': [langfuse_handler]
+    }
     app.get_graph().print_ascii()
 
-    user_query = "Analyze the relationship between student demographics and performance. Specifically, compare the average assessment scores from the LMS database against the different 'region' categories found in the SIS database. Provide a summary of the findings and a bar chart comparing the scores by region."
+    user_query = "Analyze the relationship between student demographics and performance. Specifically, compare the average assessment scores from the LMS database against the different 'region' categories found in the SIS database. Provide a summary of the findings."
 
     logger.log_event('graph_start', {'user_query': user_query})
 
@@ -81,20 +77,6 @@ if __name__ == '__main__':
         )
         logger.info('Graph: Execution completed successfully')
         logger.debug(f'Final Result State keys: {list(final_result.keys())}')
-
-        viz = final_result.get('viz_json', 'NONE')
-        viz = extract_json_from_markdown(viz)
-
-        if viz:
-            logger.info('Graph: Displaying visualization')
-            import plotly.io as pio
-
-            try:
-                pio.from_json(json.dumps(viz)).show()
-            except Exception as e:
-                logger.error(f'Error displaying visualization: {e}')
-        else:
-            logger.info('No visualization to display.')
 
     except Exception as e:
         logger.error(f'Graph execution failed: {e}', exc_info=True)

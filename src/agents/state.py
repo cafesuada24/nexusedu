@@ -33,8 +33,6 @@ class AgentState(TypedDict):
     tasks: list[dict]
     results: Annotated[list[dict], results_reducer]
     final_data: Annotated[list[dict] | None, last_value_reducer]
-    viz_json: Annotated[dict | str | None, last_value_reducer]
-    decision_log: Annotated[list[dict], operator.add]  # Track agent reasoning
     retry_count: int  # For error handling and loops
     next_step: str
     discovery_context: str | None  # Store schema/discovery information

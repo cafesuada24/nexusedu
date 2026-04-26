@@ -30,18 +30,6 @@ sql_gen_llm = ChatGoogleGenerativeAI(
     stop_after_attempt=6,
 )
 
-determiner_model = os.getenv(
-    'DETERMINER_MODEL', os.getenv('PLANNER_MODEL', 'gemini-3.1-flash-lite-preview')
-)
-logger.info(f'Initializing Determiner LLM: {determiner_model}')
-determiner_llm = ChatGoogleGenerativeAI(
-    model=determiner_model,
-    max_retries=6,
-).with_retry(
-    wait_exponential_jitter=True,
-    stop_after_attempt=6,
-)
-
 # email_tools = EMAIL_TOOLS
 # export_tools = [export_data]
 #

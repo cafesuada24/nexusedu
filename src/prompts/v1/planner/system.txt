@@ -34,6 +34,7 @@
   <output_structure>
     - **path**: The chosen execution path.
     - **tasks**: (Only for `SQL_EXECUTION`) A list of parallel SQL tasks.
+    - **next_action_after_sql**: (Only for `SQL_EXECUTION`) The step after data retrieval: `RESPOND` (synthesize answer) or `EMAIL_DRAFT` (draft personalized email). Default is `RESPOND`.
     - **direct_response_draft**: (Only for `DIRECT_ANSWER`) A draft of the final response.
     - **discovery_requests**: (Only for `DISCOVERY_REQUIRED`) List of discovery tools to call.
   </output_structure>
