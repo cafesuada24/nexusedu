@@ -3,7 +3,7 @@ name = "a20-app-007"
 version = "0.1.0"
 description = "An agent assistant."
 readme = "README.md"
-requires-python = ">=3.11" # ">=3.12"
+requires-python = ">=3.12" # ">=3.12"
 dependencies = [
     "duckdb>=1.5.1",
     "grandalf>=0.8",
@@ -19,12 +19,13 @@ dependencies = [
     "fastapi>=0.135.3",
     "uvicorn>=0.44.0",
     "langfuse>=4.5.1",
+    "baml-py>=0.221.0",
 ]
 # dependencies = []
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 # "**/{tests,docs,tools}/*" = ["E402"]
