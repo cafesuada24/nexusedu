@@ -1,5 +1,6 @@
 """DuckDB implementation of the DatabaseEngine protocol."""
 
+import contextlib
 import re
 import threading
 import uuid
@@ -9,6 +10,8 @@ from typing import Any
 
 import duckdb
 import pandas as pd
+import sqlglot
+from sqlglot import exp
 
 from src.database.config import DATA_DIR, DB_REGISTRY
 
@@ -26,10 +29,8 @@ class DuckDBEngine:
     def close(self) -> None:
         """Close all persistent connections."""
         for conn in self._connections.values():
-            try:
+            with contextlib.suppress(Exception):
                 conn.close()
-            except Exception:
-                pass
         self._connections.clear()
 
     def _validate_db_id(self, db_id: str) -> None:
@@ -70,10 +71,8 @@ class DuckDBEngine:
             # For write operations, we must close the cached read-only connection if it exists
             # because DuckDB doesn't allow mixed configurations in the same process for the same file.
             if db_id in self._connections:
-                try:
+                with contextlib.suppress(Exception):
                     self._connections[db_id].close()
-                except Exception:
-                    pass
                 del self._connections[db_id]
 
             # For write operations, return a new connection
@@ -146,14 +145,15 @@ class DuckDBEngine:
                     r['activity_id'] = str(uuid.uuid4())
 
         df = pd.DataFrame(records_list)
-        with self._write_lock:
-            with self._get_connection(db_id, read_only=False) as conn:
-                if table_name == 'students':
-                    # Use validated table_name
-                    conn.execute(f'DELETE FROM {table_name} WHERE sid IN (SELECT sid FROM df)')
-
+        with self._write_lock, self._get_connection(db_id, read_only=False) as conn:
+            if table_name == 'students':
                 # Use validated table_name
-                conn.execute(f'INSERT INTO {table_name} BY NAME SELECT * FROM df')
+                conn.execute(
+                    f'DELETE FROM {table_name} WHERE sid IN (SELECT sid FROM df)',
+                )
+
+            # Use validated table_name
+            conn.execute(f'INSERT INTO {table_name} BY NAME SELECT * FROM df')
 
     def ingest_custom_data(
         self,
@@ -167,11 +167,10 @@ class DuckDBEngine:
         self._validate_table_name(table_name)
 
         df = pd.DataFrame(list(records))
-        with self._write_lock:
-            with self._get_connection('sis_db', read_only=False) as conn:
+        with self._write_lock, self._get_connection('sis_db', read_only=False) as conn:
                 # Use validated table_name
                 conn.execute(
-                    f'CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df LIMIT 0'
+                    f'CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df LIMIT 0',
                 )
                 conn.execute(f'INSERT INTO {table_name} SELECT * FROM df')
 
@@ -190,25 +189,25 @@ class DuckDBEngine:
         conn = self._get_connection(db_id, read_only=True)
         # Safely describe and sample using validated table_name
         rel_cols = conn.sql(f'DESCRIBE {table_name}')
-        cols = [dict(zip(rel_cols.columns, r)) for r in rel_cols.fetchall()]
-        
+        cols = [dict(zip(rel_cols.columns, r, strict=True)) for r in rel_cols.fetchall()]
+
         rel_sample = conn.sql(f'SELECT * FROM {table_name} LIMIT 3')
         sample_names = rel_sample.columns
         sample_rows = rel_sample.fetchall()
-        
-        col_lines = []
+
+        col_lines: list[str] = []
         for col in cols:
             nullable = 'NULLABLE' if col['null'] == 'YES' else 'NOT NULL'
             col_lines.append(
                 f'    - {col["column_name"]} ({col["column_type"]}, {nullable})',
             )
 
-        # Build sample data string manually to avoid Pandas if possible, 
+        # Build sample data string manually to avoid Pandas if possible,
         # but for small samples it's probably okay to use Pandas just for formatting
         # however, let's stick to simple formatting to be safe
-        sample_str = " | ".join(sample_names) + "\n" + "-" * 20 + "\n"
+        sample_str = ' | '.join(sample_names) + '\n' + '-' * 20 + '\n'
         for row in sample_rows:
-            sample_str += " | ".join(map(str, row)) + "\n"
+            sample_str += ' | '.join(map(str, row)) + '\n'
 
         return (
             f'#### TABLE: {table_name}\n'
@@ -227,14 +226,39 @@ class DuckDBEngine:
         # db_id validated in _get_connection
 
         if read_only:
-            # STRICT WHITELIST for read-only queries
-            # Only allow statements starting with safe keywords
-            allowed_statements = ('SELECT', 'WITH', 'DESCRIBE', 'SHOW', 'EXPLAIN')
-            sql_trimmed = sql.strip().upper()
-            if not any(sql_trimmed.startswith(kw) for kw in allowed_statements):
+            try:
+                # Use sqlglot to parse and validate the SQL
+                expressions = sqlglot.parse(sql, read='duckdb')
+                
+                if len(expressions) != 1:
+                    return [
+                        {
+                            'error': 'Blocked: Multiple statements are not allowed.',
+                        },
+                    ]
+                
+                expression = expressions[0]
+                # Allowed statement types for read-only execution
+                # WITH statements are parsed as exp.Select
+                allowed_types = (exp.Select, exp.Describe, exp.Show)
+                
+                is_allowed = isinstance(expression, allowed_types)
+                
+                # Handle EXPLAIN which sqlglot may parse as a Command
+                if not is_allowed and isinstance(expression, exp.Command):
+                    if expression.this.upper() == 'EXPLAIN':
+                        is_allowed = True
+                
+                if not is_allowed:
+                    return [
+                        {
+                            'error': f'Blocked: Statement type {type(expression).__name__} is not allowed in read-only mode.',
+                        },
+                    ]
+            except sqlglot.errors.ParseError as e:
                 return [
                     {
-                        'error': 'Blocked: Only SELECT, WITH, DESCRIBE, SHOW, and EXPLAIN statements are allowed.',
+                        'error': f'SQL Parse Error: {e}',
                     },
                 ]
 
@@ -245,23 +269,20 @@ class DuckDBEngine:
                 if rel is None:
                     return []
                 names = rel.columns
-                return [dict(zip(names, row)) for row in rel.fetchall()]
-            else:
-                with self._write_lock:
-                    with conn:
-                        rel = conn.sql(sql)
-                        if rel is None:
-                            return []
-                        names = rel.columns
-                        return [dict(zip(names, row)) for row in rel.fetchall()]
+                return [dict(zip(names, row, strict=True)) for row in rel.fetchall()]
+            with self._write_lock, conn:
+                    rel = conn.sql(sql)
+                    if rel is None:
+                        return []
+                    names = rel.columns
+                    return [dict(zip(names, row, strict=True)) for row in rel.fetchall()]
         except Exception as e:
             return [{'error': str(e)}]
 
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""
         # Uses parameter binding which is safe
-        with self._write_lock:
-            with self._get_connection('sis_db', read_only=False) as conn:
+        with self._write_lock, self._get_connection('sis_db', read_only=False) as conn:
                 conn.execute(
                     'UPDATE students SET intervention_status = ? WHERE sid = ?',
                     (status, sid),
