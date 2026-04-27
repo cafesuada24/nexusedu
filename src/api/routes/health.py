@@ -1,6 +1,6 @@
 """Monitoring and health check routes for the API."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
@@ -15,6 +15,6 @@ async def health_check() -> dict[str, str]:
     """
     return {
         "status": "online",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": "1.0.0",
     }

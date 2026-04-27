@@ -2,11 +2,10 @@
 
 from typing import Annotated, Any, TypedDict
 
-from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import add_messages
 
 # Type Aliases for clarity
-type MessageList = list[BaseMessage]
+type MessageList = list[dict[str, str]]
 type ResultList = list[dict[str, Any]]
 
 class SQLTask(TypedDict):

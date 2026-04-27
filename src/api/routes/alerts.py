@@ -5,14 +5,13 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from langchain_core.messages import HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 from src.agents.state import AgentState
 from src.api.dependencies.agent import get_agent
+from src.database import db_manager
 from src.telemetry.logger import logger
-from src.tools.db import db_manager
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
@@ -49,7 +48,7 @@ class SendEmailRequest(BaseModel):
 
 
 @router.get('/', response_model=list[AlertStudent])
-async def get_alerts(status: str | None = Query(None)) -> list[dict[object, object]]:
+async def get_alerts(status: str | None = Query(None)) -> list[dict[str, str]]:
     """Retrieve students who have an active alert for the Kanban board."""
     sql: str = "SELECT sid, student_name, email, current_risk_status, intervention_status FROM students WHERE intervention_status != 'none'"
     if status:
@@ -128,7 +127,7 @@ async def generate_email_draft(
 
     try:
         final_state = await agent.ainvoke(
-            {'messages': [HumanMessage(content=query)]},
+            {'messages': [{'role': 'user', 'content': query}]},
             config=config,
         )
         messages = final_state.get('messages', [])

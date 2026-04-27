@@ -13,12 +13,12 @@ from src.tools.db import (
 
 # Tool Dispatch Map
 DISCOVERY_TOOLS: dict[str, Callable[[dict[str, Any]], Any]] = {
-    'get_db_list': lambda _: get_db_list.invoke({}),
-    'list_tables': lambda args: list_tables.invoke({'db_id': args.get('db_id')})
+    'get_db_list': lambda _: get_db_list(),
+    'list_tables': lambda args: list_tables(db_id=args.get('db_id'))
     if args.get('db_id')
     else None,
-    'describe_table': lambda args: describe_table.invoke(
-        {'db_id': args.get('db_id'), 'table_name': args.get('table_name')},
+    'describe_table': lambda args: describe_table(
+        db_id=args.get('db_id'), table_name=args.get('table_name'),
     )
     if args.get('db_id') and args.get('table_name')
     else None,

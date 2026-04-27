@@ -7,9 +7,6 @@ requires-python = ">=3.12" # ">=3.12"
 dependencies = [
     "duckdb>=1.5.1",
     "grandalf>=0.8",
-    "langchain>=1.2.15",
-    "langchain-google-genai>=4.2.1",
-    "langchain-openai>=1.1.12",
     "pandas>=3.0.2",
     "plotly>=6.7.0",
     "python-dotenv>=1.2.2",
@@ -20,6 +17,7 @@ dependencies = [
     "uvicorn>=0.44.0",
     "langfuse>=4.5.1",
     "baml-py>=0.221.0",
+    "langgraph>=1.1.9",
 ]
 # dependencies = []
 
