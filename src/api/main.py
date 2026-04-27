@@ -4,6 +4,7 @@ This module initializes the FastAPI application, configures middleware,
 and includes the API routers for the agent's functionality.
 """
 
+import os
 import time
 from typing import Any
 
@@ -22,9 +23,13 @@ app = FastAPI(
 )
 
 # CORS Configuration
+# Read allowed origins from environment variable, default to localhost:3000
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
