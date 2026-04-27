@@ -1,5 +1,22 @@
 // Learn more about clients at https://docs.boundaryml.com/docs/snippets/clients/overview
 
+retry_policy Constant {
+  max_retries 3
+  strategy {
+    type constant_delay
+    delay_ms 200
+  }
+}
+
+retry_policy Exponential {
+  max_retries 3
+  strategy {
+    type exponential_backoff
+    delay_ms 300
+    multiplier 1.5
+    max_delay_ms 10000
+  }
+}
 // Example Google AI client (uncomment to use)
 client<llm> Gemini_31_Flash_Lite {
   provider google-ai
@@ -72,20 +89,3 @@ client<llm> Gemma_4_31b {
 // }
 
 // https://docs.boundaryml.com/docs/snippets/clients/retry
-retry_policy Constant {
-  max_retries 3
-  strategy {
-    type constant_delay
-    delay_ms 200
-  }
-}
-
-retry_policy Exponential {
-  max_retries 2
-  strategy {
-    type exponential_backoff
-    delay_ms 300
-    multiplier 1.5
-    max_delay_ms 10000
-  }
-}
