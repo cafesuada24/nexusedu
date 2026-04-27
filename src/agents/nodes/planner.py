@@ -7,9 +7,15 @@ from src.baml_client import b
 from src.telemetry.logger import logger
 
 
-def _msg_to_yaml(msg: dict[str, str]) -> str:
-    role = 'ai_response' if msg['role'] == 'assistant' else 'human_message'
-    return f'<{role}>\n{msg["content"]}\n<\\{role}>'
+def _msg_to_yaml(msg: Any) -> str:
+    if isinstance(msg, dict):
+        role = 'ai_response' if msg.get('role') == 'assistant' else 'human_message'
+        content = msg.get('content', '')
+    else:
+        # Handle LangGraph/LangChain message objects
+        role = 'ai_response' if getattr(msg, 'type', '') == 'ai' else 'human_message'
+        content = getattr(msg, 'content', '')
+    return f'<{role}>\n{content}\n<\\{role}>'
 
 
 def _msg_list_to_yaml(state: MessageList) -> str:
@@ -24,7 +30,7 @@ def planner(state: AgentState) -> dict[str, Any]:
     messages = state.get('messages', [])
     if len(messages) > MAX_MESSAGES:
         logger.warning(
-            f'Planner: Message history exceeds limit ({len(messages)} > {MAX_MESSAGES}). Truncating...'
+            f'Planner: Message history exceeds limit ({len(messages)} > {MAX_MESSAGES}). Truncating...',
         )
         # Keep the system message if it's there (usually first), but here they are just role/content dicts.
         # LangGraph add_messages handles appending, but we might want to trim the state.
@@ -73,7 +79,7 @@ def planner(state: AgentState) -> dict[str, Any]:
         results = state.get('results', [])
         if results and len(results) > MAX_RESULTS:
             logger.warning(
-                f'Planner: Results list exceeds limit ({len(results)} > {MAX_RESULTS}). Truncating...'
+                f'Planner: Results list exceeds limit ({len(results)} > {MAX_RESULTS}). Truncating...',
             )
             update['results'] = results[-MAX_RESULTS:]
 

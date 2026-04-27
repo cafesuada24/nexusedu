@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from src.database.config import DB_REGISTRY
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
@@ -99,3 +101,36 @@ class DatabaseManager[T_Engine: "DatabaseEngine", T_Algo: "AnomalyAlgorithm"]:
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results."""
         return self.engine.execute(db_id, sql, read_only=read_only)
+
+    def get_formatted_db_list(self) -> str:
+        """Retrieve list of available databases in markdown format."""
+        header = '## AVAILABLE DATABASE REGISTRY\n'
+        entries = []
+        for db in DB_REGISTRY:
+            entry = f'### ID: `{db["id"]}`\n- **Description**: {db["description"]}\n- **Keywords**: {", ".join(db["keywords"])}\n'
+            entries.append(entry)
+        return header + '\n---\n'.join(entries)
+
+    def get_formatted_table_list(self, db_id: str) -> str:
+        """List all tables available in the specified database in markdown format."""
+        try:
+            tables = self.list_tables(db_id)
+            return f'## Tables in {db_id}:' + '\n- '.join(tables)
+        except Exception as e:
+            return f'Error: {e}'
+
+    def get_formatted_table_schema(self, db_id: str, table_name: str) -> str:
+        """Get the detailed schema and sample data for a specific table in markdown format."""
+        try:
+            return self.get_table_schema(db_id, table_name)
+        except Exception as e:
+            return f'Error: {e}'
+
+    def get_formatted_db_schema(self, db_id: str) -> str:
+        """Get the detailed schema of a specific database in markdown format."""
+        try:
+            tables = self.list_tables(db_id)
+            schemas = [self.get_table_schema(db_id, t) for t in tables]
+            return f'### DATABASE: {db_id.upper()}\n' + '\n\n'.join(schemas)
+        except Exception as e:
+            return f'Error: {e}'
