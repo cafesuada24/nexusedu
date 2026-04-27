@@ -2,14 +2,14 @@
 
 from typing import Any
 
-from src.agents.state import AgentState, MessageList
+from src.agents.state import MAX_MESSAGES, MAX_RESULTS, AgentState, MessageList
 from src.baml_client import b
 from src.telemetry.logger import logger
 
 
 def _msg_to_yaml(msg: dict[str, str]) -> str:
     role = 'ai_response' if msg['role'] == 'assistant' else 'human_message'
-    return f'<{role}>\n{msg['content']}\n<\\{role}>'
+    return f'<{role}>\n{msg["content"]}\n<\\{role}>'
 
 
 def _msg_list_to_yaml(state: MessageList) -> str:
@@ -21,16 +21,25 @@ def planner(state: AgentState) -> dict[str, Any]:
     logger.info('Planner: Executing...')
     logger.debug(f'Planner Input State: {state}')
 
-    message = _msg_list_to_yaml(state['messages'])
+    messages = state.get('messages', [])
+    if len(messages) > MAX_MESSAGES:
+        logger.warning(
+            f'Planner: Message history exceeds limit ({len(messages)} > {MAX_MESSAGES}). Truncating...'
+        )
+        # Keep the system message if it's there (usually first), but here they are just role/content dicts.
+        # LangGraph add_messages handles appending, but we might want to trim the state.
+        messages = messages[-MAX_MESSAGES:]
+
+    message_yaml = _msg_list_to_yaml(messages)
 
     # Include discovery context in the prompt if available
     if state.get('discovery_context'):
         logger.info('Planner: Incorporating discovery context.')
-        message += f'\n\n<discovery_context>\n{state["discovery_context"]}\n</discovery_context>'
+        message_yaml += f'\n\n<discovery_context>\n{state["discovery_context"]}\n</discovery_context>'
         logger.debug(f'Discovery Context Length: {len(state["discovery_context"])}')
 
     logger.debug('Planner: Invoking LLM...')
-    plan = b.PlanNextStep(message)
+    plan = b.PlanNextStep(message_yaml)
 
     logger.info(f'Planner Path Decision: {plan.path}')
     logger.log_event(
@@ -46,6 +55,7 @@ def planner(state: AgentState) -> dict[str, Any]:
     )
 
     update: dict[str, Any] = {
+        'messages': messages,  # Update with truncated messages
         'routing_metadata': {
             'path': plan.path,
             'direct_response_draft': plan.direct_response_draft,
@@ -60,6 +70,12 @@ def planner(state: AgentState) -> dict[str, Any]:
         update['results'] = None
     else:
         logger.info('Planner: Follow-up iteration, preserving existing results.')
+        results = state.get('results', [])
+        if results and len(results) > MAX_RESULTS:
+            logger.warning(
+                f'Planner: Results list exceeds limit ({len(results)} > {MAX_RESULTS}). Truncating...'
+            )
+            update['results'] = results[-MAX_RESULTS:]
 
     if plan.path == 'SQL_EXECUTION' and plan.tasks:
         logger.debug(f'Planner Tasks: {plan.tasks}')

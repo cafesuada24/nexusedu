@@ -8,6 +8,10 @@ from langgraph.graph import add_messages
 type MessageList = list[dict[str, str]]
 type ResultList = list[dict[str, Any]]
 
+# Context Limits
+MAX_MESSAGES = 20
+MAX_RESULTS = 10
+
 class SQLTask(TypedDict):
     """Internal state for a parallel SQL worker task."""
     db_id: str
