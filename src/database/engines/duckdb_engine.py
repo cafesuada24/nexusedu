@@ -30,6 +30,14 @@ class DuckDBEngine:
         self._main_conn.execute('PRAGMA enable_checkpoint_on_shutdown')
         self._main_conn.execute("PRAGMA checkpoint_threshold='1GB'")
         self._main_conn.execute('PRAGMA threads=8')
+
+        # Strict Sandboxing for Security
+        self._main_conn.execute('SET allow_unsigned_extensions=false')
+        # We don't use enable_external_access=false because we need to ATTACH local .duckdb files.
+        # But we can disable extension loading/installing to prevent malicious extensions.
+        self._main_conn.execute('SET autoinstall_known_extensions=false')
+        self._main_conn.execute('SET autoload_known_extensions=false')
+
         self._attached_dbs: set[str] = set()
         self.write_lock = threading.RLock()
 
