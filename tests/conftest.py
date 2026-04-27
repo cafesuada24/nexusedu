@@ -30,7 +30,8 @@ def test_db_manager(test_data_dir: Path) -> DatabaseManager:
     """Provides a DatabaseManager instance configured for testing."""
     engine = DuckDBEngine(data_dir=test_data_dir)
     algo = DuckDBZScoreAnomalyAlgorithm()
-    manager = DatabaseManager(engine=engine, anomaly_algo=algo)
+    manager = DatabaseManager()
+    manager.initialize(engine=engine, anomaly_algo=algo)
     manager.initialize_schema()
     return manager
 
