@@ -19,6 +19,16 @@ class DuckDBEngine:
         """Initialize DuckDBEngine with a data directory."""
         self.data_dir = Path(data_dir)
         self._allowed_db_ids = {db['id'] for db in DB_REGISTRY}
+        self._connections: dict[str, duckdb.DuckDBPyConnection] = {}
+
+    def close(self) -> None:
+        """Close all persistent connections."""
+        for conn in self._connections.values():
+            try:
+                conn.close()
+            except Exception:
+                pass
+        self._connections.clear()
 
     def _validate_db_id(self, db_id: str) -> None:
         """Validate db_id against the registry."""
@@ -41,13 +51,30 @@ class DuckDBEngine:
         db_id: str,
         read_only: bool = True,
     ) -> duckdb.DuckDBPyConnection:
-        """Get a connection to the specified database."""
+        """Get a connection to the specified database. Caches read-only connections."""
         self._validate_db_id(db_id)
         path = self._get_path(db_id)
-        if read_only and not path.exists():
-            msg = f"Database '{db_id}' not found at {path}"
-            raise FileNotFoundError(msg)
-        return duckdb.connect(str(path), read_only=read_only)
+
+        if read_only:
+            if db_id not in self._connections:
+                if not path.exists():
+                    msg = f"Database '{db_id}' not found at {path}"
+                    raise FileNotFoundError(msg)
+                # Maintain a persistent, long-lived read_only=True DuckDB connection
+                self._connections[db_id] = duckdb.connect(str(path), read_only=True)
+            return self._connections[db_id]
+
+        # For write operations, we must close the cached read-only connection if it exists
+        # because DuckDB doesn't allow mixed configurations in the same process for the same file.
+        if db_id in self._connections:
+            try:
+                self._connections[db_id].close()
+            except Exception:
+                pass
+            del self._connections[db_id]
+
+        # For write operations, return a new connection
+        return duckdb.connect(str(path), read_only=False)
 
     def initialize_schema(self) -> None:
         """Initialize the database schema for LMS and SIS."""
@@ -117,12 +144,10 @@ class DuckDBEngine:
         df = pd.DataFrame(records_list)
         with self._get_connection(db_id, read_only=False) as conn:
             if table_name == 'students':
-                # Use subquery on df to find sids to delete, avoiding direct string interpolation of data
-                conn.execute('DELETE FROM students WHERE sid IN (SELECT sid FROM df)')
+                # Use validated table_name
+                conn.execute(f'DELETE FROM {table_name} WHERE sid IN (SELECT sid FROM df)')
 
-            # Using identifiers in f-strings is generally unsafe but since we validated table_name
-            # and db_id is whitelisted, this is controlled.
-            # DuckDB's 'BY NAME' is safe for columns.
+            # Use validated table_name
             conn.execute(f'INSERT INTO {table_name} BY NAME SELECT * FROM df')
 
     def ingest_custom_data(
@@ -138,43 +163,53 @@ class DuckDBEngine:
 
         df = pd.DataFrame(list(records))
         with self._get_connection('sis_db', read_only=False) as conn:
-            # table_name is validated
+            # Use validated table_name
             conn.execute(
-                f'CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df LIMIT 0',
+                f'CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df LIMIT 0'
             )
             conn.execute(f'INSERT INTO {table_name} SELECT * FROM df')
 
     def list_tables(self, db_id: str) -> list[str]:
         """List all tables in the specified database."""
         # db_id validated in _get_connection
-        with self._get_connection(db_id, read_only=True) as conn:
-            tables = conn.execute('SHOW TABLES').fetchdf()
-            return tables['name'].tolist()
+        conn = self._get_connection(db_id, read_only=True)
+        res = conn.execute('SHOW TABLES').fetchall()
+        return [row[0] for row in res]
 
     def get_table_schema(self, db_id: str, table_name: str) -> str:
         """Get the schema and sample data for a specific table."""
         self._validate_table_name(table_name)
         # db_id validated in _get_connection
 
-        with self._get_connection(db_id, read_only=True) as conn:
-            # Identifiers cannot be parameterized in standard SQL,
-            # but we have validated table_name.
-            cols = conn.execute(f'DESCRIBE {table_name}').fetchdf()
-            sample = conn.execute(f'SELECT * FROM {table_name} LIMIT 3').fetchdf()
-
-            col_lines = []
-            for _, col in cols.iterrows():
-                nullable = 'NULLABLE' if col['null'] == 'YES' else 'NOT NULL'
-                col_lines.append(
-                    f'    - {col["column_name"]} ({col["column_type"]}, {nullable})',
-                )
-
-            return (
-                f'#### TABLE: {table_name}\n'
-                f'- Columns:\n'
-                + '\n'.join(col_lines)
-                + f'\n- Sample data:\n```\n{sample.to_string(index=False)}\n```'
+        conn = self._get_connection(db_id, read_only=True)
+        # Safely describe and sample using validated table_name
+        rel_cols = conn.sql(f'DESCRIBE {table_name}')
+        cols = [dict(zip(rel_cols.columns, r)) for r in rel_cols.fetchall()]
+        
+        rel_sample = conn.sql(f'SELECT * FROM {table_name} LIMIT 3')
+        sample_names = rel_sample.columns
+        sample_rows = rel_sample.fetchall()
+        
+        col_lines = []
+        for col in cols:
+            nullable = 'NULLABLE' if col['null'] == 'YES' else 'NOT NULL'
+            col_lines.append(
+                f'    - {col["column_name"]} ({col["column_type"]}, {nullable})',
             )
+
+        # Build sample data string manually to avoid Pandas if possible, 
+        # but for small samples it's probably okay to use Pandas just for formatting
+        # however, let's stick to simple formatting to be safe
+        sample_str = " | ".join(sample_names) + "\n" + "-" * 20 + "\n"
+        for row in sample_rows:
+            sample_str += " | ".join(map(str, row)) + "\n"
+
+        return (
+            f'#### TABLE: {table_name}\n'
+            f'- Columns:\n'
+            + '\n'.join(col_lines)
+            + f'\n- Sample data:\n```\n{sample_str}```'
+        )
 
     def execute(
         self,
@@ -182,33 +217,36 @@ class DuckDBEngine:
         sql: str,
         read_only: bool = True,
     ) -> list[dict[str, Any]]:
-        """Execute a SQL query and return results as list of dicts."""
+        """Execute a SQL query and return results as list of dicts. Avoids Pandas for memory efficiency."""
         # db_id validated in _get_connection
 
-        sql_upper = sql.strip().upper()
-        blocked = [
-            'DROP',
-            'DELETE',
-            'INSERT',
-            'UPDATE',
-            'ALTER',
-            'CREATE',
-            'TRUNCATE',
-            'COPY',
-        ]
         if read_only:
-            for keyword in blocked:
-                if sql_upper.startswith(keyword):
-                    return [
-                        {
-                            'error': f'Blocked: {keyword} statements are not allowed via this tool.',
-                        },
-                    ]
+            # STRICT WHITELIST for read-only queries
+            # Only allow statements starting with safe keywords
+            allowed_statements = ('SELECT', 'WITH', 'DESCRIBE', 'SHOW', 'EXPLAIN')
+            sql_trimmed = sql.strip().upper()
+            if not any(sql_trimmed.startswith(kw) for kw in allowed_statements):
+                return [
+                    {
+                        'error': 'Blocked: Only SELECT, WITH, DESCRIBE, SHOW, and EXPLAIN statements are allowed.',
+                    },
+                ]
 
         try:
-            with self._get_connection(db_id, read_only=read_only) as conn:
-                result = conn.execute(sql).fetchdf()
-                return result.to_dict(orient='records')
+            conn = self._get_connection(db_id, read_only=read_only)
+            if read_only:
+                rel = conn.sql(sql)
+                if rel is None:
+                    return []
+                names = rel.columns
+                return [dict(zip(names, row)) for row in rel.fetchall()]
+            else:
+                with conn:
+                    rel = conn.sql(sql)
+                    if rel is None:
+                        return []
+                    names = rel.columns
+                    return [dict(zip(names, row)) for row in rel.fetchall()]
         except Exception as e:
             return [{'error': str(e)}]
 
