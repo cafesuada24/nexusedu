@@ -4,23 +4,47 @@ This module initializes the FastAPI application, configures middleware,
 and includes the API routers for the agent's functionality.
 """
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import time
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routes import alerts, data, health, query
+from src.database import db_manager
+from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
+from src.database.engines.duckdb_engine import DuckDBEngine
 from src.telemetry.logger import logger
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manages the startup and shutdown lifecycle of the FastAPI application."""
+    # STARTUP: Initialize Database
+    load_dotenv()
+    logger.info('API Lifecycle: Initializing DatabaseManager...')
+    db_manager.initialize(
+        engine=DuckDBEngine(),
+        anomaly_algo=DuckDBZScoreAnomalyAlgorithm(),
+    )
+    # Optional: ensure schema is ready
+    db_manager.initialize_schema()
+
+    yield
+
+    # SHUTDOWN: Cleanup resources
+    logger.info('API Lifecycle: Shutting down DatabaseManager...')
+    db_manager.close()
+
+
 app = FastAPI(
-    title="Agent Assistant API",
-    description="API to interact with the LangGraph Agent for data analysis and visualization.",
-    version="1.0.0",
+    title='Agent Assistant API',
+    description='API to interact with the LangGraph Agent for data analysis and visualization.',
+    version='1.0.0',
+    lifespan=lifespan,
 )
 
 # CORS Configuration
