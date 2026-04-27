@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TypedDict
 
 # Thư mục chứa các file .duckdb — resolve từ gốc project
 DATA_DIR = 'data'
@@ -11,7 +12,14 @@ DATA_DIR = 'data'
 # DATABASE REGISTRY
 # ============================================================================
 
-DB_REGISTRY = [
+class DBDescription(TypedDict):
+    """Database description for DB_REGISTRY."""
+    id: str
+    description: str
+    dialect: str
+    keywords: list[str]
+
+DB_REGISTRY: list[DBDescription] = [
     {
         'id': 'lms_db',
         'description': (
