@@ -51,11 +51,9 @@ class DuckDBEngine:
         """Resolve db_id to file path."""
         return self.data_dir / f'{db_id}.duckdb'
 
-    def get_connection(
-        self,
-        db_id: str,
-    ) -> duckdb.DuckDBPyConnection:
-        """Get a cursor-like connection to the specified database attached to the main connection."""
+    @contextlib.contextmanager
+    def get_cursor(self, db_id: str):
+        """Get a cursor to the specified database. Ensures the cursor is closed after use."""
         self._validate_db_id(db_id)
 
         with self.write_lock:
@@ -68,14 +66,17 @@ class DuckDBEngine:
 
         # Return a cursor that defaults to the requested database
         cursor = self._main_conn.cursor()
-        cursor.execute(f'USE {db_id}')
-        return cursor
+        try:
+            cursor.execute(f'USE {db_id}')
+            yield cursor
+        finally:
+            cursor.close()
 
     def initialize_schema(self) -> None:
         """Initialize the database schema for LMS and SIS."""
         with self.write_lock:
             # LMS schema
-            with self.get_connection('lms_db') as cursor:
+            with self.get_cursor('lms_db') as cursor:
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS activities (
                         activity_id VARCHAR PRIMARY KEY,
@@ -91,7 +92,7 @@ class DuckDBEngine:
                 """)
 
             # SIS schema
-            with self.get_connection('sis_db') as cursor:
+            with self.get_cursor('sis_db') as cursor:
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS students (
                         sid VARCHAR PRIMARY KEY,
@@ -129,7 +130,7 @@ class DuckDBEngine:
             return
 
         self._validate_table_name(table_name)
-        # db_id is validated in _get_connection
+        # db_id is validated in _get_cursor
 
         records_list = [dict(r) for r in records]
         if table_name == 'activities':
@@ -138,7 +139,7 @@ class DuckDBEngine:
                     r['activity_id'] = str(uuid.uuid4())
 
         df = pd.DataFrame(records_list)
-        with self.write_lock, self.get_connection(db_id) as cursor:
+        with self.write_lock, self.get_cursor(db_id) as cursor:
             cursor.begin()
             try:
                 if table_name == 'students':
@@ -166,7 +167,7 @@ class DuckDBEngine:
         self._validate_table_name(table_name)
 
         df = pd.DataFrame(list(records))
-        with self.write_lock, self.get_connection('sis_db') as cursor:
+        with self.write_lock, self.get_cursor('sis_db') as cursor:
             cursor.begin()
             try:
                 # Use validated table_name
@@ -181,17 +182,17 @@ class DuckDBEngine:
 
     def list_tables(self, db_id: str) -> list[str]:
         """List all tables in the specified database."""
-        # db_id validated in _get_connection
-        with self.get_connection(db_id) as cursor:
+        # db_id validated in _get_cursor
+        with self.get_cursor(db_id) as cursor:
             res = cursor.execute('SHOW TABLES').fetchall()
             return [row[0] for row in res]
 
     def get_table_schema(self, db_id: str, table_name: str) -> str:
         """Get the schema and sample data for a specific table."""
         self._validate_table_name(table_name)
-        # db_id validated in _get_connection
+        # db_id validated in _get_cursor
 
-        with self.get_connection(db_id) as cursor:
+        with self.get_cursor(db_id) as cursor:
             # Safely describe and sample using validated table_name
             rel_cols = cursor.sql(f'DESCRIBE {table_name}')
             cols = [
@@ -230,7 +231,7 @@ class DuckDBEngine:
         read_only: bool = True,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results as list of dicts. Avoids Pandas for memory efficiency."""
-        # db_id validated in _get_connection
+        # db_id validated in _get_cursor
 
         if read_only:
             try:
@@ -274,7 +275,7 @@ class DuckDBEngine:
 
         try:
             if read_only:
-                with self.get_connection(db_id) as cursor:
+                with self.get_cursor(db_id) as cursor:
                     rel = cursor.sql(sql)
                     if rel is None:
                         return []
@@ -283,7 +284,7 @@ class DuckDBEngine:
                         dict(zip(names, row, strict=True)) for row in rel.fetchall()
                     ]
 
-            with self.write_lock, self.get_connection(db_id) as cursor:
+            with self.write_lock, self.get_cursor(db_id) as cursor:
                 rel = cursor.sql(sql)
                 if rel is None:
                     return []
@@ -295,7 +296,7 @@ class DuckDBEngine:
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""
         # Uses parameter binding which is safe
-        with self.write_lock, self.get_connection('sis_db') as cursor:
+        with self.write_lock, self.get_cursor('sis_db') as cursor:
             cursor.execute(
                 'UPDATE students SET intervention_status = ? WHERE sid = ?',
                 (status, sid),
@@ -307,7 +308,7 @@ class DuckDBEngine:
         for db_id in ['lms_db', 'sis_db']:
             try:
                 # db_id is whitelisted above
-                with self.get_connection(db_id) as cursor:
+                with self.get_cursor(db_id) as cursor:
                     cursor.execute('SELECT 1')
                 health_status[db_id] = 'healthy'
             except Exception as e:
