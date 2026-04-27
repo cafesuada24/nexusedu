@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 
 from src.api.lifecycle import get_agent, get_dbmanager
 from src.api.main import app
+from src.api.auth import current_active_user, User
+import uuid
 from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
 from src.database.engines.duckdb_engine import DuckDBEngine
 from src.database.manager import DatabaseManager
@@ -64,10 +66,25 @@ def mock_agent() -> MagicMock:
 
 
 @pytest.fixture
-def client(mock_agent: MagicMock, test_db_manager: DatabaseManager) -> Generator[TestClient, None, None]:
+def mock_user() -> User:
+    """Provides a mock authenticated User with admin:all role."""
+    return User(
+        id=uuid.uuid4(), 
+        email="test@example.com", 
+        hashed_password="hashed_password", 
+        role="admin:all", 
+        is_active=True, 
+        is_superuser=False, 
+        is_verified=True
+    )
+
+
+@pytest.fixture
+def client(mock_agent: MagicMock, test_db_manager: DatabaseManager, mock_user: User) -> Generator[TestClient, None, None]:
     """Provides a FastAPI TestClient with mocked dependencies."""
     app.dependency_overrides[get_agent] = lambda: mock_agent
     app.dependency_overrides[get_dbmanager] = lambda: test_db_manager
+    app.dependency_overrides[current_active_user] = lambda: mock_user
 
     with TestClient(app) as c:
         yield c
