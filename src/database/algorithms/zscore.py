@@ -5,6 +5,8 @@ from __future__ import annotations
 import contextlib
 from typing import TYPE_CHECKING, override
 
+from duckdb import DatabaseError
+
 from src.database.engines.duckdb_engine import DuckDBEngine
 
 if TYPE_CHECKING:
@@ -20,8 +22,8 @@ class DuckDBZScoreAnomalyAlgorithm:
             raise TypeError(msg)
 
         # sis_db and lms_db are already attached to the engine's main connection.
-        # _get_connection('sis_db') returns a cursor set to sis_db context.
-        with engine.write_lock, engine.get_connection('sis_db') as cursor:
+        # _get_cursor('sis_db') returns a cursor set to sis_db context.
+        with engine.write_lock, engine.get_cursor('sis_db') as cursor:
             cursor.begin()
             try:
                 # 1. Calculate and insert new history records
@@ -96,6 +98,8 @@ class DuckDBZScoreAnomalyAlgorithm:
                 """)
 
                 cursor.commit()
+            except DatabaseError:
+                raise
             except Exception:
                 cursor.rollback()
                 raise
