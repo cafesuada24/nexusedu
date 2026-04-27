@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.dependencies.agent import get_agent
+from src.api.lifecycle import get_agent, get_dbmanager
 from src.api.main import app
 from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
 from src.database.engines.duckdb_engine import DuckDBEngine
@@ -42,11 +42,7 @@ def patch_db_manager(
     test_db_manager: DatabaseManager,
 ) -> None:
     """Monkeypatches the global db_manager to use the test version during tests."""
-    monkeypatch.setattr('src.database.db_manager', test_db_manager)
-    monkeypatch.setattr('src.database.manager.db_manager', test_db_manager)
-    monkeypatch.setattr('src.tools.db.db_manager', test_db_manager)
-    monkeypatch.setattr('src.api.routes.data.db_manager', test_db_manager)
-    monkeypatch.setattr('src.api.routes.alerts.db_manager', test_db_manager)
+    monkeypatch.setattr('src.api.lifecycle.get_dbmanager', lambda: test_db_manager)
 
 
 @pytest.fixture
@@ -68,9 +64,10 @@ def mock_agent() -> MagicMock:
 
 
 @pytest.fixture
-def client(mock_agent: MagicMock) -> Generator[TestClient, None, None]:
+def client(mock_agent: MagicMock, test_db_manager: DatabaseManager) -> Generator[TestClient, None, None]:
     """Provides a FastAPI TestClient with mocked dependencies."""
     app.dependency_overrides[get_agent] = lambda: mock_agent
+    app.dependency_overrides[get_dbmanager] = lambda: test_db_manager
 
     with TestClient(app) as c:
         yield c

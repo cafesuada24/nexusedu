@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.state import AgentState
-from src.api.dependencies.agent import get_agent
+from src.api.lifecycle import get_agent
 from src.api.models.request import QueryRequest
 from src.api.models.response import QueryResponse
 from src.telemetry.logger import logger
@@ -66,16 +66,20 @@ async def process_query(
                 answer = str(last_message)
 
         # 2. Tabular Data (Tables)
-        final_data = final_state.get('final_data')
-        tables = None
-        if final_data and isinstance(final_data, list) and len(final_data) > 0:
-            first_result = final_data[0]
-            if isinstance(first_result, dict) and 'data' in first_result:
-                tables = [first_result['data']]
+        results = final_state.get('results', [])
+        tables = []
+        if results and isinstance(results, list):
+            for result in results:
+                if isinstance(result, dict) and 'data' in result:
+                    # Filter out error dictionaries from results
+                    data = result['data']
+                    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict) and 'error' in data[0]:
+                        continue
+                    tables.append(data)
 
         return QueryResponse(
             answer=answer,
-            tables=tables,
+            tables=tables if tables else None,
             visualizations=None,
             session_id=session_id,
         )

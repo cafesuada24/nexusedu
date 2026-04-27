@@ -1,6 +1,6 @@
 """Database package for multi-source DB access and anomaly detection."""
 
 from src.database.config import DB_REGISTRY
-from src.database.manager import DatabaseManager, db_manager
+from src.database.manager import DatabaseManager
 
-__all__ = ['DatabaseManager', 'db_manager', 'DB_REGISTRY']
+__all__ = ['DatabaseManager', 'DB_REGISTRY']
