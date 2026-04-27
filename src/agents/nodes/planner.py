@@ -2,19 +2,14 @@
 
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage
-
 from src.agents.state import AgentState, MessageList
 from src.baml_client import b
-from src.prompts.loader import load_prompt
 from src.telemetry.logger import logger
 
-PLANNER_SYSTEM_PROMPT = load_prompt('src/prompts/v1/planner/system.txt')
 
-
-def _msg_to_yaml(msg: BaseMessage) -> str:
-    role = 'ai_response' if isinstance(msg, AIMessage) else 'human_message'
-    return f'<{role}>\n{msg.content}\n<\\{role}>'
+def _msg_to_yaml(msg: dict[str, str]) -> str:
+    role = 'ai_response' if msg['role'] == 'assistant' else 'human_message'
+    return f'<{role}>\n{msg['content']}\n<\\{role}>'
 
 
 def _msg_list_to_yaml(state: MessageList) -> str:
@@ -29,7 +24,6 @@ def planner(state: AgentState) -> dict[str, Any]:
     message = _msg_list_to_yaml(state['messages'])
 
     # Include discovery context in the prompt if available
-    discovery_info = ''
     if state.get('discovery_context'):
         logger.info('Planner: Incorporating discovery context.')
         message += f'\n\n<discovery_context>\n{state["discovery_context"]}\n</discovery_context>'

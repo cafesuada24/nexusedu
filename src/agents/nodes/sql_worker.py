@@ -5,15 +5,11 @@ from typing import Any
 from src.agents.state import SQLTask
 from src.agents.utils import stringifyToYaml
 from src.baml_client import b
-from src.baml_client.types import GeneratedSQL, RequestDBSchema
-from src.prompts.loader import load_prompt
+from src.baml_client.types import GeneratedSQL
 from src.telemetry.logger import logger
 from src.tools.db import execute_sql, get_db_schema
 
-SQL_GENERATOR_SYSTEM_PROMPT = load_prompt(
-    'src/prompts/v1/sql_generator/system.txt',
-    fallback='You are a SQL expert. Generate SQL for the given task.',
-)
+MAX_LOOP = 3
 
 
 def sql_worker(state: SQLTask) -> dict[str, Any]:
@@ -24,23 +20,27 @@ def sql_worker(state: SQLTask) -> dict[str, Any]:
 
     messages = [f'<task>\n{stringifyToYaml(state)}\n<\\task>']
     sql_data = None
-    loop = 0
-    while not isinstance(sql_data, GeneratedSQL) and loop < 3:
-        loop += 1
+    for _ in range(MAX_LOOP):
         sql_data = b.GenerateSQL('\n\n'.join(messages))
-        if isinstance(sql_data, RequestDBSchema):
-            messages.append('<db_schema_request>\ndb_id: {sql_data.db_id}\n</db_schema_request>')
-            schema = get_db_schema(sql_data.db_id)
-            messages.append(
-                f'<db_schema_result>\ndb_id: {sql_data.db_id}\n{schema}\n</db_schema_result>',
-            )
-        else:
+        if isinstance(sql_data, GeneratedSQL):
             logger.info(f'SQL_Worker [{db_id}]: Generated SQL: {sql_data.sql}')
             logger.log_event('sql_generated', sql_data.model_dump())
-
-    if loop >= 3:
+            break
+        messages.append(
+            '<db_schema_request>\ndb_id: {sql_data.db_id}\n</db_schema_request>',
+        )
+        schema = get_db_schema(sql_data.db_id)
+        messages.append(
+            f'<db_schema_result>\ndb_id: {sql_data.db_id}\n{schema}\n</db_schema_result>',
+        )
+    else:
         return {
-            'results': [{'db': db_id, 'data': {'error': 'Exceeded iteration limit 3'}}],
+            'results': [
+                {
+                    'db': db_id,
+                    'data': {'error': f'Agent exceeded iteration limit {MAX_LOOP}'},
+                },
+            ],
         }
 
     try:

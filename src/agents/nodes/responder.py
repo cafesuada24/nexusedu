@@ -1,17 +1,10 @@
 """Node that synthesizes all available context into a final response for the user."""
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-
-from src.agents.state import AgentState
+from src.agents.state import AgentState, MessageList
 from src.agents.utils import ResultSummarizer
 from src.baml_client import b
-from src.prompts.loader import load_prompt
 from src.telemetry.logger import logger
 
-RESPONDER_SYSTEM_PROMPT = load_prompt(
-    'src/prompts/v1/responder/system.txt',
-    fallback='You are a helpful data assistant. Synthesize the provided query results into a concise, professional answer for the user.',
-)
 
 def _summarize_result(state: AgentState) -> str:
     results = state.get('results', [])
@@ -38,7 +31,7 @@ def _summarize_result(state: AgentState) -> str:
 
 
 
-def responder_node(state: AgentState) -> dict[str, list[BaseMessage]]:
+def responder_node(state: AgentState) -> dict[str, MessageList]:
     """Node that synthesizes all available context into a final response for the user."""
     logger.info('Responder: Generating final response...')
     logger.debug(f'Responder State: {state}')
@@ -47,9 +40,9 @@ def responder_node(state: AgentState) -> dict[str, list[BaseMessage]]:
     context = _summarize_result(state)
 
     human_messages = [
-        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
+        m for m in state.get('messages', []) if m['role'] == 'user'
     ]
-    user_intent = str(human_messages[-1].content) if human_messages else 'No intent found'
+    user_intent = str(human_messages[-1]['content']) if human_messages else 'No intent found'
 
     prompt = f"""
     <user_intent>
@@ -65,4 +58,4 @@ def responder_node(state: AgentState) -> dict[str, list[BaseMessage]]:
     response = b.Respond(prompt)
 
     logger.info('Responder: Response generated.')
-    return {'messages': [AIMessage(response)]}
+    return {'messages': [{'role': 'assistant', 'content': response}]}

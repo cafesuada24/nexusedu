@@ -5,10 +5,7 @@ function for instantiating the compiled agent.
 """
 
 import uuid
-from typing import Any
 
-from langchain_core.messages import HumanMessage
-from langfuse.langchain import CallbackHandler
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import Checkpointer, CompiledStateGraph
 
@@ -69,14 +66,10 @@ def main() -> None:
     logger.set_context({'session_id': session_id})
     logger.info('Graph: Initializing execution', session_id=session_id)
 
-    # Initialize Langfuse Callback
-    langfuse_handler = CallbackHandler()
-
     # Configuration for execution
     config = {
         'recursion_limit': 50,
         'configurable': {'max_concurrency': 3},
-        'callbacks': [langfuse_handler],
     }
 
     # Print ASCII representation for debugging
@@ -93,7 +86,7 @@ def main() -> None:
 
     try:
         final_result = app.invoke(
-            {'messages': [HumanMessage(content=user_query)]},
+            {'messages': [{'role': 'user', 'content': user_query}]},
             config=config,
         )
         logger.info('Graph: Execution completed successfully')
