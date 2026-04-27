@@ -12,6 +12,7 @@ from psycopg_pool import ConnectionPool
 
 from src.agents.agent import create_graph
 from src.agents.state import AgentState
+from src.api.auth import create_db_and_tables
 from src.database import DatabaseManager
 from src.database.factory import algorithm_registry, engine_registry
 from src.telemetry.logger import logger
@@ -29,6 +30,10 @@ class AppState:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manages the startup and shutdown lifecycle of the FastAPI application."""
     load_dotenv()
+
+    # ==== Auth DB ====
+    logger.info('API Lifecycle: Initializing Auth Database...')
+    await create_db_and_tables()
 
     # ==== DB ====
     logger.info('API Lifecycle: Initializing DatabaseManager...')

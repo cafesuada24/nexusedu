@@ -61,9 +61,17 @@ def sql_worker(state: SQLTask, config: RunnableConfig) -> dict[str, Any]:
         logger.info(f'SQL_Worker [{db_id}]: Generated SQL: {sql_data.sql}')
         logger.log_event('sql_generated', sql_data.model_dump())
 
+        # Dynamic Column Masking for PII Hardening
+        user_role = config.get('configurable', {}).get('user_role', 'advisor:read')
+        final_sql = sql_data.sql
+        if user_role == 'advisor:read':
+            # Wrap the query in a CTE and exclude PII columns (DuckDB specific syntax)
+            final_sql = f'SELECT * EXCLUDE (student_name, email, phone) FROM ({sql_data.sql}) AS subquery'
+            logger.info(f'SQL_Worker [{db_id}]: Applied PII masking for {user_role}')
+
         try:
             logger.info(f'SQL_Worker [{db_id}]: Executing query (Attempt {i + 1})...')
-            raw_data = db_manager.execute(db_id, sql_data.sql)
+            raw_data = db_manager.execute(db_id, final_sql)
 
             # Check for errors in the returned data if the tool returns a list with error dict
             if raw_data and isinstance(raw_data, list) and 'error' in raw_data[0]:

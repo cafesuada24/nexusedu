@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.state import AgentState
+from src.api.auth import User, check_role
 from src.api.lifecycle import get_agent, get_dbmanager
 from src.api.models.request import QueryRequest
 from src.api.models.response import (
@@ -28,6 +29,7 @@ async def _run_agent_task(
     thread_id: str | None,
     agent: CompiledStateGraph[AgentState, None, AgentState],
     db_manager: DatabaseManager,
+    user: User,
 ) -> None:
     """Encapsulates the LangGraph agent execution in a background task."""
     session_id = thread_id or str(uuid.uuid4())
@@ -41,6 +43,7 @@ async def _run_agent_task(
             'thread_id': session_id,
             'max_concurrency': 3,
             'db_manager': db_manager,
+            'user_role': user.role,
         },
     }
 
@@ -116,6 +119,7 @@ async def process_query(
         Depends(get_agent),
     ],
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:read'))],
 ) -> JobAcceptedResponse:
     """Triggers the LangGraph agent in the background.
 
@@ -134,6 +138,7 @@ async def process_query(
         thread_id=request.thread_id,
         agent=agent,
         db_manager=db_manager,
+        user=user,
     )
 
     return JobAcceptedResponse(job_id=job_id, status='processing')

@@ -9,6 +9,7 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 from src.agents.state import AgentState
+from src.api.auth import User, check_role
 from src.api.lifecycle import get_agent, get_dbmanager
 from src.api.models.response import (
     JobAcceptedResponse,
@@ -55,6 +56,7 @@ class SendEmailRequest(BaseModel):
 @router.get('/', response_model=list[AlertStudent])
 async def get_alerts(
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:read'))],
     status: str | None = Query(None),
 ) -> list[dict[str, str]]:
     """Retrieve students who have an active alert for the Kanban board."""
@@ -82,6 +84,7 @@ async def update_alert_status(
     sid: str,
     update: StatusUpdate,
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:write'))],
 ) -> dict[str, str]:
     """Update the Kanban state for a specific student's intervention."""
     valid_statuses = [
@@ -113,6 +116,7 @@ async def _run_email_draft_task(
     sid: str,
     agent: CompiledStateGraph[AgentState, None, AgentState],
     db_manager: DatabaseManager,
+    user: User,
 ) -> None:
     """Encapsulates the email draft generation in a background task."""
     logger.set_context({'sid': sid, 'job_id': job_id})
@@ -131,16 +135,30 @@ async def _run_email_draft_task(
         student_name = student_data[0]['student_name']
         recipient_email = student_data[0]['email']
 
-        # 2. Invoke Agent with anonymized request
+        # 2. Fetch performance data locally for anonymization
+        perf_data = db_manager.execute(
+            'sis_db',
+            f"SELECT academic_year, semester, baseline_avg, baseline_std, current_score_avg, z_score, anomaly_flag FROM student_status_history WHERE sid = '{sid}'",
+        )
+        
+        # 3. Create session-based anonymized_id
+        anonymized_id = f"STU_{uuid.uuid4().hex[:8]}"
+
+        # 4. Invoke Agent with anonymized request and local context
         query = (
-            f"Generate an empathetic nudge email draft for student sid '{sid}'. "
+            f"Generate an empathetic nudge email draft for student with anonymized_id '{anonymized_id}'. "
+            f"Contextual Performance Patterns: {perf_data}. "
             'Use placeholders {{STUDENT_NAME}} and {{ADVISOR_LINK}}. '
-            'Focus on their performance trajectory in the student_status_history.'
+            'Focus on their performance trajectory in the contextual data.'
         )
 
         config = {
             'recursion_limit': 30,
-            'configurable': {'thread_id': str(uuid.uuid4())},
+            'configurable': {
+                'thread_id': str(uuid.uuid4()),
+                'db_manager': db_manager,
+                'user_role': user.role,
+            },
         }
 
         final_state: AgentState | None = await agent.ainvoke(
@@ -205,6 +223,7 @@ async def generate_email_draft(
         Depends(get_agent),
     ],
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:write'))],
 ) -> JobAcceptedResponse:
     """Triggers the AI to generate a personalized email draft in the background.
 
@@ -222,6 +241,7 @@ async def generate_email_draft(
         sid=sid,
         agent=agent,
         db_manager=db_manager,
+        user=user,
     )
 
     return JobAcceptedResponse(job_id=job_id, status='processing')
@@ -232,6 +252,7 @@ async def send_nudge_email(
     sid: str,
     request: SendEmailRequest,
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:write'))],
 ) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle."""
     # 1. Fetch student info for logging/dispatch

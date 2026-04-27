@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from src.api.auth import User, check_role
 from src.api.lifecycle import get_dbmanager
 from src.api.models.request import (
     CoreDataSource,
@@ -19,6 +20,7 @@ router = APIRouter(prefix='/data', tags=['data'])
 async def ingest_data(
     request: DataIngestionRequest,
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('admin:all'))],
 ) -> dict[str, object]:
     """Ingest multi-source data from JSON payload.
 
