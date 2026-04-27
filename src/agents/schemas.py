@@ -9,10 +9,10 @@ class PlannerTask(BaseModel):
     db_id: str = Field(description='The ID of the database to query.')
     dialect: str = Field(description='The SQL dialect to use (e.g., duckdb).')
     query_intent: str = Field(
-        description='The specific data to retrieve from this database.'
+        description='The specific data to retrieve from this database.',
     )
     schema_hint: str = Field(
-        default='', description='Optional hints about tables or columns to focus on.'
+        default='', description='Optional hints about tables or columns to focus on.',
     )
 
 
@@ -20,7 +20,7 @@ class PlannerOutput(BaseModel):
     """The structured output for the planner LLM."""
 
     tasks: list[PlannerTask] = Field(
-        description='The list of parallel SQL tasks to execute.'
+        description='The list of parallel SQL tasks to execute.',
     )
 
 
