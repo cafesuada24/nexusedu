@@ -53,3 +53,24 @@ def test_execute_read_only_protection(test_db_manager: DatabaseManager) -> None:
     # Verify table still exists
     tables = test_db_manager.list_tables('sis_db')
     assert 'safe_table' in tables
+
+def test_execute_multi_statement_blocked(test_db_manager: DatabaseManager) -> None:
+    """Verify that multi-statement queries are blocked."""
+    sql = "SELECT 1; SELECT 2;"
+    result = test_db_manager.execute('sis_db', sql, read_only=True)
+    assert 'error' in result[0]
+    assert 'Multiple statements' in result[0]['error']
+
+def test_execute_statement_type_blocked(test_db_manager: DatabaseManager) -> None:
+    """Verify that disallowed statement types are blocked in read-only mode."""
+    sql = "INSERT INTO students (sid, student_name) VALUES ('S999', 'Malicious')"
+    result = test_db_manager.execute('sis_db', sql, read_only=True)
+    assert 'error' in result[0]
+    assert 'Blocked: Statement type Insert is not allowed' in result[0]['error']
+
+def test_execute_bypass_blocked(test_db_manager: DatabaseManager) -> None:
+    """Verify that multi-statement bypass attempts are blocked."""
+    sql = "SELECT 1; DROP TABLE students;"
+    result = test_db_manager.execute('sis_db', sql, read_only=True)
+    assert 'error' in result[0]
+    assert 'Multiple statements' in result[0]['error']
