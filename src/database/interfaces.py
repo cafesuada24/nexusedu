@@ -52,6 +52,10 @@ class DatabaseEngine(Protocol):
         """Update the intervention lifecycle status for a specific student."""
         ...
 
+    def check_health(self) -> dict[str, str]:
+        """Verify connectivity to all registered databases."""
+        ...
+
 class AnomalyAlgorithm(Protocol):
     """Protocol for anomaly detection algorithms."""
 

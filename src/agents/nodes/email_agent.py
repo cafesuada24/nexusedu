@@ -2,12 +2,11 @@
 
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage
-
 from src.agents.state import AgentState
 from src.agents.utils import ResultSummarizer
 from src.baml_client import b
 from src.telemetry.logger import logger
+
 
 def email_agent_node(state: AgentState) -> dict[str, Any]:
     """Node for generating personalized email drafts based on student data."""
@@ -17,10 +16,10 @@ def email_agent_node(state: AgentState) -> dict[str, Any]:
     summary = ResultSummarizer.summarize(results)
 
     human_messages = [
-        m for m in state.get('messages', []) if isinstance(m, HumanMessage)
+        m for m in state.get('messages', []) if m['role'] == 'user'
     ]
     user_intent = (
-        str(human_messages[-1].content) if human_messages else 'Generate nudge email'
+        str(human_messages[-1]['content']) if human_messages else 'Generate nudge email'
     )
 
     logger.debug('Email Agent: Invoking LLM for email drafting...')
