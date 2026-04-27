@@ -27,7 +27,7 @@ def sql_worker(state: SQLTask) -> dict[str, Any]:
             logger.log_event('sql_generated', sql_data.model_dump())
             break
         messages.append(
-            '<db_schema_request>\ndb_id: {sql_data.db_id}\n</db_schema_request>',
+            f'<db_schema_request>\ndb_id: {sql_data.db_id}\n</db_schema_request>',
         )
         schema = get_db_schema(sql_data.db_id)
         messages.append(
