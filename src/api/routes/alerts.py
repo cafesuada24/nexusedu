@@ -126,19 +126,20 @@ async def generate_email_draft(
     config = {'recursion_limit': 30, 'configurable': {'thread_id': str(uuid.uuid4())}}
 
     try:
-        final_state = await agent.ainvoke(
+        final_state: AgentState | None = await agent.ainvoke(
             {'messages': [{'role': 'user', 'content': query}]},
             config=config,
         )
+
+        if not final_state:
+            raise ValueError('Agent returned an empty or invalid state.')
+
         messages = final_state.get('messages', [])
-        ai_response = messages[-1].content if messages else ''
+        ai_response = ''
 
-        # Extract text if it's a list (as seen in recent logs)
-        if isinstance(ai_response, list):
-            ai_response = ai_response[0].get('text', '') if ai_response else ''
-
-        if not isinstance(ai_response, str):
-            raise RuntimeError(f'Unexpected type of ai_response: {type(ai_response)}')
+        if messages:
+            last_message = messages[-1]
+            ai_response = last_message['content']
 
         # 3. Late-stage Interpolation
         personalized_body = ai_response.replace('{{STUDENT_NAME}}', student_name)

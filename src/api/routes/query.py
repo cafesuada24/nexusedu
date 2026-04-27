@@ -48,21 +48,30 @@ async def process_query(
         execution_time = time.time() - start_time
         logger.info(f'API: Agent execution completed in {execution_time:.2f}s')
 
-        # Extract values from state
+        if not final_state:
+            raise ValueError('Agent returned an empty or invalid state.')
+
+        # Extract values from state with safety checks
         # 1. Answer (last message from the agent)
         messages = final_state.get('messages', [])
+        answer = 'No response generated.'
         if messages:
             last_message = messages[-1]
+            # Handle both BaseMessage objects and dict-based messages
             if hasattr(last_message, 'content'):
-                answer = last_message.content
+                answer = str(last_message.content)
+            elif isinstance(last_message, dict) and 'content' in last_message:
+                answer = str(last_message['content'])
             else:
                 answer = str(last_message)
-        else:
-            answer = 'No response generated.'
 
         # 2. Tabular Data (Tables)
         final_data = final_state.get('final_data')
-        tables = [final_data[0]['data']] if final_data and len(final_data) > 0 else None
+        tables = None
+        if final_data and isinstance(final_data, list) and len(final_data) > 0:
+            first_result = final_data[0]
+            if isinstance(first_result, dict) and 'data' in first_result:
+                tables = [first_result['data']]
 
         return QueryResponse(
             answer=answer,

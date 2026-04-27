@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -18,12 +18,12 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
 
-    from src.database.interfaces import AnomalyAlgorithm, DatabaseEngine
 
 @pytest.fixture
 def test_data_dir(tmp_path: Path) -> Path:
     """Provides a temporary directory for test database files."""
     return tmp_path
+
 
 @pytest.fixture
 def test_db_manager(test_data_dir: Path) -> DatabaseManager:
@@ -35,9 +35,11 @@ def test_db_manager(test_data_dir: Path) -> DatabaseManager:
     manager.initialize_schema()
     return manager
 
+
 @pytest.fixture(autouse=True)
 def patch_db_manager(
-    monkeypatch: pytest.MonkeyPatch, test_db_manager: DatabaseManager
+    monkeypatch: pytest.MonkeyPatch,
+    test_db_manager: DatabaseManager,
 ) -> None:
     """Monkeypatches the global db_manager to use the test version during tests."""
     monkeypatch.setattr('src.database.db_manager', test_db_manager)
@@ -45,6 +47,7 @@ def patch_db_manager(
     monkeypatch.setattr('src.tools.db.db_manager', test_db_manager)
     monkeypatch.setattr('src.api.routes.data.db_manager', test_db_manager)
     monkeypatch.setattr('src.api.routes.alerts.db_manager', test_db_manager)
+
 
 @pytest.fixture
 def mock_agent() -> MagicMock:
@@ -54,11 +57,15 @@ def mock_agent() -> MagicMock:
     agent.ainvoke = AsyncMock(
         return_value={
             'messages': [
-                MagicMock(content='Hello {{STUDENT_NAME}}, this is an AI draft.'),
+                {
+                    'role': 'assistant',
+                    'content': 'Hello {{STUDENT_NAME}}, this is an AI draft.',
+                },
             ],
-        }
+        },
     )
     return agent
+
 
 @pytest.fixture
 def client(mock_agent: MagicMock) -> Generator[TestClient, None, None]:
