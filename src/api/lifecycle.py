@@ -6,7 +6,9 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph.state import CompiledStateGraph
+from psycopg_pool import ConnectionPool
 
 from src.agents.agent import create_graph
 from src.agents.state import AgentState
@@ -20,6 +22,7 @@ class AppState:
     """State object held in the FastAPI app.state."""
     db_manager: DatabaseManager
     agent: CompiledStateGraph[AgentState, None, AgentState]
+    pool: ConnectionPool | None = None
 
 
 @asynccontextmanager
@@ -45,21 +48,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Ensure schema is ready
     db_manager.initialize_schema()
 
+    # ==== Agent Checkpointer ====
+    postgres_uri = os.getenv('POSTGRES_DB_URI')
+    pool = None
+    if postgres_uri:
+        logger.info('API Lifecycle: Initializing PostgresSaver checkpointer...')
+        pool = ConnectionPool(conninfo=postgres_uri, max_size=20)
+        checkpointer = PostgresSaver(pool)
+        # Note: setup() is sync in PostgresSaver
+        checkpointer.setup()
+    else:
+        logger.warning('API Lifecycle: POSTGRES_DB_URI not found. Falling back to MemorySaver.')
+        checkpointer = MemorySaver()
+
     # ==== Agent ====
     logger.info('API Lifecycle: Agents...')
-    memory = MemorySaver()
-    agent = create_graph(checkpointer=memory)
+    agent = create_graph(checkpointer=checkpointer)
 
     # Bind state to app
     app.state.app_state = AppState(
         db_manager=db_manager,
         agent=agent,
+        pool=pool,
     )
 
     yield
 
     # SHUTDOWN: Cleanup resources
-    logger.info('API Lifecycle: Shutting down DatabaseManager...')
+    logger.info('API Lifecycle: Shutting down...')
+    if pool:
+        pool.close()
     db_manager.close()
 
 
