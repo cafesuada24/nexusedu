@@ -4,7 +4,7 @@ import contextlib
 import re
 import threading
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +26,10 @@ class DuckDBEngine:
         # Use a single main connection and ATTACH other databases to it.
         # This allows cross-database joins and avoids "file already open" errors.
         self._main_conn = duckdb.connect()
+        # Enable WAL-like behavior and performance optimizations for concurrency
+        self._main_conn.execute('PRAGMA enable_checkpoint_on_shutdown')
+        self._main_conn.execute("PRAGMA checkpoint_threshold='1GB'")
+        self._main_conn.execute('PRAGMA threads=8')
         self._attached_dbs: set[str] = set()
         self.write_lock = threading.RLock()
 
@@ -52,7 +56,7 @@ class DuckDBEngine:
         return self.data_dir / f'{db_id}.duckdb'
 
     @contextlib.contextmanager
-    def get_cursor(self, db_id: str):
+    def get_cursor(self, db_id: str) -> Iterator[duckdb.DuckDBPyConnection]:
         """Get a cursor to the specified database. Ensures the cursor is closed after use."""
         self._validate_db_id(db_id)
 
@@ -224,6 +228,38 @@ class DuckDBEngine:
                 + f'\n- Sample data:\n```\n{sample_str}```'
             )
 
+    def _validate_read_only_sql(self, sql: str) -> str | None:
+        """Validate that the SQL is read-only. Returns an error message if invalid."""
+        try:
+            # Use sqlglot to parse and validate the SQL
+            expressions = sqlglot.parse(sql, read='duckdb')
+
+            if len(expressions) != 1:
+                return 'Blocked: Multiple statements are not allowed.'
+
+            expression = expressions[0]
+            # Allowed statement types for read-only execution
+            # WITH statements are parsed as exp.Select
+            allowed_types = (exp.Select, exp.Describe, exp.Show)
+
+            is_allowed = isinstance(expression, allowed_types)
+
+            # Handle EXPLAIN which sqlglot may parse as a Command
+            if (
+                not is_allowed
+                and isinstance(expression, exp.Command)
+                and expression.this.upper() == 'EXPLAIN'
+            ):
+                is_allowed = True
+
+            if not is_allowed:
+                return f'Blocked: Statement type {type(expression).__name__} is not allowed in read-only mode.'
+
+        except sqlglot.ParseError as e:
+            return f'SQL Parse Error: {e}'
+
+        return None
+
     def execute(
         self,
         db_id: str,
@@ -234,44 +270,9 @@ class DuckDBEngine:
         # db_id validated in _get_cursor
 
         if read_only:
-            try:
-                # Use sqlglot to parse and validate the SQL
-                expressions = sqlglot.parse(sql, read='duckdb')
-
-                if len(expressions) != 1:
-                    return [
-                        {
-                            'error': 'Blocked: Multiple statements are not allowed.',
-                        },
-                    ]
-
-                expression = expressions[0]
-                # Allowed statement types for read-only execution
-                # WITH statements are parsed as exp.Select
-                allowed_types = (exp.Select, exp.Describe, exp.Show)
-
-                is_allowed = isinstance(expression, allowed_types)
-
-                # Handle EXPLAIN which sqlglot may parse as a Command
-                if (
-                    not is_allowed
-                    and isinstance(expression, exp.Command)
-                    and expression.this.upper() == 'EXPLAIN'
-                ):
-                    is_allowed = True
-
-                if not is_allowed:
-                    return [
-                        {
-                            'error': f'Blocked: Statement type {type(expression).__name__} is not allowed in read-only mode.',
-                        },
-                    ]
-            except sqlglot.ParseError as e:
-                return [
-                    {
-                        'error': f'SQL Parse Error: {e}',
-                    },
-                ]
+            error = self._validate_read_only_sql(sql)
+            if error:
+                return [{'error': error}]
 
         try:
             if read_only:
@@ -280,9 +281,7 @@ class DuckDBEngine:
                     if rel is None:
                         return []
                     names = rel.columns
-                    return [
-                        dict(zip(names, row, strict=True)) for row in rel.fetchall()
-                    ]
+                    return [dict(zip(names, row, strict=True)) for row in rel.fetchall()]
 
             with self.write_lock, self.get_cursor(db_id) as cursor:
                 rel = cursor.sql(sql)
