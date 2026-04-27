@@ -1,6 +1,7 @@
 """DuckDB implementation of the DatabaseEngine protocol."""
 
 import contextlib
+import os
 import re
 import threading
 import uuid
@@ -23,10 +24,26 @@ class DuckDBEngine:
         """Initialize DuckDBEngine with a data directory."""
         self.data_dir = Path(data_dir)
         self._allowed_db_ids = {db['id'] for db in DB_REGISTRY}
-        # Use a single main connection and ATTACH other databases to it.
-        # This allows cross-database joins and avoids "file already open" errors.
-        self._main_conn = duckdb.connect()
-        # Enable WAL-like behavior and performance optimizations for concurrency
+        
+        # Check for MotherDuck token
+        md_token = os.getenv('MOTHERDUCK_TOKEN')
+        self.is_motherduck = bool(md_token)
+        md_connected = False
+
+        if self.is_motherduck:
+            try:
+            # Connect to MotherDuck
+                self._main_conn = duckdb.connect(f'md:?motherduck_token={md_token}')
+                md_connected = True
+            except Exception:
+                pass
+        if not md_connected:
+            # Use a single main connection and ATTACH other databases to it.
+            # This allows cross-database joins and avoids "file already open" errors.
+            self._main_conn = duckdb.connect()
+            # Performance optimizations for concurrency
+        
+        # Shared performance settings
         self._main_conn.execute('PRAGMA enable_checkpoint_on_shutdown')
         self._main_conn.execute("PRAGMA checkpoint_threshold='1GB'")
         self._main_conn.execute('PRAGMA threads=8')
@@ -70,10 +87,14 @@ class DuckDBEngine:
 
         with self.write_lock:
             if db_id not in self._attached_dbs:
-                path = self._get_path(db_id)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                # Attach the database file using its ID as alias
-                self._main_conn.execute(f"ATTACH '{path}' AS {db_id}")
+                if self.is_motherduck:
+                    # Resolve to MotherDuck database
+                    self._main_conn.execute(f"ATTACH 'md:{db_id}' AS {db_id}")
+                else:
+                    path = self._get_path(db_id)
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    # Attach the database file using its ID as alias
+                    self._main_conn.execute(f"ATTACH '{path}' AS {db_id}")
                 self._attached_dbs.add(db_id)
 
         # Return a cursor that defaults to the requested database
