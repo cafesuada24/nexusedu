@@ -9,15 +9,15 @@ if TYPE_CHECKING:
 
     from src.database.interfaces import AnomalyAlgorithm, DatabaseEngine
 
-class DatabaseManager:
+class DatabaseManager[T_Engine: "DatabaseEngine", T_Algo: "AnomalyAlgorithm"]:
     """Orchestrates database operations using injected engine and anomaly algorithms."""
 
     def __init__(self) -> None:
         """Initialize DatabaseManager. Engine and algorithm can be injected later."""
-        self._engine: DatabaseEngine | None = None
-        self._anomaly_algo: AnomalyAlgorithm | None = None
+        self._engine: T_Engine | None = None
+        self._anomaly_algo: T_Algo | None = None
 
-    def initialize(self, engine: DatabaseEngine, anomaly_algo: AnomalyAlgorithm) -> None:
+    def initialize(self, engine: T_Engine, anomaly_algo: T_Algo) -> None:
         """Inject dependencies and initialize the manager."""
         self._engine = engine
         self._anomaly_algo = anomaly_algo
@@ -36,14 +36,14 @@ class DatabaseManager:
         self._anomaly_algo = None
 
     @property
-    def engine(self) -> DatabaseEngine:
+    def engine(self) -> T_Engine:
         """Get the injected engine, auto-initializing if needed."""
         self._ensure_initialized()
         assert self._engine is not None
         return self._engine
 
     @property
-    def anomaly_algo(self) -> AnomalyAlgorithm:
+    def anomaly_algo(self) -> T_Algo:
         """Get the injected algorithm, auto-initializing if needed."""
         self._ensure_initialized()
         assert self._anomaly_algo is not None

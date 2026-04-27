@@ -13,6 +13,9 @@ from src.tools.db import (
 )
 
 
+MAX_DISCOVERY_CONTEXT_CHARS = 15_000
+
+
 def discovery_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
     """Node that performs schema discovery using database tools."""
     logger.info('Discovery: Executing tools...')
@@ -39,15 +42,20 @@ def discovery_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
             db_id = getattr(req, 'db_id', None)
             table_name = getattr(req, 'table_name', None)
 
-        if tool_name == 'get_db_list':
-            res = get_db_list()
-        elif tool_name == 'list_tables' and db_id:
-            res = list_tables(db_id=db_id, db_manager=db_manager)
-        elif tool_name == 'describe_table' and db_id and table_name:
-            res = describe_table(db_id=db_id, table_name=table_name, db_manager=db_manager)
-        else:
-            logger.warning(f'Discovery Task {i + 1}: Unknown tool {tool_name} or missing args')
-            continue
+        match tool_name:
+            case 'get_db_list':
+                res = get_db_list()
+            case 'list_tables' if db_id:
+                res = list_tables(db_id=db_id, db_manager=db_manager)
+            case 'describe_table' if db_id and table_name:
+                res = describe_table(
+                    db_id=db_id, table_name=table_name, db_manager=db_manager
+                )
+            case _:
+                logger.warning(
+                    f'Discovery Task {i + 1}: Unknown tool {tool_name} or missing args'
+                )
+                continue
 
         logger.info(
             f'Discovery Task {i + 1}: Calling {tool_name} for {db_id or "root"}/{table_name or "none"}',
@@ -65,6 +73,13 @@ def discovery_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
 
     current_context = state.get('discovery_context') or ''
     updated_context = current_context + '\n\n' + '\n\n'.join(new_context_parts)
+
+    # Prevent unbounded growth of discovery_context
+    if len(updated_context) > MAX_DISCOVERY_CONTEXT_CHARS:
+        logger.warning(
+            f'Discovery: Context limit reached ({len(updated_context)} > {MAX_DISCOVERY_CONTEXT_CHARS}). Truncating...'
+        )
+        updated_context = updated_context[-MAX_DISCOVERY_CONTEXT_CHARS:]
 
     logger.info(f'Discovery: Updated context length: {len(updated_context)}')
 
