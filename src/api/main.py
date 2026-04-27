@@ -12,7 +12,7 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.lifecycle import lifespan
-from src.api.routes import alerts, data, health, query
+from src.api.routes import alerts, data, health, jobs, query
 from src.telemetry.logger import logger
 
 app = FastAPI(
@@ -72,6 +72,7 @@ async def root() -> dict[str, str]:
 
 # Include routers into the versioned API router
 api_v1_router.include_router(health.router)
+api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(alerts.router)

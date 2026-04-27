@@ -2,14 +2,19 @@
 
 import time
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 from src.agents.state import AgentState
 from src.api.lifecycle import get_agent, get_dbmanager
+from src.api.models.response import (
+    JobAcceptedResponse,
+    JobStatusResponse,
+)
+from src.api.utils.jobs_store import _jobs
 from src.database.manager import DatabaseManager
 from src.telemetry.logger import logger
 
@@ -103,38 +108,41 @@ async def update_alert_status(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get('/{sid}/draft', response_model=EmailDraft)
-async def generate_email_draft(
+async def _run_email_draft_task(
+    job_id: str,
     sid: str,
-    agent: Annotated[
-        CompiledStateGraph[AgentState, None, AgentState, AgentState],
-        Depends(get_agent),
-    ],
-    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
-) -> EmailDraft:
-    """Generate a personalized, PII-safe email draft for a student."""
-    # 1. Fetch student PII locally (never exposed to LLM)
-    student_data = db_manager.execute(
-        'sis_db',
-        f"SELECT student_name, email FROM students WHERE sid = '{sid}'",
-    )
-
-    if not student_data or 'error' in student_data[0]:
-        raise HTTPException(status_code=404, detail='Student not found.')
-
-    student_name = student_data[0]['student_name']
-    recipient_email = student_data[0]['email']
-
-    # 2. Invoke Agent with anonymized request
-    query = (
-        f"Generate an empathetic nudge email draft for student sid '{sid}'. "
-        'Use placeholders {{STUDENT_NAME}} and {{ADVISOR_LINK}}. '
-        'Focus on their performance trajectory in the student_status_history.'
-    )
-
-    config = {'recursion_limit': 30, 'configurable': {'thread_id': str(uuid.uuid4())}}
+    agent: CompiledStateGraph[AgentState, None, AgentState],
+    db_manager: DatabaseManager,
+) -> None:
+    """Encapsulates the email draft generation in a background task."""
+    logger.set_context({'sid': sid, 'job_id': job_id})
+    logger.info(f'API (BG): Generating email draft for student {sid}')
 
     try:
+        # 1. Fetch student PII locally (never exposed to LLM)
+        student_data = db_manager.execute(
+            'sis_db',
+            f"SELECT student_name, email FROM students WHERE sid = '{sid}'",
+        )
+
+        if not student_data or 'error' in student_data[0]:
+            raise ValueError(f'Student {sid} not found.')
+
+        student_name = student_data[0]['student_name']
+        recipient_email = student_data[0]['email']
+
+        # 2. Invoke Agent with anonymized request
+        query = (
+            f"Generate an empathetic nudge email draft for student sid '{sid}'. "
+            'Use placeholders {{STUDENT_NAME}} and {{ADVISOR_LINK}}. '
+            'Focus on their performance trajectory in the student_status_history.'
+        )
+
+        config = {
+            'recursion_limit': 30,
+            'configurable': {'thread_id': str(uuid.uuid4())},
+        }
+
         final_state: AgentState | None = await agent.ainvoke(
             {'messages': [{'role': 'user', 'content': query}]},
             config=config,
@@ -148,7 +156,12 @@ async def generate_email_draft(
 
         if messages:
             last_message = messages[-1]
-            ai_response = last_message['content']
+            if hasattr(last_message, 'content'):
+                ai_response = str(last_message.content)
+            elif isinstance(last_message, dict) and 'content' in last_message:
+                ai_response = str(last_message['content'])
+            else:
+                ai_response = str(last_message)
 
         # 3. Late-stage Interpolation
         personalized_body = ai_response.replace('{{STUDENT_NAME}}', student_name)
@@ -158,18 +171,60 @@ async def generate_email_draft(
             'https://calendly.com/advisor-help',
         )
 
-        return EmailDraft(
-            sid=sid,
-            recipient_email=recipient_email,
-            subject='Checking in on your academic progress',
-            body=personalized_body,
+        # Update job status to completed
+        _jobs[job_id] = JobStatusResponse(
+            job_id=job_id,
+            status='completed',
+            result=EmailDraft(
+                sid=sid,
+                recipient_email=recipient_email,
+                subject='Checking in on your academic progress',
+                body=personalized_body,
+            ),
         )
 
     except Exception as e:
-        logger.error(f'Failed to generate draft: {e}', exc_info=True)
-        raise HTTPException(
-            status_code=500, detail='Failed to generate AI draft.'
-        ) from e
+        logger.error(
+            f'API (BG): Failed to generate draft for student {sid}: {e}', exc_info=True
+        )
+        _jobs[job_id] = JobStatusResponse(
+            job_id=job_id,
+            status='failed',
+            error=str(e),
+        )
+    finally:
+        logger.clear_context()
+
+
+@router.post('/{sid}/draft', response_model=JobAcceptedResponse, status_code=202)
+async def generate_email_draft(
+    sid: str,
+    background_tasks: BackgroundTasks,
+    agent: Annotated[
+        CompiledStateGraph[AgentState, None, AgentState],
+        Depends(get_agent),
+    ],
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+) -> JobAcceptedResponse:
+    """Triggers the AI to generate a personalized email draft in the background.
+
+    Returns a job_id immediately for status polling.
+    """
+    job_id = str(uuid.uuid4())
+
+    # Initialize job status
+    _jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
+
+    # Schedule background task
+    background_tasks.add_task(
+        _run_email_draft_task,
+        job_id=job_id,
+        sid=sid,
+        agent=agent,
+        db_manager=db_manager,
+    )
+
+    return JobAcceptedResponse(job_id=job_id, status='processing')
 
 
 @router.post('/{sid}/send')

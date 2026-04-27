@@ -67,7 +67,7 @@ def test_update_alert_status(client: TestClient, test_db_manager: DatabaseManage
 def test_generate_draft(
     client: TestClient, test_db_manager: DatabaseManager, mock_agent: MagicMock,
 ) -> None:
-    """Verify email draft generation with PII interpolation."""
+    """Verify email draft generation with PII interpolation via background job."""
     test_db_manager.ingest_records(
         'sis_db',
         'students',
@@ -81,13 +81,24 @@ def test_generate_draft(
         ],
     )
 
-    response = client.get('/api/v1/alerts/DRAFT_1/draft')
-    assert response.status_code == 200
+    # 1. Trigger the draft generation
+    response = client.post('/api/v1/alerts/DRAFT_1/draft')
+    assert response.status_code == 202
     data = response.json()
-    assert data['sid'] == 'DRAFT_1'
-    assert data['recipient_email'] == 'alice@pii.com'
+    assert 'job_id' in data
+    job_id = data['job_id']
+
+    # 2. Poll for the job status
+    poll_response = client.get(f'/api/v1/jobs/{job_id}')
+    assert poll_response.status_code == 200
+    poll_data = poll_response.json()
+    assert poll_data['status'] == 'completed'
+    
+    result = poll_data['result']
+    assert result['sid'] == 'DRAFT_1'
+    assert result['recipient_email'] == 'alice@pii.com'
     # Check interpolation of {{STUDENT_NAME}} from conftest mock
-    assert 'Alice PII' in data['body']
+    assert 'Alice PII' in result['body']
     assert mock_agent.ainvoke.called
 
 def test_send_nudge_email(client: TestClient, test_db_manager: DatabaseManager) -> None:
