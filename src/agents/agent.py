@@ -4,8 +4,10 @@ This module defines the state graph, node connections, and provides a factory
 function for instantiating the compiled agent.
 """
 
+import os
 import uuid
 
+from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import Checkpointer, CompiledStateGraph
 
@@ -19,6 +21,8 @@ from src.agents.nodes import (
     sql_worker,
 )
 from src.agents.state import AgentState
+from src.database import DatabaseManager
+from src.database.factory import algorithm_registry, engine_registry
 from src.telemetry.logger import logger
 
 
@@ -61,6 +65,19 @@ app = create_graph()
 
 def main() -> None:
     """CLI entry point for running the graph manually."""
+    load_dotenv()
+
+    # ==== DB Initialization for CLI ====
+    db_manager = DatabaseManager()
+    engine_name = os.getenv('DB_ENGINE', 'duckdb')
+    algo_name = os.getenv('DB_ALGORITHM', 'zscore')
+
+    db_manager.initialize(
+        engine=engine_registry.create(engine_name),
+        anomaly_algo=algorithm_registry.create(algo_name),
+    )
+    db_manager.initialize_schema()
+
     # Set session context for correlation
     session_id = str(uuid.uuid4())
     logger.set_context({'session_id': session_id})
@@ -69,7 +86,11 @@ def main() -> None:
     # Configuration for execution
     config = {
         'recursion_limit': 50,
-        'configurable': {'max_concurrency': 3},
+        'configurable': {
+            'thread_id': session_id,
+            'max_concurrency': 3,
+            'db_manager': db_manager,
+        },
     }
 
     # Print ASCII representation for debugging
@@ -95,6 +116,7 @@ def main() -> None:
     except Exception as e:
         logger.error(f'Graph execution failed: {e}', exc_info=True)
     finally:
+        db_manager.close()
         logger.info('Graph: Finished session')
         logger.clear_context()
 

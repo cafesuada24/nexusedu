@@ -1,74 +1,79 @@
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Required, TypedDict
+from dataclasses import dataclass
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.agent import create_graph
 from src.agents.state import AgentState
 from src.database import DatabaseManager
-from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
-from src.database.engines.duckdb_engine import DuckDBEngine
+from src.database.factory import algorithm_registry, engine_registry
 from src.telemetry.logger import logger
 
 
-class GlobalState(TypedDict):
+@dataclass
+class AppState:
+    """State object held in the FastAPI app.state."""
     db_manager: DatabaseManager
-    agent_with_memory: CompiledStateGraph[AgentState, None, AgentState, AgentState]
-
-
-_state: GlobalState | None = None
+    agent: CompiledStateGraph[AgentState, None, AgentState]
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manages the startup and shutdown lifecycle of the FastAPI application."""
-    # STARTUP: Initialize Database
-    global _state
     load_dotenv()
 
     # ==== DB ====
     logger.info('API Lifecycle: Initializing DatabaseManager...')
     db_manager = DatabaseManager()
+
+    # Resolve engine and algorithm from environment or defaults
+    engine_name = os.getenv('DB_ENGINE', 'duckdb')
+    algo_name = os.getenv('DB_ALGORITHM', 'zscore')
+
+    logger.info(f'API Lifecycle: Using engine={engine_name}, algorithm={algo_name}')
+
     db_manager.initialize(
-        engine=DuckDBEngine(),
-        anomaly_algo=DuckDBZScoreAnomalyAlgorithm(),
+        engine=engine_registry.create(engine_name),
+        anomaly_algo=algorithm_registry.create(algo_name),
     )
-    # Optional: ensure schema is ready
+
+    # Ensure schema is ready
     db_manager.initialize_schema()
 
     # ==== Agent ====
     logger.info('API Lifecycle: Agents...')
     memory = MemorySaver()
+    agent = create_graph(checkpointer=memory)
 
-    agent_with_memory = create_graph(checkpointer=memory)
-    _state = {
-        'db_manager': db_manager,
-        'agent_with_memory': agent_with_memory,
-    }
+    # Bind state to app
+    app.state.app_state = AppState(
+        db_manager=db_manager,
+        agent=agent,
+    )
 
     yield
 
     # SHUTDOWN: Cleanup resources
     logger.info('API Lifecycle: Shutting down DatabaseManager...')
     db_manager.close()
-    del db_manager
 
 
-def get_dbmanager() -> DatabaseManager:
-    if _state is None:
-        raise RuntimeError('global state is not initialized')
-    return _state['db_manager']
+def get_dbmanager(request: Request) -> DatabaseManager:
+    """Dependency provider for the DatabaseManager."""
+    state: AppState = request.app.state.app_state
+    return state.db_manager
 
-def get_agent() -> CompiledStateGraph[AgentState, None, AgentState, AgentState]:
+
+def get_agent(request: Request) -> CompiledStateGraph[AgentState, None, AgentState]:
     """Dependency provider for the compiled LangGraph agent.
 
     Returns:
         The compiled LangGraph workflow with memory persistence.
     """
-    if _state is None:
-        raise RuntimeError('global state is not initialized')
-    return _state['agent_with_memory']
+    state: AppState = request.app.state.app_state
+    return state.agent

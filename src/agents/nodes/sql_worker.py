@@ -2,25 +2,32 @@
 
 from typing import Any
 
+from langchain_core.runnables import RunnableConfig
+
 from src.agents.state import SQLTask
 from src.agents.utils import stringifyToYaml
 from src.baml_client import b
-from src.baml_client.types import GeneratedSQL
+from src.baml_client.types import RequestDBSchema
 from src.telemetry.logger import logger
 from src.tools.db import execute_sql, get_db_schema
 
 MAX_LOOP = 3
 
 
-def sql_worker(state: SQLTask) -> dict[str, Any]:
+def sql_worker(state: SQLTask, config: RunnableConfig) -> dict[str, Any]:
     """Node that generates and executes SQL for a specific database."""
-    from src.api.lifecycle import get_dbmanager
+    # Extract db_manager from config
+    db_manager = config.get('configurable', {}).get('db_manager')
+    if not db_manager:
+        logger.error('SQL_Worker: db_manager not found in config')
+        raise ValueError('db_manager not found in config')
+
     db_id = state['db_id']
     logger.info(f'SQL_Worker [{db_id}]: Starting task...')
     logger.debug(f'SQL_Worker [{db_id}] Intent: {state["query_intent"]}')
 
     # Proactive schema injection: fetch schema before first LLM call
-    schema = get_db_schema(db_id, get_dbmanager())
+    schema = get_db_schema(db_id, db_manager)
     messages = [
         f'<task>\n{stringifyToYaml(state)}\n<\\task>',
         f'<db_schema_result>\ndb_id: {db_id}\n{schema}\n</db_schema_result>',
@@ -39,7 +46,7 @@ def sql_worker(state: SQLTask) -> dict[str, Any]:
                     f'<db_schema_result>\ndb_id: {sql_data.db_id}\n{schema}\n</db_schema_result>',
                 )
             else:
-                new_schema = get_db_schema(sql_data.db_id, get_dbmanager())
+                new_schema = get_db_schema(sql_data.db_id, db_manager)
                 messages.append(
                     f'<db_schema_result>\ndb_id: {sql_data.db_id}\n{new_schema}\n</db_schema_result>',
                 )
@@ -51,7 +58,7 @@ def sql_worker(state: SQLTask) -> dict[str, Any]:
 
         try:
             logger.info(f'SQL_Worker [{db_id}]: Executing query (Attempt {i+1})...')
-            raw_data = execute_sql(db_id, sql_data.sql, get_dbmanager())
+            raw_data = execute_sql(db_id, sql_data.sql, db_manager)
 
             # Check for errors in the returned data if the tool returns a list with error dict
             if raw_data and isinstance(raw_data, list) and 'error' in raw_data[0]:
