@@ -1,7 +1,8 @@
 """Node that performs schema discovery using database tools."""
 
-from collections.abc import Callable
 from typing import Any
+
+from langchain_core.runnables import RunnableConfig
 
 from src.agents.state import AgentState
 from src.telemetry.logger import logger
@@ -12,30 +13,18 @@ from src.tools.db import (
 )
 
 
-def _get_dbmanager() -> Any:
-    from src.api.lifecycle import get_dbmanager
-    return get_dbmanager()
-
-# Tool Dispatch Map
-DISCOVERY_TOOLS: dict[str, Callable[[dict[str, Any]], Any]] = {
-    'get_db_list': lambda _: get_db_list(),
-    'list_tables': lambda args: list_tables(db_id=args.get('db_id'), db_manager=_get_dbmanager())
-    if args.get('db_id')
-    else None,
-    'describe_table': lambda args: describe_table(
-        db_id=args.get('db_id'), table_name=args.get('table_name'), db_manager=_get_dbmanager()
-    )
-    if args.get('db_id') and args.get('table_name')
-    else None,
-}
-
-
-def discovery_node(state: AgentState) -> dict[str, Any]:
+def discovery_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
     """Node that performs schema discovery using database tools."""
     logger.info('Discovery: Executing tools...')
     routing = state.get('routing_metadata', {})
     discovery_requests = routing.get('discovery_requests') or []
     new_context_parts: list[str] = []
+
+    # Extract db_manager from config
+    db_manager = config.get('configurable', {}).get('db_manager')
+    if not db_manager:
+        logger.error('Discovery: db_manager not found in config')
+        raise ValueError('db_manager not found in config')
 
     logger.info(f'Discovery: Processing {len(discovery_requests)} requests')
 
@@ -50,21 +39,21 @@ def discovery_node(state: AgentState) -> dict[str, Any]:
             db_id = getattr(req, 'db_id', None)
             table_name = getattr(req, 'table_name', None)
 
-        args = {
-            'db_id': db_id,
-            'table_name': table_name,
-        }
-
-        if tool_name not in DISCOVERY_TOOLS:
-            logger.warning(f'Discovery Task {i + 1}: Unknown tool {tool_name}')
+        if tool_name == 'get_db_list':
+            res = get_db_list()
+        elif tool_name == 'list_tables' and db_id:
+            res = list_tables(db_id=db_id, db_manager=db_manager)
+        elif tool_name == 'describe_table' and db_id and table_name:
+            res = describe_table(db_id=db_id, table_name=table_name, db_manager=db_manager)
+        else:
+            logger.warning(f'Discovery Task {i + 1}: Unknown tool {tool_name} or missing args')
             continue
 
         logger.info(
-            f'Discovery Task {i + 1}: Calling {tool_name} for {args["db_id"] or "root"}/{args["table_name"] or "none"}',
+            f'Discovery Task {i + 1}: Calling {tool_name} for {db_id or "root"}/{table_name or "none"}',
         )
 
         try:
-            res = DISCOVERY_TOOLS[tool_name](args)
             if res:
                 new_context_parts.append(str(res))
                 logger.debug(f'Discovery Task {i + 1} Result length: {len(str(res))}')

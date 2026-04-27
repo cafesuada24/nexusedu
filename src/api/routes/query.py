@@ -8,9 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.state import AgentState
-from src.api.lifecycle import get_agent
+from src.api.lifecycle import get_agent, get_dbmanager
 from src.api.models.request import QueryRequest
 from src.api.models.response import QueryResponse
+from src.database import DatabaseManager
 from src.telemetry.logger import logger
 
 router = APIRouter(tags=['agent'])
@@ -23,6 +24,7 @@ async def process_query(
         CompiledStateGraph[AgentState, None, AgentState],
         Depends(get_agent),
     ],
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
 ) -> QueryResponse:
     """Triggers the LangGraph agent to process a user query.
 
@@ -35,7 +37,11 @@ async def process_query(
     start_time = time.time()
     config = {
         'recursion_limit': 50,
-        'configurable': {'thread_id': session_id, 'max_concurrency': 3},
+        'configurable': {
+            'thread_id': session_id,
+            'max_concurrency': 3,
+            'db_manager': db_manager,
+        },
     }
 
     try:

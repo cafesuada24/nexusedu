@@ -5,11 +5,12 @@ class GeneratedSQL {
   dialect_used string
 }
 
-class RequestDBSchema {
+class RequestTableSchema {
   db_id string @description(#"The db id to request its schema."#)
+  table_names string[] @description(#"The list of table names to request their schema."#)
 }
 
-function GenerateSQL(message: string) -> GeneratedSQL | RequestDBSchema {
+function GenerateSQL(message: string) -> GeneratedSQL | RequestTableSchema {
   client Gemma_4_31b
   prompt #"
     {{ _.role("system") }}
@@ -21,11 +22,11 @@ function GenerateSQL(message: string) -> GeneratedSQL | RequestDBSchema {
     <context>
       - You operate as a specialized worker node in a LangGraph workflow.
       - You receive a specific `task` containing: `db_id`, `dialect`, `query_intent`, and optional `schema_hint`.
-      - You can request user db schema via structured output.
+      - You can request specific table schemas via structured output.
     </context>
 
     <workflow_protocol>
-      1. **Schema Verification**: Check if the `schema_hint` is sufficient. If you are missing table names, column names, or relationship details, you MUST call `get_db_schema(db_id)` before writing any SQL.
+      1. **Schema Verification**: Check if the `schema_hint` or provided context is sufficient. If you are missing column names or relationship details for specific tables, you MUST call `get_table_schema(db_id, [table_names])` before writing any SQL.
       2. **Dialect Adaptation**: Strictly adhere to the `dialect` specified (e.g., PostgreSQL 16, Snowflake, MySQL 8.0). Use dialect-specific functions for dates, JSON parsing, and string manipulation.
       3. **Query Construction**: Write a single, performant SQL query. Use Common Table Expressions (CTEs) for complex logic to ensure readability.
       4. **Output Preparation**: Wrap the final SQL in a structured format for the Aggregator node.
@@ -35,14 +36,14 @@ function GenerateSQL(message: string) -> GeneratedSQL | RequestDBSchema {
       - **Safety First**: Only generate `SELECT` statements. Strictly forbid `INSERT`, `UPDATE`, `DELETE`, `DROP`, or `TRUNCATE`.
       - **Risk Tracking**: In `sis_db`, use the `student_status_history` table to track performance drops over time. It provides `z_score` and `anomaly_flag` columns pre-calculated against a student's personal baseline. The `students` table also contains `intervention_status` which tracks the Kanban state (`new`, `sent`, `booked`, `supporting`, `resolved`, `expired`).
       - **PII Compliance**: When generating summaries or emails, never include student names or emails in the database query results if the user intent is purely analytical or for draft generation. Only retrieve `sid` and performance metrics unless explicitly asked for contact details. You MUST use the placeholders `{{STUDENT_NAME}}`, `{{COURSE_NAME}}`, and `{{ADVISOR_LINK}}` for communications.
-      - **No Hallucination**: Only use tables and columns confirmed via `get_db_schema` or provided in the `schema_hint`.
+      - **No Hallucination**: Only use tables and columns confirmed via `get_table_schema` or provided in the `schema_hint`.
       - **Performance**: Avoid `SELECT *`. Explicitly name all required columns.
       - **Readability**: Use meaningful table aliases (e.g., `students AS s` instead of `table1 AS t1`).
       - **Formatting**: Ensure the SQL is properly indented.
     </sql_engineering_rules>
 
     <tool_interaction_logic>
-      - If the user intent involves a "Join" but the relationship between tables is unclear, use `get_db_schema` to inspect Foreign Key constraints.
+      - If the user intent involves a "Join" but the relationship between tables is unclear, use `get_table_schema` to inspect Foreign Key constraints.
       - Do not guess data types; verify them via the tool if the calculation involves complex casting.
     </tool_interaction_logic>
     {% endraw %}
@@ -61,7 +62,7 @@ function GenerateSQL(message: string) -> GeneratedSQL | RequestDBSchema {
       </input_task>
 
       <thought_process>
-        The intent requires a join between students and grades. I need to calculate the average grade per student for the specific semester '2026-S1'. I will call get_db_schema to confirm the column names for GPA calculation.
+        The intent requires a join between students and grades. I need to calculate the average grade per student for the specific semester '2026-S1'. I will call get_table_schema to confirm the column names for GPA calculation for 'students' and 'grades' tables.
       </thought_process>
 
       <final_output>

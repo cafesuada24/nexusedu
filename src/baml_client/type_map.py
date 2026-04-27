@@ -25,8 +25,8 @@ type_map = {
     "types.PlannerTask": types.PlannerTask,
     "stream_types.PlannerTask": stream_types.PlannerTask,
 
-    "types.RequestDBSchema": types.RequestDBSchema,
-    "stream_types.RequestDBSchema": stream_types.RequestDBSchema,
+    "types.RequestTableSchema": types.RequestTableSchema,
+    "stream_types.RequestTableSchema": stream_types.RequestTableSchema,
 
     "types.RouterPlan": types.RouterPlan,
     "stream_types.RouterPlan": stream_types.RouterPlan,

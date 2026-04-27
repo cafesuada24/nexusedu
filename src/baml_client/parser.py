@@ -31,15 +31,21 @@ class LlmResponseParser:
 
     def GenerateSQL(
         self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> typing.Union["types.GeneratedSQL", "types.RequestDBSchema"]:
+    ) -> typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateSQL", llm_response=llm_response, mode="request")
-        return typing.cast(typing.Union["types.GeneratedSQL", "types.RequestDBSchema"], __result__)
+        return typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], __result__)
 
     def PlanNextStep(
         self, llm_response: str, baml_options: BamlCallOptions = {},
     ) -> types.RouterPlan:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="PlanNextStep", llm_response=llm_response, mode="request")
         return typing.cast(types.RouterPlan, __result__)
+
+    def ReflectSQLError(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> str:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="ReflectSQLError", llm_response=llm_response, mode="request")
+        return typing.cast(str, __result__)
 
     def Respond(
         self, llm_response: str, baml_options: BamlCallOptions = {},
@@ -63,15 +69,21 @@ class LlmStreamParser:
 
     def GenerateSQL(
         self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> typing.Union["stream_types.GeneratedSQL", "stream_types.RequestDBSchema"]:
+    ) -> typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"]:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateSQL", llm_response=llm_response, mode="stream")
-        return typing.cast(typing.Union["stream_types.GeneratedSQL", "stream_types.RequestDBSchema"], __result__)
+        return typing.cast(typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], __result__)
 
     def PlanNextStep(
         self, llm_response: str, baml_options: BamlCallOptions = {},
     ) -> stream_types.RouterPlan:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="PlanNextStep", llm_response=llm_response, mode="stream")
         return typing.cast(stream_types.RouterPlan, __result__)
+
+    def ReflectSQLError(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> str:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="ReflectSQLError", llm_response=llm_response, mode="stream")
+        return typing.cast(str, __result__)
 
     def Respond(
         self, llm_response: str, baml_options: BamlCallOptions = {},
