@@ -26,9 +26,7 @@ class DatabaseManager:
         """Auto-initialize with defaults if not already done."""
         if self._engine is None:
             # Late import to avoid circular dependencies
-            from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
-            from src.database.engines.duckdb_engine import DuckDBEngine
-            self.initialize(DuckDBEngine(), DuckDBZScoreAnomalyAlgorithm())
+            raise RuntimeError('DatabaseManager is not intitialized, please call `intialize`')
 
     def close(self) -> None:
         """Close any open resources."""
@@ -58,7 +56,7 @@ class DatabaseManager:
         self,
         db_id: str,
         table_name: str,
-        records: Sequence[Mapping[str, Any]],
+        records: Sequence[Mapping[str, str]],
     ) -> None:
         """Ingest records into a specified table."""
         self.engine.ingest_records(db_id, table_name, records)
@@ -78,6 +76,10 @@ class DatabaseManager:
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""
         self.engine.update_intervention_status(sid, status)
+
+    def check_health(self) -> dict[str, Any]:
+        """Verify database health."""
+        return self.engine.check_health()
 
     def list_tables(self, db_id: str) -> list[str]:
         """List all tables in the specified database."""
