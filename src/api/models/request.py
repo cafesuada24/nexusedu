@@ -9,7 +9,7 @@ class QueryRequest(BaseModel):
     """Schema for an incoming natural language query for the agent."""
 
     query: str = Field(..., description="The user's query for the agent.")
-    thread_id: str | None = Field(None, description="The session or thread identifier for multi-turn conversations.")
+    thread_id: str | None = Field(None, pattern="^[a-zA-Z0-9_-]*$", description="The session or thread identifier for multi-turn conversations.")
     metadata: dict[str, Any] | None = Field(default_factory=dict, description="Additional metadata for the request.")
 
     model_config = ConfigDict(
@@ -24,7 +24,7 @@ class QueryRequest(BaseModel):
 
 class SISRecord(BaseModel):
     """Student information system record."""
-    student_id: str = Field(..., alias="sid", description="Unique student identifier.")
+    student_id: str = Field(..., alias="sid", pattern="^[a-zA-Z0-9_-]+$", description="Unique student identifier.")
     name: str = Field(..., alias="student_name", description="Student full name.")
     email: str = Field(..., description="Student email address.")
     last_notified_timestamp: Optional[float] = Field(0, description="Timestamp of last nudge.")

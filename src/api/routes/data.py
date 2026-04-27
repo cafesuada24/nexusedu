@@ -1,19 +1,25 @@
 """API routes for data ingestion and management."""
 
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException
+
+from src.api.lifecycle import get_dbmanager
 from src.api.models.request import (
     CoreDataSource,
     DataIngestionRequest,
 )
-from src.database import db_manager
+from src.database.manager import DatabaseManager
 from src.telemetry.logger import logger
 
 router = APIRouter(prefix='/data', tags=['data'])
 
 
 @router.post('/ingest')
-async def ingest_data(request: DataIngestionRequest) -> dict[str, object]:
+async def ingest_data(
+    request: DataIngestionRequest,
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+) -> dict[str, object]:
     """Ingest multi-source data from JSON payload.
 
     Supports validated 'sis' and 'lms' sources, plus flexible 'custom' sources.

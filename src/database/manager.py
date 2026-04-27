@@ -30,6 +30,8 @@ class DatabaseManager:
 
     def close(self) -> None:
         """Close any open resources."""
+        if self._engine is not None:
+            self._engine.close()
         self._engine = None
         self._anomaly_algo = None
 
@@ -97,6 +99,3 @@ class DatabaseManager:
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results."""
         return self.engine.execute(db_id, sql, read_only=read_only)
-
-# Shared instance to be managed by FastAPI lifecycle
-db_manager = DatabaseManager()

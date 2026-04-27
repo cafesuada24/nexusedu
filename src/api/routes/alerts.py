@@ -9,8 +9,8 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
 from src.agents.state import AgentState
-from src.api.dependencies.agent import get_agent
-from src.database import db_manager
+from src.api.lifecycle import get_agent, get_dbmanager
+from src.database.manager import DatabaseManager
 from src.telemetry.logger import logger
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
@@ -48,7 +48,10 @@ class SendEmailRequest(BaseModel):
 
 
 @router.get('/', response_model=list[AlertStudent])
-async def get_alerts(status: str | None = Query(None)) -> list[dict[str, str]]:
+async def get_alerts(
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    status: str | None = Query(None),
+) -> list[dict[str, str]]:
     """Retrieve students who have an active alert for the Kanban board."""
     sql: str = "SELECT sid, student_name, email, current_risk_status, intervention_status FROM students WHERE intervention_status != 'none'"
     if status:
@@ -70,7 +73,11 @@ async def get_alerts(status: str | None = Query(None)) -> list[dict[str, str]]:
 
 
 @router.patch('/{sid}/status')
-async def update_alert_status(sid: str, update: StatusUpdate) -> dict[str, str]:
+async def update_alert_status(
+    sid: str,
+    update: StatusUpdate,
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+) -> dict[str, str]:
     """Update the Kanban state for a specific student's intervention."""
     valid_statuses = [
         'none',
@@ -83,7 +90,8 @@ async def update_alert_status(sid: str, update: StatusUpdate) -> dict[str, str]:
     ]
     if update.status not in valid_statuses:
         raise HTTPException(
-            status_code=400, detail=f'Invalid status. Must be one of {valid_statuses}',
+            status_code=400,
+            detail=f'Invalid status. Must be one of {valid_statuses}',
         )
 
     try:
@@ -102,6 +110,7 @@ async def generate_email_draft(
         CompiledStateGraph[AgentState, None, AgentState, AgentState],
         Depends(get_agent),
     ],
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
 ) -> EmailDraft:
     """Generate a personalized, PII-safe email draft for a student."""
     # 1. Fetch student PII locally (never exposed to LLM)
@@ -158,15 +167,22 @@ async def generate_email_draft(
 
     except Exception as e:
         logger.error(f'Failed to generate draft: {e}', exc_info=True)
-        raise HTTPException(status_code=500, detail='Failed to generate AI draft.') from e
+        raise HTTPException(
+            status_code=500, detail='Failed to generate AI draft.'
+        ) from e
 
 
 @router.post('/{sid}/send')
-async def send_nudge_email(sid: str, request: SendEmailRequest) -> dict[str, str]:
+async def send_nudge_email(
+    sid: str,
+    request: SendEmailRequest,
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle."""
     # 1. Fetch student info for logging/dispatch
     student_data = db_manager.execute(
-        'sis_db', f"SELECT student_name, email FROM students WHERE sid = '{sid}'",
+        'sis_db',
+        f"SELECT student_name, email FROM students WHERE sid = '{sid}'",
     )
 
     if not student_data:

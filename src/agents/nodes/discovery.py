@@ -11,14 +11,19 @@ from src.tools.db import (
     list_tables,
 )
 
+
+def _get_dbmanager() -> Any:
+    from src.api.lifecycle import get_dbmanager
+    return get_dbmanager()
+
 # Tool Dispatch Map
 DISCOVERY_TOOLS: dict[str, Callable[[dict[str, Any]], Any]] = {
     'get_db_list': lambda _: get_db_list(),
-    'list_tables': lambda args: list_tables(db_id=args.get('db_id'))
+    'list_tables': lambda args: list_tables(db_id=args.get('db_id'), db_manager=_get_dbmanager())
     if args.get('db_id')
     else None,
     'describe_table': lambda args: describe_table(
-        db_id=args.get('db_id'), table_name=args.get('table_name'),
+        db_id=args.get('db_id'), table_name=args.get('table_name'), db_manager=_get_dbmanager()
     )
     if args.get('db_id') and args.get('table_name')
     else None,

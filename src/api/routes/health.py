@@ -1,17 +1,20 @@
 """Monitoring and health check routes for the API."""
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from src.database import db_manager
+from src.api.lifecycle import get_dbmanager
+from src.database.manager import DatabaseManager
 
 router = APIRouter(tags=['monitoring'])
 
 
 @router.get('/health')
-async def health_check() -> dict[str, Any]:
+async def health_check(
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+) -> dict[str, Any]:
     """Returns the current status of the API and its dependencies.
 
     Returns:

@@ -8,11 +8,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from src.database import DB_REGISTRY, db_manager
+from src.database import DB_REGISTRY
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-
+    from src.database.manager import DatabaseManager
 
 # ============================================================================
 # DATABASE TOOLS
@@ -29,7 +28,7 @@ def get_db_list() -> str:
     return header + '\n---\n'.join(entries)
 
 
-def list_tables(db_id: str) -> str:
+def list_tables(db_id: str, db_manager: DatabaseManager) -> str:
     """List all tables available in the specified database."""
     try:
         tables = db_manager.list_tables(db_id)
@@ -38,7 +37,7 @@ def list_tables(db_id: str) -> str:
         return f'Error: {e}'
 
 
-def describe_table(db_id: str, table_name: str) -> str:
+def describe_table(db_id: str, table_name: str, db_manager: DatabaseManager) -> str:
     """Get the detailed schema and sample data for a specific table."""
     try:
         return db_manager.get_table_schema(db_id, table_name)
@@ -46,7 +45,7 @@ def describe_table(db_id: str, table_name: str) -> str:
         return f'Error: {e}'
 
 
-def get_db_schema(db_id: str) -> str:
+def get_db_schema(db_id: str, db_manager: DatabaseManager) -> str:
     """Get the detailed schema of a specific database."""
     try:
         tables = db_manager.list_tables(db_id)
@@ -56,6 +55,6 @@ def get_db_schema(db_id: str) -> str:
         return f'Error: {e}'
 
 
-def execute_sql(db_id: str, sql: str) -> list[dict[str, Any]]:
+def execute_sql(db_id: str, sql: str, db_manager: DatabaseManager) -> list[dict[str, Any]]:
     """Execute a SQL SELECT query on a specific database."""
     return db_manager.execute(db_id, sql)

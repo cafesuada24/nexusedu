@@ -56,6 +56,10 @@ class DatabaseEngine(Protocol):
         """Verify connectivity to all registered databases."""
         ...
 
+    def close(self) -> None:
+        """Close any open resources."""
+        ...
+
 class AnomalyAlgorithm(Protocol):
     """Protocol for anomaly detection algorithms."""
 
