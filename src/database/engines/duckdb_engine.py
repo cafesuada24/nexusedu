@@ -1,6 +1,7 @@
 """DuckDB implementation of the DatabaseEngine protocol."""
 
 import re
+import threading
 import uuid
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -20,6 +21,7 @@ class DuckDBEngine:
         self.data_dir = Path(data_dir)
         self._allowed_db_ids = {db['id'] for db in DB_REGISTRY}
         self._connections: dict[str, duckdb.DuckDBPyConnection] = {}
+        self._write_lock = threading.RLock()
 
     def close(self) -> None:
         """Close all persistent connections."""
@@ -55,72 +57,74 @@ class DuckDBEngine:
         self._validate_db_id(db_id)
         path = self._get_path(db_id)
 
-        if read_only:
-            if db_id not in self._connections:
-                if not path.exists():
-                    msg = f"Database '{db_id}' not found at {path}"
-                    raise FileNotFoundError(msg)
-                # Maintain a persistent, long-lived read_only=True DuckDB connection
-                self._connections[db_id] = duckdb.connect(str(path), read_only=True)
-            return self._connections[db_id]
+        with self._write_lock:
+            if read_only:
+                if db_id not in self._connections:
+                    if not path.exists():
+                        msg = f"Database '{db_id}' not found at {path}"
+                        raise FileNotFoundError(msg)
+                    # Maintain a persistent, long-lived read_only=True DuckDB connection
+                    self._connections[db_id] = duckdb.connect(str(path), read_only=True)
+                return self._connections[db_id]
 
-        # For write operations, we must close the cached read-only connection if it exists
-        # because DuckDB doesn't allow mixed configurations in the same process for the same file.
-        if db_id in self._connections:
-            try:
-                self._connections[db_id].close()
-            except Exception:
-                pass
-            del self._connections[db_id]
+            # For write operations, we must close the cached read-only connection if it exists
+            # because DuckDB doesn't allow mixed configurations in the same process for the same file.
+            if db_id in self._connections:
+                try:
+                    self._connections[db_id].close()
+                except Exception:
+                    pass
+                del self._connections[db_id]
 
-        # For write operations, return a new connection
-        return duckdb.connect(str(path), read_only=False)
+            # For write operations, return a new connection
+            return duckdb.connect(str(path), read_only=False)
 
     def initialize_schema(self) -> None:
         """Initialize the database schema for LMS and SIS."""
-        # LMS schema
-        with self._get_connection('lms_db', read_only=False) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS activities (
-                    activity_id VARCHAR PRIMARY KEY,
-                    sid VARCHAR,
-                    course_id VARCHAR,
-                    course_name VARCHAR,
-                    test_type VARCHAR,
-                    score DOUBLE,
-                    timestamp DOUBLE,
-                    academic_year INTEGER,
-                    semester INTEGER
-                );
-            """)
+        with self._write_lock:
+            # LMS schema
+            with self._get_connection('lms_db', read_only=False) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS activities (
+                        activity_id VARCHAR PRIMARY KEY,
+                        sid VARCHAR,
+                        course_id VARCHAR,
+                        course_name VARCHAR,
+                        test_type VARCHAR,
+                        score DOUBLE,
+                        timestamp DOUBLE,
+                        academic_year INTEGER,
+                        semester INTEGER
+                    );
+                """)
 
-        # SIS schema
-        with self._get_connection('sis_db', read_only=False) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS students (
-                    sid VARCHAR PRIMARY KEY,
-                    student_name VARCHAR,
-                    email VARCHAR,
-                    major VARCHAR DEFAULT 'Unknown',
-                    current_risk_status VARCHAR DEFAULT 'Normal',
-                    intervention_status VARCHAR DEFAULT 'none',
-                    last_notified_timestamp DOUBLE DEFAULT 0,
-                    last_notified_satisfaction INTEGER DEFAULT 0
-                );
+            # SIS schema
+            with self._get_connection('sis_db', read_only=False) as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS students (
+                        sid VARCHAR PRIMARY KEY,
+                        student_name VARCHAR,
+                        email VARCHAR,
+                        major VARCHAR DEFAULT 'Unknown',
+                        current_risk_status VARCHAR DEFAULT 'Normal',
+                        intervention_status VARCHAR DEFAULT 'none',
+                        last_notified_timestamp DOUBLE DEFAULT 0,
+                        last_notified_satisfaction INTEGER DEFAULT 0
+                    );
 
-                CREATE TABLE IF NOT EXISTS student_status_history (
-                    history_id VARCHAR PRIMARY KEY,
-                    sid VARCHAR,
-                    academic_year INTEGER,
-                    semester INTEGER,
-                    baseline_avg DOUBLE,
-                    baseline_std DOUBLE,
-                    current_score_avg DOUBLE,
-                    z_score DOUBLE,
-                    anomaly_flag VARCHAR,
-                    status_recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
+                    CREATE TABLE IF NOT EXISTS student_status_history (
+                        history_id VARCHAR PRIMARY KEY,
+                        sid VARCHAR,
+                        academic_year INTEGER,
+                        semester INTEGER,
+                        baseline_avg DOUBLE,
+                        baseline_std DOUBLE,
+                        current_score_avg DOUBLE,
+                        z_score DOUBLE,
+                        anomaly_flag VARCHAR,
+                        status_recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
 
     def ingest_records(
         self,
@@ -142,13 +146,14 @@ class DuckDBEngine:
                     r['activity_id'] = str(uuid.uuid4())
 
         df = pd.DataFrame(records_list)
-        with self._get_connection(db_id, read_only=False) as conn:
-            if table_name == 'students':
-                # Use validated table_name
-                conn.execute(f'DELETE FROM {table_name} WHERE sid IN (SELECT sid FROM df)')
+        with self._write_lock:
+            with self._get_connection(db_id, read_only=False) as conn:
+                if table_name == 'students':
+                    # Use validated table_name
+                    conn.execute(f'DELETE FROM {table_name} WHERE sid IN (SELECT sid FROM df)')
 
-            # Use validated table_name
-            conn.execute(f'INSERT INTO {table_name} BY NAME SELECT * FROM df')
+                # Use validated table_name
+                conn.execute(f'INSERT INTO {table_name} BY NAME SELECT * FROM df')
 
     def ingest_custom_data(
         self,
@@ -162,12 +167,13 @@ class DuckDBEngine:
         self._validate_table_name(table_name)
 
         df = pd.DataFrame(list(records))
-        with self._get_connection('sis_db', read_only=False) as conn:
-            # Use validated table_name
-            conn.execute(
-                f'CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df LIMIT 0'
-            )
-            conn.execute(f'INSERT INTO {table_name} SELECT * FROM df')
+        with self._write_lock:
+            with self._get_connection('sis_db', read_only=False) as conn:
+                # Use validated table_name
+                conn.execute(
+                    f'CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df LIMIT 0'
+                )
+                conn.execute(f'INSERT INTO {table_name} SELECT * FROM df')
 
     def list_tables(self, db_id: str) -> list[str]:
         """List all tables in the specified database."""
@@ -241,23 +247,25 @@ class DuckDBEngine:
                 names = rel.columns
                 return [dict(zip(names, row)) for row in rel.fetchall()]
             else:
-                with conn:
-                    rel = conn.sql(sql)
-                    if rel is None:
-                        return []
-                    names = rel.columns
-                    return [dict(zip(names, row)) for row in rel.fetchall()]
+                with self._write_lock:
+                    with conn:
+                        rel = conn.sql(sql)
+                        if rel is None:
+                            return []
+                        names = rel.columns
+                        return [dict(zip(names, row)) for row in rel.fetchall()]
         except Exception as e:
             return [{'error': str(e)}]
 
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""
         # Uses parameter binding which is safe
-        with self._get_connection('sis_db', read_only=False) as conn:
-            conn.execute(
-                'UPDATE students SET intervention_status = ? WHERE sid = ?',
-                (status, sid),
-            )
+        with self._write_lock:
+            with self._get_connection('sis_db', read_only=False) as conn:
+                conn.execute(
+                    'UPDATE students SET intervention_status = ? WHERE sid = ?',
+                    (status, sid),
+                )
 
     def check_health(self) -> dict[str, str]:
         """Verify connectivity to LMS and SIS databases."""
