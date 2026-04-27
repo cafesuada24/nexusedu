@@ -43,8 +43,9 @@ class PlannerTask(BaseModel):
     query_intent: typing.Optional[str] = Field(default=None, description='The specific data to retrieve from this database.')
     schema_hint: typing.Optional[str] = Field(default=None, description='Optional hints about tables or columns to focus on.')
 
-class RequestDBSchema(BaseModel):
+class RequestTableSchema(BaseModel):
     db_id: typing.Optional[str] = Field(default=None, description='The db id to request its schema.')
+    table_names: typing.List[str] = Field(description='The list of table names to request their schema.')
 
 class RouterPlan(BaseModel):
     path: typing.Optional[typing.Union[typing_extensions.Literal['SQL_EXECUTION'], typing_extensions.Literal['DIRECT_ANSWER'], typing_extensions.Literal['DISCOVERY_REQUIRED'], typing_extensions.Literal['EXTERNAL_TOOL']]] = Field(default=None, description='The execution path chosen by the planner.\'')

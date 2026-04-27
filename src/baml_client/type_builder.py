@@ -20,7 +20,7 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(type_builder.TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["DiscoveryRequest","GeneratedSQL","PlannerTask","RequestDBSchema","RouterPlan",]
+          ["DiscoveryRequest","GeneratedSQL","PlannerTask","RequestTableSchema","RouterPlan",]
         ), enums=set(
           []
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
@@ -47,8 +47,8 @@ class TypeBuilder(type_builder.TypeBuilder):
         return PlannerTaskViewer(self)
 
     @property
-    def RequestDBSchema(self) -> "RequestDBSchemaViewer":
-        return RequestDBSchemaViewer(self)
+    def RequestTableSchema(self) -> "RequestTableSchemaViewer":
+        return RequestTableSchemaViewer(self)
 
     @property
     def RouterPlan(self) -> "RouterPlanViewer":
@@ -214,22 +214,22 @@ class PlannerTaskProperties:
     
 
 
-class RequestDBSchemaAst:
+class RequestTableSchemaAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("RequestDBSchema")
-        self._properties: typing.Set[str] = set([  "db_id",  ])
-        self._props = RequestDBSchemaProperties(self._bldr, self._properties)
+        self._bldr = _tb.class_("RequestTableSchema")
+        self._properties: typing.Set[str] = set([  "db_id",  "table_names",  ])
+        self._props = RequestTableSchemaProperties(self._bldr, self._properties)
 
     def type(self) -> baml_py.FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "RequestDBSchemaProperties":
+    def props(self) -> "RequestTableSchemaProperties":
         return self._props
 
 
-class RequestDBSchemaViewer(RequestDBSchemaAst):
+class RequestTableSchemaViewer(RequestTableSchemaAst):
     def __init__(self, tb: type_builder.TypeBuilder):
         super().__init__(tb)
 
@@ -239,7 +239,7 @@ class RequestDBSchemaViewer(RequestDBSchemaAst):
     
 
 
-class RequestDBSchemaProperties:
+class RequestTableSchemaProperties:
     def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
@@ -249,6 +249,10 @@ class RequestDBSchemaProperties:
     @property
     def db_id(self) -> type_builder.ClassPropertyViewer:
         return type_builder.ClassPropertyViewer(self.__bldr.property("db_id"))
+    
+    @property
+    def table_names(self) -> type_builder.ClassPropertyViewer:
+        return type_builder.ClassPropertyViewer(self.__bldr.property("table_names"))
     
     
 
