@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
-from src.database.engines.duckdb_engine import DuckDBEngine
-
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
