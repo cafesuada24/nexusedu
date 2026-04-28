@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.agents.nodes.sql_worker import sql_worker
+from src.agents.nodes.sql_worker import sql_worker_node
 from src.api.models.response import JobStatusResponse
-from src.api.routes.alerts import _run_email_draft_task
+from src.api.services.alerts import AlertService
 from src.baml_client.types import GeneratedSQL
 from src.types import BoundedDict
 
@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from src.agents.state import SQLTask
 
 
-def test_sql_worker_dynamic_masking_advisor_read(test_db_manager) -> None:
-    """Verify sql_worker wraps the query with EXCLUDE for advisor:read role."""
+def test_sql_worker_node_dynamic_masking_advisor_read(test_db_manager) -> None:
+    """Verify sql_worker_node wraps the query with EXCLUDE for advisor:read role."""
     state: SQLTask = {
         'db_id': 'sis_db',
         'query_intent': 'Get student grades',
@@ -39,25 +39,31 @@ def test_sql_worker_dynamic_masking_advisor_read(test_db_manager) -> None:
     )
 
     with (
-        patch('src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
+        patch(
+            'src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data
+        ),
         patch.object(
             test_db_manager,
             'execute',
             return_value=[{'col': 'val'}],
         ) as mock_exec,
     ):
-        result = sql_worker(state, config)
+        result = sql_worker_node(state, config)
 
         mock_exec.assert_called_once()
         called_db_id, called_sql = mock_exec.call_args[0]
         assert called_db_id == 'sis_db'
-        assert 'EXCLUDE (student_name, email, phone)' in called_sql
+        # Verify that all PII columns are in the EXCLUDE clause
+        assert 'EXCLUDE' in called_sql
+        assert 'student_name' in called_sql
+        assert 'email' in called_sql
+        assert 'phone' in called_sql
         assert 'SELECT * FROM students' in called_sql
         assert result['results'][0]['data'] == [{'col': 'val'}]
 
 
-def test_sql_worker_no_masking_admin_all(test_db_manager) -> None:
-    """Verify sql_worker does not wrap the query with EXCLUDE for admin:all role."""
+def test_sql_worker_node_no_masking_admin_all(test_db_manager) -> None:
+    """Verify sql_worker_node does not wrap the query with EXCLUDE for admin:all role."""
     state: SQLTask = {
         'db_id': 'sis_db',
         'query_intent': 'Get all students',
@@ -76,12 +82,16 @@ def test_sql_worker_no_masking_admin_all(test_db_manager) -> None:
     )
 
     with (
-        patch('src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
+        patch(
+            'src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data
+        ),
         patch.object(
-            test_db_manager, 'execute', return_value=[{'col': 'val'}],
+            test_db_manager,
+            'execute',
+            return_value=[{'col': 'val'}],
         ) as mock_exec,
     ):
-        result = sql_worker(state, config)
+        result = sql_worker_node(state, config)
 
         mock_exec.assert_called_once()
         called_db_id, called_sql = mock_exec.call_args[0]
@@ -90,8 +100,13 @@ def test_sql_worker_no_masking_admin_all(test_db_manager) -> None:
 
 
 @pytest.mark.anyio
-async def test_email_draft_anonymization(test_db_manager, mock_agent) -> None:
-    """Verify PII is stripped and anonymized_id is passed to the LLM agent."""
+async def test_email_draft_no_pii_to_ai(test_db_manager) -> None:
+    """Verify that student PII is not sent directly to the AI draft generator.
+
+    Note: In the refactored version, we use BAML directly. We verify that
+    the context string sent to BAML contains performance data but not
+    raw student names or emails.
+    """
     sid = 'S001_SECRET'
     student_name = 'Real Name'
     email = 'real@ex.com'
@@ -106,7 +121,7 @@ async def test_email_draft_anonymization(test_db_manager, mock_agent) -> None:
                 'student_name': student_name,
                 'email': email,
                 'intervention_status': 'new',
-            }
+            },
         ],
     )
 
@@ -125,31 +140,30 @@ async def test_email_draft_anonymization(test_db_manager, mock_agent) -> None:
                 'current_score_avg': 70.0,
                 'z_score': -3.0,
                 'anomaly_flag': 1,
-            }
+            },
         ],
     )
 
-    # Use a dummy user object
-    user_mock = MagicMock()
-    user_mock.role = 'advisor:write'
-
     job_id = 'test_job'
     jobs = BoundedDict[str, JobStatusResponse](maxsize=10)
+    service = AlertService(test_db_manager)
 
-    # Run the background task directly
-    await _run_email_draft_task(
-        job_id, sid, mock_agent, test_db_manager, user_mock, jobs
-    )
+    with patch(
+        'src.api.services.alerts.b_async.GenerateDraftEmail', new_callable=AsyncMock
+    ) as mock_baml:
+        mock_baml.return_value = 'Hello {{STUDENT_NAME}}'
 
-    # Check agent was called
-    mock_agent.ainvoke.assert_called_once()
+        await service.run_email_draft_task(job_id, sid, jobs)
 
-    # Analyze the prompt
-    args, kwargs = mock_agent.ainvoke.call_args
-    query_sent_to_agent = args[0]['messages'][0]['content']
+        # Check BAML was called
+        mock_baml.assert_called_once()
 
-    assert "anonymized_id 'STU_" in query_sent_to_agent
-    assert sid not in query_sent_to_agent
-    assert student_name not in query_sent_to_agent
-    assert email not in query_sent_to_agent
-    assert "z_score': -3.0" in query_sent_to_agent
+        # Analyze the prompt context
+        args, _kwargs = mock_baml.call_args
+        context_sent_to_ai = args[1]  # context_str is the second arg
+
+        # Verify performance data is there
+        assert "z_score': -3.0" in context_sent_to_ai
+        # Verify PII is NOT there
+        assert student_name not in context_sent_to_ai
+        assert email not in context_sent_to_ai

@@ -15,10 +15,22 @@ router = APIRouter(prefix='/advisors', tags=['advisors'])
 @router.get('/leaderboard')
 async def get_leaderboard(
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
-    user: Annotated[User, Depends(check_role('advisor:read'))],
-    time_window: str = Query('all_time', pattern='^(weekly|monthly|semester|all_time)$'),
+    _user: Annotated[User, Depends(check_role('advisor:read'))],
+    time_window: str = Query(
+        'all_time',
+        pattern='^(weekly|monthly|semester|all_time)$',
+    ),
 ) -> list[dict[str, Any]]:
-    """Retrieve the advisor leaderboard based on points aggregation."""
+    """Retrieve the advisor leaderboard based on gamification points.
+
+    Args:
+        db_manager: The database manager dependency.
+        _user: Authenticated user with read access.
+        time_window: The time window for the leaderboard.
+
+    Returns:
+        List of advisors and their scores.
+    """
     interval_map = {
         'weekly': '7 days',
         'monthly': '30 days',

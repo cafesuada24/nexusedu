@@ -14,8 +14,8 @@ def test_read_root(client: TestClient) -> None:
     assert 'Welcome to the Agent Assistant API v1' in response.json()['message']
 
 def test_health_check(client: TestClient) -> None:
-    """Verifies that the health check endpoint returns a 200 status and indicates it's online."""
+    """Verifies that the health check endpoint returns a 200 status and indicates it's operational."""
     response = client.get('/api/v1/health')
     assert response.status_code == 200
-    assert response.json()['status'] == 'online'
+    assert response.json()['status'] == 'operational'
     assert 'timestamp' in response.json()

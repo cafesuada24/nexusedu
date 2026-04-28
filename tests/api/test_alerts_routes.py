@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
+
+from fastapi.testclient import TestClient
+
+from src.database.manager import DatabaseManager
 
 if TYPE_CHECKING:
-    from unittest.mock import MagicMock
-
-    from fastapi.testclient import TestClient
-
-    from src.database.manager import DatabaseManager
+    pass
 
 def test_get_alerts(client: TestClient, test_db_manager: DatabaseManager) -> None:
     """Verify that /alerts/ returns students with active alerts."""
@@ -65,7 +66,7 @@ def test_update_alert_status(client: TestClient, test_db_manager: DatabaseManage
     assert results[0]['intervention_status'] == 'booked'
 
 def test_generate_draft(
-    client: TestClient, test_db_manager: DatabaseManager, mock_agent: MagicMock,
+    client: TestClient, test_db_manager: DatabaseManager
 ) -> None:
     """Verify email draft generation with PII interpolation via background job."""
     test_db_manager.ingest_records(
@@ -81,25 +82,32 @@ def test_generate_draft(
         ],
     )
 
-    # 1. Trigger the draft generation
-    response = client.post('/api/v1/alerts/DRAFT_1/draft')
-    assert response.status_code == 202
-    data = response.json()
-    assert 'job_id' in data
-    job_id = data['job_id']
+    # Mock BAML to avoid real LLM calls and provide a predictable template
+    with patch(
+        'src.api.services.alerts.b_async.GenerateDraftEmail', new_callable=AsyncMock
+    ) as mock_baml:
+        mock_baml.return_value = 'Subject: Test\n\nHello {{STUDENT_NAME}}, please book here: {{ADVISOR_LINK}}'
 
-    # 2. Poll for the job status
-    poll_response = client.get(f'/api/v1/jobs/{job_id}')
-    assert poll_response.status_code == 200
-    poll_data = poll_response.json()
-    assert poll_data['status'] == 'completed'
-    
-    result = poll_data['result']
-    assert result['sid'] == 'DRAFT_1'
-    assert result['recipient_email'] == 'alice@pii.com'
-    # Check interpolation of {{STUDENT_NAME}} from conftest mock
-    assert 'Alice PII' in result['body']
-    assert mock_agent.ainvoke.called
+        # 1. Trigger the draft generation
+        response = client.post('/api/v1/alerts/DRAFT_1/draft')
+        assert response.status_code == 202
+        data = response.json()
+        assert 'job_id' in data
+        job_id = data['job_id']
+
+        # 2. Poll for the job status
+        poll_response = client.get(f'/api/v1/jobs/{job_id}')
+        assert poll_response.status_code == 200
+        poll_data = poll_response.json()
+        assert poll_data['status'] == 'completed'
+        
+        result = poll_data['result']
+        assert result['sid'] == 'DRAFT_1'
+        assert result['recipient_email'] == 'alice@pii.com'
+        # Check interpolation of {{STUDENT_NAME}}
+        assert 'Alice PII' in result['body']
+        # Check interpolation of {{ADVISOR_LINK}}
+        assert 'https://calendly.com/advisor-help' in result['body']
 
 def test_send_nudge_email(client: TestClient, test_db_manager: DatabaseManager) -> None:
     """Verify that sending a nudge updates the lifecycle."""

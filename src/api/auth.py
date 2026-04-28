@@ -4,7 +4,6 @@ This module sets up FastAPI-Users with JWT authentication, SQLAlchemy database
 backend, and role-based access control (RBAC).
 """
 
-import os
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from typing import Annotated, override
@@ -23,11 +22,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from src.utils.env import getenv
 
 # Configuration
-JWT_SECRET = getenv(
+JWT_SECRET: str = getenv(
     'JWT_SECRET',
     'SET_ME_IN_PRODUCTION_HEHEHE',
 )
-DATABASE_URL = getenv('AUTH_DB_URL', "sqlite+aiosqlite:///./auth.db")
+DATABASE_URL: str = getenv('AUTH_DB_URL', 'sqlite+aiosqlite:///./auth.db')
 
 
 # Database Setup
@@ -111,7 +110,7 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
     [auth_backend],
 )
 
-current_active_user = fastapi_users.current_user(active=True)
+current_active_user: Callable[..., User] = fastapi_users.current_user(active=True)
 
 
 # RBAC Utilities

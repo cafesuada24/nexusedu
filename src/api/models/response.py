@@ -5,6 +5,15 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class EmailDraft(BaseModel):
+    """Schema for a personalized email draft."""
+
+    sid: str = Field(..., description='Student identifier.')
+    recipient_email: str = Field(..., description='Student email address.')
+    subject: str = Field(..., description='Email subject line.')
+    body: str = Field(..., description='Personalized email body.')
+
+
 class QueryResponse(BaseModel):
     """Industry standard response schema for data agents."""
 

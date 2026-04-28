@@ -6,6 +6,7 @@ function for instantiating the compiled agent.
 
 import os
 import uuid
+from typing import Any
 
 from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
@@ -14,11 +15,11 @@ from langgraph.graph.state import Checkpointer, CompiledStateGraph
 from src.agents.nodes import (
     discovery_node,
     email_agent_node,
-    planner,
+    planner_node,
     responder_node,
     route_after_sql,
     route_planner,
-    sql_worker,
+    sql_worker_node,
 )
 from src.agents.state import AgentState
 from src.database import DatabaseManager
@@ -26,15 +27,17 @@ from src.database.factory import algorithm_registry, engine_registry
 from src.telemetry.logger import logger
 
 
-def create_graph(checkpointer: Checkpointer | None = None) -> CompiledStateGraph[AgentState, None, AgentState]:
+def create_graph(
+    checkpointer: Checkpointer | None = None,
+) -> CompiledStateGraph[AgentState, Any, AgentState]:
     """Factory function to build and compile the agent state graph."""
     workflow = StateGraph(AgentState)
 
     # Add Nodes
-    workflow.add_node('planner', planner)
+    workflow.add_node('planner', planner_node)
     workflow.add_node('discovery', discovery_node)
     workflow.add_node('responder', responder_node)
-    workflow.add_node('sql_worker', sql_worker)
+    workflow.add_node('sql_worker', sql_worker_node)
     workflow.add_node('email_agent', email_agent_node)
 
     # Set Entry Point
@@ -60,8 +63,10 @@ def create_graph(checkpointer: Checkpointer | None = None) -> CompiledStateGraph
 
     return workflow.compile(checkpointer=checkpointer)
 
+
 # Global app instance for API usage
 app = create_graph()
+
 
 def main() -> None:
     """CLI entry point for running the graph manually."""
@@ -97,10 +102,10 @@ def main() -> None:
     app.get_graph().print_ascii()
 
     user_query = (
-        "Analyze the relationship between student demographics and performance. "
+        'Analyze the relationship between student demographics and performance. '
         "Specifically, compare the average assessment scores from the LMS database "
         "against the different 'region' categories found in the SIS database. "
-        "Provide a summary of the findings."
+        'Provide a summary of the findings.'
     )
 
     logger.log_event('graph_start', {'user_query': user_query})
@@ -119,6 +124,7 @@ def main() -> None:
         db_manager.close()
         logger.info('Graph: Finished session')
         logger.clear_context()
+
 
 if __name__ == '__main__':
     main()

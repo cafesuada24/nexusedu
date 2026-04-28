@@ -1,3 +1,5 @@
+"""Structured data models for the agent assistant."""
+
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -12,26 +14,9 @@ class PlannerTask(BaseModel):
         description='The specific data to retrieve from this database.',
     )
     schema_hint: str = Field(
-        default='', description='Optional hints about tables or columns to focus on.',
+        default='',
+        description='Optional hints about tables or columns to focus on.',
     )
-
-
-class PlannerOutput(BaseModel):
-    """The structured output for the planner LLM."""
-
-    tasks: list[PlannerTask] = Field(
-        description='The list of parallel SQL tasks to execute.',
-    )
-
-
-class SQLGeneration(BaseModel):
-    """The structured output for the SQL generator LLM."""
-
-    sql: str = Field(description='The generated SQL query.')
-    explanation: str = Field(description='Brief explanation of the query logic.')
-
-
-# --- Redesigned Planner Schemas ---
 
 
 class DiscoveryRequest(BaseModel):
@@ -74,3 +59,10 @@ class RouterPlan(BaseModel):
         None,
         description='The list of discovery tools to call (required if path is DISCOVERY_REQUIRED).',
     )
+
+
+class SQLGeneration(BaseModel):
+    """The structured output for the SQL generator LLM."""
+
+    sql: str = Field(description='The generated SQL query.')
+    explanation: str = Field(description='Brief explanation of the query logic.')
