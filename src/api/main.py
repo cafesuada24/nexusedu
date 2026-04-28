@@ -7,14 +7,14 @@ and includes the API routers for the agent's functionality.
 import time
 from collections.abc import Awaitable, Callable
 
-from fastapi import APIRouter, FastAPI, Request, Response, status
+from fastapi import APIRouter, Depends, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.auth import auth_backend, fastapi_users
+from src.api.auth import UserRole, auth_backend, check_role, fastapi_users
 from src.api.lifecycle import lifespan
-from src.api.models.auth import UserCreate, UserRead
-from src.api.routes import advisors, alerts, data, health, jobs, query
+from src.api.models.auth import UserCreate, UserRead, UserUpdate
+from src.api.routes import advisors, alerts, data, health, jobs, query, users
 from src.telemetry.logger import logger
 from src.utils.env import getenv
 
@@ -156,6 +156,9 @@ api_v1_router.include_router(
     prefix="/auth",
     tags=["auth"],
 )
+
+# User Management
+api_v1_router.include_router(users.router)
 
 @api_v1_router.get("/")
 async def root() -> dict[str, str]:

@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.auth import User, check_role
+from src.api.auth import Scope, User, require_scope
 from src.api.lifecycle import get_data_service
 from src.api.models.request import (
     DataIngestionRequest,
@@ -19,7 +19,7 @@ router = APIRouter(prefix='/data', tags=['data'])
 async def ingest_data(
     request: DataIngestionRequest,
     data_service: Annotated[DataService, Depends(get_data_service)],
-    _user: Annotated[User, Depends(check_role('admin:all'))],
+    _user: Annotated[User, Depends(require_scope(Scope.DATA_INGEST))],
 ) -> dict[str, object]:
     """Ingest multi-source data from JSON payload.
 

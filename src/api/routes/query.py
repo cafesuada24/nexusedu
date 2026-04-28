@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends
 
-from src.api.auth import User, check_role
+from src.api.auth import Scope, User, require_scope
 from src.api.lifecycle import get_jobs_store, get_query_service
 from src.api.models.request import QueryRequest
 from src.api.models.response import (
@@ -23,7 +23,7 @@ async def process_query(
     request: QueryRequest,
     background_tasks: BackgroundTasks,
     query_service: Annotated[QueryService, Depends(get_query_service)],
-    user: Annotated[User, Depends(check_role('advisor:read'))],
+    user: Annotated[User, Depends(require_scope(Scope.QUERY_EXECUTE))],
     jobs: Annotated[JobStore, Depends(get_jobs_store)],
 ) -> JobAcceptedResponse:
     """Triggers the LangGraph agent in the background.

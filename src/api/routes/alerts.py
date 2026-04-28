@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.api.auth import User, check_role
+from src.api.auth import Scope, User, require_scope
 from src.api.lifecycle import get_alert_service, get_jobs_store
 from src.api.models.response import (
     EmailDraft,
@@ -53,7 +53,7 @@ class SendEmailRequest(BaseModel):
 @router.get('/', response_model=list[AlertStudent])
 async def get_alerts(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    _user: Annotated[User, Depends(check_role('advisor:read'))],
+    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
     status: str | None = Query(None),
 ) -> list[dict[str, str]]:
     """Retrieve students who have an active alert for the Kanban board.
@@ -85,7 +85,7 @@ async def update_alert_status(
     sid: str,
     update: StatusUpdate,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    user: Annotated[User, Depends(check_role('advisor:write'))],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
 ) -> dict[str, str]:
     """Manually transitions a student's Kanban state.
 
@@ -109,7 +109,7 @@ async def update_alert_status(
 async def review_draft(
     sid: str,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    user: Annotated[User, Depends(check_role('advisor:write'))],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft.
 
@@ -133,7 +133,7 @@ async def generate_email_draft(  # noqa: PLR0913
     sid: str,
     background_tasks: BackgroundTasks,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    user: Annotated[User, Depends(check_role('advisor:write'))],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     jobs: Annotated[JobStore, Depends(get_jobs_store)],
     request: DraftRequest | None = None,
 ) -> JobAcceptedResponse:
@@ -174,7 +174,7 @@ async def send_nudge_email(
     sid: str,
     request: SendEmailRequest,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    user: Annotated[User, Depends(check_role('advisor:write'))],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
 ) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle.
 
