@@ -1,5 +1,5 @@
 class GeneratedSQL {
-  sql string @description(#"The generated SQL query."#)
+  sql string @assert(is_select, {{ this | match(regex="(?i)^\\s*SELECT") }}) @description(#"The generated SQL query."#)
   explanation string @description(#"Brief explanation of the query logic."#)
   accessed_tables string[] @description(#"Table names used in the query."#)
   dialect_used string

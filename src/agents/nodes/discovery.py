@@ -6,12 +6,6 @@ from langchain_core.runnables import RunnableConfig
 
 from src.agents.state import AgentState
 from src.telemetry.logger import logger
-from src.tools.db import (
-    describe_table,
-    get_db_list,
-    list_tables,
-)
-
 
 MAX_DISCOVERY_CONTEXT_CHARS = 15_000
 
@@ -44,16 +38,16 @@ def discovery_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
 
         match tool_name:
             case 'get_db_list':
-                res = get_db_list()
+                res = db_manager.get_formatted_db_list()
             case 'list_tables' if db_id:
-                res = list_tables(db_id=db_id, db_manager=db_manager)
+                res = db_manager.get_formatted_table_list(db_id=db_id)
             case 'describe_table' if db_id and table_name:
-                res = describe_table(
-                    db_id=db_id, table_name=table_name, db_manager=db_manager
+                res = db_manager.get_formatted_table_schema(
+                    db_id=db_id, table_name=table_name,
                 )
             case _:
                 logger.warning(
-                    f'Discovery Task {i + 1}: Unknown tool {tool_name} or missing args'
+                    f'Discovery Task {i + 1}: Unknown tool {tool_name} or missing args',
                 )
                 continue
 
@@ -77,7 +71,7 @@ def discovery_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
     # Prevent unbounded growth of discovery_context
     if len(updated_context) > MAX_DISCOVERY_CONTEXT_CHARS:
         logger.warning(
-            f'Discovery: Context limit reached ({len(updated_context)} > {MAX_DISCOVERY_CONTEXT_CHARS}). Truncating...'
+            f'Discovery: Context limit reached ({len(updated_context)} > {MAX_DISCOVERY_CONTEXT_CHARS}). Truncating...',
         )
         updated_context = updated_context[-MAX_DISCOVERY_CONTEXT_CHARS:]
 
@@ -85,6 +79,7 @@ def discovery_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
 
     return {
         'discovery_context': updated_context,
+        'discovery_depth': state.get('discovery_depth', 0) + 1,
         'routing_metadata': {
             **routing,
             'discovery_requests': [],

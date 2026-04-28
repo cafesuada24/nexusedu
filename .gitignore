@@ -218,3 +218,9 @@ __marimo__/
 
 .DS_Store
 .vercel
+
+# Local Databases
+*.duckdb
+*.duckdb.wal
+auth.db
+auth.db-journal

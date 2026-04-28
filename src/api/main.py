@@ -6,13 +6,15 @@ and includes the API routers for the agent's functionality.
 
 import os
 import time
-from typing import Any
+from collections.abc import Awaitable, Callable
 
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.auth import auth_backend, fastapi_users
 from src.api.lifecycle import lifespan
-from src.api.routes import alerts, data, health, query
+from src.api.models.auth import UserCreate, UserRead
+from src.api.routes import alerts, data, health, jobs, query
 from src.telemetry.logger import logger
 
 app = FastAPI(
@@ -36,8 +38,11 @@ app.add_middleware(
 )
 
 # Logging Middleware
-@app.middleware("http")
-async def log_requests(request: Request, call_next: Any) -> Response:
+@app.middleware('http')
+async def log_requests(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
     """Logs the details of incoming HTTP requests and their processing time.
 
     Args:
@@ -58,6 +63,18 @@ async def log_requests(request: Request, call_next: Any) -> Response:
 # API v1 Router
 api_v1_router = APIRouter(prefix="/api/v1")
 
+# Include Auth routes
+api_v1_router.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/auth/jwt",
+    tags=["auth"],
+)
+api_v1_router.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/auth",
+    tags=["auth"],
+)
+
 @api_v1_router.get("/")
 async def root() -> dict[str, str]:
     """Provides a welcome message and documentation link for the API root.
@@ -72,6 +89,7 @@ async def root() -> dict[str, str]:
 
 # Include routers into the versioned API router
 api_v1_router.include_router(health.router)
+api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(alerts.router)

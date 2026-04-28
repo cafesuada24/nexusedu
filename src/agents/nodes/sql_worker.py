@@ -9,7 +9,6 @@ from src.agents.utils import stringifyToYaml
 from src.baml_client import b
 from src.baml_client.types import RequestTableSchema
 from src.telemetry.logger import logger
-from src.tools.db import describe_table, execute_sql, list_tables
 
 MAX_LOOP = 3
 
@@ -27,7 +26,7 @@ def sql_worker(state: SQLTask, config: RunnableConfig) -> dict[str, Any]:
     logger.debug(f'SQL_Worker [{db_id}] Intent: {state["query_intent"]}')
 
     # Schema on Demand: initially only inject table list to keep context small
-    table_list = list_tables(db_id, db_manager)
+    table_list = db_manager.get_formatted_table_list(db_id)
     task_prompt = f'<task>\n{stringifyToYaml(state)}\n</task>'
     schema_context = [f'<available_tables>\n{table_list}\n</available_tables>']
 
@@ -48,7 +47,9 @@ def sql_worker(state: SQLTask, config: RunnableConfig) -> dict[str, Any]:
                 f'SQL_Worker [{db_id}]: LLM requested schema for tables: {sql_data.table_names}',
             )
             for table_name in sql_data.table_names:
-                table_schema = describe_table(sql_data.db_id, table_name, db_manager)
+                table_schema = db_manager.get_formatted_table_schema(
+                    sql_data.db_id, table_name,
+                )
                 schema_context.append(
                     f'<table_schema name="{table_name}">\n{table_schema}\n</table_schema>',
                 )
@@ -60,9 +61,17 @@ def sql_worker(state: SQLTask, config: RunnableConfig) -> dict[str, Any]:
         logger.info(f'SQL_Worker [{db_id}]: Generated SQL: {sql_data.sql}')
         logger.log_event('sql_generated', sql_data.model_dump())
 
+        # Dynamic Column Masking for PII Hardening
+        user_role = config.get('configurable', {}).get('user_role', 'advisor:read')
+        final_sql = sql_data.sql
+        if user_role == 'advisor:read':
+            # Wrap the query in a CTE and exclude PII columns (DuckDB specific syntax)
+            final_sql = f'SELECT * EXCLUDE (student_name, email, phone) FROM ({sql_data.sql}) AS subquery'
+            logger.info(f'SQL_Worker [{db_id}]: Applied PII masking for {user_role}')
+
         try:
             logger.info(f'SQL_Worker [{db_id}]: Executing query (Attempt {i + 1})...')
-            raw_data = execute_sql(db_id, sql_data.sql, db_manager)
+            raw_data = db_manager.execute(db_id, final_sql)
 
             # Check for errors in the returned data if the tool returns a list with error dict
             if raw_data and isinstance(raw_data, list) and 'error' in raw_data[0]:

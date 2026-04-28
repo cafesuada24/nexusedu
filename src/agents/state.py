@@ -11,6 +11,7 @@ type ResultList = list[dict[str, Any]]
 # Context Limits
 MAX_MESSAGES = 20
 MAX_RESULTS = 10
+MAX_DISCOVERY_DEPTH = 2
 
 class SQLTask(TypedDict):
     """Internal state for a parallel SQL worker task."""
@@ -42,4 +43,5 @@ class AgentState(TypedDict):
     retry_count: int
     next_step: str
     discovery_context: str | None
+    discovery_depth: int
     routing_metadata: dict[str, Any]

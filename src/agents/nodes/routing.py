@@ -4,7 +4,7 @@ from typing import Literal
 
 from langgraph.types import Send
 
-from src.agents.state import AgentState
+from src.agents.state import MAX_DISCOVERY_DEPTH, AgentState
 from src.telemetry.logger import logger
 
 
@@ -28,7 +28,14 @@ def route_planner(state: AgentState) -> str | list[Send]:
     logger.info(f'Routing (Planner): Choosing path "{path}"')
 
     if path == 'DISCOVERY_REQUIRED':
+        depth = state.get('discovery_depth', 0)
+        if depth >= MAX_DISCOVERY_DEPTH:
+            logger.warning(
+                f'Routing (Planner): Discovery depth limit reached ({depth}). Forcing direct response.',
+            )
+            return 'responder'
         return 'discovery'
+
     if path == 'DIRECT_ANSWER':
         return 'responder'
 
