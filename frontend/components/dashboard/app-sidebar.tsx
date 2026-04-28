@@ -37,8 +37,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Logo } from "@/components/logo";
-import { useDataset } from "@/hooks/use-dataset";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 type Tone = "primary" | "sky" | "cyan" | "indigo" | "destructive" | "slate";
 
@@ -235,19 +235,7 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { dataset } = useDataset();
-
-  // Sidebar badge for "Alert Center" reflects the live "Nguy cơ cao"
-  // count from the Analysis dataset — the primary signal advisors act on.
-  // Falls back to undefined (no badge) when the dataset hasn't loaded yet
-  // so we never display a stale hard-coded number.
-  const alertBadgeCount = dataset ? dataset.highRisk : undefined;
-
-  const navWithLiveBadges: NavItem[] = mainNav.map((item) =>
-    item.href === "/dashboard/alerts" && alertBadgeCount && alertBadgeCount > 0
-      ? { ...item, badge: alertBadgeCount.toLocaleString("vi-VN") }
-      : item,
-  );
+  const { user, logout } = useAuth();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -267,7 +255,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
-              {navWithLiveBadges.map((item) => (
+              {mainNav.map((item) => (
                 <NavRow
                   key={item.href}
                   item={item}
@@ -305,14 +293,14 @@ export function AppSidebar() {
             >
               <Avatar className="size-8 rounded-lg ring-2 ring-primary/15">
                 <AvatarImage src="/avatar-advisor.jpg" alt="" />
-                <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
-                  LH
+                <AvatarFallback className="rounded-lg bg-primary/10 text-primary uppercase">
+                  {user?.email?.slice(0, 2) || "US"}
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">TS. Lê Hà</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  Cố vấn · Khoa CNTT
+                <span className="truncate font-semibold">{user?.email?.split('@')[0] || "Người dùng"}</span>
+                <span className="truncate text-xs text-muted-foreground uppercase">
+                  {user?.role || "Khách"}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -333,11 +321,9 @@ export function AppSidebar() {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/login">
-                <LogOut className="size-4" />
-                Đăng xuất
-              </Link>
+            <DropdownMenuItem onClick={() => logout()}>
+              <LogOut className="size-4" />
+              Đăng xuất
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -45,6 +45,8 @@ import {
 } from "@/components/ui/input-group"
 import { Kbd } from "@/components/ui/kbd"
 import { cn } from "@/lib/utils"
+import { queryAgent, getJobStatus } from "@/lib/api"
+import { toast } from "sonner"
 
 /* ────────────────────────────────────────────────────────────────
  * Topic taxonomy — color + icon, no extra prose
@@ -265,6 +267,50 @@ function Sparkline({ data, className }: { data: number[]; className?: string }) 
 export function SupportView() {
   const [query, setQuery] = React.useState("")
   const [activeTopic, setActiveTopic] = React.useState<TopicKey | "all">("all")
+  const [isAsking, setIsAsking] = React.useState(false)
+  const [aiResponse, setAiResponse] = React.useState<string | null>(null)
+
+  const handleAskAI = async () => {
+    if (!query.trim() || isAsking) return
+    setIsAsking(true)
+    setAiResponse(null)
+    const toastId = toast.loading("AI đang phân tích...")
+    
+    try {
+      const { job_id } = await queryAgent(query)
+      
+      let attempts = 0
+      const maxAttempts = 30
+      const poll = async () => {
+        if (attempts >= maxAttempts) {
+          toast.error("Hết thời gian phản hồi", { id: toastId })
+          setIsAsking(false)
+          return
+        }
+        attempts++
+        try {
+          const job = await getJobStatus(job_id)
+          if (job.status === "completed") {
+            setAiResponse(job.result.answer)
+            toast.success("AI đã trả lời", { id: toastId })
+            setIsAsking(false)
+          } else if (job.status === "failed") {
+            toast.error("AI gặp lỗi khi xử lý", { id: toastId })
+            setIsAsking(false)
+          } else {
+            setTimeout(poll, 2000)
+          }
+        } catch (err) {
+          toast.error("Lỗi kết nối", { id: toastId })
+          setIsAsking(false)
+        }
+      }
+      poll()
+    } catch (err) {
+      toast.error("Không thể gửi câu hỏi", { id: toastId })
+      setIsAsking(false)
+    }
+  }
 
   const filteredFaqs = faqs.filter((f) => {
     const matchesTopic = activeTopic === "all" || f.topic === activeTopic
@@ -579,9 +625,19 @@ export function SupportView() {
                 </p>
               </div>
             </div>
-            <Button className="rounded-xl">
+            {aiResponse && (
+              <div className="rounded-lg bg-background/50 p-3 text-sm text-foreground ring-1 ring-border/60">
+                <p className="font-medium text-primary mb-1">Kết quả:</p>
+                <div className="whitespace-pre-wrap">{aiResponse}</div>
+              </div>
+            )}
+            <Button 
+              className="rounded-xl" 
+              onClick={handleAskAI}
+              disabled={isAsking || !query.trim()}
+            >
               <Sparkles className="size-4" />
-              Hỏi AI
+              {isAsking ? "Đang trả lời..." : "Hỏi AI về kết quả trên"}
             </Button>
           </CardContent>
         </Card>

@@ -31,7 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { ScheduleEditorSheet } from "@/components/dashboard/schedule-editor-sheet"
-import { useSchedule } from "@/hooks/use-schedule"
+import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { summarizeWeek, totalWeeklyHours, type DayKey } from "@/lib/schedule"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +56,7 @@ const STAT_CARD_CLASSES: Record<StatTone, string> = {
 }
 
 export function ScheduleView() {
-  const { schedule, setSchedule } = useSchedule()
+  const { schedule, setSchedule } = useScheduleQuery()
 
   const weekSummary = React.useMemo(
     () => summarizeWeek(schedule.week),

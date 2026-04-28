@@ -17,18 +17,12 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 
-type AlertLike = {
-  id: string
-  name: string
-  mssv: string
-  subject: string
-  body: string
-}
+import { type Alert } from "@/lib/alerts"
 
 type Props = {
-  alert: AlertLike | null
+  alert: Alert | null
   onClose: () => void
-  onSave: (a: AlertLike) => void
+  onSave: (a: Alert) => void
 }
 
 export function EmailEditorDialog({ alert, onClose, onSave }: Props) {

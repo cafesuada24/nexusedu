@@ -33,7 +33,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { useSchedule } from "@/hooks/use-schedule"
+import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule"
 
 // Deterministic "busy" generator so SSR/CSR match without extra state.
@@ -46,7 +46,7 @@ type Mode = "video" | "inperson"
 
 export function BookingView() {
   const today = startOfToday()
-  const { schedule } = useSchedule()
+  const { schedule } = useScheduleQuery()
   const [date, setDate] = React.useState<Date | undefined>(addDays(today, 1))
   const [slot, setSlot] = React.useState<string | null>(null)
   const [mode, setMode] = React.useState<Mode>("video")

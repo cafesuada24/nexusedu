@@ -1,13 +1,39 @@
+"use client"
+
+import * as React from "react"
 import Link from "next/link"
-import { ArrowLeft, Lock, Mail } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowLeft, Lock, Mail, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 import { Logo } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function LoginPage() {
+  const { login } = useAuth()
+  const router = useRouter()
+  const [email, setEmail] = React.useState("")
+  const [password, setPassword] = React.useState("")
+  const [isLoading, setIsLoading] = React.useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      await login(email, password)
+      // login helper in useAuth already handles toast and navigation
+    } catch (error) {
+      // toast is already handled in useAuth
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="hero-gradient relative flex min-h-screen flex-col">
       <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-5 md:px-6">
@@ -43,6 +69,7 @@ export default function LoginPage() {
                 size="lg"
                 className="h-11 rounded-xl"
                 aria-label="Đăng nhập bằng Google Workspace"
+                disabled={isLoading}
               >
                 <GoogleIcon />
                 Tiếp tục với Google Workspace
@@ -52,6 +79,7 @@ export default function LoginPage() {
                 size="lg"
                 className="h-11 rounded-xl"
                 aria-label="Đăng nhập bằng Microsoft Workspace"
+                disabled={isLoading}
               >
                 <MicrosoftIcon />
                 Tiếp tục với Microsoft 365
@@ -64,7 +92,7 @@ export default function LoginPage() {
               <Separator className="flex-1" />
             </div>
 
-            <form className="grid gap-4">
+            <form className="grid gap-4" onSubmit={handleSubmit}>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email trường</Label>
                 <div className="relative">
@@ -78,6 +106,9 @@ export default function LoginPage() {
                     required
                     placeholder="giangvien@truong.edu.vn"
                     className="h-11 rounded-xl pl-9"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -102,12 +133,27 @@ export default function LoginPage() {
                     required
                     placeholder="••••••••"
                     className="h-11 rounded-xl pl-9"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
 
-              <Button asChild size="lg" className="mt-2 h-11 rounded-xl">
-                <Link href="/dashboard">Đăng nhập</Link>
+              <Button
+                type="submit"
+                size="lg"
+                className="mt-2 h-11 rounded-xl"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  "Đăng nhập"
+                )}
               </Button>
             </form>
 
