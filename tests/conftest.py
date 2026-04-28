@@ -10,9 +10,19 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.auth import User, current_active_user
-from src.api.lifecycle import get_agent, get_dbmanager, get_jobs_store
+from src.api.lifecycle import (
+    get_agent,
+    get_alert_service,
+    get_data_service,
+    get_dbmanager,
+    get_jobs_store,
+    get_query_service,
+)
 from src.api.main import app
 from src.api.models.response import JobStatusResponse
+from src.api.services.alerts import AlertService
+from src.api.services.data import DataService
+from src.api.services.query import QueryService
 from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
 from src.database.engines.duckdb_engine import DuckDBEngine
 from src.database.manager import DatabaseManager
@@ -98,6 +108,15 @@ def client(
     app.dependency_overrides[get_dbmanager] = lambda: test_db_manager
     app.dependency_overrides[get_jobs_store] = lambda: test_jobs
     app.dependency_overrides[current_active_user] = lambda: mock_user
+
+    # Provide real services initialized with the test_db_manager
+    alert_service = AlertService(test_db_manager)
+    query_service = QueryService(mock_agent, test_db_manager)
+    data_service = DataService(test_db_manager)
+
+    app.dependency_overrides[get_alert_service] = lambda: alert_service
+    app.dependency_overrides[get_query_service] = lambda: query_service
+    app.dependency_overrides[get_data_service] = lambda: data_service
 
     with TestClient(app) as c:
         yield c

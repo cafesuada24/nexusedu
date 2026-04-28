@@ -1,11 +1,37 @@
+"""Utility functions and classes for the agent assistant."""
+
 import json
 import re
+from collections.abc import Mapping
+from typing import Any
 
 import sqlglot
 import yaml
 from sqlglot import exp
 
-from src.agents.state import ResultList
+from src.agents.state import MessageList, ResultList
+
+
+class MessageSerializer:
+    """Serializes message history for LLM prompts."""
+
+    @staticmethod
+    def to_yaml(messages: MessageList) -> str:
+        """Convert a list of messages to a YAML-like XML format."""
+        return '\n\n'.join(MessageSerializer._msg_to_yaml(msg) for msg in messages)
+
+    @staticmethod
+    def _msg_to_yaml(msg: Mapping[str, Any]) -> str:
+        """Convert a single message to a YAML-like XML format."""
+        # Handle LangChain message objects if they have 'type' and 'content'
+        if hasattr(msg, 'type') and hasattr(msg, 'content'):
+            role = 'ai_response' if getattr(msg, 'type') == 'ai' else 'human_message'
+            content = getattr(msg, 'content')
+        else:
+            # Handle standard role/content dicts
+            role = 'ai_response' if msg.get('role') == 'assistant' else 'human_message'
+            content = msg.get('content', '')
+        return f'<{role}>\n{content}\n</{role}>'
 
 
 def mask_pii_sql(sql: str, pii_columns: set[str] | None = None) -> str:
@@ -29,8 +55,6 @@ def mask_pii_sql(sql: str, pii_columns: set[str] | None = None) -> str:
         subquery = reparsed_inner.subquery(alias='pii_masked_subquery')
 
         # 4. Build SELECT * EXCLUDE (...) from AST
-        # EXCLUDE is safer than whitelist if we don't have the full schema here,
-        # but wrapping it in a fresh SELECT via AST prevents comment-injection breakouts.
         star = exp.Star(except_=[exp.column(c) for c in pii_columns])
         masked_query = sqlglot.select(star).from_(subquery)
 
@@ -38,13 +62,13 @@ def mask_pii_sql(sql: str, pii_columns: set[str] | None = None) -> str:
         return masked_query.sql(dialect='duckdb')
     except Exception:
         # Fallback to a very strict string pattern if parsing fails
-        # We use a regex to strip any trailing semicolons or comments before wrapping
         clean_sql = re.sub(r'[;\s]+(--.*|/\*.*)?$', '', sql, flags=re.MULTILINE)
         cols_str = ', '.join(pii_columns)
         return f'SELECT * EXCLUDE ({cols_str}) FROM ({clean_sql}) AS pii_masked_subquery'
 
 
-def stringifyToYaml(obj: object) -> str:
+def stringify_to_yaml(obj: object) -> str:
+    """Convert an object or dict to indented YAML."""
     data = obj if isinstance(obj, dict) else vars(obj)
     dumped_yaml = yaml.safe_dump(
         data,
@@ -53,22 +77,13 @@ def stringifyToYaml(obj: object) -> str:
     )
     return '\n'.join('  ' + line for line in dumped_yaml.splitlines())
 
-#
-# def event_to_prompt(event: Event) -> str:
-#     """Convert an event to XML tag format."""
-#     data = event.data if isinstance(event.data, str) else stringifyToYaml(event.data)
-#     return f'<{event.type.value}>\n{data}\n</{event.type.value}>'
-#
-#
-# def thread_to_prompt(thread: Thread) -> str:
-#     """Convert a thread to XML tag format."""
-#     return '\n\n'.join(event_to_prompt(event) for event in thread.events)
-
 
 class ResultSummarizer:
+    """Summarizes query results for LLM context."""
 
     @staticmethod
     def summarize(results: ResultList, max_chars: int = 4000) -> str:
+        """Summarize a list of database results."""
         summary: list[str] = []
         for res in results:
             db_id = res.get('db', 'unknown')
@@ -86,35 +101,8 @@ class ResultSummarizer:
                     # Provide schema and a few sample rows
                     cols = list(data[0].keys()) if isinstance(data[0], dict) else 'N/A'
                     summary.append(f'Columns: {cols}')
-                    # Use default=str to handle non-serializable objects like Timestamps
                     sample_json = json.dumps(data[:2], indent=2, default=str)
                     summary.append(f'Sample: {sample_json}')
             summary.append('-' * 20)
 
         return '\n'.join(summary)[:max_chars]
-
-
-# if __name__ == '__main__':
-#     import uuid
-#     from models import EmailMessage, EventType
-#
-#     thread = Thread(ticket_id=uuid.uuid4())
-#     thread.events = [
-#         Event(
-#             thread_id=thread.id,
-#             type=EventType.EMAIL_MESSAGE,
-#             data=EmailMessage(
-#                 user_email='123',
-#                 content="""
-#             lskjfklasjfkdjfkajfkafk
-#             aksfjlksjflkds
-#
-#
-#             asfkksadlk;fjksldfjas
-#             kasfjsljkdl
-#             """,
-#             ),
-#         )
-#     ]
-#
-#     print(thread_to_prompt(thread))

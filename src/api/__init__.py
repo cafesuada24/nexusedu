@@ -1,1 +1,1 @@
-# src/api/__init__.py
+"""Agent Assistant API package."""
