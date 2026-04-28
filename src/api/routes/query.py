@@ -4,19 +4,19 @@ import time
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agents.state import AgentState
 from src.api.auth import User, check_role
-from src.api.lifecycle import get_agent, get_dbmanager
+from src.api.lifecycle import get_agent, get_dbmanager, get_jobs_store
 from src.api.models.request import QueryRequest
 from src.api.models.response import (
     JobAcceptedResponse,
     JobStatusResponse,
     QueryResponse,
 )
-from src.api.utils.jobs_store import _jobs
+from src.api.types import JobStore
 from src.database import DatabaseManager
 from src.telemetry.logger import logger
 
@@ -30,6 +30,7 @@ async def _run_agent_task(
     agent: CompiledStateGraph[AgentState, None, AgentState],
     db_manager: DatabaseManager,
     user: User,
+    jobs: Annotated[JobStore, Depends(get_jobs_store)],
 ) -> None:
     """Encapsulates the LangGraph agent execution in a background task."""
     session_id = thread_id or str(uuid.uuid4())
@@ -88,7 +89,7 @@ async def _run_agent_task(
                     tables.append(data)
 
         # Update job status to completed
-        _jobs[job_id] = JobStatusResponse(
+        jobs[job_id] = JobStatusResponse(
             job_id=job_id,
             status='completed',
             result=QueryResponse(
@@ -101,7 +102,7 @@ async def _run_agent_task(
 
     except Exception as e:
         logger.error(f'API (BG): Agent execution failed: {e}', exc_info=True)
-        _jobs[job_id] = JobStatusResponse(
+        jobs[job_id] = JobStatusResponse(
             job_id=job_id,
             status='failed',
             error=str(e),
@@ -120,6 +121,7 @@ async def process_query(
     ],
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
     user: Annotated[User, Depends(check_role('advisor:read'))],
+    jobs: Annotated[JobStore, Depends(get_jobs_store)],
 ) -> JobAcceptedResponse:
     """Triggers the LangGraph agent in the background.
 
@@ -128,7 +130,7 @@ async def process_query(
     job_id = str(uuid.uuid4())
 
     # Initialize job status
-    _jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
+    jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
 
     # Schedule background task
     background_tasks.add_task(
@@ -139,6 +141,7 @@ async def process_query(
         agent=agent,
         db_manager=db_manager,
         user=user,
+        jobs=jobs,
     )
 
     return JobAcceptedResponse(job_id=job_id, status='processing')

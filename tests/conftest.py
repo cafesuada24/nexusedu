@@ -10,11 +10,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.auth import User, current_active_user
-from src.api.lifecycle import get_agent, get_dbmanager
+from src.api.lifecycle import get_agent, get_dbmanager, get_jobs_store
 from src.api.main import app
+from src.api.models.response import JobStatusResponse
 from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
 from src.database.engines.duckdb_engine import DuckDBEngine
 from src.database.manager import DatabaseManager
+from src.types import BoundedDict
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -91,8 +93,10 @@ def client(
     mock_agent: MagicMock, test_db_manager: DatabaseManager, mock_user: User
 ) -> Generator[TestClient, None, None]:
     """Provides a FastAPI TestClient with mocked dependencies."""
+    test_jobs = BoundedDict[str, JobStatusResponse](maxsize=100)
     app.dependency_overrides[get_agent] = lambda: mock_agent
     app.dependency_overrides[get_dbmanager] = lambda: test_db_manager
+    app.dependency_overrides[get_jobs_store] = lambda: test_jobs
     app.dependency_overrides[current_active_user] = lambda: mock_user
 
     with TestClient(app) as c:

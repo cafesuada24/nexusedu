@@ -13,16 +13,21 @@ from psycopg_pool import ConnectionPool
 from src.agents.agent import create_graph
 from src.agents.state import AgentState
 from src.api.auth import create_db_and_tables
+from src.api.models.response import JobStatusResponse
+from src.api.types import JobStore
 from src.database import DatabaseManager
 from src.database.factory import algorithm_registry, engine_registry
+from src.database.interfaces import AnomalyAlgorithm, DatabaseEngine
 from src.telemetry.logger import logger
+from src.types import BoundedDict
 
 
 @dataclass
 class AppState:
     """State object held in the FastAPI app.state."""
-    db_manager: DatabaseManager
+    db_manager: DatabaseManager[DatabaseEngine, AnomalyAlgorithm]
     agent: CompiledStateGraph[AgentState, None, AgentState]
+    job_store: JobStore
     pool: ConnectionPool | None = None
 
 
@@ -37,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # ==== DB ====
     logger.info('API Lifecycle: Initializing DatabaseManager...')
-    db_manager = DatabaseManager()
+    db_manager = DatabaseManager[DatabaseEngine, AnomalyAlgorithm]()
 
     # Resolve engine and algorithm from environment or defaults
     engine_name = os.getenv('DB_ENGINE', 'duckdb')
@@ -70,11 +75,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info('API Lifecycle: Agents...')
     agent = create_graph(checkpointer=checkpointer)
 
+
+    # ==== JobStore ====
+    jobs = BoundedDict[str, JobStatusResponse](maxsize=1000)
+
     # Bind state to app
     app.state.app_state = AppState(
         db_manager=db_manager,
         agent=agent,
         pool=pool,
+        job_store=jobs,
     )
 
     yield
@@ -86,7 +96,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_manager.close()
 
 
-def get_dbmanager(request: Request) -> DatabaseManager:
+def get_dbmanager(request: Request) -> DatabaseManager[DatabaseEngine, AnomalyAlgorithm]:
     """Dependency provider for the DatabaseManager."""
     state: AppState = request.app.state.app_state
     return state.db_manager
@@ -100,3 +110,12 @@ def get_agent(request: Request) -> CompiledStateGraph[AgentState, None, AgentSta
     """
     state: AppState = request.app.state.app_state
     return state.agent
+
+def get_jobs_store(request: Request) -> JobStore:
+    """Dependency provider for the JobStore.
+
+    Returns:
+        The JobStore
+    """
+    state: AppState = request.app.state.app_state
+    return state.job_store
