@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.auth import User, current_active_user
 from src.api.lifecycle import get_agent, get_dbmanager
 from src.api.main import app
-from src.api.auth import current_active_user, User
-import uuid
 from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
 from src.database.engines.duckdb_engine import DuckDBEngine
 from src.database.manager import DatabaseManager
@@ -19,6 +19,12 @@ from src.database.manager import DatabaseManager
 if TYPE_CHECKING:
     from collections.abc import Generator
     from pathlib import Path
+
+
+@pytest.fixture(autouse=True)
+def disable_motherduck(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure MotherDuck is disabled during tests."""
+    monkeypatch.delenv('MOTHERDUCK_TOKEN', raising=False)
 
 
 @pytest.fixture
@@ -30,6 +36,7 @@ def test_data_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def test_db_manager(test_data_dir: Path) -> DatabaseManager:
     """Provides a DatabaseManager instance configured for testing."""
+    print(f'DEBUG: test_db_manager using data_dir={test_data_dir}')
     engine = DuckDBEngine(data_dir=test_data_dir)
     algo = DuckDBZScoreAnomalyAlgorithm()
     manager = DatabaseManager()
@@ -69,18 +76,20 @@ def mock_agent() -> MagicMock:
 def mock_user() -> User:
     """Provides a mock authenticated User with admin:all role."""
     return User(
-        id=uuid.uuid4(), 
-        email="test@example.com", 
-        hashed_password="hashed_password", 
-        role="admin:all", 
-        is_active=True, 
-        is_superuser=False, 
-        is_verified=True
+        id=uuid.uuid4(),
+        email='test@example.com',
+        hashed_password='hashed_password',
+        role='admin:all',
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
     )
 
 
 @pytest.fixture
-def client(mock_agent: MagicMock, test_db_manager: DatabaseManager, mock_user: User) -> Generator[TestClient, None, None]:
+def client(
+    mock_agent: MagicMock, test_db_manager: DatabaseManager, mock_user: User
+) -> Generator[TestClient, None, None]:
     """Provides a FastAPI TestClient with mocked dependencies."""
     app.dependency_overrides[get_agent] = lambda: mock_agent
     app.dependency_overrides[get_dbmanager] = lambda: test_db_manager
@@ -90,3 +99,4 @@ def client(mock_agent: MagicMock, test_db_manager: DatabaseManager, mock_user: U
         yield c
 
     app.dependency_overrides.clear()
+

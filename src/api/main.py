@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.auth import auth_backend, fastapi_users
 from src.api.lifecycle import lifespan
 from src.api.models.auth import UserCreate, UserRead
-from src.api.routes import alerts, data, health, jobs, query
+from src.api.routes import advisors, alerts, data, health, jobs, query
 from src.telemetry.logger import logger
 
 app = FastAPI(
@@ -93,6 +93,7 @@ api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(alerts.router)
+api_v1_router.include_router(advisors.router)
 
 # Include the versioned API router into the app
 app.include_router(api_v1_router)

@@ -81,6 +81,10 @@ class DatabaseManager[T_Engine: "DatabaseEngine", T_Algo: "AnomalyAlgorithm"]:
         """Update the intervention lifecycle status for a specific student."""
         self.engine.update_intervention_status(sid, status)
 
+    def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
+        """Inject points for an advisor action into the points ledger."""
+        self.engine.inject_points(advisor_id, sid, action_type)
+
     def check_health(self) -> dict[str, Any]:
         """Verify database health."""
         return self.engine.check_health()

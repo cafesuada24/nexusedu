@@ -5,7 +5,7 @@ import os
 import re
 import threading
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -24,25 +24,25 @@ class DuckDBEngine:
         """Initialize DuckDBEngine with a data directory."""
         self.data_dir = Path(data_dir)
         self._allowed_db_ids = {db['id'] for db in DB_REGISTRY}
-        
+
         # Check for MotherDuck token
         md_token = os.getenv('MOTHERDUCK_TOKEN')
         self.is_motherduck = bool(md_token)
-        md_connected = False
 
         if self.is_motherduck:
             try:
-            # Connect to MotherDuck
+                # Connect to MotherDuck
                 self._main_conn = duckdb.connect(f'md:?motherduck_token={md_token}')
-                md_connected = True
             except Exception:
+                self.is_motherduck = False
                 pass
-        if not md_connected:
+
+        if not self.is_motherduck:
             # Use a single main connection and ATTACH other databases to it.
             # This allows cross-database joins and avoids "file already open" errors.
             self._main_conn = duckdb.connect()
             # Performance optimizations for concurrency
-        
+
         # Shared performance settings
         self._main_conn.execute('PRAGMA enable_checkpoint_on_shutdown')
         self._main_conn.execute("PRAGMA checkpoint_threshold='1GB'")
@@ -81,7 +81,8 @@ class DuckDBEngine:
         return self.data_dir / f'{db_id}.duckdb'
 
     @contextlib.contextmanager
-    def get_cursor(self, db_id: str) -> Iterator[duckdb.DuckDBPyConnection]:
+
+    def get_cursor(self, db_id: str) -> Generator[duckdb.DuckDBPyConnection]:
         """Get a cursor to the specified database. Ensures the cursor is closed after use."""
         self._validate_db_id(db_id)
 
@@ -149,6 +150,21 @@ class DuckDBEngine:
                         z_score DOUBLE,
                         anomaly_flag VARCHAR,
                         status_recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE TABLE IF NOT EXISTS advisors (
+                        advisor_id VARCHAR PRIMARY KEY,
+                        name VARCHAR,
+                        email VARCHAR
+                    );
+
+                    CREATE TABLE IF NOT EXISTS advisor_points_ledger (
+                        id VARCHAR PRIMARY KEY,
+                        advisor_id VARCHAR,
+                        action_type VARCHAR,
+                        points INTEGER,
+                        sid VARCHAR,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
 
@@ -307,15 +323,13 @@ class DuckDBEngine:
             if read_only:
                 with self.get_cursor(db_id) as cursor:
                     rel = cursor.sql(sql)
-                    if rel is None:
-                        return []
                     names = rel.columns
-                    return [dict(zip(names, row, strict=True)) for row in rel.fetchall()]
+                    return [
+                        dict(zip(names, row, strict=True)) for row in rel.fetchall()
+                    ]
 
             with self.write_lock, self.get_cursor(db_id) as cursor:
                 rel = cursor.sql(sql)
-                if rel is None:
-                    return []
                 names = rel.columns
                 return [dict(zip(names, row, strict=True)) for row in rel.fetchall()]
         except Exception as e:
@@ -328,6 +342,45 @@ class DuckDBEngine:
             cursor.execute(
                 'UPDATE students SET intervention_status = ? WHERE sid = ?',
                 (status, sid),
+            )
+
+    def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
+        """Inject points for an advisor action with response time multiplier."""
+        matrix = {
+            'draft_reviewed': 5,
+            'email_sent': 10,
+            'meeting_booked': 50,
+            'student_resolved': 100,
+        }
+        base_points = matrix.get(action_type, 0)
+        if base_points == 0:
+            return
+
+        with self.write_lock, self.get_cursor('sis_db') as cursor:
+            # Check for response time bonus (24h SLA)
+            # Find the most recent status record for this student
+            res = cursor.execute(
+                'SELECT status_recorded_at FROM student_status_history WHERE sid = ? ORDER BY status_recorded_at DESC LIMIT 1',
+                (sid,),
+            ).fetchone()
+
+            multiplier = 1.0
+            if res:
+                recorded_at = res[0]
+                # Compare current_timestamp with recorded_at using DuckDB SQL
+                is_within_24h = cursor.execute(
+                    'SELECT (epoch(current_timestamp) - epoch(?)) < 86400',
+                    (recorded_at,),
+                ).fetchone()[0]
+                if is_within_24h:
+                    multiplier = 1.2
+
+            final_points = int(base_points * multiplier)
+            ledger_id = str(uuid.uuid4())
+
+            cursor.execute(
+                'INSERT INTO advisor_points_ledger (id, advisor_id, action_type, points, sid) VALUES (?, ?, ?, ?, ?)',
+                (ledger_id, advisor_id, action_type, final_points, sid),
             )
 
     def check_health(self) -> dict[str, str]:

@@ -105,9 +105,31 @@ async def update_alert_status(
     try:
         db_manager.update_intervention_status(sid, update.status)
         logger.info(f'Updated student {sid} intervention status to {update.status}')
+
+        # Gamification hooks for status transitions
+        if update.status == 'booked':
+            db_manager.inject_points(str(user.id), sid, 'meeting_booked')
+        elif update.status == 'resolved':
+            db_manager.inject_points(str(user.id), sid, 'student_resolved')
+
         return {'status': 'success', 'sid': sid, 'new_status': update.status}
     except Exception as e:
         logger.error(f'Failed to update status for student {sid}: {e}')
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/{sid}/draft/review')
+async def review_draft(
+    sid: str,
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:write'))],
+) -> dict[str, str]:
+    """Explicitly rewards the advisor for reviewing the LLM draft."""
+    try:
+        db_manager.inject_points(str(user.id), sid, 'draft_reviewed')
+        return {'status': 'success', 'message': 'Draft review points awarded.'}
+    except Exception as e:
+        logger.error(f'Failed to award draft review points for student {sid}: {e}')
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -278,6 +300,10 @@ async def send_nudge_email(
             'sis_db',
             f"UPDATE students SET last_notified_timestamp = {time.time()} WHERE sid = '{sid}'",
         )
+
+        # Gamification hook
+        db_manager.inject_points(str(user.id), sid, 'email_sent')
+
         return {'status': 'success', 'message': f'Email sent to {email}'}
     except Exception as e:
         logger.error(f'Failed to finalize send: {e}')

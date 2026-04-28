@@ -52,6 +52,10 @@ class DatabaseEngine(Protocol):
         """Update the intervention lifecycle status for a specific student."""
         ...
 
+    def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
+        """Inject points for an advisor action into the points ledger."""
+        ...
+
     def check_health(self) -> dict[str, str]:
         """Verify connectivity to all registered databases."""
         ...
