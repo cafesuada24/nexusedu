@@ -1,0 +1,467 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Neutrals */
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.18 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 260);
+
+  /* Primary — Blue #2563eb */
+  --primary: oklch(0.546 0.215 262.881);
+  --primary-foreground: oklch(0.99 0 0);
+
+  /* Secondary & muted — light blue tints */
+  --secondary: oklch(0.968 0.012 260);
+  --secondary-foreground: oklch(0.28 0.04 262);
+  --muted: oklch(0.97 0.006 260);
+  --muted-foreground: oklch(0.52 0.02 260);
+  --accent: oklch(0.955 0.02 260);
+  --accent-foreground: oklch(0.35 0.08 262);
+
+  /* Feedback */
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.62 0.15 150);
+  --warning: oklch(0.72 0.17 70);
+
+  /* Blue family — accent shades for navigation & section coding */
+  --accent-sky: oklch(0.62 0.16 230);
+  --accent-sky-foreground: oklch(0.99 0 0);
+  --accent-cyan: oklch(0.6 0.13 205);
+  --accent-cyan-foreground: oklch(0.99 0 0);
+  --accent-indigo: oklch(0.5 0.22 268);
+  --accent-indigo-foreground: oklch(0.99 0 0);
+  --accent-slate: oklch(0.5 0.04 258);
+  --accent-slate-foreground: oklch(0.99 0 0);
+
+  --border: oklch(0.92 0.008 260);
+  --input: oklch(0.92 0.008 260);
+  --ring: oklch(0.546 0.215 262.881);
+
+  /* Charts — blue-led analogous palette */
+  --chart-1: oklch(0.546 0.215 262.881);
+  --chart-2: oklch(0.68 0.14 230);
+  --chart-3: oklch(0.78 0.11 200);
+  --chart-4: oklch(0.62 0.15 150);
+  --chart-5: oklch(0.72 0.17 70);
+
+  --radius: 0.875rem;
+
+  --sidebar: oklch(0.985 0.004 260);
+  --sidebar-foreground: oklch(0.28 0.03 260);
+  --sidebar-primary: oklch(0.546 0.215 262.881);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.955 0.018 260);
+  --sidebar-accent-foreground: oklch(0.3 0.06 262);
+  --sidebar-border: oklch(0.92 0.008 260);
+  --sidebar-ring: oklch(0.546 0.215 262.881);
+}
+
+.dark {
+  --background: oklch(0.15 0.015 260);
+  --foreground: oklch(0.97 0.005 260);
+  --card: oklch(0.19 0.02 260);
+  --card-foreground: oklch(0.97 0.005 260);
+  --popover: oklch(0.19 0.02 260);
+  --popover-foreground: oklch(0.97 0.005 260);
+
+  --primary: oklch(0.68 0.18 262);
+  --primary-foreground: oklch(0.14 0.02 262);
+
+  --secondary: oklch(0.26 0.03 260);
+  --secondary-foreground: oklch(0.95 0.01 260);
+  --muted: oklch(0.24 0.02 260);
+  --muted-foreground: oklch(0.7 0.02 260);
+  --accent: oklch(0.28 0.04 262);
+  --accent-foreground: oklch(0.95 0.01 260);
+
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.68 0.15 150);
+  --warning: oklch(0.78 0.16 70);
+
+  --accent-sky: oklch(0.72 0.14 230);
+  --accent-sky-foreground: oklch(0.14 0.02 230);
+  --accent-cyan: oklch(0.72 0.12 205);
+  --accent-cyan-foreground: oklch(0.14 0.02 205);
+  --accent-indigo: oklch(0.66 0.2 268);
+  --accent-indigo-foreground: oklch(0.14 0.02 268);
+  --accent-slate: oklch(0.7 0.03 258);
+  --accent-slate-foreground: oklch(0.14 0.02 258);
+
+  --border: oklch(0.28 0.02 260);
+  --input: oklch(0.28 0.02 260);
+  --ring: oklch(0.68 0.18 262);
+
+  --chart-1: oklch(0.68 0.18 262);
+  --chart-2: oklch(0.72 0.13 220);
+  --chart-3: oklch(0.8 0.1 195);
+  --chart-4: oklch(0.7 0.14 150);
+  --chart-5: oklch(0.78 0.16 70);
+
+  --sidebar: oklch(0.17 0.018 260);
+  --sidebar-foreground: oklch(0.9 0.01 260);
+  --sidebar-primary: oklch(0.68 0.18 262);
+  --sidebar-primary-foreground: oklch(0.14 0.02 262);
+  --sidebar-accent: oklch(0.25 0.03 260);
+  --sidebar-accent-foreground: oklch(0.95 0.01 260);
+  --sidebar-border: oklch(0.26 0.02 260);
+  --sidebar-ring: oklch(0.68 0.18 262);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), 'Inter Fallback', ui-sans-serif, system-ui;
+  --font-serif: var(--font-playfair), 'Playfair Display Fallback', ui-serif, Georgia;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-accent-sky: var(--accent-sky);
+  --color-accent-sky-foreground: var(--accent-sky-foreground);
+  --color-accent-cyan: var(--accent-cyan);
+  --color-accent-cyan-foreground: var(--accent-cyan-foreground);
+  --color-accent-indigo: var(--accent-indigo);
+  --color-accent-indigo-foreground: var(--accent-indigo-foreground);
+  --color-accent-slate: var(--accent-slate);
+  --color-accent-slate-foreground: var(--accent-slate-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: color-mix(in oklab, var(--card) 70%, transparent);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+  .glass-strong {
+    background: color-mix(in oklab, var(--card) 85%, transparent);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+  /* Hero surface — calm institutional feel. A soft single-color glow at the
+     top adds depth without the multi-hue marketing look. */
+  .hero-gradient {
+    background:
+      radial-gradient(
+        1100px 520px at 25% 0%,
+        color-mix(in oklab, var(--primary) 14%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--primary) 6%, var(--background)) 0%,
+        var(--background) 75%
+      );
+  }
+
+  /* Dashboard canvas — subtle two-stop tint that gives the page some
+     breathing room while keeping cards crisp and readable. */
+  .dashboard-canvas {
+    background:
+      radial-gradient(
+        700px 380px at 100% 0%,
+        color-mix(in oklab, var(--accent-sky) 9%, transparent),
+        transparent 60%
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--primary) 4%, var(--background)) 0%,
+        var(--background) 70%
+      );
+  }
+
+  /* Subtle dotted grid for background depth */
+  .bg-grid {
+    background-image: radial-gradient(
+      color-mix(in oklab, var(--primary) 14%, transparent) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+    background-position: 0 0;
+  }
+
+  /* Sidebar accent gradient for active item background */
+  .sidebar-rail-gradient {
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--primary) 10%, transparent) 0%,
+      transparent 100%
+    );
+  }
+
+  /* Tinted top stripes — apply to <Card> for section identity.
+     Accessibility: stripe is the *only* color cue on body cards so it must be
+     clearly visible. Cards keep a solid `--card` background (handled below)
+     to maximize text contrast for older users / low-vision users. */
+  .stripe-sky,
+  .stripe-cyan,
+  .stripe-indigo,
+  .stripe-slate,
+  .stripe-primary,
+  .stripe-success,
+  .stripe-warning,
+  .stripe-destructive {
+    position: relative;
+  }
+  .stripe-sky::before,
+  .stripe-cyan::before,
+  .stripe-indigo::before,
+  .stripe-slate::before,
+  .stripe-primary::before,
+  .stripe-success::before,
+  .stripe-warning::before,
+  .stripe-destructive::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    /* Bumped from 2px → 3px so the section indicator stays legible
+       once we remove the body gradient. */
+    height: 3px;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+  }
+  /* Solid color stripe (no fade) — easier to perceive for low-vision users
+     than a fading gradient. */
+  .stripe-sky::before {
+    background: var(--accent-sky);
+  }
+  .stripe-cyan::before {
+    background: var(--accent-cyan);
+  }
+  .stripe-indigo::before {
+    background: var(--accent-indigo);
+  }
+  .stripe-slate::before {
+    background: var(--accent-slate);
+  }
+  .stripe-primary::before {
+    background: var(--primary);
+  }
+  .stripe-success::before {
+    background: var(--success);
+  }
+  .stripe-warning::before {
+    background: var(--warning);
+  }
+  .stripe-destructive::before {
+    background: var(--destructive);
+  }
+
+  /* ---------------------------------------------------------------------
+     School-context tone — gradients are *allowed but gentle*. We override
+     the strong tinted card backgrounds (e.g. `from-primary/18 via-primary/8
+     to-card`) with a much softer wash so text stays comfortable to read
+     for older users / low-vision users while the section still gets a
+     touch of color identity from its top stripe + corner glow.
+     --------------------------------------------------------------------- */
+  .stripe-sky.bg-gradient-to-br,
+  .stripe-cyan.bg-gradient-to-br,
+  .stripe-indigo.bg-gradient-to-br,
+  .stripe-slate.bg-gradient-to-br,
+  .stripe-primary.bg-gradient-to-br,
+  .stripe-success.bg-gradient-to-br,
+  .stripe-warning.bg-gradient-to-br,
+  .stripe-destructive.bg-gradient-to-br {
+    background-color: var(--card);
+    background-image: none;
+    position: relative;
+    isolation: isolate;
+  }
+  .stripe-sky.bg-gradient-to-br::after,
+  .stripe-cyan.bg-gradient-to-br::after,
+  .stripe-indigo.bg-gradient-to-br::after,
+  .stripe-slate.bg-gradient-to-br::after,
+  .stripe-primary.bg-gradient-to-br.bg-gradient-to-br::after,
+  .stripe-primary.bg-gradient-to-br::after,
+  .stripe-success.bg-gradient-to-br::after,
+  .stripe-warning.bg-gradient-to-br::after,
+  .stripe-destructive.bg-gradient-to-br::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: -1;
+  }
+  /* Diagonal wash mirroring the original `bg-gradient-to-br` direction
+     but kept light (~15% start → fully transparent ~70%) so body text on
+     `--card` stays comfortable. The gradient is laid behind content via
+     z-index: -1 to avoid affecting child contrast. */
+  .stripe-sky.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent-sky) 16%, transparent) 0%,
+      color-mix(in oklab, var(--accent-sky) 7%, transparent) 35%,
+      transparent 75%
+    );
+  }
+  .stripe-cyan.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent-cyan) 16%, transparent) 0%,
+      color-mix(in oklab, var(--accent-cyan) 7%, transparent) 35%,
+      transparent 75%
+    );
+  }
+  .stripe-indigo.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent-indigo) 15%, transparent) 0%,
+      color-mix(in oklab, var(--accent-indigo) 7%, transparent) 35%,
+      transparent 75%
+    );
+  }
+  .stripe-slate.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--accent-slate) 14%, transparent) 0%,
+      color-mix(in oklab, var(--accent-slate) 6%, transparent) 35%,
+      transparent 75%
+    );
+  }
+  .stripe-primary.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--primary) 16%, transparent) 0%,
+      color-mix(in oklab, var(--primary) 7%, transparent) 35%,
+      transparent 75%
+    );
+  }
+  .stripe-success.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--success) 15%, transparent) 0%,
+      color-mix(in oklab, var(--success) 6%, transparent) 35%,
+      transparent 75%
+    );
+  }
+  .stripe-warning.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--warning) 15%, transparent) 0%,
+      color-mix(in oklab, var(--warning) 6%, transparent) 35%,
+      transparent 75%
+    );
+  }
+  .stripe-destructive.bg-gradient-to-br::after {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--destructive) 13%, transparent) 0%,
+      color-mix(in oklab, var(--destructive) 6%, transparent) 35%,
+      transparent 75%
+    );
+  }
+
+  /* Gentle utility for inner content blocks (panels, list items, KPI tiles)
+     that don't have a `stripe-*` modifier. Add `.surface-soft` and the block
+     gets a barely-there diagonal sheen on top of `--card`. */
+  .surface-soft {
+    background-color: var(--card);
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--primary) 7%, transparent) 0%,
+      color-mix(in oklab, var(--accent-sky) 4%, transparent) 40%,
+      transparent 80%
+    );
+  }
+  .surface-soft-muted {
+    background-color: var(--muted);
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--primary) 5%, transparent) 0%,
+      transparent 70%
+    );
+  }
+
+  /* Soften gradient text — keep the directional fade but blend two close
+     blues so the headline remains readable instead of a high-contrast
+     marketing flourish. */
+  .bg-clip-text.text-transparent {
+    background-image: linear-gradient(
+      90deg,
+      var(--primary) 0%,
+      color-mix(in oklab, var(--accent-sky) 90%, var(--primary)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* Slightly stronger secondary-text contrast inside the dashboard so
+     muted labels (timestamps, helper copy) stay legible on tinted card
+     surfaces. WCAG AA-friendly tweak for older users / low-vision. */
+  .dashboard-canvas {
+    --muted-foreground: oklch(0.42 0.025 260);
+  }
+  .dark .dashboard-canvas {
+    --muted-foreground: oklch(0.78 0.02 260);
+  }
+
+  /* Page-level header divider — gentle one-color fade, no rainbow band */
+  .page-divider {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--primary) 35%, transparent) 0%,
+      color-mix(in oklab, var(--primary) 12%, transparent) 50%,
+      transparent 100%
+    );
+  }
+}

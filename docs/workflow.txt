@@ -1,0 +1,34 @@
+graph TD
+    subgraph Frontend
+        CSV[CSV Files] --> Parse[Frontend Parser]
+    end
+
+    subgraph "FastAPI Backend (/api/v1)"
+        Parse --> Ingest[POST /data/ingest]
+        Ingest --> Validate[Pydantic Validation]
+        Validate --> DB_Ingest[DuckDB Ingestion]
+        DB_Ingest --> AnomalyEngine[SQL Anomaly Engine]
+    end
+
+    subgraph "DuckDB (Persistent Storage)"
+        AnomalyEngine --> activities[(LMS Activities)]
+        AnomalyEngine --> students[(SIS Students)]
+        AnomalyEngine --> history[(Student Status History)]
+        
+        activities --> Stats[Window Functions]
+        Stats --> history
+        history --> students[Update Risk Status]
+    end
+
+    subgraph "AI Agent (LangGraph)"
+        Advisor[User/Advisor] --> Query[POST /query]
+        Query --> Planner[Planner Node]
+        Planner --> Discovery[Discovery Node]
+        Discovery --> SQLWorker[SQL Worker Node]
+        SQLWorker --> history
+        SQLWorker --> Aggregator[Determiner Node]
+        Aggregator --> Responder[Responder Node]
+        Responder --> Drafts[Nudge Emails & Briefs]
+    end
+
+    Drafts --> Advisor
