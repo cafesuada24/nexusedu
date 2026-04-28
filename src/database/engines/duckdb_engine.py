@@ -124,7 +124,8 @@ class DuckDBEngine:
                         score DOUBLE,
                         timestamp DOUBLE,
                         academic_year INTEGER,
-                        semester INTEGER
+                        semester INTEGER,
+                        week INTEGER
                     );
                 """)
 
@@ -147,6 +148,7 @@ class DuckDBEngine:
                         sid VARCHAR,
                         academic_year INTEGER,
                         semester INTEGER,
+                        week INTEGER,
                         baseline_avg DOUBLE,
                         baseline_std DOUBLE,
                         current_score_avg DOUBLE,
