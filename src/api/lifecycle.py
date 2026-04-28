@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -20,6 +19,7 @@ from src.database.factory import algorithm_registry, engine_registry
 from src.database.interfaces import AnomalyAlgorithm, DatabaseEngine
 from src.telemetry.logger import logger
 from src.types import BoundedDict
+from src.utils.env import getenv
 
 
 @dataclass
@@ -45,8 +45,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_manager = DatabaseManager[DatabaseEngine, AnomalyAlgorithm]()
 
     # Resolve engine and algorithm from environment or defaults
-    engine_name = os.getenv('DB_ENGINE', 'duckdb')
-    algo_name = os.getenv('DB_ALGORITHM', 'zscore')
+    engine_name = getenv('DB_ENGINE', 'duckdb')
+    algo_name = getenv('DB_ALGORITHM', 'zscore')
 
     logger.info(f'API Lifecycle: Using engine={engine_name}, algorithm={algo_name}')
 
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_manager.initialize_schema()
 
     # ==== Agent Checkpointer ====
-    postgres_uri = os.getenv('POSTGRES_DB_URI')
+    postgres_uri = getenv('POSTGRES_DB_URI')
     pool = None
     if postgres_uri:
         logger.info('API Lifecycle: Initializing PostgresSaver checkpointer...')

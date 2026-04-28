@@ -20,9 +20,15 @@ from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
+from src.utils.env import getenv
+
 # Configuration
-JWT_SECRET = os.getenv('JWT_SECRET', 'SECRET_CHANGE_ME_IN_PRODUCTION')
-DATABASE_URL = 'sqlite+aiosqlite:///./auth.db'
+JWT_SECRET = getenv(
+    'JWT_SECRET',
+    'SET_ME_IN_PRODUCTION_HEHEHE',
+)
+DATABASE_URL = getenv('AUTH_DB_URL', "sqlite+aiosqlite:///./auth.db")
+
 
 # Database Setup
 class Base(DeclarativeBase):
