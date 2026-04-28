@@ -50,7 +50,7 @@ class SendEmailRequest(BaseModel):
     body: str = Field(..., description='The final email body to send.')
 
 
-@router.get('/', response_model=list[AlertStudent])
+@router.get('', response_model=list[AlertStudent])
 async def get_alerts(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
