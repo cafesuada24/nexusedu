@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from src.api.auth import User, UserRole, check_role, current_active_user, get_user_manager, UserManager
+from src.api.auth import User, UserRole, Scope, require_scope, current_active_user, get_user_manager, UserManager
 from src.api.models.auth import UserRead, UserUpdate
 
 router = APIRouter(prefix='/users', tags=['users'])
@@ -25,7 +25,7 @@ async def update_user(
     user_update: UserUpdate,
     request: Request,
     user_manager: Annotated[UserManager, Depends(get_user_manager)],
-    _admin: Annotated[User, Depends(check_role(UserRole.ADMIN.value))],
+    _admin: Annotated[User, Depends(require_scope(Scope.USERS_WRITE))],
 ) -> User:
     """Update a user's information, including their role (Admin only)."""
     # Note: We can fetch the user first if we want to verify existence
@@ -42,7 +42,7 @@ async def update_user(
 @router.get('/', response_model=list[UserRead])
 async def list_users(
     user_manager: Annotated[UserManager, Depends(get_user_manager)],
-    _admin: Annotated[User, Depends(check_role(UserRole.ADMIN.value))],
+    _admin: Annotated[User, Depends(require_scope(Scope.USERS_READ))],
 ) -> list[User]:
     """List all users (Admin only)."""
     # This is a bit of a hack for SQLAlchemyBaseUserTable

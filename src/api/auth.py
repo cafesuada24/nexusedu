@@ -30,19 +30,42 @@ JWT_SECRET: str = getenv(
 DATABASE_URL: str = getenv('AUTH_DB_URL', 'sqlite+aiosqlite:///./auth.db')
 
 
+class Scope(str, Enum):
+    """Granular permissions (capabilities) in the system."""
+
+    ALERTS_READ = 'alerts:read'
+    ALERTS_WRITE = 'alerts:write'
+    ADVISORS_READ = 'advisors:read'
+    DATA_INGEST = 'data:ingest'
+    JOBS_READ = 'jobs:read'
+    QUERY_EXECUTE = 'query:execute'
+    USERS_READ = 'users:read'
+    USERS_WRITE = 'users:write'
+
+
 class UserRole(str, Enum):
-    """Available roles for users in the system."""
+    """Simplified user roles."""
 
-    ADMIN = 'admin:all'
-    ADVISOR_WRITE = 'advisor:write'
-    ADVISOR_READ = 'advisor:read'
+    ADMIN = 'admin'
+    ADVISOR = 'advisor'
+    VIEWER = 'viewer'
 
 
-# Define which roles are implied by others
-ROLE_HIERARCHY: dict[UserRole, set[UserRole]] = {
-    UserRole.ADMIN: {UserRole.ADMIN, UserRole.ADVISOR_WRITE, UserRole.ADVISOR_READ},
-    UserRole.ADVISOR_WRITE: {UserRole.ADVISOR_WRITE, UserRole.ADVISOR_READ},
-    UserRole.ADVISOR_READ: {UserRole.ADVISOR_READ},
+# Map roles to their specific capabilities
+ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
+    UserRole.ADMIN: set(Scope),  # Full access
+    UserRole.ADVISOR: {
+        Scope.ALERTS_READ,
+        Scope.ALERTS_WRITE,
+        Scope.ADVISORS_READ,
+        Scope.JOBS_READ,
+        Scope.QUERY_EXECUTE,
+    },
+    UserRole.VIEWER: {
+        Scope.ALERTS_READ,
+        Scope.ADVISORS_READ,
+        Scope.JOBS_READ,
+    },
 }
 
 
@@ -56,7 +79,7 @@ class Base(DeclarativeBase):
 class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table."""
 
-    role: Mapped[str] = mapped_column(default=UserRole.ADVISOR_READ.value)
+    role: Mapped[str] = mapped_column(default=UserRole.VIEWER.value)
 
 
 engine = create_async_engine(DATABASE_URL)
@@ -131,43 +154,58 @@ current_active_user: Callable[..., User] = fastapi_users.current_user(active=Tru
 
 
 # RBAC Utilities
-def check_role(required_role: str) -> Callable[[User], User]:
-    """Dependency for checking if a user has the required role.
+def require_scope(required_scope: Scope) -> Callable[[User], User]:
+    """Dependency for checking if a user has the required capability.
 
     Args:
-        required_role: The role name required to access the endpoint.
+        required_scope: The capability required to access the endpoint.
 
     Returns:
-        A dependency function that validates the user's role.
+        A dependency function that validates the user's permissions.
     """
 
-    def role_checker(
+    def scope_checker(
         user: Annotated[User, Depends(current_active_user)],
     ) -> User:
-        """Inner dependency that performs the role check."""
+        """Inner dependency that performs the scope check."""
         try:
             user_role = UserRole(user.role)
-            req_role = UserRole(required_role)
         except ValueError:
-            # Fallback for unexpected strings in DB or code
-            # admin:all has full access
-            if user.role == UserRole.ADMIN.value:
-                return user
-            # Exact match
-            if user.role == required_role:
+            # Handle legacy roles during transition or invalid roles
+            if user.role == 'admin:all':
                 return user
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail='Forbidden: Invalid role configuration',
+                detail=f'Forbidden: Invalid role "{user.role}"',
             )
 
-        # Check hierarchy
-        if req_role in ROLE_HIERARCHY.get(user_role, set()):
+        # Check if the user's role has the required scope
+        user_scopes = ROLE_PERMISSIONS.get(user_role, set())
+        if required_scope in user_scopes:
             return user
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail='Forbidden: Insufficient role',
+            detail=f'Forbidden: Insufficient permissions (requires {required_scope.value})',
         )
 
-    return role_checker
+    return scope_checker
+
+
+def check_role(role_string: str) -> Callable[[User], User]:
+    """Temporary backward-compatible wrapper for check_role.
+
+    Maps legacy role strings to their modern Scope equivalents.
+    """
+    mapping = {
+        'admin:all': Scope.DATA_INGEST,  # Representing a high-level admin task
+        'advisor:write': Scope.ALERTS_WRITE,
+        'advisor:read': Scope.ALERTS_READ,
+    }
+
+    # If it's already a new role name, we can try to guess or just use admin:all as fallback
+    if role_string == UserRole.ADMIN.value:
+        return require_scope(Scope.USERS_WRITE)
+
+    scope = mapping.get(role_string, Scope.ALERTS_READ)
+    return require_scope(scope)

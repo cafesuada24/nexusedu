@@ -44,9 +44,10 @@ def test_auth_login_and_token(raw_client: TestClient) -> None:
     # 1. Register User
     email = f'test_login_{uuid.uuid4().hex[:8]}@example.com'
     password = 'securepassword'
+    # Registration ignores role, so we register normally
     reg_response = raw_client.post(
         '/api/v1/auth/register',
-        json={'email': email, 'password': password, 'role': 'advisor:read'},
+        json={'email': email, 'password': password},
     )
     assert reg_response.status_code == 201
 
@@ -61,12 +62,12 @@ def test_auth_login_and_token(raw_client: TestClient) -> None:
 
 
 def test_auth_rbac_forbidden(raw_client: TestClient) -> None:
-    """Verify advisor:read gets 403 when hitting admin:all endpoints."""
-    # 1. Register & Login as Advisor
-    email = f'advisor_read_{uuid.uuid4().hex[:8]}@example.com'
+    """Verify viewer gets 403 when hitting admin endpoints."""
+    # 1. Register & Login as Viewer (default)
+    email = f'viewer_user_{uuid.uuid4().hex[:8]}@example.com'
     raw_client.post(
         '/api/v1/auth/register',
-        json={'email': email, 'password': 'password', 'role': 'advisor:read'},
+        json={'email': email, 'password': 'password'},
     )
     login_response = raw_client.post(
         '/api/v1/auth/jwt/login', data={'username': email, 'password': 'password'}
@@ -80,7 +81,45 @@ def test_auth_rbac_forbidden(raw_client: TestClient) -> None:
         headers={'Authorization': f'Bearer {token}'},
     )
     assert response.status_code == 403
-    assert 'Forbidden' in response.json()['detail']
+    assert 'Insufficient permissions' in response.json()['detail']
+
+
+def test_auth_rbac_advisor_vs_viewer(raw_client: TestClient) -> None:
+    """Verify advisor can write but viewer cannot."""
+    # 1. Register a viewer and an advisor
+    viewer_email = f'viewer_{uuid.uuid4().hex[:8]}@example.com'
+    raw_client.post('/api/v1/auth/register', json={'email': viewer_email, 'password': 'password'})
+
+    advisor_email = f'advisor_{uuid.uuid4().hex[:8]}@example.com'
+    raw_client.post('/api/v1/auth/register', json={'email': advisor_email, 'password': 'password'})
+
+    async def elevate_to_advisor():
+        async with async_session_maker() as session:
+            stmt = update(User).where(User.email == advisor_email).values(role=UserRole.ADVISOR.value)
+            await session.execute(stmt)
+            await session.commit()
+    asyncio.run(elevate_to_advisor())
+
+    # 2. Login as Viewer and try to patch alert (should fail)
+    v_login = raw_client.post('/api/v1/auth/jwt/login', data={'username': viewer_email, 'password': 'password'})
+    v_token = v_login.json()['access_token']
+    v_resp = raw_client.patch(
+        '/api/v1/alerts/S123/status',
+        json={'status': 'sent'},
+        headers={'Authorization': f'Bearer {v_token}'}
+    )
+    assert v_resp.status_code == 403
+
+    # 3. Login as Advisor and try to patch alert (should pass authentication check)
+    a_login = raw_client.post('/api/v1/auth/jwt/login', data={'username': advisor_email, 'password': 'password'})
+    a_token = a_login.json()['access_token']
+    a_resp = raw_client.patch(
+        '/api/v1/alerts/S123/status',
+        json={'status': 'sent'},
+        headers={'Authorization': f'Bearer {a_token}'}
+    )
+    # Might be 404 or 500 because student S123 doesn't exist, but NOT 403
+    assert a_resp.status_code != 403
 
 
 def test_auth_rbac_success(raw_client: TestClient) -> None:

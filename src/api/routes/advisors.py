@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.auth import User, check_role
+from src.api.auth import Scope, User, require_scope
 from src.api.lifecycle import get_dbmanager
 from src.database.manager import DatabaseManager
 from src.telemetry.logger import logger
@@ -15,7 +15,7 @@ router = APIRouter(prefix='/advisors', tags=['advisors'])
 @router.get('/leaderboard')
 async def get_leaderboard(
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
-    _user: Annotated[User, Depends(check_role('advisor:read'))],
+    _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
     time_window: str = Query(
         'all_time',
         pattern='^(weekly|monthly|semester|all_time)$',

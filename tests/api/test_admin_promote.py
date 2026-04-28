@@ -52,11 +52,11 @@ def test_admin_promote_user(raw_client: TestClient):
     # 6. Promote the user
     promote_resp = raw_client.patch(
         f"/api/v1/users/{user_id}",
-        json={"role": UserRole.ADVISOR_WRITE.value},
+        json={"role": UserRole.ADVISOR.value},
         headers={"Authorization": f"Bearer {admin_token}"}
     )
     assert promote_resp.status_code == 200
-    assert promote_resp.json()["role"] == UserRole.ADVISOR_WRITE.value
+    assert promote_resp.json()["role"] == UserRole.ADVISOR.value
 
 def test_non_admin_cannot_promote(raw_client: TestClient):
     """Verify that a non-admin user cannot promote themselves or others."""
