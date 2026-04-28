@@ -43,7 +43,7 @@ class DatabaseEngine(Protocol):
         self,
         db_id: str,
         sql: str,
-        params: object = None,
+        params: Sequence[str | int] | Mapping[str, int | str] | None = None,
         read_only: bool = True,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results."""

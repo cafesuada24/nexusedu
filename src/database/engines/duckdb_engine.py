@@ -312,7 +312,7 @@ class DuckDBEngine:
         self,
         db_id: str,
         sql: str,
-        params: object = None,
+        params: Sequence[str | int] | Mapping[str, int | str] | None = None,
         read_only: bool = True,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results as list of dicts. Avoids Pandas for memory efficiency."""
@@ -326,28 +326,18 @@ class DuckDBEngine:
         try:
             if read_only:
                 with self.get_cursor(db_id) as cursor:
-                    if params:
-                        cursor.execute(sql, params)
-                        names = [desc[0] for desc in cursor.description]
-                        return [
-                            dict(zip(names, row, strict=True)) for row in cursor.fetchall()
-                        ]
-                    rel = cursor.sql(sql)
-                    names = rel.columns
-                    return [
-                        dict(zip(names, row, strict=True)) for row in rel.fetchall()
-                    ]
-
-            with self.write_lock, self.get_cursor(db_id) as cursor:
-                if params:
                     cursor.execute(sql, params)
                     names = [desc[0] for desc in cursor.description]
                     return [
                         dict(zip(names, row, strict=True)) for row in cursor.fetchall()
                     ]
-                rel = cursor.sql(sql)
-                names = rel.columns
-                return [dict(zip(names, row, strict=True)) for row in rel.fetchall()]
+
+            with self.write_lock, self.get_cursor(db_id) as cursor:
+                cursor.execute(sql, params)
+                names = [desc[0] for desc in cursor.description]
+                return [
+                    dict(zip(names, row, strict=True)) for row in cursor.fetchall()
+                ]
         except Exception as e:
             return [{'error': str(e)}]
 
