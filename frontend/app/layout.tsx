@@ -1,25 +1,25 @@
-import type { Metadata, Viewport } from "next"
-import { Inter, Playfair_Display } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/sonner"
-import "./globals.css"
+import type { Metadata, Viewport } from "next";
+import { Inter, Playfair_Display } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
+import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
-})
+});
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-playfair",
   weight: ["700", "800", "900"],
   display: "swap",
-})
+});
 
 export const metadata: Metadata = {
-  title: "NexusEdu — AI đồng hành, gắn kết tình thầy trò",
+  title: "NexusEdu — Hệ sinh thái AI hỗ trợ đào tạo và quản lý sinh viên",
   description:
     "NexusEdu là nền tảng AI phát hiện sớm sinh viên có nguy cơ, hỗ trợ cố vấn học tập gửi email chăm sóc và đặt lịch tư vấn thông minh.",
   generator: "v0.app",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     "student success",
     "advisor booking",
   ],
-}
+};
 
 export const viewport: Viewport = {
   themeColor: [
@@ -39,7 +39,7 @@ export const viewport: Viewport = {
   ],
   width: "device-width",
   initialScale: 1,
-}
+};
 
 export default function RootLayout({
   children,
@@ -63,5 +63,5 @@ export default function RootLayout({
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
-  )
+  );
 }
