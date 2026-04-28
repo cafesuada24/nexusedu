@@ -20,21 +20,21 @@ async def get_leaderboard(
 ) -> list[dict[str, Any]]:
     """Retrieve the advisor leaderboard based on points aggregation."""
     interval_map = {
-        'weekly': "INTERVAL '7 days'",
-        'monthly': "INTERVAL '30 days'",
-        'semester': "INTERVAL '120 days'",  # Simplified semester definition
-        'all_time': None,
+        'weekly': '7 days',
+        'monthly': '30 days',
+        'semester': '120 days',  # Simplified semester definition
     }
 
     where_clause = ''
+    param = None
     if time_window != 'all_time':
-        interval = interval_map[time_window]
-        where_clause = f'WHERE timestamp >= current_timestamp - {interval}'
+        param = (interval_map[time_window],)
+        where_clause = "WHERE timestamp >= current_timestamp - CAST(? AS INTERVAL)"
 
     # Aggregate points and join with advisors table for names
     sql = f"""
-        SELECT 
-            l.advisor_id, 
+        SELECT
+            l.advisor_id,
             COALESCE(a.name, l.advisor_id) as name,
             SUM(l.points) as total_points,
             COUNT(l.id) as actions_count
@@ -46,7 +46,7 @@ async def get_leaderboard(
     """
 
     try:
-        results = db_manager.execute('sis_db', sql)
+        results = db_manager.execute('sis_db', sql, param)
         if results and 'error' in results[0]:
             raise ValueError(results[0]['error'])
         return results
