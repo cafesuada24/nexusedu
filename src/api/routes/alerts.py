@@ -2,7 +2,7 @@
 
 import time
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from langgraph.graph.state import CompiledStateGraph
@@ -10,12 +10,12 @@ from pydantic import BaseModel, Field
 
 from src.agents.state import AgentState
 from src.api.auth import User, check_role
-from src.api.lifecycle import get_agent, get_dbmanager
+from src.api.lifecycle import get_agent, get_dbmanager, get_jobs_store
 from src.api.models.response import (
     JobAcceptedResponse,
     JobStatusResponse,
 )
-from src.api.utils.jobs_store import _jobs
+from src.api.types import JobStore
 from src.database.manager import DatabaseManager
 from src.telemetry.logger import logger
 
@@ -48,9 +48,9 @@ class EmailDraft(BaseModel):
 
 
 class SendEmailRequest(BaseModel):
-    """Schema for sending a finalized email."""
+    """Schema for sending a personalized nudge email."""
 
-    body: str = Field(..., description='The finalized email content to send.')
+    body: str = Field(..., description='The final email body to send.')
 
 
 @router.get('/', response_model=list[AlertStudent])
@@ -86,28 +86,34 @@ async def update_alert_status(
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
     user: Annotated[User, Depends(check_role('advisor:write'))],
 ) -> dict[str, str]:
-    """Update the Kanban state for a specific student's intervention."""
-    valid_statuses = [
-        'none',
-        'new',
-        'sent',
-        'booked',
-        'supporting',
-        'resolved',
-        'expired',
-    ]
-    if update.status not in valid_statuses:
-        raise HTTPException(
-            status_code=400,
-            detail=f'Invalid status. Must be one of {valid_statuses}',
-        )
-
+    """Manually transitions a student's Kanban state."""
     try:
         db_manager.update_intervention_status(sid, update.status)
-        logger.info(f'Updated student {sid} intervention status to {update.status}')
-        return {'status': 'success', 'sid': sid, 'new_status': update.status}
+
+        # Gamification hooks for status changes
+        if update.status == 'booked':
+            db_manager.inject_points(str(user.id), sid, 'meeting_booked')
+        elif update.status == 'resolved':
+            db_manager.inject_points(str(user.id), sid, 'student_resolved')
+
+        return {'sid': sid, 'new_status': update.status}
     except Exception as e:
         logger.error(f'Failed to update status for student {sid}: {e}')
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/{sid}/draft/review')
+async def review_draft(
+    sid: str,
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:write'))],
+) -> dict[str, str]:
+    """Explicitly rewards the advisor for reviewing the LLM draft."""
+    try:
+        db_manager.inject_points(str(user.id), sid, 'draft_reviewed')
+        return {'status': 'success', 'message': 'Draft review points awarded.'}
+    except Exception as e:
+        logger.error(f'Failed to award draft review points for student {sid}: {e}')
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -117,6 +123,7 @@ async def _run_email_draft_task(
     agent: CompiledStateGraph[AgentState, None, AgentState],
     db_manager: DatabaseManager,
     user: User,
+    jobs: JobStore,
 ) -> None:
     """Encapsulates the email draft generation in a background task."""
     logger.set_context({'sid': sid, 'job_id': job_id})
@@ -126,7 +133,8 @@ async def _run_email_draft_task(
         # 1. Fetch student PII locally (never exposed to LLM)
         student_data = db_manager.execute(
             'sis_db',
-            f"SELECT student_name, email FROM students WHERE sid = '{sid}'",
+            'SELECT student_name, email FROM students WHERE sid = ?',
+            (sid,),
         )
 
         if not student_data or 'error' in student_data[0]:
@@ -138,16 +146,17 @@ async def _run_email_draft_task(
         # 2. Fetch performance data locally for anonymization
         perf_data = db_manager.execute(
             'sis_db',
-            f"SELECT academic_year, semester, baseline_avg, baseline_std, current_score_avg, z_score, anomaly_flag FROM student_status_history WHERE sid = '{sid}'",
+            'SELECT academic_year, semester, baseline_avg, baseline_std, current_score_avg, z_score, anomaly_flag FROM student_status_history WHERE sid = ?',
+            (sid,),
         )
-        
+
         # 3. Create session-based anonymized_id
-        anonymized_id = f"STU_{uuid.uuid4().hex[:8]}"
+        anonymized_id = f'STU_{uuid.uuid4().hex[:8]}'
 
         # 4. Invoke Agent with anonymized request and local context
         query = (
             f"Generate an empathetic nudge email draft for student with anonymized_id '{anonymized_id}'. "
-            f"Contextual Performance Patterns: {perf_data}. "
+            f'Contextual Performance Patterns: {perf_data}. '
             'Use placeholders {{STUDENT_NAME}} and {{ADVISOR_LINK}}. '
             'Focus on their performance trajectory in the contextual data.'
         )
@@ -190,7 +199,7 @@ async def _run_email_draft_task(
         )
 
         # Update job status to completed
-        _jobs[job_id] = JobStatusResponse(
+        jobs[job_id] = JobStatusResponse(
             job_id=job_id,
             status='completed',
             result=EmailDraft(
@@ -205,7 +214,7 @@ async def _run_email_draft_task(
         logger.error(
             f'API (BG): Failed to generate draft for student {sid}: {e}', exc_info=True
         )
-        _jobs[job_id] = JobStatusResponse(
+        jobs[job_id] = JobStatusResponse(
             job_id=job_id,
             status='failed',
             error=str(e),
@@ -224,6 +233,7 @@ async def generate_email_draft(
     ],
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
     user: Annotated[User, Depends(check_role('advisor:write'))],
+    jobs: Annotated[JobStore, Depends(get_jobs_store)],
 ) -> JobAcceptedResponse:
     """Triggers the AI to generate a personalized email draft in the background.
 
@@ -232,7 +242,7 @@ async def generate_email_draft(
     job_id = str(uuid.uuid4())
 
     # Initialize job status
-    _jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
+    jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
 
     # Schedule background task
     background_tasks.add_task(
@@ -242,6 +252,7 @@ async def generate_email_draft(
         agent=agent,
         db_manager=db_manager,
         user=user,
+        jobs=jobs,
     )
 
     return JobAcceptedResponse(job_id=job_id, status='processing')
@@ -258,7 +269,8 @@ async def send_nudge_email(
     # 1. Fetch student info for logging/dispatch
     student_data = db_manager.execute(
         'sis_db',
-        f"SELECT student_name, email FROM students WHERE sid = '{sid}'",
+        'SELECT student_name, email FROM students WHERE sid = ?',
+        (sid,),
     )
 
     if not student_data:
@@ -276,8 +288,14 @@ async def send_nudge_email(
 
         db_manager.execute(
             'sis_db',
-            f"UPDATE students SET last_notified_timestamp = {time.time()} WHERE sid = '{sid}'",
+            'UPDATE students SET last_notified_timestamp = ? WHERE sid = ?',
+            (time.time(), sid),
+            read_only=False,
         )
+
+        # Gamification hook
+        db_manager.inject_points(str(user.id), sid, 'email_sent')
+
         return {'status': 'success', 'message': f'Email sent to {email}'}
     except Exception as e:
         logger.error(f'Failed to finalize send: {e}')

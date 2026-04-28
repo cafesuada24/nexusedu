@@ -43,6 +43,7 @@ class DatabaseEngine(Protocol):
         self,
         db_id: str,
         sql: str,
+        params: object = None,
         read_only: bool = True,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results."""
@@ -50,6 +51,10 @@ class DatabaseEngine(Protocol):
 
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""
+        ...
+
+    def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
+        """Inject points for an advisor action into the points ledger."""
         ...
 
     def check_health(self) -> dict[str, str]:

@@ -1,0 +1,55 @@
+"""API routes for Advisor management and Leaderboards."""
+
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from src.api.auth import User, check_role
+from src.api.lifecycle import get_dbmanager
+from src.database.manager import DatabaseManager
+from src.telemetry.logger import logger
+
+router = APIRouter(prefix='/advisors', tags=['advisors'])
+
+
+@router.get('/leaderboard')
+async def get_leaderboard(
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    user: Annotated[User, Depends(check_role('advisor:read'))],
+    time_window: str = Query('all_time', pattern='^(weekly|monthly|semester|all_time)$'),
+) -> list[dict[str, Any]]:
+    """Retrieve the advisor leaderboard based on points aggregation."""
+    interval_map = {
+        'weekly': "INTERVAL '7 days'",
+        'monthly': "INTERVAL '30 days'",
+        'semester': "INTERVAL '120 days'",  # Simplified semester definition
+        'all_time': None,
+    }
+
+    where_clause = ''
+    if time_window != 'all_time':
+        interval = interval_map[time_window]
+        where_clause = f'WHERE timestamp >= current_timestamp - {interval}'
+
+    # Aggregate points and join with advisors table for names
+    sql = f"""
+        SELECT 
+            l.advisor_id, 
+            COALESCE(a.name, l.advisor_id) as name,
+            SUM(l.points) as total_points,
+            COUNT(l.id) as actions_count
+        FROM advisor_points_ledger l
+        LEFT JOIN advisors a ON l.advisor_id = a.advisor_id
+        {where_clause}
+        GROUP BY l.advisor_id, a.name
+        ORDER BY total_points DESC
+    """
+
+    try:
+        results = db_manager.execute('sis_db', sql)
+        if results and 'error' in results[0]:
+            raise ValueError(results[0]['error'])
+        return results
+    except Exception as e:
+        logger.error(f'Failed to fetch leaderboard: {e}')
+        raise HTTPException(status_code=500, detail=str(e)) from e

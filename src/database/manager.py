@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from src.database.interfaces import AnomalyAlgorithm, DatabaseEngine
 
-class DatabaseManager[T_Engine: "DatabaseEngine", T_Algo: "AnomalyAlgorithm"]:
+class DatabaseManager[T_Engine: DatabaseEngine, T_Algo: AnomalyAlgorithm]:
     """Orchestrates database operations using injected engine and anomaly algorithms."""
 
     def __init__(self) -> None:
@@ -81,6 +81,10 @@ class DatabaseManager[T_Engine: "DatabaseEngine", T_Algo: "AnomalyAlgorithm"]:
         """Update the intervention lifecycle status for a specific student."""
         self.engine.update_intervention_status(sid, status)
 
+    def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
+        """Inject points for an advisor action into the points ledger."""
+        self.engine.inject_points(advisor_id, sid, action_type)
+
     def check_health(self) -> dict[str, Any]:
         """Verify database health."""
         return self.engine.check_health()
@@ -97,15 +101,16 @@ class DatabaseManager[T_Engine: "DatabaseEngine", T_Algo: "AnomalyAlgorithm"]:
         self,
         db_id: str,
         sql: str,
+        params: object = None,
         read_only: bool = True,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results."""
-        return self.engine.execute(db_id, sql, read_only=read_only)
+        return self.engine.execute(db_id, sql, params=params, read_only=read_only)
 
     def get_formatted_db_list(self) -> str:
         """Retrieve list of available databases in markdown format."""
         header = '## AVAILABLE DATABASE REGISTRY\n'
-        entries = []
+        entries: list[str] = []
         for db in DB_REGISTRY:
             entry = f'### ID: `{db["id"]}`\n- **Description**: {db["description"]}\n- **Keywords**: {", ".join(db["keywords"])}\n'
             entries.append(entry)

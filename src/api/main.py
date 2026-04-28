@@ -4,7 +4,6 @@ This module initializes the FastAPI application, configures middleware,
 and includes the API routers for the agent's functionality.
 """
 
-import os
 import time
 from collections.abc import Awaitable, Callable
 
@@ -14,8 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.auth import auth_backend, fastapi_users
 from src.api.lifecycle import lifespan
 from src.api.models.auth import UserCreate, UserRead
-from src.api.routes import alerts, data, health, jobs, query
+from src.api.routes import advisors, alerts, data, health, jobs, query
 from src.telemetry.logger import logger
+from src.utils.env import getenv
 
 app = FastAPI(
     title='Agent Assistant API',
@@ -26,7 +26,7 @@ app = FastAPI(
 
 # CORS Configuration
 # Read allowed origins from environment variable, default to localhost:3000
-allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins_str = getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
 
 app.add_middleware(
@@ -93,6 +93,7 @@ api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(alerts.router)
+api_v1_router.include_router(advisors.router)
 
 # Include the versioned API router into the app
 app.include_router(api_v1_router)
