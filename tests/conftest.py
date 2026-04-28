@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.auth import User, current_active_user
+from src.api.auth import User, UserRole, current_active_user
 from src.api.lifecycle import (
     get_agent,
     get_alert_service,
@@ -86,12 +86,12 @@ def mock_agent() -> MagicMock:
 
 @pytest.fixture
 def mock_user() -> User:
-    """Provides a mock authenticated User with admin:all role."""
+    """Provides a mock authenticated User with admin role."""
     return User(
         id=uuid.uuid4(),
         email='test@example.com',
         hashed_password='hashed_password',
-        role='admin:all',
+        role=UserRole.ADMIN.value,
         is_active=True,
         is_superuser=False,
         is_verified=True,

@@ -118,7 +118,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         user: User,
         _request: Request | None = None,
     ) -> None:
-        """Callback triggered after a user successfully registers."""
+        """Callback triggered after a user successfully registers.
+
+        Args:
+            user: The newly registered user.
+            _request: The incoming request object.
+        """
         print(f'User {user.id} has registered.')
 
 
@@ -134,7 +139,11 @@ bearer_transport = BearerTransport(tokenUrl='api/v1/auth/jwt/login')
 
 
 def get_jwt_strategy() -> JWTStrategy:
-    """Strategy for generating and validating JWT tokens."""
+    """Strategy for generating and validating JWT tokens.
+
+    Returns:
+        A JWTStrategy instance configured with the system secret.
+    """
     return JWTStrategy(secret=JWT_SECRET, lifetime_seconds=3600)
 
 
@@ -167,17 +176,24 @@ def require_scope(required_scope: Scope) -> Callable[[User], User]:
     def scope_checker(
         user: Annotated[User, Depends(current_active_user)],
     ) -> User:
-        """Inner dependency that performs the scope check."""
+        """Inner dependency that performs the scope check.
+
+        Args:
+            user: The current authenticated user.
+
+        Returns:
+            The user if they have the required scope.
+
+        Raises:
+            HTTPException: If the role is invalid or permissions are insufficient.
+        """
         try:
             user_role = UserRole(user.role)
         except ValueError:
-            # Handle legacy roles during transition or invalid roles
-            if user.role == 'admin:all':
-                return user
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f'Forbidden: Invalid role "{user.role}"',
-            )
+            ) from None
 
         # Check if the user's role has the required scope
         user_scopes = ROLE_PERMISSIONS.get(user_role, set())
@@ -193,19 +209,20 @@ def require_scope(required_scope: Scope) -> Callable[[User], User]:
 
 
 def check_role(role_string: str) -> Callable[[User], User]:
-    """Temporary backward-compatible wrapper for check_role.
+    """Dependency for checking if a user has permissions associated with a role name.
 
-    Maps legacy role strings to their modern Scope equivalents.
+    This maps role names (e.g., 'admin', 'advisor') to a minimum required scope.
+
+    Args:
+        role_string: The role name to check.
+
+    Returns:
+        A dependency function that validates permissions.
     """
-    mapping = {
-        'admin:all': Scope.DATA_INGEST,  # Representing a high-level admin task
-        'advisor:write': Scope.ALERTS_WRITE,
-        'advisor:read': Scope.ALERTS_READ,
-    }
-
-    # If it's already a new role name, we can try to guess or just use admin:all as fallback
     if role_string == UserRole.ADMIN.value:
         return require_scope(Scope.USERS_WRITE)
+    if role_string == UserRole.ADVISOR.value:
+        return require_scope(Scope.ALERTS_WRITE)
 
-    scope = mapping.get(role_string, Scope.ALERTS_READ)
-    return require_scope(scope)
+    return require_scope(Scope.ALERTS_READ)
+

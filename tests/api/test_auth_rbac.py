@@ -123,7 +123,7 @@ def test_auth_rbac_advisor_vs_viewer(raw_client: TestClient) -> None:
 
 
 def test_auth_rbac_success(raw_client: TestClient) -> None:
-    """Verify admin:all can access admin endpoints."""
+    """Verify admin can access admin endpoints."""
     # 1. Register
     email = f'admin_user_{uuid.uuid4().hex[:8]}@example.com'
     password = 'password'
