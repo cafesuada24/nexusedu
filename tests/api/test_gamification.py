@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import time
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+
     from src.database.manager import DatabaseManager
 
 
@@ -121,7 +122,7 @@ def test_leaderboard(client: TestClient, test_db_manager: DatabaseManager) -> No
     # Seed ledger with some data
     test_db_manager.execute('sis_db', """
         INSERT INTO advisor_points_ledger (id, advisor_id, action_type, points, sid, timestamp)
-        VALUES 
+        VALUES
             ('L1', 'adv_1', 'action', 100, 's1', current_timestamp),
             ('L2', 'adv_1', 'action', 50, 's2', current_timestamp),
             ('L3', 'adv_2', 'action', 80, 's3', current_timestamp),
@@ -139,8 +140,8 @@ def test_leaderboard(client: TestClient, test_db_manager: DatabaseManager) -> No
 
     # Weekly (adv_2's L4 should be excluded)
     resp = client.get('/api/v1/advisors/leaderboard?time_window=weekly')
-    data = resp.json()
     # adv_1: 150, adv_2: 80
+    data = resp.json()
     assert data[0]['advisor_id'] == 'adv_1'
     assert data[0]['total_points'] == 150
     assert data[1]['advisor_id'] == 'adv_2'
