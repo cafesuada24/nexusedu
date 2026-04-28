@@ -6,6 +6,7 @@ backend, and role-based access control (RBAC).
 
 import uuid
 from collections.abc import AsyncGenerator, Callable
+from enum import Enum
 from typing import Annotated, override
 
 from fastapi import Depends, HTTPException, Request, status
@@ -29,6 +30,22 @@ JWT_SECRET: str = getenv(
 DATABASE_URL: str = getenv('AUTH_DB_URL', 'sqlite+aiosqlite:///./auth.db')
 
 
+class UserRole(str, Enum):
+    """Available roles for users in the system."""
+
+    ADMIN = 'admin:all'
+    ADVISOR_WRITE = 'advisor:write'
+    ADVISOR_READ = 'advisor:read'
+
+
+# Define which roles are implied by others
+ROLE_HIERARCHY: dict[UserRole, set[UserRole]] = {
+    UserRole.ADMIN: {UserRole.ADMIN, UserRole.ADVISOR_WRITE, UserRole.ADVISOR_READ},
+    UserRole.ADVISOR_WRITE: {UserRole.ADVISOR_WRITE, UserRole.ADVISOR_READ},
+    UserRole.ADVISOR_READ: {UserRole.ADVISOR_READ},
+}
+
+
 # Database Setup
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
@@ -39,7 +56,7 @@ class Base(DeclarativeBase):
 class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table."""
 
-    role: Mapped[str] = mapped_column(default='advisor:read')
+    role: Mapped[str] = mapped_column(default=UserRole.ADVISOR_READ.value)
 
 
 engine = create_async_engine(DATABASE_URL)
@@ -128,16 +145,24 @@ def check_role(required_role: str) -> Callable[[User], User]:
         user: Annotated[User, Depends(current_active_user)],
     ) -> User:
         """Inner dependency that performs the role check."""
-        # admin:all has full access
-        if user.role == 'admin:all':
-            return user
+        try:
+            user_role = UserRole(user.role)
+            req_role = UserRole(required_role)
+        except ValueError:
+            # Fallback for unexpected strings in DB or code
+            # admin:all has full access
+            if user.role == UserRole.ADMIN.value:
+                return user
+            # Exact match
+            if user.role == required_role:
+                return user
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='Forbidden: Invalid role configuration',
+            )
 
-        # Exact match
-        if user.role == required_role:
-            return user
-
-        # Hierarchy: advisor:write can do advisor:read
-        if required_role == 'advisor:read' and user.role == 'advisor:write':
+        # Check hierarchy
+        if req_role in ROLE_HIERARCHY.get(user_role, set()):
             return user
 
         raise HTTPException(

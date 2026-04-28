@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import uuid
 from typing import TYPE_CHECKING
+import asyncio
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import update
 
+from src.api.auth import async_session_maker, User, UserRole
 from src.api.lifecycle import get_agent, get_dbmanager
 from src.api.main import app
 
@@ -82,18 +85,30 @@ def test_auth_rbac_forbidden(raw_client: TestClient) -> None:
 
 def test_auth_rbac_success(raw_client: TestClient) -> None:
     """Verify admin:all can access admin endpoints."""
-    # 1. Register & Login as Admin
+    # 1. Register
     email = f'admin_user_{uuid.uuid4().hex[:8]}@example.com'
+    password = 'password'
     raw_client.post(
         '/api/v1/auth/register',
-        json={'email': email, 'password': 'password', 'role': 'admin:all'},
+        json={'email': email, 'password': password},
     )
+
+    # 2. Manually elevate to admin in the DB (since registration ignores role)
+    async def elevate_user():
+        async with async_session_maker() as session:
+            stmt = update(User).where(User.email == email).values(role=UserRole.ADMIN.value)
+            await session.execute(stmt)
+            await session.commit()
+
+    asyncio.run(elevate_user())
+
+    # 3. Login
     login_response = raw_client.post(
-        '/api/v1/auth/jwt/login', data={'username': email, 'password': 'password'}
+        '/api/v1/auth/jwt/login', data={'username': email, 'password': password}
     )
     token = login_response.json()['access_token']
 
-    # 2. Hit Admin Endpoint
+    # 4. Hit Admin Endpoint
     response = raw_client.post(
         '/api/v1/data/ingest',
         json={'batch_id': '123', 'data_sources': []},
