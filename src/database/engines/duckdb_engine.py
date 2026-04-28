@@ -316,8 +316,12 @@ class DuckDBEngine:
         sql: str,
         params: Sequence[str | int] | Mapping[str, int | str] | None = None,
         read_only: bool = True,
+        max_rows: int = 1000,
     ) -> list[dict[str, Any]]:
-        """Execute a SQL query and return results as list of dicts. Avoids Pandas for memory efficiency."""
+        """Execute a SQL query and return results as list of dicts.
+
+        Includes a safety limit (max_rows) to prevent OOM errors for large analytical results.
+        """
         # db_id validated in _get_cursor
 
         if read_only:
@@ -326,22 +330,38 @@ class DuckDBEngine:
                 return [{'error': error}]
 
         try:
-            if read_only:
-                with self.get_cursor(db_id) as cursor:
-                    cursor.execute(sql, params)
-                    names = [desc[0] for desc in cursor.description]
-                    return [
-                        dict(zip(names, row, strict=True)) for row in cursor.fetchall()
-                    ]
+            with (
+                self.get_cursor(db_id) if read_only else self.write_lock
+            ) as cursor:
+                # If we were using the write_lock context, we still need to get the cursor
+                if not read_only:
+                    cursor = self._main_conn.cursor()
+                    cursor.execute(f'USE {db_id}')
 
-            with self.write_lock, self.get_cursor(db_id) as cursor:
                 cursor.execute(sql, params)
                 names = [desc[0] for desc in cursor.description]
+
+                # Fetch only up to max_rows + 1 to detect truncation
+                rows = cursor.fetchmany(max_rows + 1)
+
+                if len(rows) > max_rows:
+                    from src.telemetry.logger import logger
+                    logger.warning(
+                        f'Query result truncated to {max_rows} rows for {db_id}. Original query might be too large.',
+                    )
+                    rows = rows[:max_rows]
+                    return [
+                        dict(zip(names, row, strict=True)) for row in rows
+                    ] + [{'_warning': f'Result truncated to {max_rows} rows.'}]
+
                 return [
-                    dict(zip(names, row, strict=True)) for row in cursor.fetchall()
+                    dict(zip(names, row, strict=True)) for row in rows
                 ]
         except Exception as e:
             return [{'error': str(e)}]
+        finally:
+            if not read_only and 'cursor' in locals():
+                cursor.close()
 
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""

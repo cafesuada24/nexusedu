@@ -103,9 +103,12 @@ class DatabaseManager[T_Engine: DatabaseEngine, T_Algo: AnomalyAlgorithm]:
         sql: str,
         params: Sequence[str | int] | Mapping[str, int | str] | None = None,
         read_only: bool = True,
+        max_rows: int = 1000,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results."""
-        return self.engine.execute(db_id, sql, params=params, read_only=read_only)
+        return self.engine.execute(
+            db_id, sql, params=params, read_only=read_only, max_rows=max_rows,
+        )
 
     def get_formatted_db_list(self) -> str:
         """Retrieve list of available databases in markdown format."""

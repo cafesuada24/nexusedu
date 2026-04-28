@@ -7,8 +7,9 @@ and includes the API routers for the agent's functionality.
 import time
 from collections.abc import Awaitable, Callable
 
-from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi import APIRouter, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.api.auth import auth_backend, fastapi_users
 from src.api.lifecycle import lifespan
@@ -37,6 +38,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Simple In-Memory Rate Limiting
+# In production, use Redis or a dedicated library like slowapi
+rate_limit_store: dict[str, list[float]] = {}
+RATE_LIMIT_CALLS = 100
+RATE_LIMIT_WINDOW = 60  # seconds
+
+
+@app.middleware('http')
+async def rate_limit_middleware(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Simple rate limiting middleware based on client host."""
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+
+    # Clean up old timestamps
+    if client_ip in rate_limit_store:
+        rate_limit_store[client_ip] = [
+            ts for ts in rate_limit_store[client_ip] if now - ts < RATE_LIMIT_WINDOW
+        ]
+    else:
+        rate_limit_store[client_ip] = []
+
+    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_CALLS:
+        logger.warning(f"Rate Limit Exceeded for {client_ip}")
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": "Too many requests. Please try again later."},
+        )
+
+    rate_limit_store[client_ip].append(now)
+    return await call_next(request)
+
+
 # Logging Middleware
 @app.middleware('http')
 async def log_requests(
@@ -59,6 +95,52 @@ async def log_requests(
         f"HTTP: {request.method} {request.url.path} - Status: {response.status_code} - Duration: {process_time:.2f}s",
     )
     return response
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catches all unhandled exceptions and returns a sanitized JSON response."""
+    logger.error(f"Unhandled Exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "detail": "An unexpected internal error occurred.",
+            "type": type(exc).__name__,
+        },
+    )
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    """Handles validation errors specifically."""
+    logger.warning(f"Validation Error: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "detail": str(exc),
+            "type": "ValidationError",
+        },
+    )
+
+
+try:
+    from sqlglot import ParseError as SQLParseError
+except ImportError:
+    SQLParseError = Exception
+
+
+@app.exception_handler(SQLParseError)
+async def sql_parse_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handles SQL parsing errors specifically."""
+    logger.warning(f"SQL Parse Error: {exc}")
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "detail": "The generated or provided SQL query is invalid.",
+            "type": "SQLParseError",
+        },
+    )
+
 
 # API v1 Router
 api_v1_router = APIRouter(prefix="/api/v1")

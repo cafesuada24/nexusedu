@@ -45,6 +45,7 @@ class DatabaseEngine(Protocol):
         sql: str,
         params: Sequence[str | int] | Mapping[str, int | str] | None = None,
         read_only: bool = True,
+        max_rows: int = 1000,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results."""
         ...
