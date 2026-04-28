@@ -30,41 +30,44 @@ class DuckDBZScoreAnomalyAlgorithm:
                 # Refer to lms_db explicitly for the activities table
                 cursor.execute("""
                     INSERT INTO student_status_history (
-                        history_id, sid, academic_year, semester,
+                        history_id, sid, academic_year, semester, week,
                         baseline_avg, baseline_std, current_score_avg, z_score, anomaly_flag
                     )
-                    WITH semester_stats AS (
+                    WITH weekly_stats AS (
                         SELECT
                             sid,
                             academic_year,
                             semester,
+                            week,
                             AVG(score) as avg_score
                         FROM lms_db.activities
-                        GROUP BY sid, academic_year, semester
+                        GROUP BY sid, academic_year, semester, week
                     ),
                     historical_stats AS (
                         SELECT
                             sid,
                             academic_year,
                             semester,
+                            week,
                             avg_score,
                             AVG(avg_score) OVER (
                                 PARTITION BY sid
-                                ORDER BY academic_year, semester
+                                ORDER BY academic_year, semester, week
                                 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
                             ) as baseline_avg,
                             STDDEV(avg_score) OVER (
                                 PARTITION BY sid
-                                ORDER BY academic_year, semester
+                                ORDER BY academic_year, semester, week
                                 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
                             ) as baseline_std
-                        FROM semester_stats
+                        FROM weekly_stats
                     )
                     SELECT
                         uuid() as history_id,
                         sid,
                         academic_year,
                         semester,
+                        week,
                         baseline_avg,
                         baseline_std,
                         avg_score as current_score_avg,
@@ -76,7 +79,7 @@ class DuckDBZScoreAnomalyAlgorithm:
                         END as anomaly_flag
                     FROM historical_stats
                     WHERE baseline_avg IS NOT NULL
-                    AND (sid, academic_year, semester) NOT IN (SELECT sid, academic_year, semester FROM student_status_history);
+                    AND (sid, academic_year, semester, week) NOT IN (SELECT sid, academic_year, semester, week FROM student_status_history);
                 """)
 
                 # 2. Update current risk and intervention status in students table
@@ -92,7 +95,7 @@ class DuckDBZScoreAnomalyAlgorithm:
                     FROM (
                         SELECT sid, anomaly_flag
                         FROM student_status_history
-                        QUALIFY ROW_NUMBER() OVER (PARTITION BY sid ORDER BY academic_year DESC, semester DESC) = 1
+                        QUALIFY ROW_NUMBER() OVER (PARTITION BY sid ORDER BY academic_year DESC, semester DESC, week DESC) = 1
                     ) h
                     WHERE students.sid = h.sid;
                 """)

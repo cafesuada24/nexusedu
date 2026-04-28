@@ -5,17 +5,16 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field
 
-from src.agents.state import AgentState
 from src.api.auth import User, check_role
-from src.api.lifecycle import get_agent, get_dbmanager, get_jobs_store
+from src.api.lifecycle import get_dbmanager, get_jobs_store
 from src.api.models.response import (
     JobAcceptedResponse,
     JobStatusResponse,
 )
 from src.api.types import JobStore
+from src.baml_client.async_client import b as b_async
 from src.database.manager import DatabaseManager
 from src.telemetry.logger import logger
 
@@ -36,6 +35,12 @@ class StatusUpdate(BaseModel):
     """Schema for updating a student's intervention status."""
 
     status: str = Field(..., description='The new Kanban state.')
+
+
+class DraftRequest(BaseModel):
+    """Schema for requesting a personalized email draft."""
+
+    booking_link: str | None = Field(None, description='Custom booking link to use in the draft.')
 
 
 class EmailDraft(BaseModel):
@@ -120,17 +125,17 @@ async def review_draft(
 async def _run_email_draft_task(
     job_id: str,
     sid: str,
-    agent: CompiledStateGraph[AgentState, None, AgentState],
     db_manager: DatabaseManager,
     user: User,
     jobs: JobStore,
+    booking_link: str | None = None,
 ) -> None:
-    """Encapsulates the email draft generation in a background task."""
+    """Encapsulates the email draft generation in a background task (Fast-Draft)."""
     logger.set_context({'sid': sid, 'job_id': job_id})
-    logger.info(f'API (BG): Generating email draft for student {sid}')
+    logger.info(f'API (BG): Generating fast email draft for student {sid}')
 
     try:
-        # 1. Fetch student PII locally (never exposed to LLM)
+        # 1. Fetch student PII locally
         student_data = db_manager.execute(
             'sis_db',
             'SELECT student_name, email FROM students WHERE sid = ?',
@@ -143,59 +148,31 @@ async def _run_email_draft_task(
         student_name = student_data[0]['student_name']
         recipient_email = student_data[0]['email']
 
-        # 2. Fetch performance data locally for anonymization
+        # 2. Fetch performance data locally (deterministic context)
         perf_data = db_manager.execute(
             'sis_db',
-            'SELECT academic_year, semester, baseline_avg, baseline_std, current_score_avg, z_score, anomaly_flag FROM student_status_history WHERE sid = ?',
+            'SELECT academic_year, semester, week, baseline_avg, baseline_std, current_score_avg, z_score, anomaly_flag FROM student_status_history WHERE sid = ? ORDER BY academic_year DESC, semester DESC, week DESC',
             (sid,),
         )
 
-        # 3. Create session-based anonymized_id
-        anonymized_id = f'STU_{uuid.uuid4().hex[:8]}'
-
-        # 4. Invoke Agent with anonymized request and local context
-        query = (
-            f"Generate an empathetic nudge email draft for student with anonymized_id '{anonymized_id}'. "
-            f'Contextual Performance Patterns: {perf_data}. '
-            'Use placeholders {{STUDENT_NAME}} and {{ADVISOR_LINK}}. '
-            'Focus on their performance trajectory in the contextual data.'
+        # 3. Invoke BAML Directly (Bypass LangGraph)
+        user_intent = (
+            'Generate a supportive nudge email draft based on the provided student performance history. '
+            'Highlight any significant changes and offer assistance.'
         )
 
-        config = {
-            'recursion_limit': 30,
-            'configurable': {
-                'thread_id': str(uuid.uuid4()),
-                'db_manager': db_manager,
-                'user_role': user.role,
-            },
-        }
+        context_str = f'Student Performance History: {perf_data}'
 
-        final_state: AgentState | None = await agent.ainvoke(
-            {'messages': [{'role': 'user', 'content': query}]},
-            config=config,
-        )
+        ai_response = await b_async.GenerateDraftEmail(user_intent, context_str)
 
-        if not final_state:
-            raise ValueError('Agent returned an empty or invalid state.')
-
-        messages = final_state.get('messages', [])
-        ai_response = ''
-
-        if messages:
-            last_message = messages[-1]
-            if hasattr(last_message, 'content'):
-                ai_response = str(last_message.content)
-            elif isinstance(last_message, dict) and 'content' in last_message:
-                ai_response = str(last_message['content'])
-            else:
-                ai_response = str(last_message)
-
-        # 3. Late-stage Interpolation
+        # 4. Late-stage Interpolation
         personalized_body = ai_response.replace('{{STUDENT_NAME}}', student_name)
-        # Default placeholder for link if not provided by some other config
+        
+        # Interpolate booking link (provided or fallback)
+        link_to_use = booking_link or 'https://calendly.com/advisor-help'
         personalized_body = personalized_body.replace(
             '{{ADVISOR_LINK}}',
-            'https://calendly.com/advisor-help',
+            link_to_use,
         )
 
         # Update job status to completed
@@ -227,19 +204,18 @@ async def _run_email_draft_task(
 async def generate_email_draft(
     sid: str,
     background_tasks: BackgroundTasks,
-    agent: Annotated[
-        CompiledStateGraph[AgentState, None, AgentState],
-        Depends(get_agent),
-    ],
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
     user: Annotated[User, Depends(check_role('advisor:write'))],
     jobs: Annotated[JobStore, Depends(get_jobs_store)],
+    request: DraftRequest | None = None,
 ) -> JobAcceptedResponse:
     """Triggers the AI to generate a personalized email draft in the background.
 
     Returns a job_id immediately for status polling.
     """
     job_id = str(uuid.uuid4())
+
+    booking_link = request.booking_link if request else None
 
     # Initialize job status
     jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
@@ -249,10 +225,10 @@ async def generate_email_draft(
         _run_email_draft_task,
         job_id=job_id,
         sid=sid,
-        agent=agent,
         db_manager=db_manager,
         user=user,
         jobs=jobs,
+        booking_link=booking_link,
     )
 
     return JobAcceptedResponse(job_id=job_id, status='processing')

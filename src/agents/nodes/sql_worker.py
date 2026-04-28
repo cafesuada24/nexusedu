@@ -61,12 +61,20 @@ def sql_worker(state: SQLTask, config: RunnableConfig) -> dict[str, Any]:
         logger.info(f'SQL_Worker [{db_id}]: Generated SQL: {sql_data.sql}')
         logger.log_event('sql_generated', sql_data.model_dump())
 
+        # Stricter SQL Sanitization: transpile to canonical form to strip comments/excess
+        try:
+            import sqlglot
+            canonical_sql = sqlglot.transpile(sql_data.sql, read='duckdb', write='duckdb')[0]
+        except Exception as e:
+            logger.warning(f'SQL_Worker [{db_id}]: SQLGlot transpile failed: {e}. Using raw SQL.')
+            canonical_sql = sql_data.sql
+
         # Dynamic Column Masking for PII Hardening
         user_role = config.get('configurable', {}).get('user_role', 'advisor:read')
-        final_sql = sql_data.sql
+        final_sql = canonical_sql
         if user_role == 'advisor:read':
-            # Wrap the query in a CTE and exclude PII columns (DuckDB specific syntax)
-            final_sql = f'SELECT * EXCLUDE (student_name, email, phone) FROM ({sql_data.sql}) AS subquery'
+            from src.agents.utils import mask_pii_sql
+            final_sql = mask_pii_sql(final_sql)
             logger.info(f'SQL_Worker [{db_id}]: Applied PII masking for {user_role}')
 
         try:
