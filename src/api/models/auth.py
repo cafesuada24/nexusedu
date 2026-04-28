@@ -15,15 +15,20 @@ class UserRead(schemas.BaseUser[uuid.UUID]):
 
 class UserCreate(schemas.BaseUserCreate):
     """Schema for creating a new user.
-    
+
     Role is intentionally excluded to prevent self-assignment during registration.
-    It defaults to 'advisor:read' in the database model.
+    It defaults to 'viewer' in the database model.
     """
 
     pass
 
 
 class UserUpdate(schemas.BaseUserUpdate):
-    """Schema for updating an existing user."""
+    """Schema for updating an existing user.
+
+    Attributes:
+        role: The new role to assign to the user.
+    """
 
     role: UserRole | None = None
+

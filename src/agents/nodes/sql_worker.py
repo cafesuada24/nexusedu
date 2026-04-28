@@ -133,20 +133,29 @@ class SQLWorkerNode:
             return [{'error': error_msg}], str(hint)
 
     def _sanitize_sql(self, sql: str, config: RunnableConfig) -> str:
-        """Sanitize and transpile SQL, applying PII masking if needed."""
+        """Sanitize and transpile SQL, applying PII masking if needed.
+
+        Args:
+            sql: The raw SQL string to sanitize.
+            config: The runnable configuration containing the user role.
+
+        Returns:
+            The sanitized and potentially masked SQL string.
+        """
         try:
             canonical_sql = sqlglot.transpile(sql, read='duckdb', write='duckdb')[0]
         except Exception as e:
             logger.warning(f'SQL_Worker: SQLGlot transpile failed: {e}. Using raw SQL.')
             canonical_sql = sql
 
-        user_role = config.get('configurable', {}).get('user_role', 'advisor:read')
-        if user_role == 'advisor:read':
+        user_role = config.get('configurable', {}).get('user_role', 'viewer')
+        if user_role == 'viewer':
             final_sql = mask_pii_sql(canonical_sql)
             logger.info('SQL_Worker: Applied PII masking')
             return final_sql
 
         return canonical_sql
+
 
 
 sql_worker_node = SQLWorkerNode()

@@ -74,3 +74,31 @@ def test_non_admin_cannot_promote(raw_client: TestClient):
     # 3. Attempt to access the users list (should be forbidden)
     resp = raw_client.get("/api/v1/users", headers={"Authorization": f"Bearer {u1_token}"})
     assert resp.status_code == 403
+
+def test_admin_list_users(raw_client: TestClient):
+    """Verify that an admin can list all users."""
+    # 1. Register an admin
+    admin_email = f"admin_{uuid.uuid4().hex[:8]}@example.com"
+    admin_password = "adminpassword"
+    raw_client.post("/api/v1/auth/register", json={"email": admin_email, "password": admin_password})
+
+    # 2. Manually elevate the admin in the DB
+    async def elevate_admin():
+        async with async_session_maker() as session:
+            stmt = update(User).where(User.email == admin_email).values(role=UserRole.ADMIN.value)
+            await session.execute(stmt)
+            await session.commit()
+    asyncio.run(elevate_admin())
+
+    # 3. Login as Admin
+    login_resp = raw_client.post("/api/v1/auth/jwt/login", data={"username": admin_email, "password": admin_password})
+    admin_token = login_resp.json()["access_token"]
+
+    # 4. List users
+    resp = raw_client.get("/api/v1/users/", headers={"Authorization": f"Bearer {admin_token}"})
+    assert resp.status_code == 200
+    users = resp.json()
+    assert isinstance(users, list)
+    assert len(users) >= 1
+    # The registered admin should be in the list
+    assert any(u["email"] == admin_email for u in users)

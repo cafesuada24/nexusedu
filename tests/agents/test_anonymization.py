@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from src.agents.state import SQLTask
 
 
-def test_sql_worker_node_dynamic_masking_advisor_read(test_db_manager) -> None:
-    """Verify sql_worker_node wraps the query with EXCLUDE for advisor:read role."""
+def test_sql_worker_node_dynamic_masking_viewer(test_db_manager) -> None:
+    """Verify sql_worker_node wraps the query with EXCLUDE for viewer role."""
     state: SQLTask = {
         'db_id': 'sis_db',
         'query_intent': 'Get student grades',
@@ -28,7 +28,7 @@ def test_sql_worker_node_dynamic_masking_advisor_read(test_db_manager) -> None:
     }
 
     config = {
-        'configurable': {'db_manager': test_db_manager, 'user_role': 'advisor:read'}
+        'configurable': {'db_manager': test_db_manager, 'user_role': 'viewer'}
     }
 
     mock_sql_data = GeneratedSQL(
@@ -62,8 +62,8 @@ def test_sql_worker_node_dynamic_masking_advisor_read(test_db_manager) -> None:
         assert result['results'][0]['data'] == [{'col': 'val'}]
 
 
-def test_sql_worker_node_no_masking_admin_all(test_db_manager) -> None:
-    """Verify sql_worker_node does not wrap the query with EXCLUDE for admin:all role."""
+def test_sql_worker_node_no_masking_admin(test_db_manager) -> None:
+    """Verify sql_worker_node does not wrap the query with EXCLUDE for admin role."""
     state: SQLTask = {
         'db_id': 'sis_db',
         'query_intent': 'Get all students',
@@ -72,7 +72,7 @@ def test_sql_worker_node_no_masking_admin_all(test_db_manager) -> None:
         'error': None,
     }
 
-    config = {'configurable': {'db_manager': test_db_manager, 'user_role': 'admin:all'}}
+    config = {'configurable': {'db_manager': test_db_manager, 'user_role': 'admin'}}
 
     mock_sql_data = GeneratedSQL(
         sql='SELECT * FROM students',
