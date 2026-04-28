@@ -65,7 +65,10 @@ class DuckDBEngine:
         self._attached_dbs.clear()
 
     def _validate_db_id(self, db_id: str) -> None:
-        """Validate db_id against the registry."""
+        """Validate db_id against the registry and for alphanumeric format."""
+        if not re.match(r'^[a-zA-Z0-9_]+$', db_id):
+            msg = f"Invalid database ID format: '{db_id}'. Only alphanumeric and underscores allowed."
+            raise ValueError(msg)
         if db_id not in self._allowed_db_ids:
             msg = f"Invalid or unauthorized database ID: '{db_id}'"
             raise ValueError(msg)
@@ -309,6 +312,7 @@ class DuckDBEngine:
         self,
         db_id: str,
         sql: str,
+        params: object = None,
         read_only: bool = True,
     ) -> list[dict[str, Any]]:
         """Execute a SQL query and return results as list of dicts. Avoids Pandas for memory efficiency."""
@@ -322,6 +326,12 @@ class DuckDBEngine:
         try:
             if read_only:
                 with self.get_cursor(db_id) as cursor:
+                    if params:
+                        cursor.execute(sql, params)
+                        names = [desc[0] for desc in cursor.description]
+                        return [
+                            dict(zip(names, row, strict=True)) for row in cursor.fetchall()
+                        ]
                     rel = cursor.sql(sql)
                     names = rel.columns
                     return [
@@ -329,6 +339,12 @@ class DuckDBEngine:
                     ]
 
             with self.write_lock, self.get_cursor(db_id) as cursor:
+                if params:
+                    cursor.execute(sql, params)
+                    names = [desc[0] for desc in cursor.description]
+                    return [
+                        dict(zip(names, row, strict=True)) for row in cursor.fetchall()
+                    ]
                 rel = cursor.sql(sql)
                 names = rel.columns
                 return [dict(zip(names, row, strict=True)) for row in rel.fetchall()]
@@ -371,8 +387,8 @@ class DuckDBEngine:
                 is_within_24h = cursor.execute(
                     'SELECT (epoch(current_timestamp) - epoch(?)) < 86400',
                     (recorded_at,),
-                ).fetchone()[0]
-                if is_within_24h:
+                ).fetchone()
+                if is_within_24h and is_within_24h[0]:
                     multiplier = 1.2
 
             final_points = int(base_points * multiplier)
