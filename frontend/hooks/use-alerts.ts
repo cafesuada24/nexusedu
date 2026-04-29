@@ -25,6 +25,7 @@ export function useAlerts() {
     enabled: isMounted && isAuthenticated,
     // Ensure we refetch when coming back to the tab to keep Kanban fresh
     refetchOnWindowFocus: true,
+    refetchInterval: 10000, // Balanced 10s polling for real-time Kanban updates
     retry: false,
   });
 }

@@ -42,9 +42,12 @@ export function EngagementChart() {
     )
   }
 
+  // Sort data high to low based on total activity
+  const sortedData = [...data].sort((a, b) => (b.sent + b.drafted) - (a.sent + a.drafted))
+
   return (
     <ChartContainer config={config} className="h-[280px] w-full">
-      <BarChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
+      <BarChart data={sortedData} margin={{ left: 4, right: 8, top: 8 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
         <XAxis dataKey="faculty" tickLine={false} axisLine={false} tickMargin={8} />
         <YAxis tickLine={false} axisLine={false} tickMargin={8} width={28} />

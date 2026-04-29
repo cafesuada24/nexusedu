@@ -22,6 +22,7 @@ export function useKpiStats() {
     queryFn: fetchKpiStats,
     enabled: isMounted && isAuthenticated,
     refetchOnWindowFocus: true,
+    refetchInterval: 10000, // Balanced 10s polling for real-time dashboard
     retry: false,
   });
 }
@@ -42,6 +43,7 @@ export function useRetentionTrend() {
     queryFn: fetchRetentionTrend,
     enabled: isMounted && isAuthenticated,
     refetchOnWindowFocus: true,
+    refetchInterval: 10000, // Balanced 10s polling for real-time dashboard
     retry: false,
   });
 }
