@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   ArrowRight,
   RotateCcw,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useDraftStatus } from "@/hooks/use-alerts"
 import {
   type Alert,
   type AlertStatus,
@@ -34,7 +36,7 @@ import {
   COLUMNS,
   getInitials,
   formatAppointment,
-  getEmailPreview,
+
   relativeTime,
 } from "@/lib/alerts"
 
@@ -55,6 +57,8 @@ export function KanbanCard({
   onMove,
   onOpenGoals,
 }: KanbanCardProps) {
+  const { data: draft } = useDraftStatus(a.id)
+
   const meta = problemMeta[a.problem]
   const ProblemIcon = meta.icon
   const goalsTotal = a.goals.length
@@ -67,6 +71,13 @@ export function KanbanCard({
       g.deadline !== null &&
       new Date(g.deadline).getTime() < new Date().setHours(0, 0, 0, 0),
   )
+
+  const isGenerating = draft?.is_generating ?? (!draft?.body)
+  const draftBody = isGenerating
+    ? ""
+    : (draft?.body || '')
+
+
 
   return (
     <article className="group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
@@ -205,16 +216,42 @@ export function KanbanCard({
 
       {a.status === "new" ? (
         <div className="mt-3 flex flex-col gap-2">
-          <Badge
-            variant="outline"
-            className="w-fit gap-1.5 rounded-md border-transparent bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-primary/20"
+          {isGenerating ? (
+            <Badge
+              variant="outline"
+              className="w-fit gap-1.5 rounded-md border-transparent bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border"
+            >
+              <Loader2 className="size-3.5 animate-spin" />
+              Đang soạn thảo AI...
+            </Badge>
+          ) : draftBody ? (
+            <div className="flex items-center justify-between">
+              <Badge
+                variant="outline"
+                className="w-fit gap-1.5 rounded-md border-transparent bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-primary/20"
+              >
+                <Sparkles className="size-3.5" />
+                Bản nháp AI sẵn sàng
+              </Badge>
+            </div>
+          ) : null}
+
+          <div
+            className={cn(
+              "rounded-lg border border-border/40 bg-muted/20 p-2.5 transition-all",
+              !isGenerating && draftBody && "cursor-pointer hover:bg-muted/40"
+            )}
+            onClick={!isGenerating && draftBody ? onEdit : undefined}
           >
-            <Sparkles className="size-3.5" />
-            Bản nháp AI sẵn sàng
-          </Badge>
-          <p className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">
-            {getEmailPreview(a.body)}
-          </p>
+            <p className={cn(
+              "text-[13px] leading-relaxed text-muted-foreground",
+              isGenerating ? "italic" : "line-clamp-3"
+            )}>
+              {isGenerating
+                ? "Hệ thống đang phân tích kết quả học tập để soạn thư hỗ trợ phù hợp..."
+                : draftBody || "Chưa có bản nháp email. Nhấn Sửa để soạn thảo."}
+            </p>
+          </div>
         </div>
       ) : a.status === "scheduled" && a.appointmentAt ? (
         <p className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-warning">
@@ -228,11 +265,12 @@ export function KanbanCard({
       )}
 
       <CardActions
-        alert={a}
+        alert={{ ...a, body: draftBody }}
         onSend={onSend}
         onEdit={onEdit}
         onMove={onMove}
         onOpenGoals={onOpenGoals}
+        isGenerating={isGenerating}
       />
     </article>
   )
@@ -244,12 +282,14 @@ function CardActions({
   onEdit,
   onMove,
   onOpenGoals,
+  isGenerating,
 }: {
   alert: Alert
   onSend: () => void
   onEdit: () => void
   onMove: (status: AlertStatus, message?: string) => void
   onOpenGoals: () => void
+  isGenerating?: boolean
 }) {
   const hasGoals = a.goals.length > 0
   if (a.status === "new") {
@@ -260,6 +300,7 @@ function CardActions({
           size="sm"
           className="h-10 flex-1 rounded-lg text-sm font-medium"
           onClick={onEdit}
+          disabled={isGenerating}
         >
           <Pencil className="size-4" />
           Sửa
@@ -268,7 +309,7 @@ function CardActions({
           size="sm"
           className="h-10 flex-1 rounded-lg text-sm font-medium"
           onClick={onSend}
-          disabled={!a.email}
+          disabled={!a.email || isGenerating}
           title={!a.email ? "Sinh viên chưa có email trong CSV" : undefined}
         >
           <Send className="size-4" />

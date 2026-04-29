@@ -9,7 +9,7 @@ import {
   CardHeader,
 } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { EmailEditorDialog } from "@/components/dashboard/email-editor-dialog"
+import { EmailEditorSheet } from "@/components/dashboard/email-editor-sheet"
 import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog"
 import { type Problem } from "@/lib/csv"
 import { sendNudge } from "@/lib/api"
@@ -44,6 +44,14 @@ export function AlertCenter() {
   // Map remote alerts to local Alert interface
   const alerts = React.useMemo(() => {
     const now = Math.floor(Date.now() / 1000)
+
+    const getProblemFromStatus = (status: string): Problem => {
+      const s = status.toLowerCase()
+      if (s.includes("final")) return "failed_final"
+      if (s.includes("midterm") || s.includes("critical")) return "failed_midterm"
+      return "low_average"
+    }
+
     return remoteAlerts
       .filter(r => !localAlertState[r.sid]?.hidden)
       .map((r) => ({
@@ -51,14 +59,17 @@ export function AlertCenter() {
         name: r.student_name,
         mssv: r.sid.slice(0, 8).toUpperCase(),
         email: r.email,
-        problem: "low_average" as Problem, // Default or map if available
+        problem: getProblemFromStatus(r.current_risk_status),
         summary: r.current_risk_status,
         severity: "high" as const,
-        subject: "",
-        body: "",
+        subject: r.draft_subject || "",
+        body: r.draft_body || "",
         lastContactedAt: null,
         status: fromBackendStatus(r.intervention_status),
         movedAt: now,
+        draftJobId: r.draft_job_id,
+        draftSubject: r.draft_subject,
+        draftBody: r.draft_body,
         appointmentAt: r.intervention_status === "booked" ? pickRandomAppointment() : null,
         goals: localAlertState[r.sid]?.goals || [],
       }))
@@ -313,7 +324,7 @@ export function AlertCenter() {
         )}
       </div>
 
-      <EmailEditorDialog
+      <EmailEditorSheet
         alert={editing}
         onClose={() => setEditing(null)}
         onSave={saveEdit}

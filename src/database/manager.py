@@ -73,13 +73,21 @@ class DatabaseManager[T_Engine: DatabaseEngine, T_Algo: AnomalyAlgorithm]:
         """Ingest custom data."""
         self.engine.ingest_custom_data(table_name, records)
 
-    def run_anomaly_engine(self) -> None:
-        """Run the configured anomaly detection algorithm."""
-        self.anomaly_algo.run(self.engine)
+    def run_anomaly_engine(self) -> list[str]:
+        """Run the configured anomaly detection algorithm.
+
+        Returns:
+            List of student IDs (SIDs) whose status transitioned to 'new'.
+        """
+        return self.anomaly_algo.run(self.engine)
 
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""
         self.engine.update_intervention_status(sid, status)
+
+    def update_draft_job_ids(self, updates: list[tuple[str, str]]) -> None:
+        """Batch update the draft_job_id for multiple students."""
+        self.engine.update_draft_job_ids(updates)
 
     def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
         """Inject points for an advisor action into the points ledger."""

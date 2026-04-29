@@ -140,7 +140,8 @@ class DuckDBEngine:
                         current_risk_status VARCHAR DEFAULT 'Normal',
                         intervention_status VARCHAR DEFAULT 'none',
                         last_notified_timestamp DOUBLE DEFAULT 0,
-                        last_notified_satisfaction INTEGER DEFAULT 0
+                        last_notified_satisfaction INTEGER DEFAULT 0,
+                        draft_job_id VARCHAR
                     );
 
                     CREATE TABLE IF NOT EXISTS student_status_history (
@@ -171,6 +172,17 @@ class DuckDBEngine:
                         sid VARCHAR,
                         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
+
+                    CREATE TABLE IF NOT EXISTS intervention_emails (
+                        email_id VARCHAR PRIMARY KEY,
+                        sid VARCHAR,
+                        advisor_id VARCHAR,
+                        subject VARCHAR,
+                        body VARCHAR,
+                        status VARCHAR, -- 'draft', 'sent'
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        sent_at TIMESTAMP
+                    );
                 """)
 
     def ingest_records(
@@ -196,14 +208,8 @@ class DuckDBEngine:
         with self.write_lock, self.get_cursor(db_id) as cursor:
             cursor.begin()
             try:
-                if table_name == 'students':
-                    # Use validated table_name
-                    cursor.execute(
-                        f'DELETE FROM {table_name} WHERE sid IN (SELECT sid FROM df)',
-                    )
-
-                # Use validated table_name
-                cursor.execute(f'INSERT INTO {table_name} BY NAME SELECT * FROM df')
+                # Use INSERT OR IGNORE to skip existing records with same PRIMARY KEY (e.g., sid for students)
+                cursor.execute(f'INSERT OR IGNORE INTO {table_name} BY NAME SELECT * FROM df')
                 cursor.commit()
             except Exception:
                 cursor.rollback()
@@ -371,6 +377,26 @@ class DuckDBEngine:
                 'UPDATE students SET intervention_status = ? WHERE sid = ?',
                 (status, sid),
             )
+
+    def update_draft_job_ids(self, updates: list[tuple[str, str]]) -> None:
+        """Batch update the draft_job_id for multiple students.
+
+        Args:
+            updates: List of (job_id, sid) tuples.
+        """
+        if not updates:
+            return
+        with self.write_lock, self.get_cursor('sis_db') as cursor:
+            cursor.begin()
+            try:
+                cursor.executemany(
+                    'UPDATE students SET draft_job_id = ? WHERE sid = ?',
+                    updates,
+                )
+                cursor.commit()
+            except Exception:
+                cursor.rollback()
+                raise
 
     def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
         """Inject points for an advisor action with response time multiplier."""

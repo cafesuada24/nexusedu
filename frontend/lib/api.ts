@@ -41,6 +41,9 @@ export type BackendAlert = {
   email: string;
   current_risk_status: BackendRiskStatus;
   intervention_status: BackendInterventionStatus;
+  draft_job_id?: string | null;
+  draft_subject?: string | null;
+  draft_body?: string | null;
 };
 
 /** One row of the canonical student-test schema sent to /data/ingest records. */
@@ -59,10 +62,6 @@ export type BackendIngestRow = {
   semester: number;
 };
 
-export type DraftJobResponse = {
-  job_id: string;
-  status: "processing" | "completed" | "failed" | string;
-};
 
 export type JobResult = {
   job_id: string;
@@ -424,43 +423,6 @@ export async function updateAlertStatus(
 /* ----------------------------------------------------------------------- */
 
 /**
- * Trigger AI to generate a draft email for a student (async).
- * Returns job metadata (includes job_id). The backend returns 202 with
- * { job_id, status: "processing" } per ENDPOINTS.md.
- */
-export async function createDraft(
-  sid: string,
-  opts?: { booking_link?: string },
-): Promise<DraftJobResponse> {
-  const body: Record<string, any> = {};
-  if (opts?.booking_link) body.booking_link = opts.booking_link;
-
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
-  );
-
-  // Return parsed body. Caller should poll getJobStatus with job_id.
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Tạo bản nháp thất bại: ${message}`);
-  }
-  return (await res.json()) as DraftJobResponse;
-}
-
-/**
- * Poll job status/result.
- * GET /jobs/{job_id} returns:
  * { job_id, status, result?, error? }
  */
 export async function getJobStatus(job_id: string): Promise<JobResult> {
@@ -672,4 +634,64 @@ export async function fetchRetentionTrend(): Promise<RetentionTrendItem[]> {
   const data = await res.json();
   if (!Array.isArray(data)) return [];
   return data as RetentionTrendItem[];
+}
+
+export type EmailHistoryItem = {
+  email_id: string;
+  subject: string;
+  body: string;
+  status: "draft" | "sent";
+  created_at: string;
+  sent_at: string | null;
+};
+
+/**
+ * GET /alerts/{sid}/history — returns communication history for a student.
+ */
+export async function fetchAlertHistory(sid: string): Promise<EmailHistoryItem[]> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/alerts/${encodeURIComponent(sid)}/history`),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy lịch sử email: ${message}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data as EmailHistoryItem[];
+}
+
+export type DraftStatusResponse = {
+  sid: string;
+  is_generating: boolean;
+  subject: string | null;
+  body: string | null;
+};
+
+/**
+ * GET /alerts/{sid}/draft — returns current draft status and content.
+ */
+export async function fetchDraftStatus(sid: string): Promise<DraftStatusResponse> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy trạng thái bản nháp: ${message}`);
+  }
+  return (await res.json()) as DraftStatusResponse;
 }

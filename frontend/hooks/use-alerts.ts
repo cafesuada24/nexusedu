@@ -1,10 +1,9 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchAlerts, updateAlertStatus, type BackendInterventionStatus, getAuthToken } from "@/lib/api";
+import { fetchAlerts, updateAlertStatus, type BackendInterventionStatus, getAuthToken, fetchDraftStatus } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
-import { toBackendStatus } from "@/lib/alerts";
 import React from "react";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -26,6 +25,7 @@ export function useAlerts() {
     enabled: isMounted && !!token,
     // Ensure we refetch when coming back to the tab to keep Kanban fresh
     refetchOnWindowFocus: true,
+    refetchInterval: 5000, // Poll every 5s to catch AI draft updates
     retry: false,
   });
 }
@@ -75,5 +75,24 @@ export function useUpdateAlertStatus() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.alerts.list() });
     },
+  });
+}
+
+/**
+ * Hook to poll draft status for a student.
+ */
+export function useDraftStatus(sid?: string | null) {
+  return useQuery({
+    queryKey: sid ? ["alerts", sid, "draft"] : ["alerts", "draft", "none"],
+    queryFn: () => (sid ? fetchDraftStatus(sid) : null),
+    enabled: !!sid,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data && !data.is_generating && data.body) {
+        return false;
+      }
+      return 3000; // Poll every 3s if still generating
+    },
+    retry: false,
   });
 }
