@@ -25,7 +25,7 @@ async def health_check(
         A dictionary containing the status of various system components.
     """
     # 1. Check SIS/LMS Database Health
-    db_health = db_manager.check_health()
+    db_health = await db_manager.check_health_async()
     db_healthy = all(status == 'healthy' for status in db_health.values())
 
     # 2. Check AI Connectivity (BAML/LLM)

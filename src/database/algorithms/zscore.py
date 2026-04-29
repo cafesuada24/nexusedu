@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import contextlib
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING
 
 from duckdb import DatabaseError
 
@@ -11,6 +10,7 @@ from src.database.engines.duckdb_engine import DuckDBEngine
 
 if TYPE_CHECKING:
     from src.database.interfaces import DatabaseEngine
+
 
 class DuckDBZScoreAnomalyAlgorithm:
     """Z-Score anomaly detection algorithm optimized for DuckDB."""
@@ -95,10 +95,12 @@ class DuckDBZScoreAnomalyAlgorithm:
                         FROM student_status_history
                         QUALIFY ROW_NUMBER() OVER (PARTITION BY sid ORDER BY academic_year DESC, semester DESC, week DESC) = 1
                     ) h ON students.sid = h.sid
-                    WHERE h.anomaly_flag != 'Normal' 
+                    WHERE h.anomaly_flag != 'Normal'
                     AND students.intervention_status IN ('none', 'resolved', 'expired')
                 """
-                new_sids = [r[0] for r in cursor.execute(newly_at_risk_query).fetchall()]
+                new_sids = [
+                    r[0] for r in cursor.execute(newly_at_risk_query).fetchall()
+                ]
 
                 # 3. Update current risk and intervention status in students table
                 cursor.execute("""

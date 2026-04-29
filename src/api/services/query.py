@@ -38,30 +38,23 @@ class QueryService:
         job_id: str,
         query: str,
         thread_id: str | None,
-        user: 'User',
+        user_dict: dict[str, Any],
         jobs: 'JobStore',
     ) -> None:
-        """Encapsulates the LangGraph agent execution in a background task.
-
-        Args:
-            job_id: Unique job identifier.
-            query: User's natural language query.
-            thread_id: Optional session identifier.
-            user: The user performing the query.
-            jobs: Job storage dictionary.
-        """
+        """Encapsulates the LangGraph agent execution in a background task."""
         session_id = thread_id or str(uuid.uuid4())
         logger.set_context({'session_id': session_id, 'job_id': job_id})
         logger.info(f'QueryService: Processing query: {query}')
 
         start_time = time.time()
+        # Reduce recursion_limit from 50 to 10 as per roadmap
         config = {
-            'recursion_limit': 50,
+            'recursion_limit': 10,
             'configurable': {
                 'thread_id': session_id,
                 'max_concurrency': 3,
                 'db_manager': self.db,
-                'user_role': user.role,
+                'user_role': user_dict.get('role', 'advisor'),
             },
         }
 

@@ -33,7 +33,7 @@ async def get_engagement_metrics(
     """
 
     try:
-        results = db_manager.execute('sis_db', sql)
+        results = await db_manager.execute_async('sis_db', sql)
         if results and 'error' in results[0]:
             raise ValueError(results[0]['error'])
         return results
@@ -90,7 +90,7 @@ async def get_leaderboard(
     """
 
     try:
-        results = db_manager.execute('sis_db', sql, param)
+        results = await db_manager.execute_async('sis_db', sql, param)
         if results and 'error' in results[0]:
             raise ValueError(results[0]['error'])
         return results

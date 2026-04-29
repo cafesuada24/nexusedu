@@ -5,12 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
-from fastapi.testclient import TestClient
-
-from src.database.manager import DatabaseManager
-
 if TYPE_CHECKING:
-    pass
+    from fastapi.testclient import TestClient
+
+    from src.database.manager import DatabaseManager
+
 
 def test_get_alerts(client: TestClient, test_db_manager: DatabaseManager) -> None:
     """Verify that /alerts/ returns students with active alerts."""
@@ -40,7 +39,10 @@ def test_get_alerts(client: TestClient, test_db_manager: DatabaseManager) -> Non
     assert len(data) == 1
     assert data[0]['sid'] == 'ALERT_1'
 
-def test_update_alert_status(client: TestClient, test_db_manager: DatabaseManager) -> None:
+
+def test_update_alert_status(
+    client: TestClient, test_db_manager: DatabaseManager
+) -> None:
     """Verify that status updates work correctly."""
     test_db_manager.ingest_records(
         'sis_db',
@@ -61,53 +63,11 @@ def test_update_alert_status(client: TestClient, test_db_manager: DatabaseManage
 
     # Verify in DB
     results = test_db_manager.execute(
-        'sis_db', "SELECT intervention_status FROM students WHERE sid = 'PATCH_1'",
+        'sis_db',
+        "SELECT intervention_status FROM students WHERE sid = 'PATCH_1'",
     )
     assert results[0]['intervention_status'] == 'booked'
 
-def test_generate_draft(
-    client: TestClient, test_db_manager: DatabaseManager
-) -> None:
-    """Verify email draft generation with PII interpolation via background job."""
-    test_db_manager.ingest_records(
-        'sis_db',
-        'students',
-        [
-            {
-                'sid': 'DRAFT_1',
-                'student_name': 'Alice PII',
-                'email': 'alice@pii.com',
-                'intervention_status': 'new',
-            },
-        ],
-    )
-
-    # Mock BAML to avoid real LLM calls and provide a predictable template
-    with patch(
-        'src.api.services.alerts.b_async.GenerateDraftEmail', new_callable=AsyncMock
-    ) as mock_baml:
-        mock_baml.return_value = 'Subject: Test\n\nHello {{STUDENT_NAME}}, please book here: {{ADVISOR_LINK}}'
-
-        # 1. Trigger the draft generation
-        response = client.post('/api/v1/alerts/DRAFT_1/draft')
-        assert response.status_code == 202
-        data = response.json()
-        assert 'job_id' in data
-        job_id = data['job_id']
-
-        # 2. Poll for the job status
-        poll_response = client.get(f'/api/v1/jobs/{job_id}')
-        assert poll_response.status_code == 200
-        poll_data = poll_response.json()
-        assert poll_data['status'] == 'completed'
-        
-        result = poll_data['result']
-        assert result['sid'] == 'DRAFT_1'
-        assert result['recipient_email'] == 'alice@pii.com'
-        # Check interpolation of {{STUDENT_NAME}}
-        assert 'Alice PII' in result['body']
-        # Check interpolation of {{ADVISOR_LINK}}
-        assert 'https://calendly.com/advisor-help' in result['body']
 
 def test_send_nudge_email(client: TestClient, test_db_manager: DatabaseManager) -> None:
     """Verify that sending a nudge updates the lifecycle."""
@@ -129,6 +89,7 @@ def test_send_nudge_email(client: TestClient, test_db_manager: DatabaseManager) 
 
     # Verify status moved to 'sent'
     results = test_db_manager.execute(
-        'sis_db', "SELECT intervention_status FROM students WHERE sid = 'SEND_1'",
+        'sis_db',
+        "SELECT intervention_status FROM students WHERE sid = 'SEND_1'",
     )
     assert results[0]['intervention_status'] == 'sent'

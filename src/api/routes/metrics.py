@@ -17,7 +17,7 @@ async def get_kpi_stats(
     _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
 ) -> dict[str, Any]:
     """Retrieve high-level KPI stats for the dashboard."""
-    return metrics_service.get_kpi_stats()
+    return await metrics_service.get_kpi_stats()
 
 
 @router.get('/retention')
@@ -26,4 +26,4 @@ async def get_retention_trend(
     _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
 ) -> list[dict[str, Any]]:
     """Retrieve retention trend data over time."""
-    return metrics_service.get_retention_trend()
+    return await metrics_service.get_retention_trend()

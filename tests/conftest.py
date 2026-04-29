@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+
+# Ensure DuckDB instances created by TestClient are isolated and don't conflict with real data
+os.environ['DB_DIR'] = '/tmp/pytest_duckdb'
+os.environ['AUTH_DB_URL'] = 'sqlite+aiosqlite:///:memory:'
+os.makedirs('/tmp/pytest_duckdb', exist_ok=True)
 
 from src.api.auth import User, UserRole, current_active_user
 from src.api.lifecycle import (
@@ -23,11 +29,14 @@ from src.api.main import app
 from src.api.models.response import JobStatusResponse
 from src.api.services.alerts import AlertService
 from src.api.services.data import DataService
+from src.api.services.gamification import GamificationService
 from src.api.services.metrics import MetricsService
 from src.api.services.query import QueryService
 from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
 from src.database.engines.duckdb_engine import DuckDBEngine
 from src.database.manager import DatabaseManager
+from src.database.repositories.advisor_repository import AdvisorRepository
+from src.database.repositories.student_repository import StudentRepository
 from src.types import BoundedDict
 
 if TYPE_CHECKING:
@@ -39,6 +48,33 @@ if TYPE_CHECKING:
 def disable_motherduck(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure MotherDuck is disabled during tests."""
     monkeypatch.delenv('MOTHERDUCK_TOKEN', raising=False)
+
+
+@pytest.fixture(autouse=True)
+def mock_arq_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mock ARQ Redis pool creation to avoid connection errors in tests."""
+    mock_pool = AsyncMock()
+
+    async def mock_enqueue_job(func_name: str, *args, **kwargs) -> Any:
+        """Mock enqueue_job that executes tasks synchronously using the app's service instances."""
+        from src.api.main import app
+        # Ensure app_state is initialized (TestClient does this on first request)
+        if not hasattr(app.state, 'app_state'):
+            return AsyncMock()
+            
+        state = app.state.app_state
+
+        if func_name == 'run_email_draft_task':
+            await state.alert_service.run_email_draft_task(*args, **kwargs)
+        elif func_name == 'run_agent_task':
+            await state.query_service.run_agent_task(*args, **kwargs)
+
+        return AsyncMock()
+
+    mock_pool.enqueue_job = AsyncMock(side_effect=mock_enqueue_job)
+    monkeypatch.setattr(
+        'src.api.lifecycle.create_pool', AsyncMock(return_value=mock_pool)
+    )
 
 
 @pytest.fixture
@@ -112,7 +148,10 @@ def client(
     app.dependency_overrides[current_active_user] = lambda: mock_user
 
     # Provide real services initialized with the test_db_manager
-    alert_service = AlertService(test_db_manager)
+    advisor_repo = AdvisorRepository(test_db_manager)
+    student_repo = StudentRepository(test_db_manager)
+    gamification_service = GamificationService(advisor_repo, student_repo)
+    alert_service = AlertService(test_db_manager, gamification_service, student_repo)
     query_service = QueryService(mock_agent, test_db_manager)
     data_service = DataService(test_db_manager)
     metrics_service = MetricsService(test_db_manager)
@@ -126,4 +165,3 @@ def client(
         yield c
 
     app.dependency_overrides.clear()
-
