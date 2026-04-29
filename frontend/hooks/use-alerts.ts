@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
  * Hook to fetch the list of alerts (at-risk students).
  */
 export function useAlerts() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -20,12 +20,12 @@ export function useAlerts() {
   }, []);
 
   return useQuery({
-    queryKey: [...queryKeys.alerts.list(), token],
+    queryKey: queryKeys.alerts.list(),
     queryFn: fetchAlerts,
-    enabled: isMounted && !!token,
+    enabled: isMounted && isAuthenticated,
     // Ensure we refetch when coming back to the tab to keep Kanban fresh
     refetchOnWindowFocus: true,
-    refetchInterval: 5000, // Poll every 5s to catch AI draft updates
+    refetchInterval: 10000, // Balanced 10s polling for real-time Kanban updates
     retry: false,
   });
 }

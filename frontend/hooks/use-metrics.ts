@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
  * Hook to fetch dashboard KPI stats.
  */
 export function useKpiStats() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -18,11 +18,11 @@ export function useKpiStats() {
   }, []);
 
   return useQuery({
-    queryKey: [...queryKeys.metrics.stats, token],
+    queryKey: queryKeys.metrics.stats,
     queryFn: fetchKpiStats,
-    enabled: isMounted && !!token,
+    enabled: isMounted && isAuthenticated,
     refetchOnWindowFocus: true,
-    refetchInterval: 3000,
+    refetchInterval: 10000, // Balanced 10s polling for real-time dashboard
     retry: false,
   });
 }
@@ -31,7 +31,7 @@ export function useKpiStats() {
  * Hook to fetch retention trend data.
  */
 export function useRetentionTrend() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -39,11 +39,11 @@ export function useRetentionTrend() {
   }, []);
 
   return useQuery({
-    queryKey: [...queryKeys.metrics.retention, token],
+    queryKey: queryKeys.metrics.retention,
     queryFn: fetchRetentionTrend,
-    enabled: isMounted && !!token,
+    enabled: isMounted && isAuthenticated,
     refetchOnWindowFocus: true,
-    refetchInterval: 3000,
+    refetchInterval: 10000, // Balanced 10s polling for real-time dashboard
     retry: false,
   });
 }

@@ -39,26 +39,28 @@ export function AdvisorLeaderboard() {
     )
   }
 
-  // Calculate rate and initials for each advisor
-  const processedAdvisors = advisors.map((l, index) => {
-    const initials = l.name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-    
-    const rate = l.sent_count > 0 
-      ? Math.round((l.resolved_count / l.sent_count) * 100) 
-      : 0
+  // Calculate rate and initials for each advisor, and sort by points
+  const processedAdvisors = [...advisors]
+    .sort((a, b) => b.total_points - a.total_points)
+    .map((l, index) => {
+      const initials = l.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+      
+      const rate = l.sent_count > 0 
+        ? Math.round((l.resolved_count / l.sent_count) * 100) 
+        : 0
 
-    return {
-      ...l,
-      rank: index + 1,
-      initials,
-      rate: Math.min(rate, 100), // Cap at 100% just in case
-    }
-  })
+      return {
+        ...l,
+        rank: index + 1,
+        initials,
+        rate: Math.min(rate, 100), // Cap at 100% just in case
+      }
+    })
 
   return (
     <TooltipProvider delayDuration={150}>

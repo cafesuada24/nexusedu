@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
  * Hook to fetch the advisor leaderboard.
  */
 export function useAdvisorsLeaderboard(timeWindow: "weekly" | "monthly" | "semester" | "all_time" = "all_time") {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -18,11 +18,11 @@ export function useAdvisorsLeaderboard(timeWindow: "weekly" | "monthly" | "semes
   }, []);
 
   return useQuery({
-    queryKey: [...queryKeys.advisors.leaderboard(timeWindow), token],
+    queryKey: queryKeys.advisors.leaderboard(timeWindow),
     queryFn: () => fetchAdvisorsLeaderboard(timeWindow),
-    enabled: isMounted && !!token,
+    enabled: isMounted && isAuthenticated,
     refetchOnWindowFocus: true,
-    refetchInterval: 3000,
+    refetchInterval: 10000, // Balanced 10s polling
     retry: false,
   });
 }
@@ -31,7 +31,7 @@ export function useAdvisorsLeaderboard(timeWindow: "weekly" | "monthly" | "semes
  * Hook to fetch advisor engagement metrics.
  */
 export function useAdvisorsEngagement() {
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -39,11 +39,11 @@ export function useAdvisorsEngagement() {
   }, []);
 
   return useQuery({
-    queryKey: [...queryKeys.advisors.engagement(), token],
+    queryKey: queryKeys.advisors.engagement(),
     queryFn: fetchAdvisorsEngagement,
-    enabled: isMounted && !!token,
+    enabled: isMounted && isAuthenticated,
     refetchOnWindowFocus: true,
-    refetchInterval: 3000,
+    refetchInterval: 10000, // Balanced 10s polling for real-time updates
     retry: false,
   });
 }
