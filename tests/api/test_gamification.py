@@ -135,6 +135,8 @@ def test_leaderboard(client: TestClient, test_db_manager: DatabaseManager) -> No
     # adv_1: 150, adv_2: 90
     assert data[0]['advisor_id'] == 'adv_1'
     assert data[0]['total_points'] == 150
+    assert 'sent_count' in data[0]
+    assert 'resolved_count' in data[0]
     assert data[1]['advisor_id'] == 'adv_2'
     assert data[1]['total_points'] == 90
 
@@ -146,3 +148,32 @@ def test_leaderboard(client: TestClient, test_db_manager: DatabaseManager) -> No
     assert data[0]['total_points'] == 150
     assert data[1]['advisor_id'] == 'adv_2'
     assert data[1]['total_points'] == 80
+
+def test_engagement_metrics(client: TestClient, test_db_manager: DatabaseManager) -> None:
+    """Verify the engagement metrics API aggregates by major correctly."""
+    # Seed students with different majors and statuses
+    test_db_manager.ingest_records(
+        'sis_db',
+        'students',
+        [
+            {'sid': 'S1', 'student_name': 'S1', 'email': 's1@ex.com', 'major': 'CS', 'intervention_status': 'sent'},
+            {'sid': 'S2', 'student_name': 'S2', 'email': 's2@ex.com', 'major': 'CS', 'intervention_status': 'new'},
+            {'sid': 'S3', 'student_name': 'S3', 'email': 's3@ex.com', 'major': 'Math', 'intervention_status': 'resolved'},
+            {'sid': 'S4', 'student_name': 'S4', 'email': 's4@ex.com', 'major': 'Math', 'intervention_status': 'new'},
+        ],
+    )
+
+    resp = client.get('/api/v1/advisors/engagement')
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    # Sort by faculty to be predictable
+    data.sort(key=lambda x: x['faculty'])
+    
+    assert data[0]['faculty'] == 'CS'
+    assert data[0]['sent'] == 1
+    assert data[0]['drafted'] == 1
+    
+    assert data[1]['faculty'] == 'Math'
+    assert data[1]['sent'] == 1
+    assert data[1]['drafted'] == 1

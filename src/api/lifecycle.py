@@ -21,6 +21,7 @@ from src.api.auth import create_db_and_tables
 from src.api.models.response import JobStatusResponse
 from src.api.services.alerts import AlertService
 from src.api.services.data import DataService
+from src.api.services.metrics import MetricsService
 from src.api.services.query import QueryService
 from src.api.types import JobStore
 from src.database import DatabaseManager
@@ -41,6 +42,7 @@ class AppState:
     alert_service: AlertService
     query_service: QueryService
     data_service: DataService
+    metrics_service: MetricsService
     pool: ConnectionPool | None = None
 
 
@@ -74,6 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ==== Services ====
     alert_service = AlertService(db_manager)
     data_service = DataService(db_manager)
+    metrics_service = MetricsService(db_manager)
 
     # ==== Agent Checkpointer ====
     postgres_uri = getenv('POSTGRES_DB_URI')
@@ -109,6 +112,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         alert_service=alert_service,
         query_service=query_service,
         data_service=data_service,
+        metrics_service=metrics_service,
     )
 
     yield
@@ -164,3 +168,9 @@ def get_data_service(request: Request) -> DataService:
     """Dependency provider for the DataService."""
     state: AppState = request.app.state.app_state
     return state.data_service
+
+
+def get_metrics_service(request: Request) -> MetricsService:
+    """Dependency provider for the MetricsService."""
+    state: AppState = request.app.state.app_state
+    return state.metrics_service
