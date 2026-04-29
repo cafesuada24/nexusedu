@@ -15,8 +15,12 @@ if TYPE_CHECKING:
 class DuckDBZScoreAnomalyAlgorithm:
     """Z-Score anomaly detection algorithm optimized for DuckDB."""
 
-    def run(self, engine: DatabaseEngine) -> None:
-        """Calculate baselines and anomalies, updating the history table."""
+    def run(self, engine: DatabaseEngine) -> list[str]:
+        """Calculate baselines and anomalies, updating the history table.
+
+        Returns:
+            List of student IDs (SIDs) whose status transitioned to 'new'.
+        """
         if not isinstance(engine, DuckDBEngine):
             msg = 'DuckDBZScoreAnomalyAlgorithm requires DuckDBEngine'
             raise TypeError(msg)
@@ -27,7 +31,7 @@ class DuckDBZScoreAnomalyAlgorithm:
             cursor.begin()
             try:
                 # 1. Calculate and insert new history records
-                # Refer to lms_db explicitly for the activities table
+                # ... (rest of query remains same)
                 cursor.execute("""
                     INSERT INTO student_status_history (
                         history_id, sid, academic_year, semester, week,
@@ -82,25 +86,49 @@ class DuckDBZScoreAnomalyAlgorithm:
                     AND (sid, academic_year, semester, week) NOT IN (SELECT sid, academic_year, semester, week FROM student_status_history);
                 """)
 
-                # 2. Update current risk and intervention status in students table
+                # 2. Identify students who will transition to 'new'
+                newly_at_risk_query = """
+                    SELECT students.sid
+                    FROM students
+                    JOIN (
+                        SELECT sid, anomaly_flag
+                        FROM student_status_history
+                        QUALIFY ROW_NUMBER() OVER (PARTITION BY sid ORDER BY academic_year DESC, semester DESC, week DESC) = 1
+                    ) h ON students.sid = h.sid
+                    WHERE h.anomaly_flag != 'Normal' 
+                    AND students.intervention_status IN ('none', 'resolved', 'expired')
+                """
+                new_sids = [r[0] for r in cursor.execute(newly_at_risk_query).fetchall()]
+
+                # 3. Update current risk and intervention status in students table
                 cursor.execute("""
                     UPDATE students
                     SET
                         current_risk_status = h.anomaly_flag,
-                        intervention_status = CASE
-                            WHEN h.anomaly_flag != 'Normal' AND intervention_status IN ('none', 'resolved', 'expired')
-                            THEN 'new'
-                            ELSE intervention_status
-                        END
+                        intervention_status = 'new'
                     FROM (
                         SELECT sid, anomaly_flag
                         FROM student_status_history
                         QUALIFY ROW_NUMBER() OVER (PARTITION BY sid ORDER BY academic_year DESC, semester DESC, week DESC) = 1
                     ) h
-                    WHERE students.sid = h.sid;
+                    WHERE students.sid = h.sid
+                    AND h.anomaly_flag != 'Normal'
+                    AND intervention_status IN ('none', 'resolved', 'expired');
+
+                    UPDATE students
+                    SET
+                        current_risk_status = h.anomaly_flag
+                    FROM (
+                        SELECT sid, anomaly_flag
+                        FROM student_status_history
+                        QUALIFY ROW_NUMBER() OVER (PARTITION BY sid ORDER BY academic_year DESC, semester DESC, week DESC) = 1
+                    ) h
+                    WHERE students.sid = h.sid
+                    AND (h.anomaly_flag = 'Normal' OR intervention_status NOT IN ('none', 'resolved', 'expired'));
                 """)
 
                 cursor.commit()
+                return new_sids
             except DatabaseError:
                 raise
             except Exception:
