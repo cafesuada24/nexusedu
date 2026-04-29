@@ -21,8 +21,7 @@ async function persistSchedule(next: Schedule): Promise<void> {
 }
 
 /**
- * Hook to manage advisor's schedule with automatic polling and caching.
- * Replaces the manual singleton + listener logic in use-schedule.ts.
+ * Hook to manage advisor's schedule with automatic caching and focus revalidation.
  */
 export function useScheduleQuery() {
   const queryClient = useQueryClient();
@@ -30,7 +29,6 @@ export function useScheduleQuery() {
   const query = useQuery({
     queryKey: queryKeys.schedule.all,
     queryFn: fetchSchedule,
-    refetchInterval: 4000, // Poll every 4 seconds
     refetchOnWindowFocus: true,
     placeholderData: DEFAULT_SCHEDULE,
   });

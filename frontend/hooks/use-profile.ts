@@ -7,22 +7,19 @@ import { queryKeys } from "@/lib/query-keys";
 
 /**
  * Hook to fetch the current user's profile.
- * Only enables the query if a JWT token is present in localStorage.
+ * Relies on httpOnly cookies for authentication.
  */
-export function useProfile(initialToken?: string | null) {
+export function useProfile() {
   const [isMounted, setIsMounted] = React.useState(false);
 
   React.useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Use the provided token or fall back to localStorage on mount
-  const token = initialToken !== undefined ? initialToken : (typeof window !== "undefined" ? getAuthToken() : null);
-
   return useQuery({
-    queryKey: [...queryKeys.auth.me, token],
+    queryKey: queryKeys.auth.me,
     queryFn: getCurrentUser,
-    enabled: isMounted && !!token, 
+    enabled: isMounted, 
     staleTime: 1000 * 60 * 15,
     retry: false, // Don't retry on 401s to avoid multiple error toasts
   });
