@@ -22,6 +22,7 @@ export function useAdvisorsLeaderboard(timeWindow: "weekly" | "monthly" | "semes
     queryFn: () => fetchAdvisorsLeaderboard(timeWindow),
     enabled: isMounted && !!token,
     refetchOnWindowFocus: true,
+    refetchInterval: 3000,
     retry: false,
   });
 }
@@ -42,6 +43,7 @@ export function useAdvisorsEngagement() {
     queryFn: fetchAdvisorsEngagement,
     enabled: isMounted && !!token,
     refetchOnWindowFocus: true,
+    refetchInterval: 3000,
     retry: false,
   });
 }

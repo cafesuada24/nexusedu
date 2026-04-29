@@ -196,9 +196,8 @@ export function AlertCenter() {
   }
 
   const saveEdit = (updated: Alert) => {
-    // Note: Email content editing is currently local-only in this demo
-    toast.success("Đã lưu chỉnh sửa email")
     setEditing(null)
+    send(updated)
   }
 
   const addGoal = (

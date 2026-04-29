@@ -42,7 +42,7 @@ import {
 
 type KanbanCardProps = {
   alert: Alert
-  onSend: () => void
+  onSend: (updated: Alert) => void
   onEdit: () => void
   onRemove: () => void
   onMove: (status: AlertStatus, message?: string) => void
@@ -266,7 +266,7 @@ export function KanbanCard({
 
       <CardActions
         alert={{ ...a, body: draftBody }}
-        onSend={onSend}
+        onSend={(updated: Alert) => onSend(updated)}
         onEdit={onEdit}
         onMove={onMove}
         onOpenGoals={onOpenGoals}
@@ -285,7 +285,7 @@ function CardActions({
   isGenerating,
 }: {
   alert: Alert
-  onSend: () => void
+  onSend: (updated: Alert) => void
   onEdit: () => void
   onMove: (status: AlertStatus, message?: string) => void
   onOpenGoals: () => void
@@ -308,7 +308,7 @@ function CardActions({
         <Button
           size="sm"
           className="h-10 flex-1 rounded-lg text-sm font-medium"
-          onClick={onSend}
+          onClick={() => onSend(a)}
           disabled={!a.email || isGenerating}
           title={!a.email ? "Sinh viên chưa có email trong CSV" : undefined}
         >

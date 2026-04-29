@@ -22,6 +22,7 @@ export function useKpiStats() {
     queryFn: fetchKpiStats,
     enabled: isMounted && !!token,
     refetchOnWindowFocus: true,
+    refetchInterval: 3000,
     retry: false,
   });
 }
@@ -42,6 +43,7 @@ export function useRetentionTrend() {
     queryFn: fetchRetentionTrend,
     enabled: isMounted && !!token,
     refetchOnWindowFocus: true,
+    refetchInterval: 3000,
     retry: false,
   });
 }

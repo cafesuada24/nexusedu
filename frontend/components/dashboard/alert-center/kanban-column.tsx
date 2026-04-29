@@ -122,7 +122,7 @@ export function KanbanColumn({
                 <KanbanCard
                   key={a.id}
                   alert={a}
-                  onSend={() => onSend(a)}
+                  onSend={onSend}
                   onEdit={() => onEdit(a)}
                   onRemove={() => onRemove(a)}
                   onMove={(s, msg) => onMove(a.id, s, msg)}
