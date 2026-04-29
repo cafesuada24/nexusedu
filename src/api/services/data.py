@@ -1,17 +1,18 @@
 """Service layer for data ingestion and management."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from src.api.models.request import CoreDataSource, DataIngestionRequest
 
 if TYPE_CHECKING:
+    from src.database.interfaces import AnomalyAlgorithm, DatabaseEngine
     from src.database.manager import DatabaseManager
 
 
 class DataService:
     """Service for handling data ingestion and processing."""
 
-    def __init__(self, db_manager: 'DatabaseManager') -> None:
+    def __init__(self, db_manager: 'DatabaseManager[DatabaseEngine, AnomalyAlgorithm]') -> None:
         """Initialize the DataService.
 
         Args:
@@ -19,14 +20,14 @@ class DataService:
         """
         self.db = db_manager
 
-    def ingest_data(self, request: DataIngestionRequest) -> list[str]:
+    def ingest_data(self, request: DataIngestionRequest) -> dict[str, Any]:
         """Ingest multi-source data and trigger the anomaly engine.
 
         Args:
             request: The ingestion request containing data sources.
 
         Returns:
-            A list of processing results.
+            A dictionary containing processing results and new at-risk SIDs.
         """
         results: list[str] = []
 
@@ -49,7 +50,10 @@ class DataService:
                 )
 
         # Trigger Anomaly Detection Engine
-        self.db.run_anomaly_engine()
+        new_sids = self.db.run_anomaly_engine()
         results.append('Anomaly engine execution completed successfully.')
 
-        return results
+        return {
+            'results': results,
+            'new_sids': new_sids
+        }

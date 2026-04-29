@@ -12,6 +12,36 @@ from src.telemetry.logger import logger
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 
 
+@router.get('/engagement')
+async def get_engagement_metrics(
+    db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
+    _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+) -> list[dict[str, Any]]:
+    """Retrieve engagement metrics aggregated by major (faculty).
+
+    Returns:
+        List of majors and their sent/drafted counts.
+    """
+    sql = """
+        SELECT
+            major as faculty,
+            COUNT(CASE WHEN intervention_status IN ('sent', 'booked', 'supporting', 'resolved') THEN 1 END) as sent,
+            COUNT(CASE WHEN intervention_status = 'new' THEN 1 END) as drafted
+        FROM students
+        GROUP BY major
+        ORDER BY sent DESC
+    """
+
+    try:
+        results = db_manager.execute('sis_db', sql)
+        if results and 'error' in results[0]:
+            raise ValueError(results[0]['error'])
+        return results
+    except Exception as e:
+        logger.error(f'Failed to fetch engagement metrics: {e}')
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get('/leaderboard')
 async def get_leaderboard(
     db_manager: Annotated[DatabaseManager, Depends(get_dbmanager)],
@@ -49,7 +79,9 @@ async def get_leaderboard(
             l.advisor_id,
             COALESCE(a.name, l.advisor_id) as name,
             SUM(l.points) as total_points,
-            COUNT(l.id) as actions_count
+            COUNT(l.id) as actions_count,
+            COUNT(CASE WHEN l.action_type = 'email_sent' THEN 1 END) as sent_count,
+            COUNT(CASE WHEN l.action_type = 'student_resolved' THEN 1 END) as resolved_count
         FROM advisor_points_ledger l
         LEFT JOIN advisors a ON l.advisor_id = a.advisor_id
         {where_clause}

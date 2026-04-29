@@ -40,6 +40,9 @@ class SISRecord(BaseModel):
     )
     name: str = Field(..., alias='student_name', description='Student full name.')
     email: str = Field(..., description='Student email address.')
+    major: str | None = Field('Unknown', description='Student major.')
+    current_risk_status: str | None = Field('Normal', description='Current risk status.')
+    intervention_status: str | None = Field('none', description='Intervention status.')
     last_notified_timestamp: float | None = Field(
         0,
         description='Timestamp of last nudge.',
@@ -55,6 +58,7 @@ class SISRecord(BaseModel):
 class LMSRecord(BaseModel):
     """Learning management system activity record."""
 
+    activity_id: str | None = Field(None, description='Unique activity identifier.')
     student_id: str = Field(..., alias='sid', description='Unique student identifier.')
     course_id: str = Field(..., description='Course identifier.')
     course_name: str = Field(..., description='Full course name.')
@@ -63,6 +67,7 @@ class LMSRecord(BaseModel):
     timestamp: float = Field(..., description='UNIX timestamp of activity.')
     academic_year: int = Field(..., description='Academic year (1-4).')
     semester: int = Field(..., description='Semester (1-2).')
+    week: int | None = Field(None, description='Week number (1-16).')
 
     model_config = ConfigDict(populate_by_name=True)
 

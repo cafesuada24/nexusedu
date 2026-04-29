@@ -16,12 +16,14 @@ from src.api.lifecycle import (
     get_data_service,
     get_dbmanager,
     get_jobs_store,
+    get_metrics_service,
     get_query_service,
 )
 from src.api.main import app
 from src.api.models.response import JobStatusResponse
 from src.api.services.alerts import AlertService
 from src.api.services.data import DataService
+from src.api.services.metrics import MetricsService
 from src.api.services.query import QueryService
 from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
 from src.database.engines.duckdb_engine import DuckDBEngine
@@ -113,10 +115,12 @@ def client(
     alert_service = AlertService(test_db_manager)
     query_service = QueryService(mock_agent, test_db_manager)
     data_service = DataService(test_db_manager)
+    metrics_service = MetricsService(test_db_manager)
 
     app.dependency_overrides[get_alert_service] = lambda: alert_service
     app.dependency_overrides[get_query_service] = lambda: query_service
     app.dependency_overrides[get_data_service] = lambda: data_service
+    app.dependency_overrides[get_metrics_service] = lambda: metrics_service
 
     with TestClient(app) as c:
         yield c

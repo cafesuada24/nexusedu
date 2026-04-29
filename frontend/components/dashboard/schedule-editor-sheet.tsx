@@ -53,7 +53,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { useSchedule } from "@/hooks/use-schedule"
+import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import {
   DAYS,
   DEFAULT_SCHEDULE,
@@ -63,7 +63,7 @@ import {
 } from "@/lib/schedule"
 
 export function ScheduleEditorSheet() {
-  const { schedule, setSchedule, resetSchedule } = useSchedule()
+  const { schedule, setSchedule, resetSchedule } = useScheduleQuery()
   const [open, setOpen] = React.useState(false)
 
   // Draft state: edits are held locally until "Lưu lịch" is pressed so that

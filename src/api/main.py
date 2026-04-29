@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from src.api.auth import UserRole, auth_backend, check_role, fastapi_users
 from src.api.lifecycle import lifespan
 from src.api.models.auth import UserCreate, UserRead, UserUpdate
-from src.api.routes import advisors, alerts, data, health, jobs, query, users
+from src.api.routes import advisors, alerts, data, health, jobs, metrics, query, users
 from src.telemetry.logger import logger
 from src.utils.env import getenv
 
@@ -179,6 +179,7 @@ api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(alerts.router)
 api_v1_router.include_router(advisors.router)
+api_v1_router.include_router(metrics.router)
 
 # Include the versioned API router into the app
 app.include_router(api_v1_router)

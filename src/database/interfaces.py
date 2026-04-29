@@ -69,6 +69,10 @@ class DatabaseEngine(Protocol):
 class AnomalyAlgorithm(Protocol):
     """Protocol for anomaly detection algorithms."""
 
-    def run(self, engine: DatabaseEngine) -> None:
-        """Run the anomaly detection and update history."""
+    def run(self, engine: DatabaseEngine) -> list[str]:
+        """Run the anomaly detection and update history.
+
+        Returns:
+            List of student IDs (SIDs) whose status transitioned to 'new'.
+        """
         ...

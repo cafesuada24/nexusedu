@@ -1,3 +1,5 @@
+import { toast } from "sonner";
+
 /**
  * Backend API client for the NexusEDU intervention service.
  *
@@ -39,6 +41,9 @@ export type BackendAlert = {
   email: string;
   current_risk_status: BackendRiskStatus;
   intervention_status: BackendInterventionStatus;
+  draft_job_id?: string | null;
+  draft_subject?: string | null;
+  draft_body?: string | null;
 };
 
 /** One row of the canonical student-test schema sent to /data/ingest records. */
@@ -57,10 +62,6 @@ export type BackendIngestRow = {
   semester: number;
 };
 
-export type DraftJobResponse = {
-  job_id: string;
-  status: "processing" | "completed" | "failed" | string;
-};
 
 export type JobResult = {
   job_id: string;
@@ -74,6 +75,8 @@ export type AdvisorLeaderboardItem = {
   name: string;
   total_points: number;
   actions_count: number;
+  sent_count: number;
+  resolved_count: number;
 };
 
 export type UserRead = {
@@ -140,7 +143,7 @@ async function withTimeout<T>(
  * on cookies being sent by the browser.
  */
 export function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
+  // if (typeof window === "undefined") return null;
   try {
     const t = window.localStorage.getItem(TOKEN_STORAGE_KEY);
     return t && t.length > 0 ? t : null;
@@ -178,9 +181,11 @@ export async function authFetch(
   opts: RequestInit = {},
   signal?: AbortSignal,
 ): Promise<Response> {
+  // Always get the freshest token from localStorage if not explicitly provided
   const token = getAuthToken();
   const headers = new Headers(opts.headers || undefined);
   headers.set("Accept", headers.get("Accept") || "application/json");
+  console.log(headers)
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -189,9 +194,17 @@ export async function authFetch(
     headers,
     signal: opts.signal ?? signal,
   };
-  return fetch(url, merged);
-}
 
+  const res = await fetch(url, merged);
+
+  // Global 401 handling: we log it. The AuthProvider
+  // or useProfile hook will handle redirecting to login if the session is truly invalid.
+  if (res.status === 401) {
+    warnLog("authFetch: 401 Unauthorized", url);
+  }
+
+  return res;
+}
 /* ----------------------------------------------------------------------- */
 /*  Utility                                                                */
 /* ----------------------------------------------------------------------- */
@@ -233,10 +246,11 @@ export async function login(
   );
 
   if (!res.ok) {
-    // Let caller surface the error; return null for convenience.
-    warnLog("login failed", res.status, res.statusText);
-    return null;
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Đăng nhập thất bại: ${message}`);
   }
+
   const body = await res.json();
   if (body?.access_token) {
     setAuthToken(body.access_token);
@@ -264,9 +278,9 @@ export async function register(email: string, password: string): Promise<any> {
   );
 
   if (!res.ok) {
-    throw new Error(
-      `POST /auth/register failed: ${res.status} ${res.statusText}`,
-    );
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Đăng ký thất bại: ${message}`);
   }
   return res.json();
 }
@@ -276,21 +290,19 @@ export async function register(email: string, password: string): Promise<any> {
  * Requires a valid token; authFetch will attach Authorization header.
  */
 export async function getCurrentUser(): Promise<UserRead | null> {
-  try {
-    const res = await withTimeout(
-      (signal) => authFetch(endpoint("/users/me"), { method: "GET" }, signal),
-      DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-      // Not authenticated or other error — return null so caller can react.
-      return null;
-    }
-    const data = await res.json();
-    return data as UserRead;
-  } catch (err) {
-    warnLog("getCurrentUser failed", err);
-    return null;
+  const res = await withTimeout(
+    (signal) => authFetch(endpoint("/users/me"), { method: "GET" }, signal),
+    DEFAULT_TIMEOUT_MS,
+  );
+  
+  if (!res.ok) {
+    if (res.status === 401) return null;
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Failed to fetch user: ${res.status}`);
   }
+  
+  const data = await res.json();
+  return data as UserRead;
 }
 
 /* ----------------------------------------------------------------------- */
@@ -298,56 +310,63 @@ export async function getCurrentUser(): Promise<UserRead | null> {
 /* ----------------------------------------------------------------------- */
 
 /**
- * Sends parsed CSV rows to the backend for long-term storage and analysis.
+ * Sends multi-source data to the backend for ingestion.
  *
- * The payload uses the documented shape:
+ * The payload follows the DataIngestionRequest schema:
  * {
  *   batch_id: string,
  *   upload_timestamp: string,
- *   data_sources: [{ source_type, table_name?, records: [...] }]
+ *   data_sources: [
+ *     { source_type: "sis", records: SISRecord[] },
+ *     { source_type: "lms", records: LMSRecord[] },
+ *     { source_type: "custom", table_name: string, records: any[] }
+ *   ]
  * }
- *
- * The call is best-effort: the UI does not block on it and failures are
- * logged; callers may catch to surface UI warnings.
  */
-export async function ingestRows(rows: BackendIngestRow[]): Promise<void> {
-  if (rows.length === 0) return;
+export async function ingestData(dataSources: {
+  source_type: "sis" | "lms" | "custom";
+  table_name?: string;
+  records: any[];
+}[]): Promise<void> {
+  if (dataSources.length === 0) return;
   const payload = {
     batch_id: `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     upload_timestamp: new Date().toISOString(),
-    data_sources: [
-      {
-        source_type: "custom",
-        table_name: "ingest_rows",
-        records: rows,
-      },
-    ],
+    data_sources: dataSources,
   };
 
-  try {
-    const res = await withTimeout(
-      (signal) =>
-        authFetch(
-          endpoint("/data/ingest"),
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          },
-          signal,
-        ),
-      INGEST_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-      warnLog(
-        `POST /data/ingest returned non-ok status: ${res.status} ${res.statusText}`,
-      );
-      return;
-    }
-  } catch (err) {
-    warnLog("POST /data/ingest failed, dataset stays local-only", err);
-    return;
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/data/ingest"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        signal,
+      ),
+    INGEST_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Đồng bộ dữ liệu thất bại: ${message}`);
   }
+}
+
+/**
+ * Sends parsed CSV rows to the backend for long-term storage and analysis.
+ * @deprecated Use ingestData for multi-source support.
+ */
+export async function ingestRows(rows: BackendIngestRow[]): Promise<void> {
+  return ingestData([
+    {
+      source_type: "custom",
+      table_name: "ingest_rows",
+      records: rows,
+    },
+  ]);
 }
 
 /**
@@ -355,23 +374,20 @@ export async function ingestRows(rows: BackendIngestRow[]): Promise<void> {
  * Returns an empty array on failure or malformed response (keeps UI usable).
  */
 export async function fetchAlerts(): Promise<BackendAlert[]> {
-  try {
-    const res = await withTimeout(
-      (signal) => authFetch(endpoint("/alerts"), { method: "GET" }, signal),
-      DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-      return [];
-    }
-    const data = await res.json();
-    if (!Array.isArray(data)) return [];
-    return (data as BackendAlert[]).filter(
-      (a) => typeof a?.sid === "string" && a.sid.length > 0,
-    );
-  } catch (err) {
-    warnLog("fetchAlerts failed, falling back to empty array", err);
-    return [];
+  const res = await withTimeout(
+    (signal) => authFetch(endpoint("/alerts"), { method: "GET" }, signal),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy danh sách cảnh báo: ${message}`);
   }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return (data as BackendAlert[]).filter(
+    (a) => typeof a?.sid === "string" && a.sid.length > 0,
+  );
 }
 
 /**
@@ -396,9 +412,9 @@ export async function updateAlertStatus(
     DEFAULT_TIMEOUT_MS,
   );
   if (!res.ok) {
-    throw new Error(
-      `PATCH /alerts/${sid}/status failed: ${res.status} ${res.statusText}`,
-    );
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Cập nhật trạng thái thất bại: ${message}`);
   }
 }
 
@@ -407,65 +423,24 @@ export async function updateAlertStatus(
 /* ----------------------------------------------------------------------- */
 
 /**
- * Trigger AI to generate a draft email for a student (async).
- * Returns job metadata (includes job_id). The backend returns 202 with
- * { job_id, status: "processing" } per ENDPOINTS.md.
+ * { job_id, status, result?, error? }
  */
-export async function createDraft(
-  sid: string,
-  opts?: { booking_link?: string },
-): Promise<DraftJobResponse> {
-  const body: Record<string, any> = {};
-  if (opts?.booking_link) body.booking_link = opts.booking_link;
-
+export async function getJobStatus(job_id: string): Promise<JobResult> {
   const res = await withTimeout(
     (signal) =>
       authFetch(
-        endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
+        endpoint(`/jobs/${encodeURIComponent(job_id)}`),
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          method: "GET",
         },
         signal,
       ),
     DEFAULT_TIMEOUT_MS,
   );
-
-  // Return parsed body. Caller should poll getJobStatus with job_id.
   if (!res.ok) {
-    throw new Error(
-      `POST /alerts/${sid}/draft failed: ${res.status} ${res.statusText}`,
-    );
+    throw new Error(`Kiểm tra trạng thái job thất bại: ${res.status}`);
   }
-  return (await res.json()) as DraftJobResponse;
-}
-
-/**
- * Poll job status/result.
- * GET /jobs/{job_id} returns:
- * { job_id, status, result?, error? }
- */
-export async function getJobStatus(job_id: string): Promise<JobResult> {
-  try {
-    const res = await withTimeout(
-      (signal) =>
-        authFetch(
-          endpoint(`/jobs/${encodeURIComponent(job_id)}`),
-          {
-            method: "GET",
-          },
-          signal,
-        ),
-      DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-      throw new Error(`GET /jobs/${job_id} failed: ${res.status}`);
-    }
-    return (await res.json()) as JobResult;
-  } catch (err) {
-    throw err;
-  }
+  return (await res.json()) as JobResult;
 }
 
 /**
@@ -490,9 +465,9 @@ export async function sendNudge(
     DEFAULT_TIMEOUT_MS,
   );
   if (!res.ok) {
-    throw new Error(
-      `POST /alerts/${sid}/send failed: ${res.status} ${res.statusText}`,
-    );
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Gửi email thất bại: ${message}`);
   }
 }
 
@@ -522,7 +497,9 @@ export async function queryAgent(
   );
 
   if (!res.ok) {
-    throw new Error(`POST /query failed: ${res.status} ${res.statusText}`);
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Truy vấn AI thất bại: ${message}`);
   }
   return (await res.json()) as DraftJobResponse;
 }
@@ -536,36 +513,185 @@ export async function fetchAdvisorsLeaderboard(
   const qp = time_window
     ? `?time_window=${encodeURIComponent(time_window)}`
     : "";
-  try {
-    const res = await withTimeout(
-      (signal) =>
-        authFetch(
-          endpoint(`/advisors/leaderboard${qp}`),
-          { method: "GET" },
-          signal,
-        ),
-      DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!Array.isArray(data)) return [];
-    return data as AdvisorLeaderboardItem[];
-  } catch (err) {
-    warnLog("fetchAdvisorsLeaderboard failed", err);
-    return [];
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/advisors/leaderboard${qp}`),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy bảng xếp hạng: ${message}`);
   }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data as AdvisorLeaderboardItem[];
 }
 
 /* ----------------------------------------------------------------------- */
 /*  Helpers                                                                */
 /* ----------------------------------------------------------------------- */
 
-/** True when an `NEXT_PUBLIC_API_BASE_URL` was configured at build time. */
+/** True when an `NEXT_PUBLIC_API_BASE_URL` was configured at build time or we're in the browser. */
 export function isApiConfigured(): boolean {
-  // Consider the explicit override as the configured case.
+  // If we're in the browser, we assume the default /api/v1 rewrite works.
+  if (typeof window !== "undefined") return true;
+
   const env =
     typeof process !== "undefined"
       ? (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined)
       : undefined;
   return Boolean(env && env.trim());
+}
+
+
+export type AdvisorEngagementItem = {
+  faculty: string;
+  sent: number;
+  drafted: number;
+};
+
+/**
+ * GET /advisors/engagement — returns engagement metrics by faculty/major.
+ */
+export async function fetchAdvisorsEngagement(): Promise<AdvisorEngagementItem[]> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/advisors/engagement"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy dữ liệu tương tác: ${message}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data as AdvisorEngagementItem[];
+}
+
+export type KpiStats = {
+  retention_rate: number;
+  total_interventions: number;
+  advisor_engagement: number;
+  dropout_rate: number;
+  total_students: number;
+};
+
+export type RetentionTrendItem = {
+  month: string;
+  baseline: number;
+  current: number;
+};
+
+/**
+ * GET /metrics/stats — returns high-level dashboard KPIs.
+ */
+export async function fetchKpiStats(): Promise<KpiStats> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/metrics/stats"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy chỉ số KPI: ${message}`);
+  }
+  return (await res.json()) as KpiStats;
+}
+
+/**
+ * GET /metrics/retention — returns retention trend data.
+ */
+export async function fetchRetentionTrend(): Promise<RetentionTrendItem[]> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/metrics/retention"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy xu hướng giữ chân: ${message}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data as RetentionTrendItem[];
+}
+
+export type EmailHistoryItem = {
+  email_id: string;
+  subject: string;
+  body: string;
+  status: "draft" | "sent";
+  created_at: string;
+  sent_at: string | null;
+};
+
+/**
+ * GET /alerts/{sid}/history — returns communication history for a student.
+ */
+export async function fetchAlertHistory(sid: string): Promise<EmailHistoryItem[]> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/alerts/${encodeURIComponent(sid)}/history`),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy lịch sử email: ${message}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data as EmailHistoryItem[];
+}
+
+export type DraftStatusResponse = {
+  sid: string;
+  is_generating: boolean;
+  subject: string | null;
+  body: string | null;
+};
+
+/**
+ * GET /alerts/{sid}/draft — returns current draft status and content.
+ */
+export async function fetchDraftStatus(sid: string): Promise<DraftStatusResponse> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy trạng thái bản nháp: ${message}`);
+  }
+  return (await res.json()) as DraftStatusResponse;
 }

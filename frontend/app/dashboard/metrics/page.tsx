@@ -1,9 +1,12 @@
+"use client"
+
 import {
   TrendingDown,
   Users,
   HandHeart,
   Target,
   BarChart3,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +15,7 @@ import { DropoutChart } from "@/components/dashboard/dropout-chart";
 import { EngagementChart } from "@/components/dashboard/engagement-chart";
 import { AdvisorLeaderboard } from "@/components/dashboard/advisor-leaderboard";
 import { cn } from "@/lib/utils";
+import { useKpiStats } from "@/hooks/use-metrics";
 
 type KpiTone = "primary" | "success" | "warning" | "destructive";
 
@@ -49,49 +53,59 @@ const KPI_TONES: Record<
   },
 };
 
-const kpis: Array<{
-  label: string;
-  value: string;
-  delta: string;
-  icon: LucideIcon;
-  tone: KpiTone;
-  positive: boolean;
-}> = [
-  {
-    label: "Giữ chân SV",
-    value: "87.4%",
-    delta: "+4.1%",
-    icon: Target,
-    tone: "success",
-    positive: true,
-  },
-  {
-    label: "Đã can thiệp",
-    value: "1,284",
-    delta: "+312",
-    icon: Users,
-    tone: "primary",
-    positive: true,
-  },
-  {
-    label: "Cố vấn",
-    value: "92%",
-    delta: "+6%",
-    icon: HandHeart,
-    tone: "primary",
-    positive: true,
-  },
-  {
-    label: "Bỏ học",
-    value: "2.1%",
-    delta: "−0.8%",
-    icon: TrendingDown,
-    tone: "destructive",
-    positive: true,
-  },
-];
-
 export default function MetricsPage() {
+  const { data: stats, isLoading, error } = useKpiStats();
+
+  const kpis: Array<{
+    label: string;
+    value: string | number;
+    delta: string;
+    icon: LucideIcon;
+    tone: KpiTone;
+    positive: boolean;
+  }> = [
+    {
+      label: "Giữ chân SV",
+      value: stats ? `${stats.retention_rate}%` : "--",
+      delta: "+0.0%",
+      icon: Target,
+      tone: "success",
+      positive: true,
+    },
+    {
+      label: "Đã can thiệp",
+      value: stats ? stats.total_interventions.toLocaleString() : "--",
+      delta: "+0",
+      icon: Users,
+      tone: "primary",
+      positive: true,
+    },
+    {
+      label: "Cố vấn tham gia",
+      value: stats ? `${stats.advisor_engagement}%` : "--",
+      delta: "+0%",
+      icon: HandHeart,
+      tone: "primary",
+      positive: true,
+    },
+    {
+      label: "Bỏ học",
+      value: stats ? `${stats.dropout_rate}%` : "--",
+      delta: "0.0%",
+      icon: TrendingDown,
+      tone: "destructive",
+      positive: true,
+    },
+  ];
+
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center p-8 text-destructive">
+        Không thể tải dữ liệu chỉ số. Vui lòng thử lại sau.
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -137,20 +151,26 @@ export default function MetricsPage() {
                       tone.value,
                     )}
                   >
-                    {k.value}
+                    {isLoading ? (
+                      <Loader2 className="size-5 animate-spin opacity-50" />
+                    ) : (
+                      k.value
+                    )}
                   </div>
                   <div className="mt-1 flex items-center gap-1.5 text-xs">
                     <span className="truncate text-muted-foreground">
                       {k.label}
                     </span>
-                    <span
-                      className={cn(
-                        "ml-auto shrink-0 font-mono font-semibold",
-                        tone.delta,
-                      )}
-                    >
-                      {k.delta}
-                    </span>
+                    {!isLoading && (
+                      <span
+                        className={cn(
+                          "ml-auto shrink-0 font-mono font-semibold",
+                          tone.delta,
+                        )}
+                      >
+                        {k.delta}
+                      </span>
+                    )}
                   </div>
                 </div>
               </CardContent>

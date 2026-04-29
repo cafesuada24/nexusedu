@@ -1,20 +1,13 @@
 """API routes for Kanban Alert Dashboard management."""
 
-import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.api.auth import Scope, User, require_scope
-from src.api.lifecycle import get_alert_service, get_jobs_store
-from src.api.models.response import (
-    EmailDraft,
-    JobAcceptedResponse,
-    JobStatusResponse,
-)
+from src.api.lifecycle import get_alert_service
 from src.api.services.alerts import AlertService
-from src.api.types import JobStore
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
@@ -27,6 +20,9 @@ class AlertStudent(BaseModel):
     email: str = Field(..., description='Student email.')
     current_risk_status: str = Field(..., description='The type of anomaly detected.')
     intervention_status: str = Field(..., description='The current Kanban state.')
+    draft_job_id: str | None = Field(
+        None, description='Background Job ID for the AI draft.',
+    )
 
 
 class StatusUpdate(BaseModel):
@@ -50,7 +46,7 @@ class SendEmailRequest(BaseModel):
     body: str = Field(..., description='The final email body to send.')
 
 
-@router.get('/', response_model=list[AlertStudent])
+@router.get('', response_model=list[AlertStudent])
 async def get_alerts(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
@@ -128,45 +124,55 @@ async def review_draft(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post('/{sid}/draft', response_model=JobAcceptedResponse, status_code=202)
-async def generate_email_draft(  # noqa: PLR0913
+@router.get('/{sid}/draft')
+async def get_email_draft(
     sid: str,
-    background_tasks: BackgroundTasks,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
-    jobs: Annotated[JobStore, Depends(get_jobs_store)],
-    request: DraftRequest | None = None,
-) -> JobAcceptedResponse:
-    """Triggers the AI to generate a personalized email draft in the background.
+    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+) -> dict[str, Any]:
+    """Retrieve the current AI draft status and content for a student.
+
+    Returns:
+        The draft subject and body if available, plus generation status.
+    """
+    try:
+        # Check if currently generating
+        student = alert_service.db.execute('sis_db', 'SELECT draft_job_id FROM students WHERE sid = ?', (sid,))
+        is_generating = bool(student and student[0].get('draft_job_id'))
+
+        # Fetch latest draft
+        drafts = alert_service.get_email_history(sid)
+        latest_draft = next((d for d in drafts if d['status'] == 'draft'), None)
+
+        return {
+            'sid': sid,
+            'is_generating': is_generating,
+            'subject': latest_draft['subject'] if latest_draft else None,
+            'body': latest_draft['body'] if latest_draft else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get('/{sid}/history')
+async def get_alert_history(
+    sid: str,
+    alert_service: Annotated[AlertService, Depends(get_alert_service)],
+    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+) -> list[dict[str, Any]]:
+    """Retrieve communication history for a specific student.
 
     Args:
         sid: Student identifier.
-        background_tasks: FastAPI background tasks.
         alert_service: The alert service dependency.
-        user: Authenticated user with write access.
-        jobs: The job store dependency.
-        request: The draft request details.
 
     Returns:
-        A job acceptance response with job_id.
+        List of historical communication entries.
     """
-    job_id = str(uuid.uuid4())
-    booking_link = request.booking_link if request else None
-
-    # Initialize job status
-    jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
-
-    # Schedule background task
-    background_tasks.add_task(
-        alert_service.run_email_draft_task,
-        job_id=job_id,
-        sid=sid,
-        jobs=jobs,
-        booking_link=booking_link,
-        user_id=str(user.id),
-    )
-
-    return JobAcceptedResponse(job_id=job_id, status='processing')
+    try:
+        return alert_service.get_email_history(sid)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post('/{sid}/send')

@@ -181,6 +181,11 @@ function toNumber(raw: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function toInteger(raw: string | undefined): number | undefined {
+  const n = toNumber(raw);
+  return n !== undefined ? Math.round(n) : undefined;
+}
+
 /**
  * Treats Unix-seconds `0`, missing values, or sentinel strings ("None"/"null")
  * as "never notified".
@@ -316,6 +321,138 @@ function classifyStudent(tests: TestRow[]): {
 /* ----------------------------------------------------------------------- */
 /*  Public API                                                             */
 /* ----------------------------------------------------------------------- */
+
+// Matches the fixed schema used by NexusEDU (scores 0–100).
+export const SAMPLE_CSV = `sid,student_name,course_id,course_name,test_type,email,last_notified_timestamp,last_notified_satisfaction,score,timestamp,academic_year,semester
+550e8400-e29b-41d4-a716-446655440000,Nguyen Van An,a1b2c3d4,Machine Learning,middle_semester,an.nv21@student.edu.vn,0,0,45.0,1776844800,3,2
+550e8400-e29b-41d4-a716-446655440000,Nguyen Van An,a1b2c3d4,Machine Learning,final_semester,an.nv21@student.edu.vn,0,0,38.0,1776931200,3,2
+661f9511-f30c-52e5-b827-557766551111,Tran Thi Binh,a1b2c3d4,Machine Learning,middle_semester,binh.tt21@student.edu.vn,1776240000,1,85.0,1776844800,3,2
+661f9511-f30c-52e5-b827-557766551111,Tran Thi Binh,a1b2c3d4,Machine Learning,final_semester,binh.tt21@student.edu.vn,1776240000,1,88.0,1776931200,3,2
+772e0622-041d-43f6-8938-668877662222,Le Hoang Nam,b2c3d4e5,Deep Learning,middle_semester,nam.lh22@student.edu.vn,0,0,30.0,1776852000,4,1
+772e0622-041d-43f6-8938-668877662222,Le Hoang Nam,b2c3d4e5,Deep Learning,final_semester,nam.lh22@student.edu.vn,0,0,42.0,1776938400,4,1
+883e1733-152e-44e7-9049-779988773333,Pham Minh Duc,b2c3d4e5,Deep Learning,final_semester,duc.pm22@student.edu.vn,1775808000,1,90.0,1776855600,4,1
+994e2844-263f-45f8-a150-880099884444,Vo Hoang Yen,c3d4e5f6,Computer Vision,middle_semester,yen.vh23@student.edu.vn,0,0,25.0,1776859200,2,2
+994e2844-263f-45f8-a150-880099884444,Vo Hoang Yen,c3d4e5f6,Computer Vision,final_semester,yen.vh23@student.edu.vn,0,0,48.0,1776945600,2,2
+aa5e3955-374f-46f9-b261-991100995555,Dang Thu Thao,c3d4e5f6,Computer Vision,final_semester,thao.dt23@student.edu.vn,1775635200,0,72.0,1776862800,2,2
+bb6e4066-485f-470a-b372-002211006666,Bui Gia Bao,d4e5f6f7,Linear Algebra,middle_semester,bao.bg24@student.edu.vn,1775462400,1,58.0,1776866400,1,1
+bb6e4066-485f-470a-b372-002211006666,Bui Gia Bao,d4e5f6f7,Linear Algebra,final_semester,bao.bg24@student.edu.vn,1775462400,1,62.0,1776952800,1,1
+cc7e5177-586f-481b-b483-113322117777,Ho Sy Minh Ha,d4e5f6f7,Linear Algebra,middle_semester,ha.hsm24@student.edu.vn,0,0,95.0,1776870000,1,1
+dd8e6288-697f-492c-b594-224433228888,Nguyen Thi Huong,e5f6f7f8,Data Structures,final_semester,huong.nt@student.edu.vn,0,0,40.0,1776873600,2,1
+ee9e7399-708f-4a3d-b605-335544339999,Phan Van Khai,e5f6f7f8,Data Structures,middle_semester,khai.pv@student.edu.vn,1775289600,1,60.0,1776877200,2,1
+`;
+
+/** Concatenate two CSV strings sharing the same header row. */
+export function mergeCsv(a: string, b: string): string {
+  const trim = (s: string) => s.replace(/^\uFEFF/, "").trim();
+  const aTxt = trim(a);
+  const bTxt = trim(b);
+  if (!aTxt) return bTxt;
+  if (!bTxt) return aTxt;
+
+  // Lấy header + body của hai file
+  const aFirstNl = aTxt.indexOf("\n");
+  const bFirstNl = bTxt.indexOf("\n");
+  if (aFirstNl < 0 || bFirstNl < 0) return `${aTxt}\n${bTxt}`;
+
+  const aHeaderLine = aTxt.slice(0, aFirstNl).trim();
+  const bHeaderLine = bTxt.slice(0, bFirstNl).trim();
+  const aBody = aTxt.slice(aFirstNl + 1);
+  const bBody = bTxt.slice(bFirstNl + 1);
+
+  // Nếu header giống nhau thì giữ logic cũ (bỏ header thứ hai)
+  if (aHeaderLine === bHeaderLine) return `${aTxt}\n${bBody}`;
+
+  // Tạo danh sách cột (split đơn giản cho header; header hiếm khi có dấu phẩy trong chuỗi)
+  const splitHeader = (line: string) =>
+    line
+      .split(",")
+      .map((h) => h.trim())
+      .filter(Boolean);
+
+  const aCols = splitHeader(aHeaderLine);
+  const bCols = splitHeader(bHeaderLine);
+
+  // Hiệp nhất cột, ưu tiên thứ tự của a rồi thêm cột lạ từ b
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const aNorm = aCols.map(norm);
+  const union = [...aCols];
+  for (const c of bCols) {
+    if (!aNorm.includes(norm(c))) union.push(c);
+  }
+
+  // Helper để parse dòng CSV đơn (cơ bản, xử lý quotes đơn giản)
+  const parseLine = (line: string) => {
+    const out: string[] = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          field += ch;
+        }
+      } else {
+        if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ",") {
+          out.push(field);
+          field = "";
+        } else {
+          field += ch;
+        }
+      }
+    }
+    out.push(field);
+    return out.map((v) => v.trim());
+  };
+
+  const renderLine = (fields: string[]) =>
+    fields
+      .map((f) =>
+        f.includes(",") || f.includes('"') ? `"${f.replace(/"/g, '""')}"` : f,
+      )
+      .join(",");
+
+  // Map body rows của mỗi file thành mảng theo union header
+  const mapBody = (body: string, cols: string[]) => {
+    const lines = body.split(/\r?\n/).filter((l) => l.trim() !== "");
+    const mapped: string[] = [];
+    for (const line of lines) {
+      // Nếu dòng là header lạ (ví dụ headerB nếu không bị loại đi), bỏ qua
+      const p = parseLine(line);
+      // Nếu p.length === cols.length và p matches header text, skip
+      const maybeHeader = p.map((v) => v.toLowerCase()).join(",");
+      if (maybeHeader === cols.map((c) => c.toLowerCase()).join(",")) continue;
+
+      // Map fields by position (cols order)
+      const rowFields: Record<string, string> = {};
+      for (let i = 0; i < cols.length; i++) {
+        rowFields[cols[i]] = p[i] ?? "";
+      }
+      // Build array in union order, pulling from rowFields (if missing, empty)
+      const outRow = union.map((uc) => {
+        // if this file doesn't have uc, try to find a matching column name by normalized form
+        if (uc in rowFields) return rowFields[uc];
+        const matched = cols.find((c) => norm(c) === norm(uc));
+        return matched ? (rowFields[matched] ?? "") : "";
+      });
+      mapped.push(renderLine(outRow));
+    }
+    return mapped;
+  };
+
+  const mappedA = mapBody(aBody, aCols);
+  const mappedB = mapBody(bBody, bCols);
+
+  return `${union.join(",")}\n${[...mappedA, ...mappedB].join("\n")}`;
+}
 
 export function analyzeCsv(text: string): ParsedDataset {
   const { headers, rows } = parseCsv(text);
@@ -569,24 +706,73 @@ function emptyDataset(headers: string[]): ParsedDataset {
 /* ----------------------------------------------------------------------- */
 
 /**
- * Re-parses a (possibly merged) CSV text into the canonical row shape that
- * the backend `POST /data/ingest` endpoint expects. Unknown columns are
- * preserved as best-effort numeric/string fields. Rows missing `sid` or
- * `score` are dropped.
+ * Re-parses a CSV text into the canonical LMS record shape.
  */
-export function csvToIngestRows(text: string): Array<{
+export function csvToLMSRecords(text: string): Array<{
+  activity_id?: string;
   sid: string;
-  student_name: string;
   course_id: string;
   course_name: string;
   test_type: string;
-  email: string;
-  last_notified_timestamp: number;
-  last_notified_satisfaction: number;
   score: number;
   timestamp: number;
   academic_year: number;
   semester: number;
+  week?: number;
+}> {
+  const { headers, rows } = parseCsv(text);
+
+  const col = {
+    activity_id: findCol(headers, ["activity_id", "activityid"]),
+    sid: findCol(headers, ["sid", "studentid", "student_id", "mssv"]),
+    courseId: findCol(headers, ["courseid", "course_id"]),
+    courseName: findCol(headers, ["coursename", "course_name", "course"]),
+    testType: findCol(headers, ["testtype", "test_type", "examtype"]),
+    score: findCol(headers, ["score", "diem"]),
+    timestamp: findCol(headers, ["timestamp", "time"]),
+    academicYear: findCol(headers, ["academicyear", "academic_year", "year"]),
+    semester: findCol(headers, ["semester", "hocky"]),
+    week: findCol(headers, ["week", "tuan"]),
+  };
+
+  if (!col.sid || !col.score) return [];
+
+  const out: ReturnType<typeof csvToLMSRecords> = [];
+  for (const r of rows) {
+    const sid = r[col.sid]?.trim();
+    if (!sid) continue;
+    const score = toNumber(r[col.score]);
+    if (score === undefined) continue;
+
+    out.push({
+      activity_id: col.activity_id ? r[col.activity_id] : undefined,
+      sid,
+      course_id: (col.courseId && r[col.courseId]) || "",
+      course_name: (col.courseName && r[col.courseName]) || "",
+      test_type: col.testType ? r[col.testType] : "other",
+      score,
+      timestamp: (col.timestamp ? toNumber(r[col.timestamp]) : undefined) ?? 0,
+      academic_year:
+        (col.academicYear ? toInteger(r[col.academicYear]) : undefined) ?? 0,
+      semester: (col.semester ? toInteger(r[col.semester]) : undefined) ?? 0,
+      week: col.week ? toInteger(r[col.week]) : undefined,
+    });
+  }
+  return out;
+}
+
+/**
+ * Re-parses a CSV text into the canonical SIS record shape.
+ */
+export function csvToSISRecords(text: string): Array<{
+  sid: string;
+  student_name: string;
+  email: string;
+  major?: string;
+  current_risk_status?: string;
+  intervention_status?: string;
+  last_notified_timestamp?: number;
+  last_notified_satisfaction?: number;
 }> {
   const { headers, rows } = parseCsv(text);
 
@@ -599,10 +785,10 @@ export function csvToIngestRows(text: string): Array<{
       "hoten",
       "fullname",
     ]),
-    courseId: findCol(headers, ["courseid", "course_id"]),
-    courseName: findCol(headers, ["coursename", "course_name", "course"]),
-    testType: findCol(headers, ["testtype", "test_type", "examtype"]),
     email: findCol(headers, ["email"]),
+    major: findCol(headers, ["major", "nganh"]),
+    risk: findCol(headers, ["current_risk_status", "risk_status", "risk"]),
+    status: findCol(headers, ["intervention_status", "status"]),
     lastNotifiedTimestamp: findCol(headers, [
       "lastnotifiedtimestamp",
       "last_notified_timestamp",
@@ -613,45 +799,79 @@ export function csvToIngestRows(text: string): Array<{
       "lastnotifiedsatisfaction",
       "last_notified_satisfaction",
     ]),
-    score: findCol(headers, ["score", "diem"]),
-    timestamp: findCol(headers, ["timestamp", "time"]),
-    academicYear: findCol(headers, ["academicyear", "academic_year", "year"]),
-    semester: findCol(headers, ["semester", "hocky"]),
   };
 
-  if (!col.sid || !col.score) return [];
+  if (!col.sid) return [];
 
-  const out: ReturnType<typeof csvToIngestRows> = [];
+  const out: ReturnType<typeof csvToSISRecords> = [];
   for (const r of rows) {
     const sid = r[col.sid]?.trim();
     if (!sid) continue;
-    const score = toNumber(r[col.score]);
-    if (score === undefined) continue;
-
-    const lastNotified = col.lastNotifiedTimestamp
-      ? parseLastNotified(r[col.lastNotifiedTimestamp])
-      : null;
 
     out.push({
       sid,
       student_name: (col.name && r[col.name]) || sid,
-      course_id: (col.courseId && r[col.courseId]) || "",
-      course_name: (col.courseName && r[col.courseName]) || "",
-      test_type: col.testType ? normalizeTestType(r[col.testType]) : "other",
       email: (col.email && r[col.email]) || "",
-      last_notified_timestamp: lastNotified ?? 0,
-      last_notified_satisfaction:
-        (col.lastNotifiedSatisfaction
-          ? toNumber(r[col.lastNotifiedSatisfaction])
-          : undefined) ?? 0,
-      score,
-      timestamp: (col.timestamp ? toNumber(r[col.timestamp]) : undefined) ?? 0,
-      academic_year:
-        (col.academicYear ? toNumber(r[col.academicYear]) : undefined) ?? 0,
-      semester: (col.semester ? toNumber(r[col.semester]) : undefined) ?? 0,
+      major: col.major ? r[col.major] : undefined,
+      current_risk_status: col.risk ? r[col.risk] : undefined,
+      intervention_status: col.status ? r[col.status] : undefined,
+      last_notified_timestamp: col.lastNotifiedTimestamp
+        ? parseLastNotified(r[col.lastNotifiedTimestamp]) ?? 0
+        : 0,
+      last_notified_satisfaction: col.lastNotifiedSatisfaction
+        ? toInteger(r[col.lastNotifiedSatisfaction]) ?? 0
+        : 0,
     });
   }
   return out;
+}
+
+/**
+ * Re-parses a CSV text into the canonical Advisor record shape.
+ */
+export function csvToAdvisorRecords(text: string): Array<{
+  advisor_id: string;
+  name: string;
+  email: string;
+}> {
+  const { headers, rows } = parseCsv(text);
+
+  const col = {
+    id: findCol(headers, ["advisor_id", "advisorid", "id"]),
+    name: findCol(headers, ["name", "advisor_name", "hoten"]),
+    email: findCol(headers, ["email"]),
+  };
+
+  if (!col.id) return [];
+
+  const out: ReturnType<typeof csvToAdvisorRecords> = [];
+  for (const r of rows) {
+    const id = r[col.id]?.trim();
+    if (!id) continue;
+
+    out.push({
+      advisor_id: id,
+      name: (col.name && r[col.name]) || id,
+      email: (col.email && r[col.email]) || "",
+    });
+  }
+  return out;
+}
+
+/**
+ * Re-parses a CSV text into arbitrary key-value pairs for custom sources.
+ */
+export function csvToCustomRecords(text: string): Array<Record<string, any>> {
+  const { headers, rows } = parseCsv(text);
+  return rows.map((r) => {
+    const obj: Record<string, any> = {};
+    for (const h of headers) {
+      const val = r[h];
+      const n = toNumber(val);
+      obj[h] = n !== undefined ? n : val;
+    }
+    return obj;
+  });
 }
 
 /** Human-readable, one-line summary of a student's risk factors. */

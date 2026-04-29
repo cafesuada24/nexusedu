@@ -1,5 +1,6 @@
 "use client"
 
+import { Loader2 } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import {
   ChartContainer,
@@ -7,15 +8,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-
-const data = [
-  { faculty: "CNTT", sent: 148, drafted: 52 },
-  { faculty: "Kinh tế", sent: 112, drafted: 38 },
-  { faculty: "Cơ khí", sent: 88, drafted: 24 },
-  { faculty: "Ngoại ngữ", sent: 74, drafted: 20 },
-  { faculty: "Xây dựng", sent: 62, drafted: 18 },
-  { faculty: "Kiến trúc", sent: 54, drafted: 14 },
-]
+import { useAdvisorsEngagement } from "@/hooks/use-advisors"
 
 const config = {
   sent: { label: "Đã gửi", color: "var(--chart-1)" },
@@ -23,6 +16,32 @@ const config = {
 } satisfies ChartConfig
 
 export function EngagementChart() {
+  const { data, isLoading, error } = useAdvisorsEngagement()
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[280px] w-full items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-[280px] w-full items-center justify-center text-sm text-destructive">
+        Không thể tải dữ liệu biểu đồ.
+      </div>
+    )
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex h-[280px] w-full items-center justify-center text-sm text-muted-foreground">
+        Chưa có dữ liệu tương tác.
+      </div>
+    )
+  }
+
   return (
     <ChartContainer config={config} className="h-[280px] w-full">
       <BarChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
