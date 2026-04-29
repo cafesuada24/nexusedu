@@ -1,4 +1,6 @@
-import { Mail, CheckCircle2 } from "lucide-react"
+"use client"
+
+import { Mail, CheckCircle2, Loader2 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -8,64 +10,63 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-
-// School portal — neutral activity list (no leaderboard / trophy framing).
-const advisors = [
-  {
-    rank: 1,
-    name: "TS. Lê Hà",
-    faculty: "CNTT",
-    initials: "LH",
-    sent: 148,
-    resolved: 128,
-    rate: 92,
-  },
-  {
-    rank: 2,
-    name: "ThS. Nguyễn Minh",
-    faculty: "Kinh tế",
-    initials: "NM",
-    sent: 112,
-    resolved: 98,
-    rate: 88,
-  },
-  {
-    rank: 3,
-    name: "TS. Phạm Quang",
-    faculty: "Cơ khí",
-    initials: "PQ",
-    sent: 88,
-    resolved: 72,
-    rate: 82,
-  },
-  {
-    rank: 4,
-    name: "ThS. Trần Hạnh",
-    faculty: "Ngoại ngữ",
-    initials: "TH",
-    sent: 74,
-    resolved: 60,
-    rate: 81,
-  },
-  {
-    rank: 5,
-    name: "TS. Võ Nam",
-    faculty: "Xây dựng",
-    initials: "VN",
-    sent: 62,
-    resolved: 48,
-    rate: 77,
-  },
-]
+import { useAdvisorsLeaderboard } from "@/hooks/use-advisors"
 
 export function AdvisorLeaderboard() {
+  const { data: advisors, isLoading, error } = useAdvisorsLeaderboard("all_time")
+
+  if (isLoading) {
+    return (
+      <div className="flex h-40 items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-destructive">
+        Không thể tải dữ liệu bảng xếp hạng.
+      </div>
+    )
+  }
+
+  if (!advisors || advisors.length === 0) {
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+        Chưa có dữ liệu hoạt động.
+      </div>
+    )
+  }
+
+  // Calculate rate and initials for each advisor
+  const processedAdvisors = advisors.map((l, index) => {
+    const initials = l.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+    
+    const rate = l.sent_count > 0 
+      ? Math.round((l.resolved_count / l.sent_count) * 100) 
+      : 0
+
+    return {
+      ...l,
+      rank: index + 1,
+      initials,
+      rate: Math.min(rate, 100), // Cap at 100% just in case
+    }
+  })
+
   return (
     <TooltipProvider delayDuration={150}>
       <ol className="divide-y divide-border">
-        {advisors.map((l) => {
+        {processedAdvisors.map((l) => {
           return (
             <li
-              key={l.rank}
+              key={l.advisor_id}
               className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 md:flex-row md:items-center"
             >
               <div className="flex items-center gap-3 md:w-72">
@@ -83,7 +84,7 @@ export function AdvisorLeaderboard() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{l.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {l.faculty}
+                    Cố vấn học tập
                   </p>
                 </div>
               </div>
@@ -95,6 +96,9 @@ export function AdvisorLeaderboard() {
                     aria-label="Tỷ lệ giải quyết"
                   >
                     {l.rate}%
+                  </span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-medium">
+                    {l.total_points} điểm
                   </span>
                 </div>
                 <Progress value={l.rate} className="h-1.5" />
@@ -108,10 +112,10 @@ export function AdvisorLeaderboard() {
                       className="gap-1 rounded-md font-mono text-[11px]"
                     >
                       <Mail className="size-3" />
-                      {l.sent}
+                      {l.sent_count}
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent>{l.sent} email đã gửi</TooltipContent>
+                  <TooltipContent>{l.sent_count} email đã gửi</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -120,10 +124,10 @@ export function AdvisorLeaderboard() {
                       className="gap-1 rounded-md bg-success/15 font-mono text-[11px] text-success hover:bg-success/15"
                     >
                       <CheckCircle2 className="size-3" />
-                      {l.resolved}
+                      {l.resolved_count}
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent>{l.resolved} đã xử lý</TooltipContent>
+                  <TooltipContent>{l.resolved_count} đã xử lý</TooltipContent>
                 </Tooltip>
               </div>
             </li>
