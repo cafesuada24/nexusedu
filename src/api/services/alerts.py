@@ -27,7 +27,7 @@ class AlertService:
         """
         self.db = db_manager
         # Limit concurrency of AI draft generation
-        self._semaphore = asyncio.Semaphore(int(getenv('MAX_CONCURRENT_DRAFTS', '2')))
+        self._semaphore = asyncio.Semaphore(int(getenv('MAX_CONCURRENT_DRAFTS', '5')))
 
     # ... (get_alerts, update_status, award_review_points, trigger_draft remain same)
 

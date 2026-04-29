@@ -5,7 +5,7 @@ import os
 import re
 import threading
 import uuid
-from collections.abc import Generator, Iterator, Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ import sqlglot
 from sqlglot import exp
 
 from src.database.config import DATA_DIR, DB_REGISTRY
+from src.telemetry.logger import logger
 
 
 class DuckDBEngine:
@@ -84,7 +85,6 @@ class DuckDBEngine:
         return self.data_dir / f'{db_id}.duckdb'
 
     @contextlib.contextmanager
-
     def get_cursor(self, db_id: str) -> Generator[duckdb.DuckDBPyConnection]:
         """Get a cursor to the specified database. Ensures the cursor is closed after use."""
         self._validate_db_id(db_id)
@@ -209,7 +209,9 @@ class DuckDBEngine:
             cursor.begin()
             try:
                 # Use INSERT OR IGNORE to skip existing records with same PRIMARY KEY (e.g., sid for students)
-                cursor.execute(f'INSERT OR IGNORE INTO {table_name} BY NAME SELECT * FROM df')
+                cursor.execute(
+                    f'INSERT OR IGNORE INTO {table_name} BY NAME SELECT * FROM df'
+                )
                 cursor.commit()
             except Exception:
                 cursor.rollback()
@@ -311,6 +313,29 @@ class DuckDBEngine:
             if not is_allowed:
                 return f'Blocked: Statement type {type(expression).__name__} is not allowed in read-only mode.'
 
+            # LFI Protection: Block functions that read external files
+            banned_funcs = {
+                'read_csv',
+                'read_csv_auto',
+                'read_text',
+                'read_json',
+                'read_json_auto',
+                'read_parquet',
+                'readcsv',
+                'readjson',
+            }
+            for node in expression.walk():
+                name = None
+                if isinstance(node, exp.Func):
+                    name = node.name
+                elif isinstance(node, exp.Anonymous):
+                    name = node.this
+
+                if (name and str(name).lower() in banned_funcs) or (
+                    node.key in banned_funcs
+                ):
+                    return f"Blocked: Function '{name or node.key}' is not allowed."
+
         except sqlglot.ParseError as e:
             return f'SQL Parse Error: {e}'
 
@@ -320,7 +345,7 @@ class DuckDBEngine:
         self,
         db_id: str,
         sql: str,
-        params: Sequence[str | int] | Mapping[str, int | str] | None = None,
+        params: Sequence[Any] | Mapping[str, Any] | None = None,
         read_only: bool = True,
         max_rows: int = 1000,
     ) -> list[dict[str, Any]]:
@@ -328,46 +353,50 @@ class DuckDBEngine:
 
         Includes a safety limit (max_rows) to prevent OOM errors for large analytical results.
         """
-        # db_id validated in _get_cursor
-
-        if read_only:
-            error = self._validate_read_only_sql(sql)
-            if error:
-                return [{'error': error}]
+        if read_only and (error := self._validate_read_only_sql(sql)):
+            return [{'error': error}]
 
         try:
-            with (
-                self.get_cursor(db_id) if read_only else self.write_lock
-            ) as cursor:
-                # If we were using the write_lock context, we still need to get the cursor
-                if not read_only:
-                    cursor = self._main_conn.cursor()
-                    cursor.execute(f'USE {db_id}')
+            if read_only:
+                with self.get_cursor(db_id) as cursor:
+                    return self._execute_and_fetch(cursor, db_id, sql, params, max_rows)
 
-                cursor.execute(sql, params)
-                names = [desc[0] for desc in cursor.description]
+            with self.write_lock, self.get_cursor(db_id) as cursor:
+                return self._execute_and_fetch(cursor, db_id, sql, params, max_rows)
 
-                # Fetch only up to max_rows + 1 to detect truncation
-                rows = cursor.fetchmany(max_rows + 1)
-
-                if len(rows) > max_rows:
-                    from src.telemetry.logger import logger
-                    logger.warning(
-                        f'Query result truncated to {max_rows} rows for {db_id}. Original query might be too large.',
-                    )
-                    rows = rows[:max_rows]
-                    return [
-                        dict(zip(names, row, strict=True)) for row in rows
-                    ] + [{'_warning': f'Result truncated to {max_rows} rows.'}]
-
-                return [
-                    dict(zip(names, row, strict=True)) for row in rows
-                ]
         except Exception as e:
+            logger.error(f'Database execution error in {db_id}: {e}')
             return [{'error': str(e)}]
-        finally:
-            if not read_only and 'cursor' in locals():
-                cursor.close()
+
+    def _execute_and_fetch(
+        self,
+        cursor: duckdb.DuckDBPyConnection,
+        db_id: str,
+        sql: str,
+        params: Sequence[Any] | Mapping[str, Any] | None = None,
+        max_rows: int = 1000,
+    ) -> list[dict[str, Any]]:
+        """Internal helper to execute SQL and format results into dicts."""
+        cursor.execute(sql, params)
+
+        if not cursor.description:
+            return []
+
+        names = [desc[0] for desc in cursor.description]
+
+        # Fetch only up to max_rows + 1 to detect truncation
+        rows = cursor.fetchmany(max_rows + 1)
+
+        if len(rows) > max_rows:
+            logger.warning(
+                f'Query result truncated to {max_rows} rows for {db_id}. Original query might be too large.',
+            )
+            rows = rows[:max_rows]
+            results = [dict(zip(names, row, strict=True)) for row in rows]
+            results.append({'_warning': f'Result truncated to {max_rows} rows.'})
+            return results
+
+        return [dict(zip(names, row, strict=True)) for row in rows]
 
     def update_intervention_status(self, sid: str, status: str) -> None:
         """Update the intervention lifecycle status for a specific student."""

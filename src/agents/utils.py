@@ -1,7 +1,6 @@
 """Utility functions and classes for the agent assistant."""
 
 import json
-import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -60,11 +59,9 @@ def mask_pii_sql(sql: str, pii_columns: set[str] | None = None) -> str:
 
         # 5. Transpile to final string
         return masked_query.sql(dialect='duckdb')
-    except Exception:
-        # Fallback to a very strict string pattern if parsing fails
-        clean_sql = re.sub(r'[;\s]+(--.*|/\*.*)?$', '', sql, flags=re.MULTILINE)
-        cols_str = ', '.join(pii_columns)
-        return f'SELECT * EXCLUDE ({cols_str}) FROM ({clean_sql}) AS pii_masked_subquery'
+    except Exception as e:
+        msg = f"Failed to parse SQL for PII masking: {e}"
+        raise ValueError(msg) from e
 
 
 def stringify_to_yaml(obj: object) -> str:
