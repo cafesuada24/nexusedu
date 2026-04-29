@@ -10,7 +10,11 @@ import pytest
 from src.agents.nodes.sql_worker import sql_worker_node
 from src.api.models.response import JobStatusResponse
 from src.api.services.alerts import AlertService
+from src.api.services.gamification import GamificationService
 from src.baml_client.types import GeneratedSQL
+from src.database.manager import DatabaseManager
+from src.database.repositories.advisor_repository import AdvisorRepository
+from src.database.repositories.student_repository import StudentRepository
 from src.types import BoundedDict
 
 if TYPE_CHECKING:
@@ -27,9 +31,7 @@ def test_sql_worker_node_dynamic_masking_viewer(test_db_manager) -> None:
         'error': None,
     }
 
-    config = {
-        'configurable': {'db_manager': test_db_manager, 'user_role': 'viewer'}
-    }
+    config = {'configurable': {'db_manager': test_db_manager, 'user_role': 'viewer'}}
 
     mock_sql_data = GeneratedSQL(
         sql='SELECT * FROM students',
@@ -39,9 +41,7 @@ def test_sql_worker_node_dynamic_masking_viewer(test_db_manager) -> None:
     )
 
     with (
-        patch(
-            'src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data
-        ),
+        patch('src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
         patch.object(
             test_db_manager,
             'execute',
@@ -82,9 +82,7 @@ def test_sql_worker_node_no_masking_admin(test_db_manager) -> None:
     )
 
     with (
-        patch(
-            'src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data
-        ),
+        patch('src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
         patch.object(
             test_db_manager,
             'execute',
@@ -100,7 +98,7 @@ def test_sql_worker_node_no_masking_admin(test_db_manager) -> None:
 
 
 @pytest.mark.anyio
-async def test_email_draft_no_pii_to_ai(test_db_manager) -> None:
+async def test_email_draft_no_pii_to_ai(test_db_manager: DatabaseManager) -> None:
     """Verify that student PII is not sent directly to the AI draft generator.
 
     Note: In the refactored version, we use BAML directly. We verify that
@@ -146,7 +144,14 @@ async def test_email_draft_no_pii_to_ai(test_db_manager) -> None:
 
     job_id = 'test_job'
     jobs = BoundedDict[str, JobStatusResponse](maxsize=10)
-    service = AlertService(test_db_manager)
+
+    student_repo = StudentRepository(test_db_manager)
+    advisor_repo = AdvisorRepository(test_db_manager)
+    service = AlertService(
+        test_db_manager,
+        GamificationService(advisor_repo, student_repo),
+        student_repo,
+    )
 
     with patch(
         'src.api.services.alerts.b_async.GenerateDraftEmail', new_callable=AsyncMock
@@ -163,7 +168,7 @@ async def test_email_draft_no_pii_to_ai(test_db_manager) -> None:
         context_sent_to_ai = args[1]  # context_str is the second arg
 
         # Verify performance data is there
-        assert "z_score': -3.0" in context_sent_to_ai
+        assert "Score 70.0" in context_sent_to_ai
         # Verify PII is NOT there
         assert student_name not in context_sent_to_ai
         assert email not in context_sent_to_ai

@@ -1,6 +1,7 @@
 """Service layer for Dashboard Metrics and KPIs."""
 
 from typing import TYPE_CHECKING, Any
+
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:
@@ -18,7 +19,7 @@ class MetricsService:
         """
         self.db = db_manager
 
-    def get_kpi_stats(self) -> dict[str, Any]:
+    async def get_kpi_stats(self) -> dict[str, Any]:
         """Calculate high-level KPI stats for the dashboard.
 
         Returns:
@@ -34,14 +35,16 @@ class MetricsService:
                     COUNT(CASE WHEN current_risk_status LIKE '%Significant Drop%' THEN 1 END) as dropout
                 FROM students
             """
-            risk_res = self.db.execute('sis_db', risk_sql)[0]
+            risk_res_list = await self.db.execute_async('sis_db', risk_sql)
+            risk_res = risk_res_list[0]
             total = risk_res['total'] or 1
             retention_rate = (risk_res['normal'] / total) * 100
             dropout_rate = (risk_res['dropout'] / total) * 100
 
             # 2. Interventions
             int_sql = "SELECT COUNT(*) as count FROM students WHERE intervention_status != 'none'"
-            int_res = self.db.execute('sis_db', int_sql)[0]
+            int_res_list = await self.db.execute_async('sis_db', int_sql)
+            int_res = int_res_list[0]
 
             # 3. Advisor Engagement
             # Percentage of advisors who have at least one entry in the ledger
@@ -50,7 +53,8 @@ class MetricsService:
                     (SELECT COUNT(DISTINCT advisor_id) FROM advisor_points_ledger) * 100.0 / 
                     NULLIF((SELECT COUNT(*) FROM advisors), 0) as engagement
             """
-            adv_res = self.db.execute('sis_db', adv_sql)[0]
+            adv_res_list = await self.db.execute_async('sis_db', adv_sql)
+            adv_res = adv_res_list[0]
             engagement = adv_res['engagement'] or 0.0
 
             return {
@@ -58,13 +62,13 @@ class MetricsService:
                 "total_interventions": int_res['count'],
                 "advisor_engagement": round(float(engagement), 1),
                 "dropout_rate": round(dropout_rate, 1),
-                "total_students": total
+                "total_students": total,
             }
         except Exception as e:
             logger.error(f"Error calculating KPI stats: {e}")
             raise
 
-    def get_retention_trend(self) -> list[dict[str, Any]]:
+    async def get_retention_trend(self) -> list[dict[str, Any]]:
         """Retrieve retention trend data over time (weeks).
 
         Returns:
@@ -83,7 +87,7 @@ class MetricsService:
                 ORDER BY academic_year DESC, semester DESC, week DESC
                 LIMIT 12
             """
-            results = self.db.execute('sis_db', sql)
+            results = await self.db.execute_async('sis_db', sql)
             # Reverse to get chronological order
             return results[::-1]
         except Exception as e:

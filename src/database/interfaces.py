@@ -23,6 +23,14 @@ class DatabaseEngine(Protocol):
         """Ingest a list of dictionaries into a specified table."""
         ...
 
+    def update_draft_job_ids(self, updates: list[tuple[str, str]]) -> None:
+        """Update the draft_job_id for multiple students.
+
+        Args:
+            updates: List of (job_id, sid) tuples.
+        """
+        ...
+
     def ingest_custom_data(
         self,
         table_name: str,
@@ -57,6 +65,13 @@ class DatabaseEngine(Protocol):
     def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
         """Inject points for an advisor action into the points ledger."""
         ...
+
+    def check_idempotency(self, key: str) -> bool:
+        """Check if an idempotency key has already been used."""
+        ...
+
+    def record_idempotency(self, key: str) -> None:
+        """Record an idempotency key."""
 
     def check_health(self) -> dict[str, str]:
         """Verify connectivity to all registered databases."""

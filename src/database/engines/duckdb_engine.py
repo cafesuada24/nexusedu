@@ -21,8 +21,10 @@ from src.telemetry.logger import logger
 class DuckDBEngine:
     """DuckDB implementation of the DatabaseEngine protocol."""
 
-    def __init__(self, data_dir: str | Path = DATA_DIR) -> None:
+    def __init__(self, data_dir: str | Path | None = None) -> None:
         """Initialize DuckDBEngine with a data directory."""
+        if data_dir is None:
+            data_dir = os.getenv('DB_DIR', DATA_DIR)
         self.data_dir = Path(data_dir)
         self._allowed_db_ids = {db['id'] for db in DB_REGISTRY}
 
@@ -183,6 +185,11 @@ class DuckDBEngine:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         sent_at TIMESTAMP
                     );
+
+                    CREATE TABLE IF NOT EXISTS idempotency_keys (
+                        key VARCHAR PRIMARY KEY,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
                 """)
 
     def ingest_records(
@@ -210,7 +217,7 @@ class DuckDBEngine:
             try:
                 # Use INSERT OR IGNORE to skip existing records with same PRIMARY KEY (e.g., sid for students)
                 cursor.execute(
-                    f'INSERT OR IGNORE INTO {table_name} BY NAME SELECT * FROM df'
+                    f'INSERT OR IGNORE INTO {table_name} BY NAME SELECT * FROM df',
                 )
                 cursor.commit()
             except Exception:
@@ -345,7 +352,7 @@ class DuckDBEngine:
         self,
         db_id: str,
         sql: str,
-        params: Sequence[Any] | Mapping[str, Any] | None = None,
+        params: Sequence[str | int] | Mapping[str, int | str] | None = None,
         read_only: bool = True,
         max_rows: int = 1000,
     ) -> list[dict[str, Any]]:
@@ -428,43 +435,25 @@ class DuckDBEngine:
                 raise
 
     def inject_points(self, advisor_id: str, sid: str, action_type: str) -> None:
-        """Inject points for an advisor action with response time multiplier."""
-        matrix = {
-            'draft_reviewed': 5,
-            'email_sent': 10,
-            'meeting_booked': 50,
-            'student_resolved': 100,
-        }
-        base_points = matrix.get(action_type, 0)
-        if base_points == 0:
-            return
+        """Inject points for an advisor action into the points ledger."""
 
-        with self.write_lock, self.get_cursor('sis_db') as cursor:
-            # Check for response time bonus (24h SLA)
-            # Find the most recent status record for this student
-            res = cursor.execute(
-                'SELECT status_recorded_at FROM student_status_history WHERE sid = ? ORDER BY status_recorded_at DESC LIMIT 1',
-                (sid,),
-            ).fetchone()
+    def check_idempotency(self, key: str) -> bool:
+        """Check if an idempotency key has already been used."""
+        res = self.execute(
+            'sis_db',
+            'SELECT 1 FROM idempotency_keys WHERE key = ?',
+            (key,),
+        )
+        return bool(res and 'error' not in res[0])
 
-            multiplier = 1.0
-            if res:
-                recorded_at = res[0]
-                # Compare current_timestamp with recorded_at using DuckDB SQL
-                is_within_24h = cursor.execute(
-                    'SELECT (epoch(current_timestamp) - epoch(?)) < 86400',
-                    (recorded_at,),
-                ).fetchone()
-                if is_within_24h and is_within_24h[0]:
-                    multiplier = 1.2
-
-            final_points = int(base_points * multiplier)
-            ledger_id = str(uuid.uuid4())
-
-            cursor.execute(
-                'INSERT INTO advisor_points_ledger (id, advisor_id, action_type, points, sid) VALUES (?, ?, ?, ?, ?)',
-                (ledger_id, advisor_id, action_type, final_points, sid),
-            )
+    def record_idempotency(self, key: str) -> None:
+        """Record an idempotency key."""
+        self.execute(
+            'sis_db',
+            'INSERT INTO idempotency_keys (key) VALUES (?)',
+            (key,),
+            read_only=False,
+        )
 
     def check_health(self) -> dict[str, str]:
         """Verify connectivity to LMS and SIS databases."""

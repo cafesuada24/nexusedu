@@ -20,7 +20,7 @@ class DataService:
         """
         self.db = db_manager
 
-    def ingest_data(self, request: DataIngestionRequest) -> dict[str, Any]:
+    async def ingest_data(self, request: DataIngestionRequest) -> dict[str, Any]:
         """Ingest multi-source data and trigger the anomaly engine.
 
         Args:
@@ -39,21 +39,21 @@ class DataService:
                 # model_dump(by_alias=True) ensures we use 'sid' etc.
                 records = [r.model_dump(by_alias=True) for r in source.records]
 
-                self.db.ingest_records(db_id, table_name, records)
+                await self.db.ingest_records_async(db_id, table_name, records)
                 results.append(
                     f'Ingested {len(records)} records into {db_id}.{table_name}',
                 )
             else:  # Custom data source
-                self.db.ingest_custom_data(source.table_name, source.records)
+                await self.db.ingest_custom_data_async(source.table_name, source.records)
                 results.append(
                     f'Ingested {len(source.records)} records into sis_db.{source.table_name}',
                 )
 
         # Trigger Anomaly Detection Engine
-        new_sids = self.db.run_anomaly_engine()
+        new_sids = await self.db.run_anomaly_engine_async()
         results.append('Anomaly engine execution completed successfully.')
 
         return {
             'results': results,
-            'new_sids': new_sids
+            'new_sids': new_sids,
         }
