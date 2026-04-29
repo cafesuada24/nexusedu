@@ -76,6 +76,8 @@ export type AdvisorLeaderboardItem = {
   name: string;
   total_points: number;
   actions_count: number;
+  sent_count: number;
+  resolved_count: number;
 };
 
 export type UserRead = {
@@ -584,3 +586,90 @@ export function isApiConfigured(): boolean {
   return Boolean(env && env.trim());
 }
 
+
+export type AdvisorEngagementItem = {
+  faculty: string;
+  sent: number;
+  drafted: number;
+};
+
+/**
+ * GET /advisors/engagement — returns engagement metrics by faculty/major.
+ */
+export async function fetchAdvisorsEngagement(): Promise<AdvisorEngagementItem[]> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/advisors/engagement"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy dữ liệu tương tác: ${message}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data as AdvisorEngagementItem[];
+}
+
+export type KpiStats = {
+  retention_rate: number;
+  total_interventions: number;
+  advisor_engagement: number;
+  dropout_rate: number;
+  total_students: number;
+};
+
+export type RetentionTrendItem = {
+  month: string;
+  baseline: number;
+  current: number;
+};
+
+/**
+ * GET /metrics/stats — returns high-level dashboard KPIs.
+ */
+export async function fetchKpiStats(): Promise<KpiStats> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/metrics/stats"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy chỉ số KPI: ${message}`);
+  }
+  return (await res.json()) as KpiStats;
+}
+
+/**
+ * GET /metrics/retention — returns retention trend data.
+ */
+export async function fetchRetentionTrend(): Promise<RetentionTrendItem[]> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/metrics/retention"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy xu hướng giữ chân: ${message}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  return data as RetentionTrendItem[];
+}
