@@ -5,16 +5,20 @@ from typing import Any
 from arq.connections import RedisSettings
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.agents.agent import create_graph
-from src.api.services.alerts import AlertService
-from src.api.services.gamification import GamificationService
-from src.api.services.query import QueryService
-from src.api.types import JobStore
-from src.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
-from src.database.engines.duckdb_engine import DuckDBEngine
-from src.database.manager import DatabaseManager
-from src.database.repositories.advisor_repository import AdvisorRepository
-from src.database.repositories.student_repository import StudentRepository
+from src.infrastructure.agents.agent import create_graph
+from src.infrastructure.database.algorithms.zscore import DuckDBZScoreAnomalyAlgorithm
+from src.infrastructure.database.engines.duckdb_engine import DuckDBEngine
+from src.infrastructure.database.manager import DatabaseManager
+from src.infrastructure.database.repositories.advisor_repository import (
+    AdvisorRepository,
+)
+from src.infrastructure.database.repositories.student_repository import (
+    StudentRepository,
+)
+from src.presentation.api.services.alerts import AlertService
+from src.presentation.api.services.gamification import GamificationService
+from src.presentation.api.services.query import QueryService
+from src.presentation.api.types import JobStore
 from src.telemetry.logger import logger
 from src.utils.env import getenv
 

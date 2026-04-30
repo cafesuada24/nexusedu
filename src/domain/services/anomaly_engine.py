@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:
-    from src.domain.ports.repositories import (
+    from src.domain.repositories.interfaces import (
         ActivityRepository,
         StatusHistoryRepository,
         StudentRepository,
