@@ -45,8 +45,8 @@ async def ingest_data(
             new_sids = results.get('new_sids', [])
 
             # Trigger automatic draft generation for new at-risk students
-            triggered_jobs = []
-            db_updates = []
+            triggered_jobs: list[dict[str, int | str]] = []
+            db_updates: list[tuple[str, str]] = []
             for sid in new_sids:
                 job_id = await alert_service.trigger_draft(
                     sid=sid,

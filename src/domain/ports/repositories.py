@@ -53,6 +53,10 @@ class StudentRepository(Protocol):
         """Update the risk and optionally intervention status for a student."""
         ...
 
+    async def update_last_notified(self, sid: str) -> None:
+        """Update the last notified timestamp for a student."""
+        ...
+
 
 class ActivityRepository(Protocol):
     """Interface for assessment activity operations."""

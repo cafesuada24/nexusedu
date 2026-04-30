@@ -15,6 +15,7 @@ from sqlalchemy import (
     inspect,
     literal,
     literal_column,
+    quoted_name,
     select,
     text,
     update,
@@ -399,6 +400,8 @@ class SqlAlchemyMetadataRepository:
         tables = await self.list_tables(_db_id)
         if table_name not in tables:
             raise ValueError(f"Table '{table_name}' does not exist.")
+
+        table_name = quoted_name(table_name, quote=True)
 
         # 2. Use SQLAlchemy Inspector for dialect-agnostic column retrieval
         def get_columns(connection: object) -> list[dict[str, Any]]:
