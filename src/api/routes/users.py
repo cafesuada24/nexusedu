@@ -75,4 +75,3 @@ async def list_users(
     """
     result = await session.execute(select(User))
     return list(result.scalars().all())
-

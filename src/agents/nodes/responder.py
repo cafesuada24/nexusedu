@@ -23,7 +23,9 @@ class ResponderNode:
         human_messages = [
             m for m in state.get('messages', []) if m.get('role') == 'user'
         ]
-        user_intent = str(human_messages[-1]['content']) if human_messages else 'No intent found'
+        user_intent = (
+            str(human_messages[-1]['content']) if human_messages else 'No intent found'
+        )
 
         prompt = f"""
         <user_intent>

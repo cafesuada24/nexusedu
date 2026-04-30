@@ -83,7 +83,8 @@ class DiscoveryNode:
                     res = db_manager.get_formatted_table_list(db_id=db_id)
                 case 'describe_table' if db_id and table_name:
                     res = db_manager.get_formatted_table_schema(
-                        db_id=db_id, table_name=table_name,
+                        db_id=db_id,
+                        table_name=table_name,
                     )
                 case _:
                     logger.warning(
@@ -92,7 +93,9 @@ class DiscoveryNode:
                     return None
 
             if res:
-                logger.debug(f'Discovery Task {index + 1} Result length: {len(str(res))}')
+                logger.debug(
+                    f'Discovery Task {index + 1} Result length: {len(str(res))}'
+                )
                 return str(res)
         except Exception as e:
             logger.error(

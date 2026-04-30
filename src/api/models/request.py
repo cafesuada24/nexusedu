@@ -41,7 +41,9 @@ class SISRecord(BaseModel):
     name: str = Field(..., alias='student_name', description='Student full name.')
     email: str = Field(..., description='Student email address.')
     major: str | None = Field('Unknown', description='Student major.')
-    current_risk_status: str | None = Field('Normal', description='Current risk status.')
+    current_risk_status: str | None = Field(
+        'Normal', description='Current risk status.'
+    )
     intervention_status: str | None = Field('none', description='Intervention status.')
     last_notified_timestamp: float | None = Field(
         0,
