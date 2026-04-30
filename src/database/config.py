@@ -12,12 +12,15 @@ DATA_DIR = 'data'
 # DATABASE REGISTRY
 # ============================================================================
 
+
 class DBDescription(TypedDict):
     """Database description for DB_REGISTRY."""
+
     id: str
     description: str
     dialect: str
     keywords: list[str]
+
 
 DB_REGISTRY: list[DBDescription] = [
     {

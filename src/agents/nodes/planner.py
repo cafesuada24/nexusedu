@@ -31,7 +31,9 @@ class PlannerNode:
         if state.get('discovery_context'):
             logger.info('Planner: Incorporating discovery context.')
             message_yaml += f'\n\n<discovery_context>\n{state["discovery_context"]}\n</discovery_context>'
-            logger.debug(f'Discovery Context Length: {len(state["discovery_context"] or "")}')
+            logger.debug(
+                f'Discovery Context Length: {len(state["discovery_context"] or "")}'
+            )
 
         logger.debug('Planner: Invoking LLM...')
         plan = b.PlanNextStep(message_yaml)

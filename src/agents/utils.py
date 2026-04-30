@@ -24,8 +24,8 @@ class MessageSerializer:
         """Convert a single message to a YAML-like XML format."""
         # Handle LangChain message objects if they have 'type' and 'content'
         if hasattr(msg, 'type') and hasattr(msg, 'content'):
-            role = 'ai_response' if getattr(msg, 'type') == 'ai' else 'human_message'
-            content = getattr(msg, 'content')
+            role = 'ai_response' if msg.type == 'ai' else 'human_message'
+            content = msg.content
         else:
             # Handle standard role/content dicts
             role = 'ai_response' if msg.get('role') == 'assistant' else 'human_message'
@@ -60,7 +60,7 @@ def mask_pii_sql(sql: str, pii_columns: set[str] | None = None) -> str:
         # 5. Transpile to final string
         return masked_query.sql(dialect='duckdb')
     except Exception as e:
-        msg = f"Failed to parse SQL for PII masking: {e}"
+        msg = f'Failed to parse SQL for PII masking: {e}'
         raise ValueError(msg) from e
 
 

@@ -24,7 +24,9 @@ class EmailAgentNode:
             m for m in state.get('messages', []) if m.get('role') == 'user'
         ]
         user_intent = (
-            str(human_messages[-1]['content']) if human_messages else 'Generate nudge email'
+            str(human_messages[-1]['content'])
+            if human_messages
+            else 'Generate nudge email'
         )
 
         logger.debug('Email Agent: Invoking LLM for email drafting...')

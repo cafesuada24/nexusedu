@@ -5,15 +5,14 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 from src.api.models.response import JobStatusResponse, QueryResponse
+from src.domain.services.agent_metadata import AgentMetadataService
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
 
     from src.agents.state import AgentState
-    from src.api.auth import User
     from src.api.types import JobStore
-    from src.database.manager import DatabaseManager
 
 
 class QueryService:
@@ -22,16 +21,16 @@ class QueryService:
     def __init__(
         self,
         agent: 'CompiledStateGraph[AgentState, None, AgentState]',
-        db_manager: 'DatabaseManager',
+        metadata_service: AgentMetadataService,
     ) -> None:
         """Initialize the QueryService.
 
         Args:
             agent: The compiled LangGraph agent.
-            db_manager: The database manager instance.
+            metadata_service: Service for database metadata retrieval.
         """
         self.agent = agent
-        self.db = db_manager
+        self.metadata_service = metadata_service
 
     async def run_agent_task(
         self,
@@ -53,7 +52,7 @@ class QueryService:
             'configurable': {
                 'thread_id': session_id,
                 'max_concurrency': 3,
-                'db_manager': self.db,
+                'metadata_service': self.metadata_service,
                 'user_role': user_dict.get('role', 'advisor'),
             },
         }
@@ -66,7 +65,9 @@ class QueryService:
             final_state = await self.agent.ainvoke(inputs, config=config)
 
             execution_time = time.time() - start_time
-            logger.info(f'QueryService: Agent execution completed in {execution_time:.2f}s')
+            logger.info(
+                f'QueryService: Agent execution completed in {execution_time:.2f}s'
+            )
 
             if not final_state:
                 raise ValueError('Agent returned an empty or invalid state.')

@@ -31,4 +31,3 @@ class UserUpdate(schemas.BaseUserUpdate):
     """
 
     role: UserRole | None = None
-

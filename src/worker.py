@@ -34,6 +34,7 @@ checkpointer = MemorySaver()
 agent = create_graph(checkpointer=checkpointer)
 query_service = QueryService(agent, db_manager)
 
+
 async def run_email_draft_task(
     _ctx: dict[Any, Any],
     job_id: str,
@@ -43,7 +44,7 @@ async def run_email_draft_task(
     user_id: str | None = None,
 ) -> None:
     """Worker task to generate email draft."""
-    logger.info(f"Worker: Starting email draft task for {sid}")
+    logger.info(f'Worker: Starting email draft task for {sid}')
     await alert_service.run_email_draft_task(
         job_id=job_id,
         sid=sid,
@@ -51,6 +52,7 @@ async def run_email_draft_task(
         booking_link=booking_link,
         user_id=user_id,
     )
+
 
 async def run_agent_task(
     _ctx: dict[Any, Any],
@@ -61,7 +63,7 @@ async def run_agent_task(
     jobs: JobStore,
 ) -> None:
     """Worker task to process agent query."""
-    logger.info(f"Worker: Starting agent task for {job_id}")
+    logger.info(f'Worker: Starting agent task for {job_id}')
     await query_service.run_agent_task(
         job_id=job_id,
         query=query,
@@ -69,6 +71,7 @@ async def run_agent_task(
         user_dict=user_dict,
         jobs=jobs,
     )
+
 
 class WorkerSettings:
     """ARQ Worker configuration."""

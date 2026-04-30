@@ -4,7 +4,7 @@ This module defines the state graph, node connections, and provides a factory
 function for instantiating the compiled agent.
 """
 
-import os
+import asyncio
 import uuid
 from typing import Any
 
@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import Checkpointer, CompiledStateGraph
 
+from src.adapters.database.sqlalchemy_repositories import SqlAlchemyMetadataRepository
 from src.agents.nodes import (
     discovery_node,
     email_agent_node,
@@ -22,8 +23,8 @@ from src.agents.nodes import (
     sql_worker_node,
 )
 from src.agents.state import AgentState
-from src.database import DatabaseManager
-from src.database.factory import algorithm_registry, engine_registry
+from src.database.session import async_session_maker
+from src.domain.services.agent_metadata import AgentMetadataService
 from src.telemetry.logger import logger
 
 
@@ -68,63 +69,56 @@ def create_graph(
 app = create_graph()
 
 
-def main() -> None:
+async def main() -> None:
     """CLI entry point for running the graph manually."""
     load_dotenv()
 
-    # ==== DB Initialization for CLI ====
-    db_manager = DatabaseManager()
-    engine_name = os.getenv('DB_ENGINE', 'duckdb')
-    algo_name = os.getenv('DB_ALGORITHM', 'zscore')
+    async with async_session_maker() as session:
+        metadata_repo = SqlAlchemyMetadataRepository(session)
+        metadata_service = AgentMetadataService(metadata_repo)
 
-    db_manager.initialize(
-        engine=engine_registry.create(engine_name),
-        anomaly_algo=algorithm_registry.create(algo_name),
-    )
-    db_manager.initialize_schema()
+        # Set session context for correlation
+        session_id = str(uuid.uuid4())
+        logger.set_context({'session_id': session_id})
+        logger.info('Graph: Initializing execution', session_id=session_id)
 
-    # Set session context for correlation
-    session_id = str(uuid.uuid4())
-    logger.set_context({'session_id': session_id})
-    logger.info('Graph: Initializing execution', session_id=session_id)
+        # Configuration for execution
+        config = {
+            'recursion_limit': 10,
+            'configurable': {
+                'thread_id': session_id,
+                'max_concurrency': 3,
+                'metadata_service': metadata_service,
+                'user_role': 'admin',
+            },
+        }
 
-    # Configuration for execution
-    config = {
-        'recursion_limit': 50,
-        'configurable': {
-            'thread_id': session_id,
-            'max_concurrency': 3,
-            'db_manager': db_manager,
-        },
-    }
+        # Print ASCII representation for debugging
+        app.get_graph().print_ascii()
 
-    # Print ASCII representation for debugging
-    app.get_graph().print_ascii()
-
-    user_query = (
-        'Analyze the relationship between student demographics and performance. '
-        "Specifically, compare the average assessment scores from the LMS database "
-        "against the different 'region' categories found in the SIS database. "
-        'Provide a summary of the findings.'
-    )
-
-    logger.log_event('graph_start', {'user_query': user_query})
-
-    try:
-        final_result = app.invoke(
-            {'messages': [{'role': 'user', 'content': user_query}]},
-            config=config,
+        user_query = (
+            'Analyze the relationship between student demographics and performance. '
+            'Specifically, compare the average assessment scores from the LMS database '
+            "against the different 'region' categories found in the SIS database. "
+            'Provide a summary of the findings.'
         )
-        logger.info('Graph: Execution completed successfully')
-        logger.debug(f'Final Result State keys: {list(final_result.keys())}')
 
-    except Exception as e:
-        logger.error(f'Graph execution failed: {e}', exc_info=True)
-    finally:
-        db_manager.close()
-        logger.info('Graph: Finished session')
-        logger.clear_context()
+        logger.log_event('graph_start', {'user_query': user_query})
+
+        try:
+            final_result = await app.ainvoke(
+                {'messages': [{'role': 'user', 'content': user_query}]},
+                config=config,
+            )
+            logger.info('Graph: Execution completed successfully')
+            logger.debug(f'Final Result State keys: {list(final_result.keys())}')
+
+        except Exception as e:
+            logger.error(f'Graph execution failed: {e}', exc_info=True)
+        finally:
+            logger.info('Graph: Finished session')
+            logger.clear_context()
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
