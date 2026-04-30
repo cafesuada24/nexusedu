@@ -73,9 +73,12 @@ class SqlAlchemyStudentRepository:
         """Batch update draft job IDs for multiple students."""
         if not updates:
             return
-        for job_id, sid in updates:
-            stmt = update(Student).where(Student.sid == sid).values(draft_job_id=job_id)
-            await self.session.execute(stmt)
+
+        # Prepare bulk update data
+        update_data = [{'sid': sid, 'draft_job_id': job_id} for job_id, sid in updates]
+
+        # Execute single bulk update
+        await self.session.execute(update(Student), update_data)
         await self.session.commit()
 
     async def update_last_notified(self, sid: str) -> None:
@@ -128,7 +131,16 @@ class SqlAlchemyStudentRepository:
         """Bulk ingest student records using upsert logic."""
         if not records:
             return
-        stmt = sqlite_insert(Student).values(records).on_conflict_do_nothing()
+
+        # Dynamically choose insert implementation based on dialect
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+        if dialect == 'postgresql':
+            from sqlalchemy.dialects.postgresql import insert as pg_insert  # noqa: PLC0415
+
+            stmt = pg_insert(Student).values(records).on_conflict_do_nothing()
+        else:
+            stmt = sqlite_insert(Student).values(records).on_conflict_do_nothing()
+
         await self.session.execute(stmt)
         await self.session.commit()
 
@@ -163,7 +175,16 @@ class SqlAlchemyActivityRepository:
         for record in records:
             if not record.get('activity_id'):
                 record['activity_id'] = str(uuid.uuid4())
-        stmt = sqlite_insert(Activity).values(records).on_conflict_do_nothing()
+
+        # Dynamically choose insert implementation based on dialect
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+        if dialect == 'postgresql':
+            from sqlalchemy.dialects.postgresql import insert as pg_insert  # noqa: PLC0415
+
+            stmt = pg_insert(Activity).values(records).on_conflict_do_nothing()
+        else:
+            stmt = sqlite_insert(Activity).values(records).on_conflict_do_nothing()
+
         await self.session.execute(stmt)
         await self.session.commit()
 
@@ -375,13 +396,23 @@ class SqlAlchemyMetadataRepository:
         return await self.session.run_sync(get_tables)
 
     async def get_table_schema(self, _db_id: str, table_name: str) -> str:
-        """Get table schema via PRAGMA (SQLite specific)."""
-        res = await self.session.execute(text(f"PRAGMA table_info('{table_name}')"))
-        cols = res.all()
+        """Get table schema securely and dialect-agnostically."""
+        # 1. Validate table_name against the schema to prevent SQL injection
+        tables = await self.list_tables(_db_id)
+        if table_name not in tables:
+            raise ValueError(f"Table '{table_name}' does not exist.")
+
+        # 2. Use SQLAlchemy Inspector for dialect-agnostic column retrieval
+        def get_columns(connection: object) -> list[dict[str, Any]]:
+            return inspect(connection).get_columns(table_name)
+
+        cols = await self.session.run_sync(get_columns)
         col_lines = [
-            f'    - {c[1]} ({c[2]}, {"NOT NULL" if c[3] else "NULLABLE"})' for c in cols
+            f'    - {c["name"]} ({c["type"]}, {"NULLABLE" if c.get("nullable", True) else "NOT NULL"})'
+            for c in cols
         ]
 
+        # 3. Safe to interpolate table_name here after validation
         res_sample = await self.session.execute(
             text(f'SELECT * FROM {table_name} LIMIT 3'),
         )
