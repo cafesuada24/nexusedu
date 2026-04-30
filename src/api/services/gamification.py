@@ -3,9 +3,7 @@
 import datetime
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from src.database.repositories.advisor_repository import AdvisorRepository
-    from src.database.repositories.student_repository import StudentRepository
+from src.domain.ports.repositories import AdvisorRepository, StudentRepository
 
 
 class GamificationService:
@@ -13,8 +11,8 @@ class GamificationService:
 
     def __init__(
         self,
-        advisor_repo: 'AdvisorRepository',
-        student_repo: 'StudentRepository',
+        advisor_repo: AdvisorRepository,
+        student_repo: StudentRepository,
     ) -> None:
         """Initialize the service with necessary repositories."""
         self.advisor_repo = advisor_repo
@@ -37,26 +35,18 @@ class GamificationService:
         recorded_dt = await self.student_repo.get_latest_status_timestamp(sid)
 
         if recorded_dt:
-            # If DuckDB returns string, parse it. If datetime, use it.
-            if isinstance(recorded_dt, str):
-                try:
-                    recorded_dt = datetime.datetime.fromisoformat(recorded_dt)
-                except ValueError:
-                    # Fallback if format is different
-                    pass
-
             now = datetime.datetime.now(datetime.UTC)
-            if isinstance(recorded_dt, datetime.datetime):
-                # Ensure recorded_dt is timezone-aware if it's not
-                if recorded_dt.tzinfo is None:
-                    recorded_dt = recorded_dt.replace(tzinfo=datetime.UTC)
+            # Ensure recorded_dt is timezone-aware if it's not
+            if recorded_dt.tzinfo is None:
+                recorded_dt = recorded_dt.replace(tzinfo=datetime.UTC)
 
-                # 24h SLA in seconds
-                sla_24h = 86400
-                if (now - recorded_dt).total_seconds() < sla_24h:
-                    multiplier = 1.2
-
+            # 24h SLA in seconds
+            sla_24h = 86400
+            if (now - recorded_dt).total_seconds() < sla_24h:
+                multiplier = 1.2
 
         final_points = int(base_points * multiplier)
-        await self.advisor_repo.record_points(advisor_id, sid, action_type, final_points)
+        await self.advisor_repo.record_points(
+            advisor_id, sid, action_type, final_points
+        )
         return final_points

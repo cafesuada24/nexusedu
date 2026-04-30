@@ -3,7 +3,7 @@
 from typing import Annotated, Any
 
 from arq import ArqRedis
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.api.auth import Scope, User, require_scope
@@ -34,15 +34,6 @@ class StatusUpdate(BaseModel):
     status: str = Field(..., description='The new Kanban state.')
 
 
-class DraftRequest(BaseModel):
-    """Schema for requesting a personalized email draft."""
-
-    booking_link: str | None = Field(
-        None,
-        description='Custom booking link to use in the draft.',
-    )
-
-
 class SendEmailRequest(BaseModel):
     """Schema for sending a personalized nudge email."""
 
@@ -54,17 +45,8 @@ async def get_alerts(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
     status: str | None = Query(None),
-) -> list[dict[str, str]]:
-    """Retrieve students who have an active alert for the Kanban board.
-
-    Args:
-        alert_service: The alert service dependency.
-        _user: Authenticated user with read access.
-        status: Optional status filter.
-
-    Returns:
-        List of students with active alerts.
-    """
+) -> list[dict[str, Any]]:
+    """Retrieve students who have an active alert for the Kanban board."""
     if status:
         valid_statuses = ['new', 'sent', 'booked', 'supporting', 'resolved', 'expired']
         if status not in valid_statuses:
@@ -75,7 +57,7 @@ async def get_alerts(
 
     try:
         return await alert_service.get_alerts(status)
-    except ValueError as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -86,20 +68,31 @@ async def update_alert_status(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
 ) -> dict[str, str]:
-    """Manually transitions a student's Kanban state.
-
-    Args:
-        sid: Student identifier.
-        update: The status update request.
-        alert_service: The alert service dependency.
-        user: Authenticated user with write access.
-
-    Returns:
-        The updated status summary.
-    """
+    """Manually transitions a student's Kanban state."""
     try:
         await alert_service.update_status(sid, update.status, str(user.id))
         return {'sid': sid, 'new_status': update.status}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/{sid}/draft/trigger', status_code=202)
+async def trigger_draft(
+    sid: str,
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+    alert_service: Annotated[AlertService, Depends(get_alert_service)],
+    jobs: Annotated[JobStore, Depends(get_jobs_store)],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+) -> dict[str, str]:
+    """Manually triggers a background AI draft generation."""
+    try:
+        job_id = await alert_service.trigger_draft(
+            sid=sid,
+            arq_pool=arq_pool,
+            jobs=jobs,
+            user_id=str(user.id),
+        )
+        return {'status': 'success', 'job_id': job_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -111,24 +104,14 @@ async def review_draft(
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
-    """Explicitly rewards the advisor for reviewing the LLM draft.
-
-    Args:
-        sid: Student identifier.
-        alert_service: The alert service dependency.
-        user: Authenticated user with write access.
-        idempotency_key: Optional idempotency key to prevent duplicate awards.
-
-    Returns:
-        Success message.
-    """
+    """Explicitly rewards the advisor for reviewing the LLM draft."""
     if idempotency_key:
-        if await alert_service.db.check_idempotency_async(idempotency_key):
+        if await alert_service.check_idempotency(idempotency_key):
             return {
                 'status': 'success',
                 'message': 'Draft review points already awarded (idempotent).',
             }
-        await alert_service.db.record_idempotency_async(idempotency_key)
+        await alert_service.record_idempotency(idempotency_key)
 
     try:
         await alert_service.award_review_points(sid, str(user.id))
@@ -143,19 +126,9 @@ async def get_email_draft(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> dict[str, Any]:
-    """Retrieve the current AI draft status and content for a student.
-
-    Returns:
-        The draft subject and body if available, plus generation status.
-    """
+    """Retrieve the current AI draft status and content for a student."""
     try:
-        # Check if currently generating
-        student = await alert_service.db.execute_async(
-            'sis_db', 'SELECT draft_job_id FROM students WHERE sid = ?', (sid,)
-        )
-        is_generating = bool(student and student[0].get('draft_job_id'))
-
-        # Fetch latest draft
+        is_generating = await alert_service.get_draft_status(sid)
         drafts = await alert_service.get_email_history(sid)
         latest_draft = next((d for d in drafts if d['status'] == 'draft'), None)
 
@@ -175,15 +148,7 @@ async def get_alert_history(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> list[dict[str, Any]]:
-    """Retrieve communication history for a specific student.
-
-    Args:
-        sid: Student identifier.
-        alert_service: The alert service dependency.
-
-    Returns:
-        List of historical communication entries.
-    """
+    """Retrieve communication history for a specific student."""
     try:
         return await alert_service.get_email_history(sid)
     except Exception as e:
@@ -198,22 +163,11 @@ async def send_nudge_email(
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
-    """Dispatches the email and updates the intervention lifecycle.
-
-    Args:
-        sid: Student identifier.
-        request: The email sending request.
-        alert_service: The alert service dependency.
-        user: Authenticated user with write access.
-        idempotency_key: Optional idempotency key to prevent duplicate sends.
-
-    Returns:
-        Success message.
-    """
+    """Dispatches the email and updates the intervention lifecycle."""
     if idempotency_key:
-        if await alert_service.db.check_idempotency_async(idempotency_key):
+        if await alert_service.check_idempotency(idempotency_key):
             return {'status': 'success', 'message': 'Email already sent (idempotent).'}
-        await alert_service.db.record_idempotency_async(idempotency_key)
+        await alert_service.record_idempotency(idempotency_key)
 
     try:
         email = await alert_service.send_email(sid, request.body, str(user.id))
