@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING, Any, Protocol
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from src.infrastructure.database.models import Advisor, Student
+    from src.domain.entities.advisor import Advisor
+    from src.domain.entities.alert import Alert
+    from src.domain.entities.intervention_email import InterventionEmail
+    from src.domain.entities.student import Student
+    from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
 
 class StudentRepository(Protocol):
@@ -21,7 +25,9 @@ class StudentRepository(Protocol):
         """Retrieve student PII (name and email)."""
         ...
 
-    async def update_intervention_status(self, sid: str, status: str) -> None:
+    async def update_intervention_status(
+        self, sid: str, status: InterventionStatus
+    ) -> None:
         """Update the intervention status for a student."""
         ...
 
@@ -48,7 +54,10 @@ class StudentRepository(Protocol):
         ...
 
     async def update_risk_status(
-        self, sid: str, risk_status: str, intervention_status: str | None = None
+        self,
+        sid: str,
+        risk_status: RiskStatus,
+        intervention_status: InterventionStatus | None = None,
     ) -> None:
         """Update the risk and optionally intervention status for a student."""
         ...
@@ -131,7 +140,7 @@ class IdempotencyRepository(Protocol):
 class EmailRepository(Protocol):
     """Interface for managing intervention emails."""
 
-    async def get_latest_draft(self, sid: str) -> dict[str, Any] | None:
+    async def get_latest_draft(self, sid: str) -> InterventionEmail | None:
         """Retrieve the latest draft email for a student."""
         ...
 
@@ -149,7 +158,7 @@ class EmailRepository(Protocol):
         """Mark the latest draft as sent for a student."""
         ...
 
-    async def get_history(self, sid: str) -> list[dict[str, Any]]:
+    async def get_history(self, sid: str) -> list[InterventionEmail]:
         """Retrieve the communication history for a student."""
         ...
 
@@ -157,9 +166,7 @@ class EmailRepository(Protocol):
 class AlertRepository(Protocol):
     """Interface for managing student alerts."""
 
-    async def get_active_alerts(
-        self, status_filter: str | None = None
-    ) -> list[dict[str, Any]]:
+    async def get_active_alerts(self, status_filter: str | None = None) -> list[Alert]:
         """Retrieve students with active alerts for the Kanban board."""
         ...
 
