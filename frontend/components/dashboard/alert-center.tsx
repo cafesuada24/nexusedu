@@ -14,6 +14,9 @@ import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog"
 import { type Problem } from "@/lib/csv"
 import { sendNudge } from "@/lib/api"
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts"
+import { useSocketEvent } from "@/hooks/use-socket"
+import { useQueryClient } from "@tanstack/react-query"
+import { queryKeys } from "@/lib/query-keys"
 import {
   type Alert,
   type AlertStatus,
@@ -37,9 +40,51 @@ export function AlertCenter() {
   // Use TanStack Query hooks
   const { data: remoteAlerts = [], isLoading } = useAlerts()
   const { mutate: updateStatus } = useUpdateAlertStatus()
+  const queryClient = useQueryClient()
+
+  // Real-time listener for new appointments
+  useSocketEvent<{ sid: string; date: string; slot: string }>(
+    "new_appointment",
+    (data) => {
+      // Move student from 'Contacted' (sent) to 'Scheduled' (booked) in the UI
+      queryClient.setQueryData(
+        queryKeys.alerts.list(),
+        (old: any[] | undefined) => {
+          if (!old) return [];
+          return old.map((alert) =>
+            alert.sid === data.sid
+              ? { ...alert, intervention_status: "booked" }
+              : alert,
+          );
+        },
+      );
+
+      // Notify the advisor
+      toast.success(`Sinh viên ${data.sid} vừa đặt lịch hẹn!`, {
+        description: `Thời gian: ${data.date} lúc ${data.slot}`,
+      });
+    },
+  );
 
   // Internal state for goals and hidden alerts (not yet persisted in backend)
   const [localAlertState, setLocalAlertState] = React.useState<Record<string, { goals: Goal[], hidden: boolean }>>({})
+
+  // Initialize from localStorage
+  React.useEffect(() => {
+    const saved = localStorage.getItem("alert-goals-state");
+    if (saved) {
+      try {
+        setLocalAlertState(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse goal state", e);
+      }
+    }
+  }, []);
+
+  // Sync to localStorage
+  React.useEffect(() => {
+    localStorage.setItem("alert-goals-state", JSON.stringify(localAlertState));
+  }, [localAlertState]);
 
   // Map remote alerts to local Alert interface
   const alerts = React.useMemo(() => {
