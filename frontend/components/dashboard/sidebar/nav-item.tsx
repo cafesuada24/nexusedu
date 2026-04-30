@@ -91,38 +91,44 @@ export function NavRow({ item, active }: { item: NavItem; active: boolean }) {
         isActive={active}
         tooltip={item.label}
         className={cn(
-          "group/nav relative h-10 rounded-lg pl-2.5 pr-2 transition-colors",
+          "group/nav relative h-12 rounded-xl transition-all duration-200",
+          "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0",
           active && tone.activeBg,
           active &&
             "data-[active=true]:bg-transparent data-[active=true]:text-sidebar-foreground hover:bg-transparent",
           !active && "hover:bg-sidebar-accent/60",
         )}
       >
-        <Link href={item.href} className="flex w-full items-center gap-2.5">
+        <Link
+          href={item.href}
+          className="flex w-full items-center gap-3 group-data-[collapsible=icon]:justify-center"
+        >
           <span
             aria-hidden
             className={cn(
-              "absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full transition-opacity",
+              "absolute left-0 top-1/2 h-7 w-1.5 -translate-y-1/2 rounded-r-full transition-all duration-200",
               tone.rail,
               active ? "opacity-100" : "opacity-0",
+              "group-data-[collapsible=icon]:h-5",
             )}
           />
           <span
             aria-hidden
             className={cn(
-              "grid size-7 shrink-0 place-items-center rounded-md ring-1 transition-colors",
+              "grid size-8 shrink-0 place-items-center rounded-xl ring-1 transition-all duration-200",
               active ? tone.tileActive : tone.tile,
               "group-hover/nav:ring-2",
             )}
           >
-            <Icon className="size-3.5" />
+            <Icon className="size-4" />
           </span>
           <span
             className={cn(
-              "truncate text-sm font-medium transition-colors",
+              "truncate text-sm font-medium transition-all duration-200",
               active
-                ? cn(tone.activeText, "font-semibold")
+                ? cn(tone.activeText, "font-bold")
                 : "text-sidebar-foreground",
+              "group-data-[collapsible=icon]:hidden",
             )}
           >
             {item.label}
@@ -131,7 +137,11 @@ export function NavRow({ item, active }: { item: NavItem; active: boolean }) {
       </SidebarMenuButton>
       {item.badge && (
         <SidebarMenuBadge
-          className={cn("rounded-md font-mono text-[11px]", tone.badge)}
+          className={cn(
+            "rounded-md font-mono text-[11px] transition-all duration-200",
+            tone.badge,
+            "group-data-[collapsible=icon]:hidden",
+          )}
         >
           {item.badge}
         </SidebarMenuBadge>

@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
 import { NavRow, type NavItem } from "./sidebar/nav-item";
-import { SidebarUserFooter } from "./sidebar/user-footer";
 
 const mainNav: NavItem[] = [
   {
@@ -36,12 +35,6 @@ const mainNav: NavItem[] = [
     label: "Nhập dữ liệu (CSV)",
     icon: FileSpreadsheet,
     tone: "sky",
-  },
-  {
-    href: "/dashboard/analysis",
-    label: "Phân tích sinh viên",
-    icon: LineChart,
-    tone: "cyan",
   },
   {
     href: "/dashboard/alerts",
@@ -82,8 +75,8 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="border-b border-sidebar-border bg-gradient-to-b from-primary/5 to-transparent px-3 py-3">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border transition-all duration-300">
+      <SidebarHeader className="border-b border-sidebar-border bg-gradient-to-b from-primary/5 to-transparent px-3 py-4 transition-all duration-300 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
         <Logo size="sm" />
       </SidebarHeader>
 
@@ -122,8 +115,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarUserFooter />
     </Sidebar>
   );
 }

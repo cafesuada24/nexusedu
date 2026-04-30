@@ -37,8 +37,9 @@ export function Logo({
       )}
       <span
         className={cn(
-          "font-serif font-black tracking-tight text-foreground",
+          "font-serif font-black tracking-tight text-foreground transition-all duration-300",
           s.text,
+          "group-data-[collapsible=icon]:hidden",
         )}
       >
         NexusEdu

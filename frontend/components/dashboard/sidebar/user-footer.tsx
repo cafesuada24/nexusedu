@@ -18,24 +18,25 @@ export function SidebarUserFooter() {
   const { user, logout } = useAuth();
 
   return (
-    <SidebarFooter className="border-t border-sidebar-border p-2">
+    <SidebarFooter className="border-t border-sidebar-border p-2 transition-all duration-300 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             size="lg"
-            className="rounded-lg data-[state=open]:bg-sidebar-accent"
+            tooltip={user?.email?.split("@")[0] || "Người dùng"}
+            className="rounded-xl transition-all duration-300 data-[state=open]:bg-sidebar-accent group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
           >
-            <Avatar className="size-8 rounded-lg ring-2 ring-primary/15">
+            <Avatar className="size-9 shrink-0 rounded-xl ring-2 ring-primary/15 transition-all duration-300">
               <AvatarImage src="/avatar-advisor.jpg" alt="" />
-              <AvatarFallback className="rounded-lg bg-primary/10 text-primary uppercase">
+              <AvatarFallback className="rounded-xl bg-primary/10 text-primary uppercase">
                 {user?.email?.slice(0, 2) || "US"}
               </AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">
+            <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+              <span className="truncate font-bold">
                 {user?.email?.split("@")[0] || "Người dùng"}
               </span>
-              <span className="truncate text-xs text-muted-foreground uppercase">
+              <span className="truncate text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                 {user?.role || "Khách"}
               </span>
             </div>
