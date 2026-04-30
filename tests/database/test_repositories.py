@@ -9,6 +9,9 @@ from src.adapters.database.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyMetricsRepository,
     SqlAlchemyStudentRepository,
+    SqlAlchemyEmailRepository,
+    SqlAlchemyIdempotencyRepository,
+    SqlAlchemyMetadataRepository,
 )
 from src.database.models import Activity, Advisor, Base, Student, StudentStatusHistory
 
@@ -37,6 +40,7 @@ async def test_student_repository(session: AsyncSession) -> None:
         {'sid': 'S2', 'student_name': 'Bob', 'email': 'b@test.com', 'major': 'Math'},
     ]
     await repo.ingest_students(students)
+    await session.commit()
 
     # 2. Test Get
     s1 = await repo.get_by_id('S1')
@@ -50,9 +54,70 @@ async def test_student_repository(session: AsyncSession) -> None:
 
     # 4. Test Update Status
     await repo.update_intervention_status('S1', 'sent')
+    await session.commit()
     s1_updated = await repo.get_by_id('S1')
     assert s1_updated.intervention_status == 'sent'
 
+@pytest.mark.asyncio
+async def test_email_repository(session: AsyncSession) -> None:
+    repo = SqlAlchemyEmailRepository(session)
+    student_repo = SqlAlchemyStudentRepository(session)
+    
+    await student_repo.ingest_students([{'sid': 'S1', 'major': 'CS'}])
+    await session.commit()
+
+    # 1. Create Draft
+    eid = await repo.create_draft('S1', 'ADV1', 'Sub', 'Body')
+    await session.commit()
+    assert eid is not None
+
+    # 2. Get Latest Draft
+    draft = await repo.get_latest_draft('S1')
+    assert draft['subject'] == 'Sub'
+    assert draft['body'] == 'Body'
+
+    # 3. Mark as Sent
+    await repo.mark_as_sent('S1', 'Updated Body')
+    await session.commit()
+    
+    # Latest draft should now be None
+    assert await repo.get_latest_draft('S1') is None
+    
+    # 4. History
+    history = await repo.get_history('S1')
+    assert len(history) == 1
+    assert history[0]['status'] == 'sent'
+    assert history[0]['body'] == 'Updated Body'
+
+@pytest.mark.asyncio
+async def test_idempotency_repository(session: AsyncSession) -> None:
+    repo = SqlAlchemyIdempotencyRepository(session)
+    
+    key = "test_key"
+    assert await repo.check_key(key) is False
+    
+    await repo.record_key(key)
+    await session.commit()
+    
+    assert await repo.check_key(key) is True
+
+@pytest.mark.asyncio
+async def test_metadata_repository(session: AsyncSession) -> None:
+    repo = SqlAlchemyMetadataRepository(session)
+    
+    # 1. List tables
+    tables = await repo.list_tables('sis_db')
+    assert 'students' in tables
+    assert 'advisors' in tables
+    
+    # 2. Get table schema
+    schema = await repo.get_table_schema('sis_db', 'students')
+    assert 'sid' in schema
+    assert 'student_name' in schema
+    
+    # 3. Execute Raw
+    results = await repo.execute_raw('sis_db', 'SELECT 1 as val')
+    assert results == [{'val': 1}]
 
 @pytest.mark.asyncio
 async def test_advisor_repository_metrics(session: AsyncSession) -> None:
@@ -67,6 +132,7 @@ async def test_advisor_repository_metrics(session: AsyncSession) -> None:
             {'sid': 'S3', 'major': 'Math', 'intervention_status': 'none'},
         ]
     )
+    await session.commit()
 
     metrics = await advisor_repo.get_engagement_metrics()
     # Ordered by 'sent' DESC
@@ -97,6 +163,7 @@ async def test_metrics_repository(session: AsyncSession) -> None:
             },
         ]
     )
+    await session.commit()
 
     stats = await repo.get_kpi_stats()
     assert stats['total_students'] == 2
@@ -119,6 +186,7 @@ async def test_activity_ingestion(session: AsyncSession) -> None:
         },
     ]
     await repo.ingest_activities(activities)
+    await session.commit()
 
     avgs = await repo.get_weekly_averages()
     assert len(avgs) == 1
