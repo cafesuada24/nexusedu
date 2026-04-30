@@ -29,6 +29,7 @@ async def test_draft_review_points(
             {'sid': sid, 'student_name': 'G1', 'email': 'g1@ex.com'},
         ]
     )
+    await student_repository.session.commit()
 
     response = client.post(f'/api/v1/alerts/{sid}/draft/review')
     assert response.status_code == 200
@@ -100,6 +101,7 @@ async def test_status_change_points(
             {'sid': sid, 'student_name': 'G3', 'email': 'g3@ex.com'},
         ]
     )
+    await student_repository.session.commit()
 
     # Booked
     client.patch(f'/api/v1/alerts/{sid}/status', json={'status': 'booked'})
@@ -281,6 +283,7 @@ async def test_engagement_metrics(
             },
         ]
     )
+    await student_repository.session.commit()
 
     resp = client.get('/api/v1/advisors/engagement')
     assert resp.status_code == 200

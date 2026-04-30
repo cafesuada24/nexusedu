@@ -112,16 +112,18 @@ class AnomalyEngine:
         exists: bool,
     ) -> dict[str, Any] | None:
         """Calculate metrics for a single week and return a record if it's new."""
-        baseline_avg = sum(historical_scores) / len(historical_scores)
+        hs_cnt = len(historical_scores)
+        baseline_avg = sum(historical_scores) / hs_cnt if hs_cnt > 0 else 0.0
         variance = (
-            sum((x - baseline_avg) ** 2 for x in historical_scores)
-            / len(historical_scores)
+            sum((x - baseline_avg) ** 2 for x in historical_scores) / hs_cnt
+            if hs_cnt > 0
+            else 0.0
         )
         baseline_std = math.sqrt(variance)
 
         current_avg = week_data['avg_score']
         z_score = (
-            ((current_avg - baseline_avg) / baseline_std) if baseline_std > 0 else 0
+            ((current_avg - baseline_avg) / baseline_std) if baseline_std > 0 else 0.0
         )
 
         if z_score < Z_SCORE_THRESHOLD:

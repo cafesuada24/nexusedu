@@ -88,11 +88,11 @@ class AlertService:
         jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
 
         # Update database with the job_id if not batching
-        if update_db:
-            await self.student_repo.update_draft_job_id(sid, job_id)
 
         # Enqueue ARQ job
         if arq_pool:
+            if update_db:
+                await self.student_repo.update_draft_job_id(sid, job_id)
             await arq_pool.enqueue_job(
                 'run_email_draft_task',
                 job_id=job_id,
@@ -103,7 +103,7 @@ class AlertService:
             )
         else:
             logger.warning(
-                'AlertService: ARQ Pool not available. Skipping background task.'
+                'AlertService: ARQ Pool not available. Skipping background task.',
             )
             jobs[job_id].status = 'failed'
             jobs[job_id].error = 'Background processing unavailable (Redis down).'
