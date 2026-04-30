@@ -4,7 +4,11 @@ from typing import Literal
 
 from langgraph.types import Send
 
-from src.agents.state import MAX_DISCOVERY_DEPTH, AgentState, RoutingMetadata
+from src.infrastructure.agents.state import (
+    MAX_DISCOVERY_DEPTH,
+    AgentState,
+    RoutingMetadata,
+)
 from src.telemetry.logger import logger
 
 

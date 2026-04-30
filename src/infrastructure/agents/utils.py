@@ -8,7 +8,7 @@ import sqlglot
 import yaml
 from sqlglot import exp
 
-from src.agents.state import MessageList, ResultList
+from src.infrastructure.agents.state import MessageList, ResultList
 
 
 class MessageSerializer:

@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import Checkpointer, CompiledStateGraph
 
-from src.adapters.database.sqlalchemy_repositories import SqlAlchemyMetadataRepository
-from src.agents.nodes import (
+from src.domain.services.agent_metadata import AgentMetadataService
+from src.infrastructure.agents.nodes import (
     discovery_node,
     email_agent_node,
     planner_node,
@@ -22,9 +22,11 @@ from src.agents.nodes import (
     route_planner,
     sql_worker_node,
 )
-from src.agents.state import AgentState
-from src.database.session import async_session_maker
-from src.domain.services.agent_metadata import AgentMetadataService
+from src.infrastructure.agents.state import AgentState
+from src.infrastructure.database.session import async_session_maker
+from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyMetadataRepository,
+)
 from src.telemetry.logger import logger
 
 

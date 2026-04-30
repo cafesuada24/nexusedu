@@ -11,13 +11,17 @@
 # baml-cli is available with the baml package.
 
 import typing
-import typing_extensions
-import baml_py
 
-from . import stream_types, types, type_builder
+import baml_py
+import typing_extensions
+
+from . import stream_types, type_builder, types
+from .globals import (
+    DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME as __runtime__,
+)
 from .parser import LlmResponseParser, LlmStreamParser
-from .runtime import DoNotUseDirectlyCallManager, BamlCallOptions
-from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME as __runtime__
+from .runtime import BamlCallOptions, DoNotUseDirectlyCallManager
+
 
 class BamlSyncClient:
     __options: DoNotUseDirectlyCallManager
@@ -49,13 +53,13 @@ class BamlSyncClient:
         self.__llm_stream_parser = LlmStreamParser(self.__options)
 
     def with_options(self,
-        tb: typing.Optional[type_builder.TypeBuilder] = None,
-        client_registry: typing.Optional[baml_py.baml_py.ClientRegistry] = None,
-        client: typing.Optional[str] = None,
-        collector: typing.Optional[typing.Union[baml_py.baml_py.Collector, typing.List[baml_py.baml_py.Collector]]] = None,
-        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = None,
-        tags: typing.Optional[typing.Dict[str, str]] = None,
-        on_tick: typing.Optional[typing.Callable[[str, baml_py.baml_py.FunctionLog], None]] = None,
+        tb: type_builder.TypeBuilder | None = None,
+        client_registry: baml_py.baml_py.ClientRegistry | None = None,
+        client: str | None = None,
+        collector: baml_py.baml_py.Collector | list[baml_py.baml_py.Collector] | None = None,
+        env: dict[str, str | None] | None = None,
+        tags: dict[str, str] | None = None,
+        on_tick: typing.Callable[[str, baml_py.baml_py.FunctionLog], None] | None = None,
     ) -> "BamlSyncClient":
         options: BamlCallOptions = {}
         if tb is not None:
@@ -102,12 +106,11 @@ class BamlSyncClient:
             __stream__ = self.stream.GenerateDraftEmail(user_intent=user_intent,context=context,
                 baml_options=baml_options)
             return __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="GenerateDraftEmail", args={
-                "user_intent": user_intent,"context": context,
-            })
-            return typing.cast(str, __result__.cast_to(types, types, stream_types, False, __runtime__))
+        # Original non-streaming code
+        __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="GenerateDraftEmail", args={
+            "user_intent": user_intent,"context": context,
+        })
+        return typing.cast("str", __result__.cast_to(types, types, stream_types, False, __runtime__))
     def GenerateSQL(self, message: str,
         baml_options: BamlCallOptions = {},
     ) -> typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]:
@@ -116,12 +119,11 @@ class BamlSyncClient:
             __stream__ = self.stream.GenerateSQL(message=message,
                 baml_options=baml_options)
             return __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="GenerateSQL", args={
-                "message": message,
-            })
-            return typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], __result__.cast_to(types, types, stream_types, False, __runtime__))
+        # Original non-streaming code
+        __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="GenerateSQL", args={
+            "message": message,
+        })
+        return typing.cast("types.GeneratedSQL | types.RequestTableSchema", __result__.cast_to(types, types, stream_types, False, __runtime__))
     def PlanNextStep(self, thread: str,
         baml_options: BamlCallOptions = {},
     ) -> types.RouterPlan:
@@ -130,12 +132,11 @@ class BamlSyncClient:
             __stream__ = self.stream.PlanNextStep(thread=thread,
                 baml_options=baml_options)
             return __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="PlanNextStep", args={
-                "thread": thread,
-            })
-            return typing.cast(types.RouterPlan, __result__.cast_to(types, types, stream_types, False, __runtime__))
+        # Original non-streaming code
+        __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="PlanNextStep", args={
+            "thread": thread,
+        })
+        return typing.cast("types.RouterPlan", __result__.cast_to(types, types, stream_types, False, __runtime__))
     def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
         baml_options: BamlCallOptions = {},
     ) -> str:
@@ -144,12 +145,11 @@ class BamlSyncClient:
             __stream__ = self.stream.ReflectSQLError(query=query,error=error,db_schema_hint=db_schema_hint,
                 baml_options=baml_options)
             return __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="ReflectSQLError", args={
-                "query": query,"error": error,"db_schema_hint": db_schema_hint,
-            })
-            return typing.cast(str, __result__.cast_to(types, types, stream_types, False, __runtime__))
+        # Original non-streaming code
+        __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="ReflectSQLError", args={
+            "query": query,"error": error,"db_schema_hint": db_schema_hint,
+        })
+        return typing.cast("str", __result__.cast_to(types, types, stream_types, False, __runtime__))
     def Respond(self, result: str,
         baml_options: BamlCallOptions = {},
     ) -> str:
@@ -158,13 +158,12 @@ class BamlSyncClient:
             __stream__ = self.stream.Respond(result=result,
                 baml_options=baml_options)
             return __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="Respond", args={
-                "result": result,
-            })
-            return typing.cast(str, __result__.cast_to(types, types, stream_types, False, __runtime__))
-    
+        # Original non-streaming code
+        __result__ = self.__options.merge_options(baml_options).call_function_sync(function_name="Respond", args={
+            "result": result,
+        })
+        return typing.cast("str", __result__.cast_to(types, types, stream_types, False, __runtime__))
+
 
 
 class BamlStreamClient:
@@ -181,8 +180,8 @@ class BamlStreamClient:
         })
         return baml_py.BamlSyncStream[str, str](
           __result__,
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def GenerateSQL(self, message: str,
@@ -193,8 +192,8 @@ class BamlStreamClient:
         })
         return baml_py.BamlSyncStream[typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]](
           __result__,
-          lambda x: typing.cast(typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast("stream_types.GeneratedSQL | stream_types.RequestTableSchema", x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast("types.GeneratedSQL | types.RequestTableSchema", x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def PlanNextStep(self, thread: str,
@@ -205,8 +204,8 @@ class BamlStreamClient:
         })
         return baml_py.BamlSyncStream[stream_types.RouterPlan, types.RouterPlan](
           __result__,
-          lambda x: typing.cast(stream_types.RouterPlan, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(types.RouterPlan, x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast("stream_types.RouterPlan", x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast("types.RouterPlan", x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
@@ -217,8 +216,8 @@ class BamlStreamClient:
         })
         return baml_py.BamlSyncStream[str, str](
           __result__,
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def Respond(self, result: str,
@@ -229,11 +228,11 @@ class BamlStreamClient:
         })
         return baml_py.BamlSyncStream[str, str](
           __result__,
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
-    
+
 
 class BamlHttpRequestClient:
     __options: DoNotUseDirectlyCallManager
@@ -276,7 +275,7 @@ class BamlHttpRequestClient:
             "result": result,
         }, mode="request")
         return __result__
-    
+
 
 class BamlHttpStreamRequestClient:
     __options: DoNotUseDirectlyCallManager
@@ -319,6 +318,6 @@ class BamlHttpStreamRequestClient:
             "result": result,
         }, mode="stream")
         return __result__
-    
+
 
 b = BamlSyncClient(DoNotUseDirectlyCallManager({}))

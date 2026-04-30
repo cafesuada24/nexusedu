@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Any
 import sqlglot
 from langchain_core.runnables import RunnableConfig
 
-from src.agents.state import SQLTask
-from src.agents.utils import mask_pii_sql, stringify_to_yaml
-from src.baml_client import b
-from src.baml_client.types import RequestTableSchema
+from src.infrastructure.agents.state import SQLTask
+from src.infrastructure.agents.utils import mask_pii_sql, stringify_to_yaml
+from src.infrastructure.extern.baml_client import b
+from src.infrastructure.extern.baml_client.types import RequestTableSchema
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:

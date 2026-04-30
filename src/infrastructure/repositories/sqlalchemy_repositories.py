@@ -21,10 +21,8 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.engine.interfaces import ReflectedColumn
-from sqlalchemy.orm import Session
 
-from src.database.models import (
+from src.infrastructure.database.models import (
     Activity,
     Advisor,
     AdvisorPointsLedger,
@@ -35,7 +33,9 @@ from src.database.models import (
 )
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import Session
 
 
 class SqlAlchemyStudentRepository:
@@ -388,7 +388,7 @@ class SqlAlchemyMetadataRepository:
         """Initialize with session."""
         self.session = session
 
-    async def list_tables(self, _db_id: str) -> list[str]:
+    async def list_tables(self, db_id: str) -> list[str]:
         """List tables using SQLAlchemy inspection."""
 
         def get_tables(connection: Session) -> list[str]:
@@ -398,10 +398,10 @@ class SqlAlchemyMetadataRepository:
 
         return await self.session.run_sync(get_tables)
 
-    async def get_table_schema(self, _db_id: str, table_name: str) -> str:
+    async def get_table_schema(self, db_id: str, table_name: str) -> str:
         """Get table schema securely and dialect-agnostically."""
         # 1. Validate table_name against the schema to prevent SQL injection
-        tables = await self.list_tables(_db_id)
+        tables = await self.list_tables(db_id)
         if table_name not in tables:
             raise ValueError(f"Table '{table_name}' does not exist.")
 
@@ -435,7 +435,7 @@ class SqlAlchemyMetadataRepository:
             + f'\n- Sample data:\n```\n{sample_str}```'
         )
 
-    async def execute_raw(self, _db_id: str, sql: str) -> list[dict[str, Any]]:
+    async def execute_raw(self, db_id: str, sql: str) -> list[dict[str, Any]]:
         """Execute raw SQL for agent analysis."""
         res = await self.session.execute(text(sql))
         if res.returns_rows:

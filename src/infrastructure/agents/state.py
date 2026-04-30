@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal, TypedDict
 
 from langgraph.graph import add_messages
 
-from src.agents.schemas import DiscoveryRequest, PlannerTask
+from src.infrastructure.agents.schemas import DiscoveryRequest, PlannerTask
 
 # Type Aliases for clarity
 type MessageList = list[dict[str, str]]

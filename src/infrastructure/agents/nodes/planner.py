@@ -4,9 +4,14 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
-from src.agents.state import MAX_MESSAGES, MAX_RESULTS, AgentState, RoutingMetadata
-from src.agents.utils import MessageSerializer
-from src.baml_client import b
+from src.infrastructure.agents.state import (
+    MAX_MESSAGES,
+    MAX_RESULTS,
+    AgentState,
+    RoutingMetadata,
+)
+from src.infrastructure.agents.utils import MessageSerializer
+from src.infrastructure.extern.baml_client import b
 from src.telemetry.logger import logger
 
 

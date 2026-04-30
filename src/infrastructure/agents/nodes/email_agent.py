@@ -4,9 +4,9 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
-from src.agents.state import AgentState
-from src.agents.utils import ResultSummarizer
-from src.baml_client import b
+from src.infrastructure.agents.state import AgentState
+from src.infrastructure.agents.utils import ResultSummarizer
+from src.infrastructure.extern.baml_client import b
 from src.telemetry.logger import logger
 
 

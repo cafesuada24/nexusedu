@@ -5,9 +5,13 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.runnables import RunnableConfig
 
 if TYPE_CHECKING:
-    from src.database.manager import DatabaseManager
+    from src.infrastructure.database.manager import DatabaseManager
 
-from src.agents.state import AgentState, DiscoveryRequest, RoutingMetadata
+from src.infrastructure.agents.state import (
+    AgentState,
+    DiscoveryRequest,
+    RoutingMetadata,
+)
 from src.telemetry.logger import logger
 
 MAX_DISCOVERY_CONTEXT_CHARS = 15_000

@@ -4,7 +4,7 @@ from typing import Protocol, runtime_checkable
 
 from langchain_core.runnables import RunnableConfig
 
-from src.agents.state import AgentState
+from src.infrastructure.agents.state import AgentState
 
 
 @runtime_checkable
