@@ -2,6 +2,7 @@
 
 from typing import Annotated, Any
 
+from arq import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.auth import Scope, User, require_scope
@@ -19,11 +20,11 @@ from src.telemetry.logger import logger
 
 router = APIRouter(prefix='/data', tags=['data'])
 
-...
+
 @router.post('/ingest')
 async def ingest_data(
     request: DataIngestionRequest,
-    arq_pool: Annotated[Any, Depends(get_arq_pool)],
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
     data_service: Annotated[DataService, Depends(get_data_service)],
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     jobs: Annotated[JobStore, Depends(get_jobs_store)],
@@ -34,17 +35,6 @@ async def ingest_data(
     Supports validated 'sis' and 'lms' sources, plus flexible 'custom' sources.
     Automatically triggers the anomaly detection engine post-ingestion.
     For students transitioning to 'new' risk status, triggers AI draft generation.
-
-    Args:
-        request: The structured data ingestion request.
-        arq_pool: ARQ redis pool for background tasks.
-        data_service: The data service instance.
-        alert_service: The alert service instance for triggering drafts.
-        jobs: The job store dependency.
-        user: The authenticated admin user.
-
-    Returns:
-        Summary of ingestion results.
     """
     try:
         results = await data_service.ingest_data(request)
@@ -64,10 +54,9 @@ async def ingest_data(
             triggered_jobs.append({'sid': sid, 'job_id': job_id})
             db_updates.append((job_id, sid))
 
-
-        # Batch update draft_job_id to avoid blocking and improve performance
+        # Batch update draft_job_id
         if db_updates:
-            await data_service.db.update_draft_job_ids_async(db_updates)
+            await data_service.batch_update_draft_job_ids(db_updates)
 
         return {
             'status': 'success',

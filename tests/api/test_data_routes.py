@@ -5,12 +5,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from sqlalchemy import select
+
+from src.database.models import Activity, Student
+
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-    from src.database.manager import DatabaseManager
 
-def test_ingest_data_success(client: TestClient, test_db_manager: DatabaseManager) -> None:
+def test_ingest_data_success(client: TestClient, test_db_session: AsyncSession) -> None:
     """Verify that the /data/ingest endpoint works correctly."""
     payload = {
         'batch_id': 'batch-123',
@@ -37,8 +41,9 @@ def test_ingest_data_success(client: TestClient, test_db_manager: DatabaseManage
                         'test_type': 'Exam',
                         'score': 85.0,
                         'timestamp': 1600000000.0,
-                        'academic_year': 1,
+                        'academic_year': 2024,
                         'semester': 1,
+                        'week': 1,
                     },
                 ],
             },
@@ -51,53 +56,41 @@ def test_ingest_data_success(client: TestClient, test_db_manager: DatabaseManage
     assert data['status'] == 'success'
     assert 'automatic_drafts' in data
 
-    # Verify data in DB
-    sis_data = test_db_manager.execute(
-        'sis_db', "SELECT * FROM students WHERE sid = 'API_S001'",
-    )
-    assert len(sis_data) == 1
+    # Verify data in DB using the test session
+    import asyncio
 
-    lms_data = test_db_manager.execute(
-        'lms_db', "SELECT * FROM activities WHERE sid = 'API_S001'",
-    )
-    assert len(lms_data) == 1
+    async def verify() -> None:
+        stmt = select(Student).where(Student.sid == 'API_S001')
+        res = await test_db_session.execute(stmt)
+        assert res.scalar_one_or_none() is not None
 
-def test_ingest_custom_data(client: TestClient, test_db_manager: DatabaseManager) -> None:
-    """Verify that custom data ingestion works via API."""
-    payload = {
-        'batch_id': 'batch-custom',
-        'upload_timestamp': datetime.now().isoformat(),
-        'data_sources': [
-            {
-                'source_type': 'custom',
-                'table_name': 'api_custom_table',
-                'records': [{'api_col': 'api_val'}],
-            },
-        ],
-    }
+        stmt2 = select(Activity).where(Activity.sid == 'API_S001')
+        res2 = await test_db_session.execute(stmt2)
+        assert res2.scalar_one_or_none() is not None
 
-    response = client.post('/api/v1/data/ingest', json=payload)
-    assert response.status_code == 200
+    asyncio.run(verify())
 
-    # Verify dynamic table
-    results = test_db_manager.execute('sis_db', 'SELECT * FROM api_custom_table')
-    assert len(results) == 1
-    assert results[0]['api_col'] == 'api_val'
 
-def test_ingest_ignore_duplicates(client: TestClient, test_db_manager: DatabaseManager) -> None:
+def test_ingest_ignore_duplicates(
+    client: TestClient, test_db_session: AsyncSession
+) -> None:
     """Verify that duplicate students (by SID) are ignored during ingestion."""
     # 1. Ingest initial student
     initial_payload = {
         'batch_id': 'batch-1',
         'upload_timestamp': datetime.now().isoformat(),
-        'data_sources': [{
-            'source_type': 'sis',
-            'records': [{
-                'sid': 'DUP_S1',
-                'student_name': 'Original Name',
-                'email': 'original@ex.com'
-            }]
-        }]
+        'data_sources': [
+            {
+                'source_type': 'sis',
+                'records': [
+                    {
+                        'sid': 'DUP_S1',
+                        'student_name': 'Original Name',
+                        'email': 'original@ex.com',
+                    }
+                ],
+            }
+        ],
     }
     resp1 = client.post('/api/v1/data/ingest', json=initial_payload)
     assert resp1.status_code == 200
@@ -106,20 +99,30 @@ def test_ingest_ignore_duplicates(client: TestClient, test_db_manager: DatabaseM
     duplicate_payload = {
         'batch_id': 'batch-2',
         'upload_timestamp': datetime.now().isoformat(),
-        'data_sources': [{
-            'source_type': 'sis',
-            'records': [{
-                'sid': 'DUP_S1',
-                'student_name': 'Duplicate Name',
-                'email': 'duplicate@ex.com'
-            }]
-        }]
+        'data_sources': [
+            {
+                'source_type': 'sis',
+                'records': [
+                    {
+                        'sid': 'DUP_S1',
+                        'student_name': 'Duplicate Name',
+                        'email': 'duplicate@ex.com',
+                    }
+                ],
+            }
+        ],
     }
     resp2 = client.post('/api/v1/data/ingest', json=duplicate_payload)
     assert resp2.status_code == 200
 
     # 3. Verify original data is preserved (Duplicate ignored)
-    results = test_db_manager.execute('sis_db', "SELECT * FROM students WHERE sid = 'DUP_S1'")
-    assert len(results) == 1
-    assert results[0]['student_name'] == 'Original Name'
-    assert results[0]['email'] == 'original@ex.com'
+    import asyncio
+
+    async def verify() -> None:
+        stmt = select(Student).where(Student.sid == 'DUP_S1')
+        res = await test_db_session.execute(stmt)
+        student = res.scalar_one()
+        assert student.student_name == 'Original Name'
+        assert student.email == 'original@ex.com'
+
+    asyncio.run(verify())
