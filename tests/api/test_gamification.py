@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from src.database.models import AdvisorPointsLedger, StudentStatusHistory
+from src.infrastructure.database.models import AdvisorPointsLedger, StudentStatusHistory
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from src.domain.ports.repositories import AdvisorRepository, StudentRepository
+    from src.domain.repositories.interfaces import AdvisorRepository, StudentRepository
 
 
 @pytest.mark.asyncio
@@ -63,7 +63,7 @@ async def test_email_sent_points(
     )
 
     # We need a draft first for /send to work
-    from src.database.models import InterventionEmail
+    from src.infrastructure.database.models import InterventionEmail
 
     test_db_session.add(
         InterventionEmail(

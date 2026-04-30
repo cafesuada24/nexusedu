@@ -9,7 +9,7 @@ import pytest
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
 
-    from src.domain.ports.repositories import StatusHistoryRepository, StudentRepository
+    from src.domain.repositories.interfaces import StatusHistoryRepository, StudentRepository
 
 
 @pytest.mark.asyncio

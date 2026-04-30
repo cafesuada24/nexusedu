@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from src.database.models import Activity, Student
+from src.infrastructure.database.models import Activity, Student
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient

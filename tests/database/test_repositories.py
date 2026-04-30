@@ -4,7 +4,7 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.adapters.database.sqlalchemy_repositories import (
+from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyMetricsRepository,
@@ -13,7 +13,7 @@ from src.adapters.database.sqlalchemy_repositories import (
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyMetadataRepository,
 )
-from src.database.models import Activity, Advisor, Base, Student, StudentStatusHistory
+from src.infrastructure.database.models import Activity, Advisor, Base, Student, StudentStatusHistory
 
 
 @pytest.fixture
