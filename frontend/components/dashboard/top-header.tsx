@@ -23,6 +23,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Kbd } from "@/components/ui/kbd"
+import { NotificationsDropdown } from "@/components/dashboard/notifications-dropdown"
+import { UserDropdown } from "@/components/dashboard/sidebar/user-dropdown"
 
 const labels: Record<string, string> = {
   dashboard: "Tổng quan",
@@ -95,18 +97,9 @@ export function TopHeader() {
           </InputGroup>
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative rounded-xl"
-          aria-label="Thông báo"
-        >
-          <Bell className="size-5" />
-          <Badge className="absolute -top-0.5 -right-0.5 h-4 min-w-4 justify-center rounded-full bg-primary p-0 text-[10px] text-primary-foreground">
-            5
-          </Badge>
-        </Button>
+        <NotificationsDropdown />
         <ThemeToggle />
+        <UserDropdown />
       </div>
     </header>
   )
