@@ -84,15 +84,26 @@ export function useUpdateAlertStatus() {
 export function useDraftStatus(sid?: string | null) {
   return useQuery({
     queryKey: sid ? ["alerts", sid, "draft"] : ["alerts", "draft", "none"],
-    queryFn: () => (sid ? fetchDraftStatus(sid) : null),
+    queryFn: async () => {
+      if (!sid) return null;
+      return await fetchDraftStatus(sid);
+    },
     enabled: !!sid,
+    // Poll only if the query data suggests generation is in progress.
     refetchInterval: (query) => {
-      const data = query.state.data;
-      if (data && !data.is_generating && data.body) {
+      const state = query.state;
+      const data = state.data;
+      
+      // Stop polling if we have data and generation is finished, or if there's an error.
+      if (data && !data.is_generating) {
         return false;
       }
-      return 3000; // Poll every 3s if still generating
+      return 3000; // Poll every 3s while generating.
     },
-    retry: false,
+    // Prevent refetching on window focus to reduce noise during background polling.
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+    retry: 2,
+    retryDelay: 3000,
   });
 }
