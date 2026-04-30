@@ -1,6 +1,6 @@
 """Service layer for data ingestion and management."""
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from src.api.models.request import CoreDataSource, DataIngestionRequest
 from src.domain.ports.repositories import ActivityRepository, StudentRepository
