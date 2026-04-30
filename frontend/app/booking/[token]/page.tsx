@@ -1,7 +1,9 @@
-import { Sparkles } from "lucide-react"
+import { Sparkles, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { BookingView } from "@/components/booking/booking-view"
 import { PublicBookingHeader } from "@/components/booking/public-header"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 // Demo-only "token → advisor" lookup. In production this would be a signed,
 // one-time link that resolves to the student + advisor on the server.
@@ -15,15 +17,56 @@ const advisors: Record<
   },
 }
 
+// Mock student lookup for demo purposes.
+// In a real app, this would be an API call: fetchStudent(sid)
+const mockStudents: Record<string, string> = {
+  "51883": "Nguyễn Văn An",
+  "51884": "Trần Thị Bình",
+  "51885": "Lê Hoàng Nam",
+}
+
 export default async function PublicBookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { token } = await params
+  const { sid } = await searchParams
+
   const meta = advisors[token] ?? {
     advisor: "Cố vấn học tập",
     role: "NexusEdu",
+  }
+
+  const studentId = typeof sid === "string" ? sid : undefined
+  const studentName = studentId ? mockStudents[studentId] : undefined
+
+  if (!studentId) {
+    return (
+      <div className="flex min-h-screen flex-col bg-muted/30">
+        <PublicBookingHeader />
+        <main className="flex flex-1 items-center justify-center p-6 text-center">
+          <div className="max-w-md space-y-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-8 shadow-sm">
+            <div className="mx-auto grid size-12 place-items-center rounded-xl bg-destructive/10 text-destructive">
+              <AlertCircle className="size-6" />
+            </div>
+            <h1 className="text-xl font-bold text-destructive">
+              Liên kết không hợp lệ
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Vui lòng sử dụng liên kết đặt lịch được gửi trực tiếp đến email
+              của bạn. Nếu bạn cho rằng đây là lỗi, hãy liên hệ với cố vấn học
+              tập.
+            </p>
+            <Button asChild className="rounded-xl">
+              <Link href="/">Quay lại trang chủ</Link>
+            </Button>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -40,7 +83,8 @@ export default async function PublicBookingPage({
               Lời mời cá nhân từ cố vấn của bạn
             </Badge>
             <h1 className="font-serif text-3xl font-bold tracking-tight text-balance md:text-4xl">
-              Chọn một khung giờ phù hợp với {meta.advisor}
+              Chào {studentName || "bạn"}, hãy chọn một khung giờ phù hợp với{" "}
+              {meta.advisor}
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground text-pretty md:text-base">
               Buổi gặp kéo dài khoảng 30 phút — hoàn toàn tự nguyện, riêng tư,
@@ -49,7 +93,7 @@ export default async function PublicBookingPage({
             </p>
           </div>
 
-          <BookingView />
+          <BookingView studentId={studentId} studentName={studentName} />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người được mời qua email này, bạn có thể bỏ
