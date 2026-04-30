@@ -5,11 +5,13 @@ from typing import Annotated, Any
 from arq import ArqRedis
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.auth import Scope, User, require_scope
 from src.api.lifecycle import get_alert_service, get_arq_pool, get_jobs_store
 from src.api.services.alerts import AlertService
 from src.api.types import JobStore
+from src.database.session import get_async_session
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
@@ -67,10 +69,12 @@ async def update_alert_status(
     update: StatusUpdate,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> dict[str, str]:
     """Manually transitions a student's Kanban state."""
     try:
-        await alert_service.update_status(sid, update.status, str(user.id))
+        async with session.begin():
+            await alert_service.update_status(sid, update.status, str(user.id))
         return {'sid': sid, 'new_status': update.status}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -83,15 +87,17 @@ async def trigger_draft(
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     jobs: Annotated[JobStore, Depends(get_jobs_store)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> dict[str, str]:
     """Manually triggers a background AI draft generation."""
     try:
-        job_id = await alert_service.trigger_draft(
-            sid=sid,
-            arq_pool=arq_pool,
-            jobs=jobs,
-            user_id=str(user.id),
-        )
+        async with session.begin():
+            job_id = await alert_service.trigger_draft(
+                sid=sid,
+                arq_pool=arq_pool,
+                jobs=jobs,
+                user_id=str(user.id),
+            )
         return {'status': 'success', 'job_id': job_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -102,19 +108,24 @@ async def review_draft(
     sid: str,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    session: Annotated[AsyncSession, Depends(get_async_session)],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft."""
-    if idempotency_key:
-        if await alert_service.check_idempotency(idempotency_key):
-            return {
-                'status': 'success',
-                'message': 'Draft review points already awarded (idempotent).',
-            }
-        await alert_service.record_idempotency(idempotency_key)
-
     try:
-        await alert_service.award_review_points(sid, str(user.id))
+        async with session.begin():
+            if idempotency_key:
+                if await alert_service.check_idempotency(idempotency_key):
+                    return {
+                        'status': 'success',
+                        'message': 'Draft review points already awarded (idempotent).',
+                    }
+
+            await alert_service.award_review_points(sid, str(user.id))
+
+            if idempotency_key:
+                await alert_service.record_idempotency(idempotency_key)
+
         return {'status': 'success', 'message': 'Draft review points awarded.'}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -161,16 +172,24 @@ async def send_nudge_email(
     request: SendEmailRequest,
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    session: Annotated[AsyncSession, Depends(get_async_session)],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle."""
-    if idempotency_key:
-        if await alert_service.check_idempotency(idempotency_key):
-            return {'status': 'success', 'message': 'Email already sent (idempotent).'}
-        await alert_service.record_idempotency(idempotency_key)
-
     try:
-        email = await alert_service.send_email(sid, request.body, str(user.id))
+        async with session.begin():
+            if idempotency_key:
+                if await alert_service.check_idempotency(idempotency_key):
+                    return {
+                        'status': 'success',
+                        'message': 'Email already sent (idempotent).',
+                    }
+
+            email = await alert_service.send_email(sid, request.body, str(user.id))
+
+            if idempotency_key:
+                await alert_service.record_idempotency(idempotency_key)
+
         return {'status': 'success', 'message': f'Email sent to {email}'}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e

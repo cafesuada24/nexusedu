@@ -34,6 +34,7 @@ async def test_get_alerts(
             },
         ]
     )
+    await student_repository.session.commit()
 
     response = client.get('/api/v1/alerts/')
     assert response.status_code == 200
@@ -58,8 +59,10 @@ async def test_update_alert_status(
             },
         ]
     )
+    await student_repository.session.commit()
 
     response = client.patch('/api/v1/alerts/PATCH_1/status', json={'status': 'booked'})
+    print(response.json())
     assert response.status_code == 200
     assert response.json()['new_status'] == 'booked'
 
@@ -83,6 +86,7 @@ async def test_send_nudge_email(
             },
         ]
     )
+    await student_repository.session.commit()
 
     response = client.post('/api/v1/alerts/SEND_1/send', json={'body': 'Final content'})
     assert response.status_code == 200

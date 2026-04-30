@@ -61,13 +61,11 @@ class SqlAlchemyStudentRepository:
             update(Student).where(Student.sid == sid).values(intervention_status=status)
         )
         await self.session.execute(stmt)
-        await self.session.commit()
 
     async def update_draft_job_id(self, sid: str, job_id: str | None) -> None:
         """Update the draft job ID for a student."""
         stmt = update(Student).where(Student.sid == sid).values(draft_job_id=job_id)
         await self.session.execute(stmt)
-        await self.session.commit()
 
     async def batch_update_draft_job_ids(self, updates: list[tuple[str, str]]) -> None:
         """Batch update draft job IDs for multiple students."""
@@ -79,7 +77,7 @@ class SqlAlchemyStudentRepository:
 
         # Execute single bulk update
         await self.session.execute(update(Student), update_data)
-        await self.session.commit()
+        # await self.session.commit() removed
 
     async def update_last_notified(self, sid: str) -> None:
         """Update the last notified timestamp for a student."""
@@ -89,7 +87,6 @@ class SqlAlchemyStudentRepository:
             .values(last_notified_timestamp=time.time())
         )
         await self.session.execute(stmt)
-        await self.session.commit()
 
     async def get_latest_status_timestamp(self, sid: str) -> datetime | None:
         """Retrieve the latest status recording timestamp for a student."""
@@ -142,7 +139,6 @@ class SqlAlchemyStudentRepository:
             stmt = sqlite_insert(Student).values(records).on_conflict_do_nothing()
 
         await self.session.execute(stmt)
-        await self.session.commit()
 
     async def update_risk_status(
         self,
@@ -157,7 +153,6 @@ class SqlAlchemyStudentRepository:
 
         stmt = update(Student).where(Student.sid == sid).values(values)
         await self.session.execute(stmt)
-        await self.session.commit()
 
 
 class SqlAlchemyActivityRepository:
@@ -186,7 +181,6 @@ class SqlAlchemyActivityRepository:
             stmt = sqlite_insert(Activity).values(records).on_conflict_do_nothing()
 
         await self.session.execute(stmt)
-        await self.session.commit()
 
     async def get_weekly_averages(self) -> list[dict[str, Any]]:
         """Retrieve average scores per student per week."""
@@ -226,14 +220,14 @@ class SqlAlchemyStatusHistoryRepository:
         """Create a new status history record."""
         entry = StudentStatusHistory(**record)
         self.session.add(entry)
-        await self.session.commit()
+        # await self.session.commit() removed
 
     async def batch_create_history(self, records: list[dict[str, Any]]) -> None:
         """Bulk create status history records."""
         if not records:
             return
         self.session.add_all([StudentStatusHistory(**r) for r in records])
-        await self.session.commit()
+        # await self.session.commit() removed
 
     async def get_all_history(self) -> list[dict[str, Any]]:
         """Retrieve all status history records ordered for processing."""
@@ -357,7 +351,7 @@ class SqlAlchemyAdvisorRepository:
             points=points,
         )
         self.session.add(entry)
-        await self.session.commit()
+        # await self.session.commit() removed
 
 
 class SqlAlchemyIdempotencyRepository:
@@ -377,7 +371,7 @@ class SqlAlchemyIdempotencyRepository:
         """Record a new idempotency key."""
         entry = IdempotencyKey(key=key)
         self.session.add(entry)
-        await self.session.commit()
+        # await self.session.commit() removed
 
 
 class SqlAlchemyMetadataRepository:
@@ -486,7 +480,7 @@ class SqlAlchemyEmailRepository:
             status='draft',
         )
         self.session.add(email)
-        await self.session.commit()
+        # await self.session.commit() removed
         return email_id
 
     async def mark_as_sent(self, sid: str, body: str) -> None:
@@ -514,7 +508,7 @@ class SqlAlchemyEmailRepository:
                 )
             )
             await self.session.execute(stmt)
-            await self.session.commit()
+            # await self.session.commit() removed
 
     async def get_history(self, sid: str) -> list[dict[str, Any]]:
         """Retrieve the communication history for a student."""
