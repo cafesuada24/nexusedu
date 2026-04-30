@@ -6,7 +6,7 @@ backend, and role-based access control (RBAC).
 
 import uuid
 from collections.abc import AsyncGenerator, Callable
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Annotated, override
 
 from fastapi import Depends, HTTPException, Request, status
@@ -16,10 +16,11 @@ from fastapi_users.authentication import (
     BearerTransport,
     JWTStrategy,
 )
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID, SQLAlchemyUserDatabase
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from fastapi_users.db import SQLAlchemyUserDatabase
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.database.models import Base, User
+from src.database.session import engine, get_async_session
 from src.utils.env import getenv
 
 # Configuration
@@ -27,10 +28,9 @@ JWT_SECRET: str = getenv(
     'JWT_SECRET',
     'SET_ME_IN_PRODUCTION_HEHEHE',
 )
-DATABASE_URL: str = getenv('AUTH_DB_URL', 'sqlite+aiosqlite:///./auth.db')
 
 
-class Scope(str, Enum):
+class Scope(StrEnum):
     """Granular permissions (capabilities) in the system."""
 
     ALERTS_READ = 'alerts:read'
@@ -43,7 +43,7 @@ class Scope(str, Enum):
     USERS_WRITE = 'users:write'
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """Simplified user roles."""
 
     ADMIN = 'admin'
@@ -69,33 +69,10 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
 }
 
 
-# Database Setup
-class Base(DeclarativeBase):
-    """Base class for SQLAlchemy models."""
-
-    pass
-
-
-class User(SQLAlchemyBaseUserTableUUID, Base):
-    """SQLAlchemy model for the User table."""
-
-    role: Mapped[str] = mapped_column(default=UserRole.VIEWER.value)
-
-
-engine = create_async_engine(DATABASE_URL)
-async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
-
-
 async def create_db_and_tables() -> None:
     """Creates the database and all tables defined in Base."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency for getting an asynchronous SQLAlchemy session."""
-    async with async_session_maker() as session:
-        yield session
 
 
 async def get_user_db(
@@ -118,12 +95,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         user: User,
         _request: Request | None = None,
     ) -> None:
-        """Callback triggered after a user successfully registers.
-
-        Args:
-            user: The newly registered user.
-            _request: The incoming request object.
-        """
+        """Callback triggered after a user successfully registers."""
         print(f'User {user.id} has registered.')
 
 
@@ -139,11 +111,7 @@ bearer_transport = BearerTransport(tokenUrl='api/v1/auth/jwt/login')
 
 
 def get_jwt_strategy() -> JWTStrategy:
-    """Strategy for generating and validating JWT tokens.
-
-    Returns:
-        A JWTStrategy instance configured with the system secret.
-    """
+    """Strategy for generating and validating JWT tokens."""
     return JWTStrategy(secret=JWT_SECRET, lifetime_seconds=3600)
 
 
@@ -164,29 +132,12 @@ current_active_user: Callable[..., User] = fastapi_users.current_user(active=Tru
 
 # RBAC Utilities
 def require_scope(required_scope: Scope) -> Callable[[User], User]:
-    """Dependency for checking if a user has the required capability.
-
-    Args:
-        required_scope: The capability required to access the endpoint.
-
-    Returns:
-        A dependency function that validates the user's permissions.
-    """
+    """Dependency for checking if a user has the required capability."""
 
     def scope_checker(
         user: Annotated[User, Depends(current_active_user)],
     ) -> User:
-        """Inner dependency that performs the scope check.
-
-        Args:
-            user: The current authenticated user.
-
-        Returns:
-            The user if they have the required scope.
-
-        Raises:
-            HTTPException: If the role is invalid or permissions are insufficient.
-        """
+        """Inner dependency that performs the scope check."""
         try:
             user_role = UserRole(user.role)
         except ValueError:
@@ -209,20 +160,10 @@ def require_scope(required_scope: Scope) -> Callable[[User], User]:
 
 
 def check_role(role_string: str) -> Callable[[User], User]:
-    """Dependency for checking if a user has permissions associated with a role name.
-
-    This maps role names (e.g., 'admin', 'advisor') to a minimum required scope.
-
-    Args:
-        role_string: The role name to check.
-
-    Returns:
-        A dependency function that validates permissions.
-    """
+    """Dependency for checking if a user has permissions associated with a role name."""
     if role_string == UserRole.ADMIN.value:
         return require_scope(Scope.USERS_WRITE)
     if role_string == UserRole.ADVISOR.value:
         return require_scope(Scope.ALERTS_WRITE)
 
     return require_scope(Scope.ALERTS_READ)
-
