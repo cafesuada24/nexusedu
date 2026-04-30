@@ -22,7 +22,7 @@ async def test_submit_query(client: TestClient) -> None:
 @pytest.mark.asyncio
 async def test_submit_query_unauthorized(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify that unauthorized users cannot submit queries."""
-    from src.api.auth import current_active_user, User, UserRole
+    from src.presentation.api.auth import current_active_user, User, UserRole
     import uuid
     
     # Override with viewer who doesn't have query:execute scope
@@ -35,7 +35,7 @@ async def test_submit_query_unauthorized(client: TestClient, monkeypatch: pytest
         is_verified=True
     )
     
-    from src.api.main import app
+    from src.presentation.api.main import app
     app.dependency_overrides[current_active_user] = lambda: viewer
     
     response = client.post('/api/v1/query?query=test')

@@ -7,16 +7,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.agents.nodes.sql_worker import sql_worker_node
-from src.api.models.response import JobStatusResponse
-from src.api.services.alerts import AlertService
-from src.api.services.gamification import GamificationService
-from src.baml_client.types import GeneratedSQL
+from src.infrastructure.agents.nodes.sql_worker import sql_worker_node
+from src.presentation.schemas.response import JobStatusResponse
+from src.presentation.api.services.alerts import AlertService
+from src.presentation.api.services.gamification import GamificationService
+from src.infrastructure.extern.baml_client.types import GeneratedSQL
 from src.domain.services.agent_metadata import AgentMetadataService
 from src.utils.collections import BoundedDict
 
 if TYPE_CHECKING:
-    from src.agents.state import SQLTask
+    from src.infrastructure.agents.state import SQLTask
 
 
 @pytest.mark.asyncio
@@ -46,7 +46,7 @@ async def test_sql_worker_node_dynamic_masking_viewer() -> None:
     )
 
     with (
-        patch('src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
+        patch('src.infrastructure.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
     ):
         result = await sql_worker_node(state, config)
 
@@ -87,7 +87,7 @@ async def test_sql_worker_node_no_masking_admin() -> None:
     )
 
     with (
-        patch('src.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
+        patch('src.infrastructure.agents.nodes.sql_worker.b.GenerateSQL', return_value=mock_sql_data),
     ):
         result = await sql_worker_node(state, config)
 
@@ -112,7 +112,7 @@ async def test_email_draft_no_pii_to_ai(
     email = 'real@ex.com'
 
     # Setup dummy student
-    from src.database.models import Student, StudentStatusHistory
+    from src.infrastructure.database.models import Student, StudentStatusHistory
 
     student = Student(
         sid=sid,
@@ -154,7 +154,7 @@ async def test_email_draft_no_pii_to_ai(
     )
 
     with patch(
-        'src.api.services.alerts.b_async.GenerateDraftEmail',
+        'src.presentation.api.services.alerts.b_async.GenerateDraftEmail',
         new_callable=AsyncMock,
     ) as mock_baml:
         mock_baml.return_value = 'Hello {{STUDENT_NAME}}'

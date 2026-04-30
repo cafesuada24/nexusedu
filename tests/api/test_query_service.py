@@ -3,8 +3,8 @@
 import pytest
 import uuid
 from unittest.mock import AsyncMock, MagicMock
-from src.api.services.query import QueryService
-from src.api.models.response import JobStatusResponse
+from src.presentation.api.services.query import QueryService
+from src.presentation.schemas.response import JobStatusResponse
 from src.domain.services.agent_metadata import AgentMetadataService
 
 @pytest.fixture

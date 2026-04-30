@@ -9,10 +9,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import update
 
-from src.api.auth import UserRole
-from src.api.lifecycle import get_agent
-from src.api.main import app
-from src.database.models import User
+from src.presentation.api.auth import UserRole
+from src.presentation.dependencies.providers import get_agent
+from src.presentation.api.main import app
+from src.infrastructure.database.models import User
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,7 @@ def raw_client(mock_agent, test_db_session: AsyncSession) -> TestClient:
     app.dependency_overrides.clear()
 
     app.dependency_overrides[get_agent] = lambda: mock_agent
-    from src.database.session import get_async_session
+    from src.infrastructure.database.session import get_async_session
 
     app.dependency_overrides[get_async_session] = lambda: test_db_session
 
