@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.auth import (
+from src.presentation.api.auth import (
     Scope,
     User,
     UserManager,
@@ -16,7 +16,7 @@ from src.api.auth import (
     get_user_manager,
     require_scope,
 )
-from src.api.models.auth import UserRead, UserUpdate
+from src.presentation.schemas.auth import UserRead, UserUpdate
 
 router = APIRouter(prefix='/users', tags=['users'])
 

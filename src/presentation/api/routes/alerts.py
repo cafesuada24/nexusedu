@@ -7,11 +7,15 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.auth import Scope, User, require_scope
-from src.api.lifecycle import get_alert_service, get_arq_pool, get_jobs_store
-from src.api.services.alerts import AlertService
-from src.api.types import JobStore
-from src.database.session import get_async_session
+from src.infrastructure.database.session import get_async_session
+from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.api.services.alerts import AlertService
+from src.presentation.api.types import JobStore
+from src.presentation.dependencies.providers import (
+    get_alert_service,
+    get_arq_pool,
+    get_jobs_store,
+)
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
@@ -113,14 +117,14 @@ async def review_draft(
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft."""
     try:
-        if idempotency_key and await alert_service.check_idempotency(idempotency_key):
-            return {
-                'status': 'success',
-                'message': 'Draft review points already awarded (idempotent).',
-            }
         async with session.begin():
-            await alert_service.award_review_points(sid, str(user.id))
+            if idempotency_key and await alert_service.check_idempotency(idempotency_key):
+                return {
+                    'status': 'success',
+                    'message': 'Draft review points already awarded (idempotent).',
+                }
 
+            await alert_service.award_review_points(sid, str(user.id))
             if idempotency_key:
                 await alert_service.record_idempotency(idempotency_key)
 
@@ -175,18 +179,15 @@ async def send_nudge_email(
 ) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle."""
     try:
-        # 1. Early Return: Check idempotency OUTSIDE the transaction
-        if idempotency_key and await alert_service.check_idempotency(idempotency_key):
-            return {
-                'status': 'success',
-                'message': 'Email already sent (idempotent).',
-            }
-
-        target_email = ''
-
-        # 2. Database Write: Open transaction strictly for state changes
-        await alert_service.dispatch_email(target_email, request.body)
         async with session.begin():
+            # 1. Early Return: Check idempotency INSIDE the transaction
+            if idempotency_key and await alert_service.check_idempotency(idempotency_key):
+                return {
+                    'status': 'success',
+                    'message': 'Email already sent (idempotent).',
+                }
+
+            # 2. Database Write: Record state and get email address
             target_email = await alert_service.record_email_state(
                 sid, request.body, str(user.id)
             )
@@ -195,6 +196,7 @@ async def send_nudge_email(
                 await alert_service.record_idempotency(idempotency_key)
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
+        await alert_service.dispatch_email(target_email, request.body)
 
         return {'status': 'success', 'message': f'Email sent to {target_email}'}
 

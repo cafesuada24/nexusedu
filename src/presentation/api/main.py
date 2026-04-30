@@ -11,11 +11,20 @@ from fastapi import APIRouter, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.auth import auth_backend, fastapi_users
-from src.api.lifecycle import lifespan
-from src.api.middleware.rate_limit import rate_limit_middleware
-from src.api.models.auth import UserCreate, UserRead
-from src.api.routes import advisors, alerts, data, health, jobs, metrics, query, users
+from src.presentation.api.auth import auth_backend, fastapi_users
+from src.presentation.api.lifecycle import lifespan
+from src.presentation.api.middleware.rate_limit import rate_limit_middleware
+from src.presentation.api.routes import (
+    advisors,
+    alerts,
+    data,
+    health,
+    jobs,
+    metrics,
+    query,
+    users,
+)
+from src.presentation.schemas.auth import UserCreate, UserRead
 from src.telemetry.logger import logger
 from src.utils.env import getenv
 

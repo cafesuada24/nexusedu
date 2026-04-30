@@ -6,18 +6,18 @@ from arq import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.auth import Scope, User, require_scope
-from src.api.lifecycle import (
+from src.infrastructure.database.session import get_async_session
+from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.api.services.alerts import AlertService
+from src.presentation.api.services.data import DataService
+from src.presentation.api.types import JobStore
+from src.presentation.dependencies.providers import (
     get_alert_service,
     get_arq_pool,
     get_data_service,
     get_jobs_store,
 )
-from src.api.models.request import DataIngestionRequest
-from src.api.services.alerts import AlertService
-from src.api.services.data import DataService
-from src.api.types import JobStore
-from src.database.session import get_async_session
+from src.presentation.schemas.request import DataIngestionRequest
 from src.telemetry.logger import logger
 
 router = APIRouter(prefix='/data', tags=['data'])

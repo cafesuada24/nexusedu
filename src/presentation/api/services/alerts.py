@@ -6,20 +6,20 @@ from typing import TYPE_CHECKING, Any
 
 from arq import ArqRedis
 
-from src.api.models.response import EmailDraft, JobStatusResponse
-from src.baml_client.async_client import b as b_async
-from src.domain.ports.repositories import (
+from src.domain.repositories.interfaces import (
     AlertRepository,
     EmailRepository,
     IdempotencyRepository,
     StudentRepository,
 )
+from src.infrastructure.extern.baml_client.async_client import b as b_async
+from src.presentation.schemas.response import EmailDraft, JobStatusResponse
 from src.telemetry.logger import logger
 from src.utils.env import getenv
 
 if TYPE_CHECKING:
-    from src.api.services.gamification import GamificationService
-    from src.api.types import JobStore
+    from src.presentation.api.services.gamification import GamificationService
+    from src.presentation.api.types import JobStore
 
 
 class AlertService:

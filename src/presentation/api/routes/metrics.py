@@ -4,9 +4,9 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
-from src.api.auth import Scope, User, require_scope
-from src.api.lifecycle import get_metrics_service
-from src.api.services.metrics import MetricsService
+from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.api.services.metrics import MetricsService
+from src.presentation.dependencies.providers import get_metrics_service
 
 router = APIRouter(prefix='/metrics', tags=['metrics'])
 

@@ -4,9 +4,9 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.auth import Scope, User, require_scope
-from src.api.lifecycle import get_advisor_repository
-from src.domain.ports.repositories import AdvisorRepository
+from src.domain.repositories.interfaces import AdvisorRepository
+from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.dependencies.providers import get_advisor_repository
 from src.telemetry.logger import logger
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])

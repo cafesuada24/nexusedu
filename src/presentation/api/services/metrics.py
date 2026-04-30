@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from src.domain.ports.repositories import MetricsRepository
+from src.domain.repositories.interfaces import MetricsRepository
 from src.telemetry.logger import logger
 
 

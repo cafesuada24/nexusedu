@@ -4,10 +4,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.auth import Scope, User, require_scope
-from src.api.lifecycle import get_jobs_store
-from src.api.models.response import JobStatusResponse
-from src.api.types import JobStore
+from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.api.types import JobStore
+from src.presentation.dependencies.providers import get_jobs_store
+from src.presentation.schemas.response import JobStatusResponse
 
 router = APIRouter(prefix='/jobs', tags=['jobs'])
 

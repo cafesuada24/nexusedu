@@ -3,7 +3,7 @@
 import datetime
 from typing import TYPE_CHECKING
 
-from src.domain.ports.repositories import AdvisorRepository, StudentRepository
+from src.domain.repositories.interfaces import AdvisorRepository, StudentRepository
 
 
 class GamificationService:

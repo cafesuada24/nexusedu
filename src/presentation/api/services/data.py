@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from src.api.models.request import CoreDataSource, DataIngestionRequest
-from src.domain.ports.repositories import ActivityRepository, StudentRepository
+from src.domain.repositories.interfaces import ActivityRepository, StudentRepository
 from src.domain.services.anomaly_engine import AnomalyEngine
+from src.presentation.schemas.request import CoreDataSource, DataIngestionRequest
 
 
 class DataService:

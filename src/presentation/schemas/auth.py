@@ -4,7 +4,7 @@ import uuid
 
 from fastapi_users import schemas
 
-from src.api.auth import UserRole
+from src.presentation.api.auth import UserRole
 
 
 class UserRead(schemas.BaseUser[uuid.UUID]):

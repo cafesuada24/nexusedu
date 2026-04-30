@@ -4,15 +4,15 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from src.api.models.response import JobStatusResponse, QueryResponse
 from src.domain.services.agent_metadata import AgentMetadataService
+from src.presentation.schemas.response import JobStatusResponse, QueryResponse
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
 
-    from src.agents.state import AgentState
-    from src.api.types import JobStore
+    from src.infrastructure.agents.state import AgentState
+    from src.presentation.api.types import JobStore
 
 
 class QueryService:

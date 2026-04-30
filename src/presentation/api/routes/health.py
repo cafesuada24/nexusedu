@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from src.baml_client import b
+from src.infrastructure.extern.baml_client import b
 
 router = APIRouter(tags=['monitoring'])
 

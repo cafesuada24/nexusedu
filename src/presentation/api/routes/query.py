@@ -5,11 +5,15 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
-from src.api.auth import Scope, User, require_scope
-from src.api.lifecycle import get_arq_pool, get_jobs_store, get_query_service
-from src.api.models.response import JobStatusResponse
-from src.api.services.query import QueryService
-from src.api.types import JobStore
+from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.api.services.query import QueryService
+from src.presentation.api.types import JobStore
+from src.presentation.dependencies.providers import (
+    get_arq_pool,
+    get_jobs_store,
+    get_query_service,
+)
+from src.presentation.schemas.response import JobStatusResponse
 
 router = APIRouter(prefix='/query', tags=['query'])
 

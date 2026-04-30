@@ -1,47 +1,13 @@
-"""Lifecycle management for the FastAPI application.
+"""Dependency injection providers for the application."""
 
-This module handles the startup and shutdown procedures, initializes global
-state, and provides dependency injection providers for core services.
-"""
-
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import Annotated, Any
 
-from arq import ArqRedis, create_pool
-from arq.connections import RedisSettings
-from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Request
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.checkpoint.postgres import PostgresSaver
+from arq import ArqRedis
+from fastapi import Depends, Request
 from langgraph.graph.state import CompiledStateGraph
-from psycopg_pool import ConnectionPool
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.adapters.database.sqlalchemy_repositories import (
-    SqlAlchemyActivityRepository,
-    SqlAlchemyAdvisorRepository,
-    SqlAlchemyAlertRepository,
-    SqlAlchemyEmailRepository,
-    SqlAlchemyIdempotencyRepository,
-    SqlAlchemyMetadataRepository,
-    SqlAlchemyMetricsRepository,
-    SqlAlchemyStatusHistoryRepository,
-    SqlAlchemyStudentRepository,
-)
-from src.agents.agent import create_graph
-from src.agents.state import AgentState
-from src.api.auth import create_db_and_tables
-from src.api.models.response import JobStatusResponse
-from src.api.services.alerts import AlertService
-from src.api.services.data import DataService
-from src.api.services.gamification import GamificationService
-from src.api.services.metrics import MetricsService
-from src.api.services.query import QueryService
-from src.api.types import JobStore
-from src.database.session import get_async_session
-from src.domain.ports.repositories import (
+from src.domain.repositories.interfaces import (
     ActivityRepository,
     AdvisorRepository,
     AlertRepository,
@@ -54,74 +20,25 @@ from src.domain.ports.repositories import (
 )
 from src.domain.services.agent_metadata import AgentMetadataService
 from src.domain.services.anomaly_engine import AnomalyEngine
-from src.telemetry.logger import logger
-from src.utils.collections import BoundedDict
-from src.utils.env import getenv
-
-
-@dataclass
-class AppState:
-    """State object held in the FastAPI app.state."""
-
-    agent: CompiledStateGraph[AgentState, Any, AgentState]
-    job_store: JobStore
-    pool: ConnectionPool | None = None
-    arq_pool: ArqRedis | None = None
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Manages the startup and shutdown lifecycle of the FastAPI application."""
-    load_dotenv()
-
-    # ==== Unified DB Initialization ====
-    logger.info('API Lifecycle: Initializing Unified Database...')
-    await create_db_and_tables()
-
-    # ==== Agent Checkpointer ====
-    postgres_uri = getenv('POSTGRES_DB_URI')
-    pool = None
-    if postgres_uri:
-        pool = ConnectionPool(conninfo=postgres_uri, max_size=20)
-        checkpointer = PostgresSaver(pool)
-        checkpointer.setup()
-    else:
-        checkpointer = MemorySaver()
-
-    # ==== Agent ====
-    agent = create_graph(checkpointer=checkpointer)
-
-    # ==== JobStore ====
-    jobs = BoundedDict[str, JobStatusResponse](maxsize=1000)
-
-    # ==== ARQ Redis Pool ====
-    try:
-        arq_pool = await create_pool(
-            RedisSettings(
-                host=getenv('REDIS_HOST', 'localhost'),
-                port=int(getenv('REDIS_PORT', '6379')),
-            ),
-        )
-        logger.info('API Lifecycle: ARQ Redis Pool initialized.')
-    except Exception as e:
-        logger.warning(
-            f'API Lifecycle: Could not connect to Redis: {e}. Background tasks will be disabled.'
-        )
-        arq_pool = None
-
-    app.state.app_state = AppState(
-        agent=agent,
-        pool=pool,
-        job_store=jobs,
-        arq_pool=arq_pool,
-    )
-
-    yield
-
-    if arq_pool:
-        await arq_pool.close()
-    if pool:
-        pool.close()
+from src.infrastructure.agents.state import AgentState
+from src.infrastructure.database.session import get_async_session
+from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyActivityRepository,
+    SqlAlchemyAdvisorRepository,
+    SqlAlchemyAlertRepository,
+    SqlAlchemyEmailRepository,
+    SqlAlchemyIdempotencyRepository,
+    SqlAlchemyMetadataRepository,
+    SqlAlchemyMetricsRepository,
+    SqlAlchemyStatusHistoryRepository,
+    SqlAlchemyStudentRepository,
+)
+from src.presentation.api.services.alerts import AlertService
+from src.presentation.api.services.data import DataService
+from src.presentation.api.services.gamification import GamificationService
+from src.presentation.api.services.metrics import MetricsService
+from src.presentation.api.services.query import QueryService
+from src.presentation.api.types import JobStore
 
 
 # Repository Providers
@@ -253,22 +170,14 @@ async def get_agent_metadata_service(
 
 
 def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentState]:
-    """Dependency provider for the compiled LangGraph agent.
-
-    Returns:
-        The compiled LangGraph workflow with memory persistence.
-    """
-    state: AppState = request.app.state.app_state
+    """Dependency provider for the compiled LangGraph agent."""
+    state = request.app.state.app_state
     return state.agent
 
 
 def get_jobs_store(request: Request) -> JobStore:
-    """Dependency provider for the JobStore.
-
-    Returns:
-        The JobStore
-    """
-    state: AppState = request.app.state.app_state
+    """Dependency provider for the JobStore."""
+    state = request.app.state.app_state
     return state.job_store
 
 
@@ -286,5 +195,5 @@ async def get_query_service(
 
 def get_arq_pool(request: Request) -> ArqRedis:
     """Dependency provider for the ARQ Redis pool."""
-    state: AppState = request.app.state.app_state
+    state = request.app.state.app_state
     return state.arq_pool

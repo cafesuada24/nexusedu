@@ -19,8 +19,8 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database.models import Base, User
-from src.database.session import engine, get_async_session
+from src.infrastructure.database.models import Base, User
+from src.infrastructure.database.session import engine, get_async_session
 from src.utils.env import getenv
 
 # Configuration
