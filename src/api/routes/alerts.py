@@ -114,12 +114,11 @@ async def review_draft(
     """Explicitly rewards the advisor for reviewing the LLM draft."""
     try:
         async with session.begin():
-            if idempotency_key:
-                if await alert_service.check_idempotency(idempotency_key):
-                    return {
-                        'status': 'success',
-                        'message': 'Draft review points already awarded (idempotent).',
-                    }
+            if idempotency_key and await alert_service.check_idempotency(idempotency_key):
+                return {
+                    'status': 'success',
+                    'message': 'Draft review points already awarded (idempotent).',
+                }
 
             await alert_service.award_review_points(sid, str(user.id))
 
@@ -178,12 +177,11 @@ async def send_nudge_email(
     """Dispatches the email and updates the intervention lifecycle."""
     try:
         async with session.begin():
-            if idempotency_key:
-                if await alert_service.check_idempotency(idempotency_key):
-                    return {
-                        'status': 'success',
-                        'message': 'Email already sent (idempotent).',
-                    }
+            if idempotency_key and await alert_service.check_idempotency(idempotency_key):
+                return {
+                    'status': 'success',
+                    'message': 'Email already sent (idempotent).',
+                }
 
             email = await alert_service.send_email(sid, request.body, str(user.id))
 

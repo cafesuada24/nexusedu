@@ -4,7 +4,6 @@ from typing import Annotated, Any
 
 from arq import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.auth import Scope, User, require_scope

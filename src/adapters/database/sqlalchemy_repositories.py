@@ -132,7 +132,9 @@ class SqlAlchemyStudentRepository:
         # Dynamically choose insert implementation based on dialect
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
         if dialect == 'postgresql':
-            from sqlalchemy.dialects.postgresql import insert as pg_insert  # noqa: PLC0415
+            from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
+                insert as pg_insert,
+            )
 
             stmt = pg_insert(Student).values(records).on_conflict_do_nothing()
         else:
@@ -174,7 +176,9 @@ class SqlAlchemyActivityRepository:
         # Dynamically choose insert implementation based on dialect
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
         if dialect == 'postgresql':
-            from sqlalchemy.dialects.postgresql import insert as pg_insert  # noqa: PLC0415
+            from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
+                insert as pg_insert,
+            )
 
             stmt = pg_insert(Activity).values(records).on_conflict_do_nothing()
         else:
