@@ -38,7 +38,6 @@ from src.presentation.api.services.data import DataService
 from src.presentation.api.services.gamification import GamificationService
 from src.presentation.api.services.metrics import MetricsService
 from src.presentation.api.services.query import QueryService
-from src.presentation.api.types import JobStore
 
 
 # Repository Providers
@@ -173,12 +172,6 @@ def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentStat
     """Dependency provider for the compiled LangGraph agent."""
     state = request.app.state.app_state
     return state.agent
-
-
-def get_jobs_store(request: Request) -> JobStore:
-    """Dependency provider for the JobStore."""
-    state = request.app.state.app_state
-    return state.job_store
 
 
 async def get_query_service(

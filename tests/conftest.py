@@ -25,9 +25,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
 )
 from src.presentation.api.auth import User, UserRole, current_active_user
 from src.presentation.api.main import app
-from src.presentation.dependencies.providers import get_agent, get_jobs_store
-from src.presentation.schemas.response import JobStatusResponse
-from src.utils.collections import BoundedDict
+from src.presentation.dependencies.providers import get_agent
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
@@ -185,10 +183,7 @@ def client(
     test_db_session: AsyncSession,
 ) -> Generator[TestClient, None, None]:
     """Provides a FastAPI TestClient with mocked dependencies."""
-    test_jobs = BoundedDict[str, JobStatusResponse](maxsize=100)
-
     app.dependency_overrides[get_agent] = lambda: mock_agent
-    app.dependency_overrides[get_jobs_store] = lambda: test_jobs
     app.dependency_overrides[current_active_user] = lambda: mock_user
     app.dependency_overrides[get_async_session] = lambda: test_db_session
 

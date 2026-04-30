@@ -21,7 +21,6 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
 from src.presentation.api.services.alerts import AlertService
 from src.presentation.api.services.gamification import GamificationService
 from src.presentation.api.services.query import QueryService
-from src.presentation.api.types import JobStore
 from src.telemetry.logger import logger
 from src.utils.env import getenv
 
@@ -30,10 +29,9 @@ async def run_email_draft_task(
     _ctx: dict[Any, Any],
     job_id: str,
     sid: str,
-    jobs: JobStore,
     booking_link: str | None = None,
     user_id: str | None = None,
-) -> None:
+) -> Any:
     """Worker task to generate email draft."""
     logger.info(f'Worker: Starting email draft task for {sid}')
 
@@ -51,10 +49,9 @@ async def run_email_draft_task(
             alert_repo, email_repo, student_repo, idempotency_repo, gamification_service
         )
 
-        await alert_service.run_email_draft_task(
+        return await alert_service.run_email_draft_task(
             job_id=job_id,
             sid=sid,
-            jobs=jobs,
             booking_link=booking_link,
             user_id=user_id,
         )
@@ -66,8 +63,7 @@ async def run_agent_task(
     query: str,
     thread_id: str | None,
     user_dict: dict[str, Any],
-    jobs: JobStore,
-) -> None:
+) -> Any:
     """Worker task to process agent query."""
     logger.info(f'Worker: Starting agent task for {job_id}')
 
@@ -79,12 +75,11 @@ async def run_agent_task(
         metadata_service = AgentMetadataService(metadata_repo)
         query_service = QueryService(agent, metadata_service)
 
-        await query_service.run_agent_task(
+        return await query_service.run_agent_task(
             job_id=job_id,
             query=query,
             thread_id=thread_id,
             user_dict=user_dict,
-            jobs=jobs,
         )
 
 

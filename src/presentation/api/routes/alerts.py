@@ -10,11 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.api.services.alerts import AlertService
-from src.presentation.api.types import JobStore
 from src.presentation.dependencies.providers import (
     get_alert_service,
     get_arq_pool,
-    get_jobs_store,
 )
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
@@ -89,7 +87,6 @@ async def trigger_draft(
     sid: str,
     arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    jobs: Annotated[JobStore, Depends(get_jobs_store)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> dict[str, str]:
@@ -99,7 +96,6 @@ async def trigger_draft(
             job_id = await alert_service.trigger_draft(
                 sid=sid,
                 arq_pool=arq_pool,
-                jobs=jobs,
                 user_id=str(user.id),
             )
         return {'status': 'success', 'job_id': job_id}

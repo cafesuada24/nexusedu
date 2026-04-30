@@ -21,10 +21,7 @@ from psycopg_pool import ConnectionPool
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.agents.state import AgentState
 from src.presentation.api.auth import create_db_and_tables
-from src.presentation.api.types import JobStore
-from src.presentation.schemas.response import JobStatusResponse
 from src.telemetry.logger import logger
-from src.utils.collections import BoundedDict
 from src.utils.env import getenv
 
 
@@ -33,7 +30,6 @@ class AppState:
     """State object held in the FastAPI app.state."""
 
     agent: CompiledStateGraph[AgentState, Any, AgentState]
-    job_store: JobStore
     pool: ConnectionPool | None = None
     arq_pool: ArqRedis | None = None
 
@@ -60,9 +56,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ==== Agent ====
     agent = create_graph(checkpointer=checkpointer)
 
-    # ==== JobStore ====
-    jobs = BoundedDict[str, JobStatusResponse](maxsize=1000)
-
     # ==== ARQ Redis Pool ====
     try:
         arq_pool = await create_pool(
@@ -81,7 +74,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.app_state = AppState(
         agent=agent,
         pool=pool,
-        job_store=jobs,
         arq_pool=arq_pool,
     )
 

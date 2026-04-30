@@ -19,7 +19,6 @@ from src.utils.env import getenv
 
 if TYPE_CHECKING:
     from src.presentation.api.services.gamification import GamificationService
-    from src.presentation.api.types import JobStore
 
 
 class AlertService:
@@ -76,18 +75,12 @@ class AlertService:
         self,
         sid: str,
         arq_pool: ArqRedis | None,
-        jobs: 'JobStore',
         user_id: str | None = None,
         booking_link: str | None = None,
         update_db: bool = True,
     ) -> str:
         """Trigger a background draft generation and update the database."""
         job_id = str(uuid.uuid4())
-
-        # Initialize job status
-        jobs[job_id] = JobStatusResponse(job_id=job_id, status='processing')
-
-        # Update database with the job_id if not batching
 
         # Enqueue ARQ job
         if arq_pool:
@@ -97,7 +90,6 @@ class AlertService:
                 'run_email_draft_task',
                 job_id=job_id,
                 sid=sid,
-                jobs=jobs,
                 booking_link=booking_link,
                 user_id=user_id,
             )
@@ -105,8 +97,6 @@ class AlertService:
             logger.warning(
                 'AlertService: ARQ Pool not available. Skipping background task.',
             )
-            jobs[job_id].status = 'failed'
-            jobs[job_id].error = 'Background processing unavailable (Redis down).'
 
         return job_id
 
@@ -114,10 +104,9 @@ class AlertService:
         self,
         job_id: str,
         sid: str,
-        jobs: 'JobStore',
         booking_link: str | None = None,
         user_id: str | None = None,
-    ) -> None:
+    ) -> EmailDraft:
         """Generate a personalized email draft in the background."""
         async with self._semaphore:
             logger.set_context({'sid': sid, 'job_id': job_id})
@@ -175,19 +164,13 @@ class AlertService:
                 # 7. Clear the job tracker
                 await self.student_repo.update_draft_job_id(sid, None)
 
-                jobs[job_id] = JobStatusResponse(
-                    job_id=job_id,
-                    status='completed',
-                    result=draft,
-                )
+                return draft
 
             except Exception as e:
                 logger.error(
                     f'AlertService: Failed to generate draft: {e}', exc_info=True
                 )
-                jobs[job_id] = JobStatusResponse(
-                    job_id=job_id, status='failed', error=str(e)
-                )
+                raise
             finally:
                 logger.clear_context()
 
