@@ -14,9 +14,12 @@ from src.adapters.database.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
+    SqlAlchemyEmailRepository,
+    SqlAlchemyIdempotencyRepository,
     SqlAlchemyMetricsRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
+    SqlAlchemyMetadataRepository,
 )
 from src.api.auth import User, UserRole, current_active_user
 from src.api.lifecycle import (
@@ -30,6 +33,7 @@ from src.api.lifecycle import (
     get_query_service,
     get_status_history_repository,
     get_student_repository,
+    get_metadata_repository,
 )
 from src.api.main import app
 from src.api.models.response import JobStatusResponse
@@ -47,31 +51,37 @@ if TYPE_CHECKING:
         MetricsRepository,
         StatusHistoryRepository,
         StudentRepository,
+        MetadataRepository,
+        EmailRepository,
+        IdempotencyRepository,
     )
 
 
 @pytest.fixture(autouse=True)
-def mock_arq_pool(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Mock ARQ Redis pool creation to avoid connection errors in tests."""
+def mock_baml(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Mock BAML client to avoid live LLM calls during tests."""
+    mock_b = MagicMock()
+    mock_b.Respond.return_value = "OK"
+    mock_b.GenerateDraftEmail = AsyncMock(return_value="AI Draft content")
+    mock_b.GenerateSQL.return_value = MagicMock(sql="SELECT 1")
+    
+    monkeypatch.setattr('src.api.routes.health.b', mock_b)
+    monkeypatch.setattr('src.api.services.alerts.b_async', mock_b) # In alerts it is b_async
+    monkeypatch.setattr('src.agents.nodes.sql_worker.b', mock_b)
+    return mock_b
+
+
+@pytest.fixture(autouse=True)
+def mock_arq_pool(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Mock ARQ Redis pool creation."""
     mock_pool = AsyncMock()
-
-    async def mock_enqueue_job(func_name: str, *args, **kwargs) -> Any:
-        """Mock enqueue_job that executes tasks synchronously using the app's service instances."""
-        from src.api.main import app
-
-        if not hasattr(app.state, 'app_state'):
-            return AsyncMock()
-
-        state = app.state.app_state
-        # Note: In the new architecture, we'd need to properly inject repositories here
-        # For simplicity in this mock, we just skip execution or provide a basic stub.
-        return AsyncMock()
-
-    mock_pool.enqueue_job = AsyncMock(side_effect=mock_enqueue_job)
+    mock_pool.enqueue_job = AsyncMock(return_value=MagicMock(job_id="test_job_id"))
+    
     monkeypatch.setattr(
         'src.api.lifecycle.create_pool',
         AsyncMock(return_value=mock_pool),
     )
+    return mock_pool
 
 
 @pytest.fixture
@@ -153,6 +163,21 @@ def activity_repository(test_db_session: AsyncSession) -> ActivityRepository:
 def status_history_repository(test_db_session: AsyncSession) -> StatusHistoryRepository:
     """Provides a SqlAlchemyStatusHistoryRepository."""
     return SqlAlchemyStatusHistoryRepository(test_db_session)
+
+@pytest.fixture
+def metadata_repository(test_db_session: AsyncSession) -> MetadataRepository:
+    """Provides a SqlAlchemyMetadataRepository."""
+    return SqlAlchemyMetadataRepository(test_db_session)
+
+@pytest.fixture
+def email_repository(test_db_session: AsyncSession) -> EmailRepository:
+    """Provides a SqlAlchemyEmailRepository."""
+    return SqlAlchemyEmailRepository(test_db_session)
+
+@pytest.fixture
+def idempotency_repository(test_db_session: AsyncSession) -> IdempotencyRepository:
+    """Provides a SqlAlchemyIdempotencyRepository."""
+    return SqlAlchemyIdempotencyRepository(test_db_session)
 
 
 @pytest.fixture

@@ -185,6 +185,7 @@ async def send_nudge_email(
         target_email = ''
 
         # 2. Database Write: Open transaction strictly for state changes
+        await alert_service.dispatch_email(target_email, request.body)
         async with session.begin():
             target_email = await alert_service.record_email_state(
                 sid, request.body, str(user.id)
@@ -194,7 +195,6 @@ async def send_nudge_email(
                 await alert_service.record_idempotency(idempotency_key)
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
-        await alert_service.dispatch_real_email(target_email, request.body)
 
         return {'status': 'success', 'message': f'Email sent to {target_email}'}
 

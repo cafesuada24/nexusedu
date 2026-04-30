@@ -21,6 +21,8 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine.interfaces import ReflectedColumn
+from sqlalchemy.orm import Session
 
 from src.database.models import (
     Activity,
@@ -389,8 +391,10 @@ class SqlAlchemyMetadataRepository:
     async def list_tables(self, _db_id: str) -> list[str]:
         """List tables using SQLAlchemy inspection."""
 
-        def get_tables(connection: object) -> list[str]:
-            return inspect(connection).get_table_names()
+        def get_tables(connection: Session) -> list[str]:
+            # connection here is the synchronous Session object.
+            # We need the underlying Connection/Engine for inspection.
+            return inspect(connection.get_bind()).get_table_names()
 
         return await self.session.run_sync(get_tables)
 
@@ -401,11 +405,11 @@ class SqlAlchemyMetadataRepository:
         if table_name not in tables:
             raise ValueError(f"Table '{table_name}' does not exist.")
 
-        table_name = quoted_name(table_name, quote=True)
 
+        table_name = quoted_name(table_name, quote=True)
         # 2. Use SQLAlchemy Inspector for dialect-agnostic column retrieval
-        def get_columns(connection: object) -> list[dict[str, Any]]:
-            return inspect(connection).get_columns(table_name)
+        def get_columns(connection: Session) -> list[ReflectedColumn]:
+            return inspect(connection.get_bind()).get_columns(table_name)
 
         cols = await self.session.run_sync(get_columns)
         col_lines = [
