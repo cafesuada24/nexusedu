@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
 
     from src.infrastructure.agents.state import AgentState
-    from src.presentation.api.types import JobStore
 
 
 class QueryService:
@@ -38,8 +37,7 @@ class QueryService:
         query: str,
         thread_id: str | None,
         user_dict: dict[str, Any],
-        jobs: 'JobStore',
-    ) -> None:
+    ) -> QueryResponse:
         """Encapsulates the LangGraph agent execution in a background task."""
         session_id = thread_id or str(uuid.uuid4())
         logger.set_context({'session_id': session_id, 'job_id': job_id})
@@ -99,24 +97,15 @@ class QueryService:
                             continue
                         tables.append(data)
 
-            # Update job status
-            jobs[job_id] = JobStatusResponse(
-                job_id=job_id,
-                status='completed',
-                result=QueryResponse(
-                    answer=answer,
-                    tables=tables if tables else None,
-                    visualizations=None,
-                    session_id=session_id,
-                ),
+            return QueryResponse(
+                answer=answer,
+                tables=tables if tables else None,
+                visualizations=None,
+                session_id=session_id,
             )
 
         except Exception as e:
             logger.error(f'QueryService: Agent execution failed: {e}', exc_info=True)
-            jobs[job_id] = JobStatusResponse(
-                job_id=job_id,
-                status='failed',
-                error=str(e),
-            )
+            raise
         finally:
             logger.clear_context()

@@ -10,12 +10,10 @@ from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.api.services.alerts import AlertService
 from src.presentation.api.services.data import DataService
-from src.presentation.api.types import JobStore
 from src.presentation.dependencies.providers import (
     get_alert_service,
     get_arq_pool,
     get_data_service,
-    get_jobs_store,
 )
 from src.presentation.schemas.request import DataIngestionRequest
 from src.telemetry.logger import logger
@@ -29,7 +27,6 @@ async def ingest_data(
     arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
     data_service: Annotated[DataService, Depends(get_data_service)],
     alert_service: Annotated[AlertService, Depends(get_alert_service)],
-    jobs: Annotated[JobStore, Depends(get_jobs_store)],
     user: Annotated[User, Depends(require_scope(Scope.DATA_INGEST))],
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> dict[str, object]:
@@ -51,7 +48,6 @@ async def ingest_data(
                 job_id = await alert_service.trigger_draft(
                     sid=sid,
                     arq_pool=arq_pool,
-                    jobs=jobs,
                     user_id=str(user.id),
                     update_db=False,  # We will batch update instead
                 )

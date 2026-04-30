@@ -8,12 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.infrastructure.agents.nodes.sql_worker import sql_worker_node
-from src.presentation.schemas.response import JobStatusResponse
 from src.presentation.api.services.alerts import AlertService
 from src.presentation.api.services.gamification import GamificationService
 from src.infrastructure.extern.baml_client.types import GeneratedSQL
 from src.domain.services.agent_metadata import AgentMetadataService
-from src.utils.collections import BoundedDict
 
 if TYPE_CHECKING:
     from src.infrastructure.agents.state import SQLTask
@@ -139,7 +137,6 @@ async def test_email_draft_no_pii_to_ai(
     await test_db_session.commit()
 
     job_id = 'test_job'
-    jobs = BoundedDict[str, JobStatusResponse](maxsize=10)
 
     # In conftest, we don't have an idempotency_repository fixture yet, let's create it locally or use mock
     mock_idempotency = MagicMock()
@@ -147,7 +144,7 @@ async def test_email_draft_no_pii_to_ai(
     gamification_service = GamificationService(advisor_repository, student_repository)
     service = AlertService(
         alert_repository,
-        MagicMock(),  # email_repo
+        AsyncMock(),  # email_repo
         student_repository,
         mock_idempotency,
         gamification_service,
@@ -159,7 +156,7 @@ async def test_email_draft_no_pii_to_ai(
     ) as mock_baml:
         mock_baml.return_value = 'Hello {{STUDENT_NAME}}'
 
-        await service.run_email_draft_task(job_id, sid, jobs)
+        await service.run_email_draft_task(job_id, sid)
 
         # Check BAML was called
         mock_baml.assert_called_once()
