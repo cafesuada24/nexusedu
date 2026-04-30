@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -116,7 +117,6 @@ def test_ingest_ignore_duplicates(
     assert resp2.status_code == 200
 
     # 3. Verify original data is preserved (Duplicate ignored)
-    import asyncio
 
     async def verify() -> None:
         stmt = select(Student).where(Student.sid == 'DUP_S1')

@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import uuid
-import pytest
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
-    from src.domain.repositories.interfaces import StudentRepository, EmailRepository
+
+    from src.domain.repositories.interfaces import EmailRepository, StudentRepository
 
 
 @pytest.mark.asyncio
 async def test_get_alerts(
-    client: TestClient, student_repository: StudentRepository
+    client: TestClient,
+    student_repository: StudentRepository,
 ) -> None:
     """Verify that /alerts/ returns students with active alerts."""
     await student_repository.ingest_students(
@@ -44,7 +47,8 @@ async def test_get_alerts(
 
 @pytest.mark.asyncio
 async def test_update_alert_status(
-    client: TestClient, student_repository: StudentRepository
+    client: TestClient,
+    student_repository: StudentRepository,
 ) -> None:
     """Verify that status updates work correctly."""
     await student_repository.ingest_students(
@@ -68,7 +72,8 @@ async def test_update_alert_status(
 
 @pytest.mark.asyncio
 async def test_trigger_draft(
-    client: TestClient, student_repository: StudentRepository
+    client: TestClient,
+    student_repository: StudentRepository,
 ) -> None:
     """Verify manual draft triggering."""
     await student_repository.ingest_students(

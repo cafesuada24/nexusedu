@@ -5,7 +5,7 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 from src.domain.services.agent_metadata import AgentMetadataService
-from src.presentation.schemas.response import JobStatusResponse, QueryResponse
+from src.presentation.schemas.response import QueryResponse
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:

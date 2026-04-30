@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from fastapi.testclient import TestClient
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from src.domain.repositories.interfaces import AdvisorRepository, StudentRepository
+    from src.domain.repositories.interfaces import StudentRepository
 
 
 @pytest.mark.asyncio

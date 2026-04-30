@@ -7,16 +7,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.infrastructure.database.models import User
+from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import UserRole
 from src.presentation.api.main import app
-from src.infrastructure.database.models import User
 
 
 @pytest.fixture
 def raw_client(test_db_session: AsyncSession):
     """Provides a clean TestClient with overridden session."""
     app.dependency_overrides.clear()
-    from src.infrastructure.database.session import get_async_session
 
     app.dependency_overrides[get_async_session] = lambda: test_db_session
     with TestClient(app) as c:
