@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from src.database.config import DB_REGISTRY
-from src.domain.ports.repositories import MetadataRepository
+from src.domain.repositories.interfaces import MetadataRepository
+from src.infrastructure.database.config import DB_REGISTRY
 
 
 class AgentMetadataService:
