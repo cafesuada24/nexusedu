@@ -191,27 +191,52 @@ class AlertService:
             finally:
                 logger.clear_context()
 
-    async def send_email(self, sid: str, body: str, user_id: str) -> str:
-        """Dispatch a nudge email and update state."""
+    # async def send_email(self, sid: str, body: str, user_id: str) -> str:
+    #     """Dispatch a nudge email and update state."""
+    #     student_data = await self.student_repo.get_pii(sid)
+    #
+    #     if not student_data:
+    #         raise ValueError(f'Student {sid} not found.')
+    #
+    #     email = student_data['email']
+    #     logger.info(f'DISPATCHING EMAIL to {email}: {body[:50]}...')
+    #
+    #     await self.student_repo.update_intervention_status(sid, 'sent')
+    #
+    #     # Update or Insert into intervention_emails as 'sent'
+    #     await self.email_repo.mark_as_sent(sid, body)
+    #
+    #     await self.student_repo.update_last_notified(sid)
+    #
+    #     # Gamification
+    #     await self.gamification_service.award_points(user_id, sid, 'email_sent')
+    #
+    #     return email
+    #
+    async def record_email_state(self, sid: str, body: str, user_id: str) -> str:
+        """Handles ONLY the database updates for the intervention."""
         student_data = await self.student_repo.get_pii(sid)
 
         if not student_data:
             raise ValueError(f'Student {sid} not found.')
 
         email = student_data['email']
-        logger.info(f'DISPATCHING EMAIL to {email}: {body[:50]}...')
 
+        # Update all DB states
         await self.student_repo.update_intervention_status(sid, 'sent')
-
-        # Update or Insert into intervention_emails as 'sent'
         await self.email_repo.mark_as_sent(sid, body)
-
         await self.student_repo.update_last_notified(sid)
 
         # Gamification
         await self.gamification_service.award_points(user_id, sid, 'email_sent')
 
         return email
+
+    async def dispatch_real_email(self, email: str, body: str) -> None:
+        """Handles ONLY the external network I/O."""
+        logger.info(f'DISPATCHING EMAIL to {email}: {body[:50]}...')
+        # TODO: Your actual SMTP or SendGrid API call goes here!
+        pass
 
     async def get_email_history(self, sid: str) -> list[dict[str, Any]]:
         """Retrieve communication history for a student."""

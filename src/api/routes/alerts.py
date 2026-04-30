@@ -113,13 +113,12 @@ async def review_draft(
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft."""
     try:
+        if idempotency_key and await alert_service.check_idempotency(idempotency_key):
+            return {
+                'status': 'success',
+                'message': 'Draft review points already awarded (idempotent).',
+            }
         async with session.begin():
-            if idempotency_key and await alert_service.check_idempotency(idempotency_key):
-                return {
-                    'status': 'success',
-                    'message': 'Draft review points already awarded (idempotent).',
-                }
-
             await alert_service.award_review_points(sid, str(user.id))
 
             if idempotency_key:
@@ -176,19 +175,29 @@ async def send_nudge_email(
 ) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle."""
     try:
-        async with session.begin():
-            if idempotency_key and await alert_service.check_idempotency(idempotency_key):
-                return {
-                    'status': 'success',
-                    'message': 'Email already sent (idempotent).',
-                }
+        # 1. Early Return: Check idempotency OUTSIDE the transaction
+        if idempotency_key and await alert_service.check_idempotency(idempotency_key):
+            return {
+                'status': 'success',
+                'message': 'Email already sent (idempotent).',
+            }
 
-            email = await alert_service.send_email(sid, request.body, str(user.id))
+        target_email = ''
+
+        # 2. Database Write: Open transaction strictly for state changes
+        async with session.begin():
+            target_email = await alert_service.record_email_state(
+                sid, request.body, str(user.id)
+            )
 
             if idempotency_key:
                 await alert_service.record_idempotency(idempotency_key)
 
-        return {'status': 'success', 'message': f'Email sent to {email}'}
+        # 3. External I/O: Send the email AFTER the DB commit succeeds
+        await alert_service.dispatch_real_email(target_email, request.body)
+
+        return {'status': 'success', 'message': f'Email sent to {target_email}'}
+
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
