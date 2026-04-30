@@ -35,6 +35,8 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule"
+import { useSocket } from "@/hooks/use-socket"
+import { updateAlertStatus } from "@/lib/api"
 
 // Deterministic "busy" generator so SSR/CSR match without extra state.
 function isBusy(date: Date, slot: string) {
@@ -44,13 +46,20 @@ function isBusy(date: Date, slot: string) {
 
 type Mode = "video" | "inperson"
 
-export function BookingView() {
+export function BookingView({
+  studentId,
+  studentName,
+}: {
+  studentId: string
+  studentName?: string
+}) {
   const today = startOfToday()
   const { schedule } = useScheduleQuery()
   const [date, setDate] = React.useState<Date | undefined>(addDays(today, 1))
   const [slot, setSlot] = React.useState<string | null>(null)
   const [mode, setMode] = React.useState<Mode>("video")
   const [stage, setStage] = React.useState<"pick" | "syncing" | "done">("pick")
+  const socket = useSocket()
 
   const slotsForDate = React.useMemo(
     () => (date ? generateSlotsForDate(date, schedule) : []),
@@ -62,15 +71,38 @@ export function BookingView() {
     [today, schedule.windowDays],
   )
 
-  const confirm = () => {
+  const confirm = async () => {
     if (!date || !slot) return
     setStage("syncing")
-    setTimeout(() => {
-      setStage("done")
-      toast.success("Đã đặt lịch thành công", {
-        description: `${format(date, "EEEE, d MMMM", { locale: vi })} · ${slot}`,
-      })
-    }, 1200)
+
+    try {
+      // 1. Update backend status from 'sent' to 'booked' (Contacted -> Scheduled)
+      await updateAlertStatus(studentId, "booked")
+
+      // 2. Prepare payload for real-time notification
+      const payload = {
+        sid: studentId,
+        date: format(date, "yyyy-MM-dd"),
+        slot,
+        mode,
+      }
+
+      // 3. Emit real-time event to advisor dashboard
+      socket.emit("new_appointment", payload)
+
+      // Simulate a small delay for better UX
+      setTimeout(() => {
+        setStage("done")
+        toast.success("Đã đặt lịch thành công", {
+          description: `${format(date, "EEEE, d MMMM", { locale: vi })} · ${slot}`,
+        })
+      }, 800)
+    } catch (error) {
+      setStage("pick")
+      toast.error("Không thể xác nhận đặt lịch. Vui lòng thử lại sau.")
+      // eslint-disable-next-line no-console
+      console.error("[booking] Error confirming:", error)
+    }
   }
 
   const reset = () => {
