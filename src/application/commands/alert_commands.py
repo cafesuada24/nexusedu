@@ -3,8 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
-from arq import ArqRedis
-
+from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.email_repository import EmailRepository
@@ -73,9 +72,10 @@ class AlertCommandHandler:
         advisor_repo: AdvisorRepository,
         idempotency_repo: IdempotencyRepository,
         gamification_service: GamificationService,
+        task_queue: BackgroundTaskQueue,
         email_drafting_service: EmailDraftingService | None = None,
-        arq_pool: ArqRedis | None = None,
-    ):
+    ) -> None:
+        """Initialize the handler with required dependencies."""
         self.student_repo = student_repo
         self.email_repo = email_repo
         self.alert_repo = alert_repo
@@ -83,7 +83,7 @@ class AlertCommandHandler:
         self.idempotency_repo = idempotency_repo
         self.gamification_service = gamification_service
         self.email_drafting_service = email_drafting_service
-        self.arq_pool = arq_pool
+        self.task_queue = task_queue
 
     async def handle_update_status(self, command: UpdateStudentStatusCommand) -> None:
         """Execute the status update command."""
@@ -107,11 +107,11 @@ class AlertCommandHandler:
 
     async def handle_trigger_draft(self, command: TriggerDraftCommand) -> UUID:
         """Execute the trigger draft command."""
-        if not self.arq_pool:
-            raise RuntimeError('ARQ pool is not available. Task cannot be enqueued.')
+        if not await self.task_queue.is_available():
+            raise RuntimeError('Task queue is not available. Task cannot be enqueued.')
 
         job_id = uuid4()
-        await self.arq_pool.enqueue_job(
+        await self.task_queue.enqueue(
             'run_email_draft_task',
             job_id=str(job_id),
             sid=str(command.sid),
@@ -124,7 +124,7 @@ class AlertCommandHandler:
         return job_id
 
     async def handle_generate_email_draft(
-        self, command: GenerateEmailDraftCommand
+        self, command: GenerateEmailDraftCommand,
     ) -> None:
         """Execute the generate email draft command (Worker task logic)."""
         if not self.email_drafting_service:
@@ -148,7 +148,7 @@ class AlertCommandHandler:
         # 3. Generate via AI port
         booking_link = command.booking_link or 'https://calendly.com/advisor-help'
         personalized_body = await self.email_drafting_service.generate_draft(
-            student_data['student_name'], context_str, booking_link
+            student_data['student_name'], context_str, booking_link,
         )
 
         # 4. Persistent storage
@@ -173,7 +173,7 @@ class AlertCommandHandler:
 
         # 2. Update states
         await self.student_repo.update_intervention_status(
-            command.sid, InterventionStatus.SENT
+            command.sid, InterventionStatus.SENT,
         )
         await self.email_repo.mark_as_sent(command.sid, command.body)
         await self.student_repo.update_last_notified(command.sid)
