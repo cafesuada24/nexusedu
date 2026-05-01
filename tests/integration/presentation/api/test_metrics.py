@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 import pytest
 
@@ -24,14 +25,14 @@ async def test_kpi_stats(
     await student_repository.ingest_students(
         [
             {
-                'sid': 'S1',
+                'sid': uuid4(),
                 'student_name': 'S1',
                 'email': 's1@ex.com',
                 'current_risk_status': 'Normal',
                 'intervention_status': 'none',
             },
             {
-                'sid': 'S2',
+                'sid': uuid4(),
                 'student_name': 'S2',
                 'email': 's2@ex.com',
                 'current_risk_status': 'Significant Drop',
@@ -60,8 +61,8 @@ async def test_retention_trend(
     # Seed students first (foreign key constraint)
     await student_repository.ingest_students(
         [
-            {'sid': 'S1', 'student_name': 'S1', 'email': 's1@ex.com'},
-            {'sid': 'S2', 'student_name': 'S2', 'email': 's2@ex.com'},
+            {'sid': (s1 := uuid4()), 'student_name': 'S1', 'email': 's1@ex.com'},
+            {'sid': (s2 := uuid4()), 'student_name': 'S2', 'email': 's2@ex.com'},
         ]
     )
 
@@ -69,16 +70,16 @@ async def test_retention_trend(
     await status_history_repository.batch_create_history(
         [
             {
-                'history_id': 'H1',
-                'sid': 'S1',
+                'history_id': uuid4(),
+                'sid': s1,
                 'academic_year': 2025,
                 'semester': 2,
                 'week': 1,
                 'anomaly_flag': 'Normal',
             },
             {
-                'history_id': 'H2',
-                'sid': 'S2',
+                'history_id': uuid4(),
+                'sid': s2,
                 'academic_year': 2025,
                 'semester': 2,
                 'week': 1,

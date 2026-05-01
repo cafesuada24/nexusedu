@@ -30,18 +30,32 @@ from src.presentation.dependencies.providers import get_agent
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
 
-    from src.domain.repositories.interfaces import (
-        ActivityRepository,
-        AdvisorRepository,
-        AlertRepository,
-        EmailRepository,
-        IdempotencyRepository,
-        MetadataRepository,
-        MetricsRepository,
+    from src.domain.repositories.activity_repository import ActivityRepository
+    from src.domain.repositories.advisor_repository import AdvisorRepository
+    from src.domain.repositories.alert_repository import AlertRepository
+    from src.domain.repositories.email_repository import EmailRepository
+    from src.domain.repositories.idempotency_repository import IdempotencyRepository
+    from src.domain.repositories.metadata_repository import MetadataRepository
+    from src.domain.repositories.metrics_repository import MetricsRepository
+    from src.domain.repositories.status_history_repository import (
         StatusHistoryRepository,
-        StudentRepository,
     )
+    from src.domain.repositories.student_repository import StudentRepository
 
+
+@pytest.fixture(autouse=True)
+def mock_uuid(monkeypatch: pytest.MonkeyPatch) -> None:
+    # This counter ensures each call returns a unique but predictable UUID
+    class UUIDGenerator:
+        def __init__(self):
+            self.counter = 0
+        def __call__(self):
+            self.counter += 1
+            # Returns 00000000-0000-0000-0000-000000000001, etc.
+            return uuid.UUID(int=self.counter, version=4)
+
+    gen = UUIDGenerator()
+    monkeypatch.setattr(uuid, "uuid4", gen)
 
 @pytest.fixture(autouse=True)
 def mock_baml(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
@@ -53,7 +67,7 @@ def mock_baml(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     # Core API and Infrastructure components
     monkeypatch.setattr('src.presentation.api.routes.health.b', mock_b)
-    monkeypatch.setattr('src.presentation.api.services.alerts.b_async', mock_b)
+    monkeypatch.setattr('src.infrastructure.extern.baml_drafting_service.b_async', mock_b)
     monkeypatch.setattr('src.infrastructure.agents.nodes.sql_worker.b', mock_b)
 
     # Agent Nodes (New Clean Architecture paths)
