@@ -1,21 +1,18 @@
 """API routes for data ingestion and management."""
 
-from typing import Annotated, Any
+from typing import Annotated
 
-from arq import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.application.commands.data_commands import DataCommandHandler
+from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
 from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import Scope, User, require_scope
-from src.presentation.api.services.alerts import AlertService
-from src.presentation.api.services.data import DataService
 from src.presentation.dependencies.providers import (
-    get_alert_service,
-    get_arq_pool,
-    get_data_service,
+    get_data_command_handler,
 )
-from src.presentation.schemas.request import DataIngestionRequest
+from src.presentation.schemas.request import CoreDataSource, DataIngestionRequest
 from src.telemetry.logger import logger
 
 router = APIRouter(prefix='/data', tags=['data'])
@@ -24,9 +21,7 @@ router = APIRouter(prefix='/data', tags=['data'])
 @router.post('/ingest')
 async def ingest_data(
     request: DataIngestionRequest,
-    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
-    data_service: Annotated[DataService, Depends(get_data_service)],
-    alert_service: Annotated[AlertService, Depends(get_alert_service)],
+    command_handler: Annotated[DataCommandHandler, Depends(get_data_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.DATA_INGEST))],
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> dict[str, object]:
@@ -37,32 +32,28 @@ async def ingest_data(
     For students transitioning to 'new' risk status, triggers AI draft generation.
     """
     try:
-        async with session.begin():
-            results = await data_service.ingest_data(request)
-            new_sids = results.get('new_sids', [])
-
-            # Trigger automatic draft generation for new at-risk students
-            triggered_jobs: list[dict[str, int | str]] = []
-            db_updates: list[tuple[str, str]] = []
-            for sid in new_sids:
-                job_id = await alert_service.trigger_draft(
-                    sid=sid,
-                    arq_pool=arq_pool,
-                    user_id=str(user.id),
-                    update_db=False,  # We will batch update instead
+        # Map request to command DTO
+        data_sources: list[DataSourceDTO] = []
+        for source in request.data_sources:
+            if isinstance(source, CoreDataSource):
+                data_sources.append(
+                    DataSourceDTO(
+                        source_type=source.source_type,
+                        records=[r.model_dump(by_alias=True) for r in source.records],
+                    )
                 )
-                triggered_jobs.append({'sid': sid, 'job_id': job_id})
-                db_updates.append((job_id, sid))
 
-            # Batch update draft_job_id
-            if db_updates:
-                await data_service.batch_update_draft_job_ids(db_updates)
+
+        command = DataIngestionCommand(data_sources=data_sources)
+
+        async with session.begin():
+            results = await command_handler.handle_ingest_data(command, user.id)
 
         return {
             'status': 'success',
             'batch_id': request.batch_id,
             'results': results['results'],
-            'automatic_drafts': triggered_jobs,
+            'automatic_drafts': results.get('triggered_jobs', []),
         }
 
     except Exception as e:
