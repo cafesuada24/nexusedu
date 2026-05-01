@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
+from uuid import UUID, uuid4
 
 import pytest
 
+from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.models import AdvisorPointsLedger, StudentStatusHistory
 
 if TYPE_CHECKING:
@@ -23,7 +25,7 @@ async def test_draft_review_points(
     test_db_session: AsyncSession,
 ) -> None:
     """Verify that /alerts/{sid}/draft/review awards points."""
-    sid = 'GAM_1'
+    sid = uuid4()
     await student_repository.ingest_students(
         [
             {'sid': sid, 'student_name': 'G1', 'email': 'g1@ex.com'},
@@ -55,7 +57,7 @@ async def test_email_sent_points(
     test_db_session: AsyncSession,
 ) -> None:
     """Verify that sending an email awards points."""
-    sid = 'GAM_2'
+    sid = uuid4()
     await student_repository.ingest_students(
         [
             {'sid': sid, 'student_name': 'G2', 'email': 'g2@ex.com'},
@@ -67,7 +69,7 @@ async def test_email_sent_points(
 
     test_db_session.add(
         InterventionEmail(
-            email_id='E1',
+            email_id=uuid4(),
             sid=sid,
             subject='S',
             body='B',
@@ -76,7 +78,9 @@ async def test_email_sent_points(
     )
     await test_db_session.commit()
 
-    response = client.post(f'/api/v1/alerts/{sid}/send', json={'body': 'test'})
+    key = str(uuid4())
+    headers = {'Idempotency-Key': key}
+    response = client.post(f'/api/v1/alerts/{sid}/send', json={'body': 'test'}, headers=headers)
     assert response.status_code == 200
 
     # Check ledger
@@ -95,7 +99,7 @@ async def test_status_change_points(
     test_db_session: AsyncSession,
 ) -> None:
     """Verify that changing status to booked/resolved awards points."""
-    sid = 'GAM_3'
+    sid = uuid4()
     await student_repository.ingest_students(
         [
             {'sid': sid, 'student_name': 'G3', 'email': 'g3@ex.com'},
@@ -126,8 +130,8 @@ async def test_response_time_bonus(
     test_db_session: AsyncSession,
 ) -> None:
     """Verify the 1.2x multiplier for <24h response."""
-    sid_fast = 'FAST_1'
-    sid_slow = 'SLOW_1'
+    sid_fast = uuid4()
+    sid_slow = uuid4()
 
     await student_repository.ingest_students(
         [
@@ -144,7 +148,7 @@ async def test_response_time_bonus(
     test_db_session.add_all(
         [
             StudentStatusHistory(
-                history_id='H_FAST',
+                history_id=uuid4(),
                 sid=sid_fast,
                 status_recorded_at=fast_time,
                 academic_year=2025,
@@ -152,7 +156,7 @@ async def test_response_time_bonus(
                 week=1,
             ),
             StudentStatusHistory(
-                history_id='H_SLOW',
+                history_id=uuid4(),
                 sid=sid_slow,
                 status_recorded_at=slow_time,
                 academic_year=2025,
@@ -184,38 +188,44 @@ async def test_response_time_bonus(
 async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) -> None:
     """Verify the leaderboard API aggregates points correctly."""
     # Seed ledger with some data
+    adv1_id = uuid4()
+    adv2_id = uuid4()
+    s1 = uuid4()
+    s2 = uuid4()
+    s3 = uuid4()
+    s4 = uuid4()
     test_db_session.add_all(
         [
             AdvisorPointsLedger(
-                id='L1',
-                advisor_id='adv_1',
+                id=uuid4(),
+                advisor_id=adv1_id,
                 action_type='action',
                 points=100,
-                sid='s1',
+                sid=s1,
                 timestamp=datetime.now(),
             ),
             AdvisorPointsLedger(
-                id='L2',
-                advisor_id='adv_1',
+                id=uuid4(),
+                advisor_id=adv1_id,
                 action_type='action',
                 points=50,
-                sid='s2',
+                sid=s2,
                 timestamp=datetime.now(),
             ),
             AdvisorPointsLedger(
-                id='L3',
-                advisor_id='adv_2',
+                id=uuid4(),
+                advisor_id=adv2_id,
                 action_type='action',
                 points=80,
-                sid='s3',
+                sid=s3,
                 timestamp=datetime.now(),
             ),
             AdvisorPointsLedger(
-                id='L4',
-                advisor_id='adv_2',
+                id=uuid4(),
+                advisor_id=adv2_id,
                 action_type='action',
                 points=10,
-                sid='s4',
+                sid=s4,
                 timestamp=datetime.now() - timedelta(days=10),
             ),
         ]
@@ -227,11 +237,11 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
     assert resp.status_code == 200
     data = resp.json()
     # adv_1: 150, adv_2: 90
-    assert data[0]['advisor_id'] == 'adv_1'
+    assert data[0]['advisor_id'] == str(adv1_id)
     assert data[0]['total_points'] == 150
     assert 'sent_count' in data[0]
     assert 'resolved_count' in data[0]
-    assert data[1]['advisor_id'] == 'adv_2'
+    assert data[1]['advisor_id'] == str(adv2_id)
     assert data[1]['total_points'] == 90
 
     # Weekly (adv_2's L4 should be excluded)
@@ -239,9 +249,9 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
     assert resp.status_code == 200
     # adv_1: 150, adv_2: 80
     data = resp.json()
-    assert data[0]['advisor_id'] == 'adv_1'
+    assert data[0]['advisor_id'] == str(adv1_id)
     assert data[0]['total_points'] == 150
-    assert data[1]['advisor_id'] == 'adv_2'
+    assert data[1]['advisor_id'] == str(adv2_id)
     assert data[1]['total_points'] == 80
 
 
@@ -254,32 +264,32 @@ async def test_engagement_metrics(
     await student_repository.ingest_students(
         [
             {
-                'sid': 'S1',
+                'sid': uuid4(),
                 'student_name': 'S1',
                 'email': 's1@ex.com',
                 'major': 'CS',
-                'intervention_status': 'sent',
+                'intervention_status': InterventionStatus.SENT.value,
             },
             {
-                'sid': 'S2',
+                'sid': uuid4(),
                 'student_name': 'S2',
                 'email': 's2@ex.com',
                 'major': 'CS',
-                'intervention_status': 'new',
+                'intervention_status': InterventionStatus.NOTIFIED.value,
             },
             {
-                'sid': 'S3',
+                'sid': uuid4(),
                 'student_name': 'S3',
                 'email': 's3@ex.com',
                 'major': 'Math',
-                'intervention_status': 'resolved',
+                'intervention_status': InterventionStatus.RESOLVED.value,
             },
             {
-                'sid': 'S4',
+                'sid': uuid4(),
                 'student_name': 'S4',
                 'email': 's4@ex.com',
                 'major': 'Math',
-                'intervention_status': 'new',
+                'intervention_status': InterventionStatus.NOTIFIED.value,
             },
         ]
     )
