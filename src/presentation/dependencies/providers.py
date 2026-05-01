@@ -12,6 +12,7 @@ from src.application.commands.alert_commands import AlertCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.queries.alert_queries import AlertQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
+from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
@@ -21,13 +22,13 @@ from src.domain.repositories.metadata_repository import MetadataRepository
 from src.domain.repositories.metrics_repository import MetricsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
-from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
 from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
+from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
@@ -134,9 +135,10 @@ async def get_alert_command_handler(
     gamification_service: Annotated[
         GamificationService, Depends(get_gamification_service)
     ],
-    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+    arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
 ) -> AlertCommandHandler:
     """Dependency provider for the AlertCommandHandler."""
+    task_queue = ArqTaskQueueAdapter(arq_pool)
     return AlertCommandHandler(
         student_repo,
         email_repo,
@@ -144,8 +146,8 @@ async def get_alert_command_handler(
         advisor_repo,
         idempotency_repo,
         gamification_service,
+        task_queue,
         email_drafting_service=BamlEmailDraftingService(),
-        arq_pool=arq_pool,
     )
 
 
@@ -161,11 +163,11 @@ async def get_data_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     activity_repo: Annotated[ActivityRepository, Depends(get_activity_repository)],
     history_repo: Annotated[
-        StatusHistoryRepository, Depends(get_status_history_repository)
+        StatusHistoryRepository, Depends(get_status_history_repository),
     ],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
     alert_command_handler: Annotated[
-        AlertCommandHandler, Depends(get_alert_command_handler)
+        AlertCommandHandler, Depends(get_alert_command_handler),
     ],
 ) -> DataCommandHandler:
     """Dependency provider for the DataCommandHandler."""
@@ -200,10 +202,10 @@ def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentStat
 
 async def get_agent_command_handler(
     agent: Annotated[
-        CompiledStateGraph[AgentState, Any, AgentState], Depends(get_agent)
+        CompiledStateGraph[AgentState, Any, AgentState], Depends(get_agent),
     ],
     metadata_service: Annotated[
-        AgentMetadataService, Depends(get_agent_metadata_service)
+        AgentMetadataService, Depends(get_agent_metadata_service),
     ],
 ) -> AgentCommandHandler:
     """Dependency provider for the AgentCommandHandler."""

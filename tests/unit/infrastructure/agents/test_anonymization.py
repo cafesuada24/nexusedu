@@ -159,6 +159,8 @@ async def test_email_draft_no_pii_to_ai(
     mock_email_drafting = AsyncMock()
     mock_email_drafting.generate_draft = AsyncMock(return_value="Hello {{STUDENT_NAME}}")
 
+    mock_task_queue = AsyncMock()
+
     handler = AlertCommandHandler(
         student_repo=student_repository,
         email_repo=AsyncMock(),
@@ -166,6 +168,7 @@ async def test_email_draft_no_pii_to_ai(
         advisor_repo=advisor_repository,
         idempotency_repo=mock_idempotency,
         gamification_service=gamification_service,
+        task_queue=mock_task_queue,
         email_drafting_service=mock_email_drafting,
     )
 
