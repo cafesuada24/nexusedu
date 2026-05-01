@@ -81,8 +81,8 @@ export function Hero() {
                             className="h-12 rounded-xl px-6 text-base"
                         >
                             <Link href="/dashboard">
-                                Bắt đầu với CSV
-                                <ArrowRight className="size-4" />
+                              Bắt đầu với NexusEdu
+                              <ArrowRight className="size-4" />
                             </Link>
                         </Button>
                         <Button
