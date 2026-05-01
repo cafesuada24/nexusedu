@@ -80,7 +80,7 @@ export function Hero() {
                             size="lg"
                             className="h-12 rounded-xl px-6 text-base transition-all duration-300 ease-out hover:scale-[1.05] hover:shadow-xl hover:shadow-blue-500/50 group"
                         >
-                            <Link href="/dashboard">
+                            <Link href="/login">
                               Bắt đầu với NexusEdu
                               <ArrowRight className="size-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" />
                             </Link>

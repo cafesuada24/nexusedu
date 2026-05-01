@@ -15,7 +15,7 @@ export function Cta() {
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button asChild size="lg" className="h-12 rounded-xl px-6 text-base transition-all duration-300 ease-out hover:scale-[1.05] hover:shadow-lg hover:shadow-blue-500/40 group">
-            <Link href="/dashboard">
+            <Link href="/login">
               Dùng thử NexusEdu
               <ArrowRight className="size-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" />
             </Link>
