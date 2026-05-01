@@ -1,9 +1,9 @@
 """Value objects for the domain."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class RiskStatus(str, Enum):
+class RiskStatus(StrEnum):
     """Student risk status levels."""
 
     NORMAL = "Normal"
@@ -12,17 +12,19 @@ class RiskStatus(str, Enum):
     UNKNOWN = "Unknown"
 
 
-class InterventionStatus(str, Enum):
+class InterventionStatus(StrEnum):
     """Student intervention status levels."""
 
     NONE = "none"
     NOTIFIED = "notified"
     BOOKED = "booked"
+    SENT = "sent"
     RESOLVED = "resolved"
     DISMISSED = "dismissed"
+    EXPIRED = "expired"
 
 
-class EmailStatus(str, Enum):
+class EmailStatus(StrEnum):
     """Status of an intervention email."""
 
     DRAFT = "draft"
