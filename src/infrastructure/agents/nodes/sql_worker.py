@@ -12,7 +12,7 @@ from src.infrastructure.extern.baml_client.types import RequestTableSchema
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:
-    from src.domain.services.agent_metadata import AgentMetadataService
+    from src.application.services.agent_metadata import AgentMetadataService
 
 MAX_LOOP = 3
 

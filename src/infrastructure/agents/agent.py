@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import Checkpointer, CompiledStateGraph
 
-from src.domain.services.agent_metadata import AgentMetadataService
+from src.application.services.agent_metadata import AgentMetadataService
 from src.infrastructure.agents.nodes import (
     discovery_node,
     email_agent_node,

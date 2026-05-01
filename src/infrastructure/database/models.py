@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import TIMESTAMP, Double, ForeignKey, Integer, String, Text, func
+from sqlalchemy import TIMESTAMP, Double, ForeignKey, Integer, String, Text, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class Student(Base):
 
     __tablename__ = 'students'
 
-    sid: Mapped[str] = mapped_column(String, primary_key=True)
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     student_name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
     major: Mapped[str] = mapped_column(String, default='Unknown')
@@ -39,7 +39,7 @@ class Student(Base):
     intervention_status: Mapped[str] = mapped_column(String, default='none')
     last_notified_timestamp: Mapped[float] = mapped_column(Double, default=0)
     last_notified_satisfaction: Mapped[int] = mapped_column(Integer, default=0)
-    draft_job_id: Mapped[str | None] = mapped_column(String)
+    draft_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     # Relationships
     activities: Mapped[list[Activity]] = relationship(
@@ -56,12 +56,12 @@ class Activity(Base):
 
     __tablename__ = 'activities'
 
-    activity_id: Mapped[str] = mapped_column(
-        String,
+    activity_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    sid: Mapped[str] = mapped_column(String, ForeignKey('students.sid'))
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
     course_id: Mapped[str | None] = mapped_column(String)
     course_name: Mapped[str | None] = mapped_column(String)
     test_type: Mapped[str | None] = mapped_column(String)
@@ -80,12 +80,12 @@ class StudentStatusHistory(Base):
 
     __tablename__ = 'student_status_history'
 
-    history_id: Mapped[str] = mapped_column(
-        String,
+    history_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    sid: Mapped[str] = mapped_column(String, ForeignKey('students.sid'))
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
     academic_year: Mapped[int | None] = mapped_column(Integer)
     semester: Mapped[int | None] = mapped_column(Integer)
     week: Mapped[int | None] = mapped_column(Integer)
@@ -108,7 +108,7 @@ class Advisor(Base):
 
     __tablename__ = 'advisors'
 
-    advisor_id: Mapped[str] = mapped_column(String, primary_key=True)
+    advisor_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
 
@@ -118,18 +118,18 @@ class AdvisorPointsLedger(Base):
 
     __tablename__ = 'advisor_points_ledger'
 
-    id: Mapped[str] = mapped_column(
-        String,
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    advisor_id: Mapped[str | None] = mapped_column(
-        String,
+    advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
         ForeignKey('advisors.advisor_id'),
     )
     action_type: Mapped[str | None] = mapped_column(String)
     points: Mapped[int | None] = mapped_column(Integer)
-    sid: Mapped[str | None] = mapped_column(String, ForeignKey('students.sid'))
+    sid: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey('students.sid'))
     timestamp: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
@@ -141,14 +141,14 @@ class InterventionEmail(Base):
 
     __tablename__ = 'intervention_emails'
 
-    email_id: Mapped[str] = mapped_column(
-        String,
+    email_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
         primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+        default=uuid.uuid4,
     )
-    sid: Mapped[str | None] = mapped_column(String, ForeignKey('students.sid'))
-    advisor_id: Mapped[str | None] = mapped_column(
-        String,
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
         ForeignKey('advisors.advisor_id'),
     )
     subject: Mapped[str | None] = mapped_column(String)
@@ -166,7 +166,7 @@ class IdempotencyKey(Base):
 
     __tablename__ = 'idempotency_keys'
 
-    key: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),

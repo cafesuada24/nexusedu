@@ -96,8 +96,6 @@ ignore = [
     'E501',   # line too long
     'F841',   # pyright already supports this
     'F401',   
-    'D416',   # numpydocstyle does not use colon in section name
-    'COM812'
 ]
 
 fixable = ['ALL']

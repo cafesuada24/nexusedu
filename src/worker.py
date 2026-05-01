@@ -1,28 +1,30 @@
 """ARQ Worker for background job processing."""
 
+import os
 from typing import Any
 
 from arq.connections import RedisSettings
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.domain.services.agent_metadata import AgentMetadataService
+from src.application.commands.agent_commands import AgentCommandHandler, RunAgentTaskCommand
+from src.application.commands.alert_commands import (
+    AlertCommandHandler,
+    GenerateEmailDraftCommand,
+)
+from src.application.services.agent_metadata import AgentMetadataService
+from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker
+from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
 from src.infrastructure.repositories.sqlalchemy_repositories import (
-    SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyMetadataRepository,
-    SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
 )
-from src.presentation.api.services.alerts import AlertService
-from src.presentation.api.services.gamification import GamificationService
-from src.presentation.api.services.query import QueryService
 from src.telemetry.logger import logger
-from src.utils.env import getenv
 
 
 async def run_email_draft_task(
@@ -32,8 +34,8 @@ async def run_email_draft_task(
     booking_link: str | None = None,
     user_id: str | None = None,
 ) -> Any:
-    """Worker task to generate email draft."""
-    logger.info(f'Worker: Starting email draft task for {sid}')
+    """Worker task to generate email draft using AlertCommandHandler."""
+    logger.info(f"Worker: Starting email draft task for {sid}")
 
     async with async_session_maker() as session:
         # Repositories
@@ -43,18 +45,28 @@ async def run_email_draft_task(
         email_repo = SqlAlchemyEmailRepository(session)
         idempotency_repo = SqlAlchemyIdempotencyRepository(session)
 
-        # Services
-        gamification_service = GamificationService(advisor_repo, student_repo)
-        alert_service = AlertService(
-            alert_repo, email_repo, student_repo, idempotency_repo, gamification_service
+        # Domain Service
+        gamification_service = GamificationService()
+
+        # Command Handler
+        handler = AlertCommandHandler(
+            student_repo=student_repo,
+            email_repo=email_repo,
+            alert_repo=alert_repo,
+            advisor_repo=advisor_repo,
+            idempotency_repo=idempotency_repo,
+            gamification_service=gamification_service,
+            email_drafting_service=BamlEmailDraftingService(),
         )
 
-        return await alert_service.run_email_draft_task(
-            job_id=job_id,
+        command = GenerateEmailDraftCommand(
             sid=sid,
+            job_id=job_id,
             booking_link=booking_link,
             user_id=user_id,
         )
+
+        return await handler.handle_generate_email_draft(command)
 
 
 async def run_agent_task(
@@ -64,8 +76,8 @@ async def run_agent_task(
     thread_id: str | None,
     user_dict: dict[str, Any],
 ) -> Any:
-    """Worker task to process agent query."""
-    logger.info(f'Worker: Starting agent task for {job_id}')
+    """Worker task to process agent query using AgentCommandHandler."""
+    logger.info(f"Worker: Starting agent task for {job_id}")
 
     checkpointer = MemorySaver()
     agent = create_graph(checkpointer=checkpointer)
@@ -73,14 +85,16 @@ async def run_agent_task(
     async with async_session_maker() as session:
         metadata_repo = SqlAlchemyMetadataRepository(session)
         metadata_service = AgentMetadataService(metadata_repo)
-        query_service = QueryService(agent, metadata_service)
 
-        return await query_service.run_agent_task(
+        handler = AgentCommandHandler(agent, metadata_service)
+        command = RunAgentTaskCommand(
             job_id=job_id,
             query=query,
             thread_id=thread_id,
             user_dict=user_dict,
         )
+
+        return await handler.handle_run_agent_task(command)
 
 
 class WorkerSettings:
@@ -88,6 +102,6 @@ class WorkerSettings:
 
     functions = [run_email_draft_task, run_agent_task]
     redis_settings = RedisSettings(
-        host=getenv('REDIS_HOST', 'localhost'),
-        port=int(getenv('REDIS_PORT', '6379')),
+        host=os.getenv("REDIS_HOST", "localhost"),
+        port=int(os.getenv("REDIS_PORT", "6379")),
     )
