@@ -1,8 +1,8 @@
 """Student domain entity."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from uuid import UUID
 
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
@@ -11,15 +11,15 @@ from src.domain.value_objects.status import InterventionStatus, RiskStatus
 class Student:
     """Represents a student in the system."""
 
-    sid: str
-    name: Optional[str] = None
-    email: Optional[str] = None
-    major: str = "Unknown"
-    current_risk_status: RiskStatus = RiskStatus.NORMAL
-    intervention_status: InterventionStatus = InterventionStatus.NONE
-    last_notified_timestamp: float = 0.0
+    sid: UUID
+    student_name: str | None
+    email: str | None
+    major: str
+    last_notified_timestamp: datetime | None
+    current_risk_status: RiskStatus
+    intervention_status: InterventionStatus
     last_notified_satisfaction: int = 0
-    draft_job_id: Optional[str] = None
+    draft_job_id: str | None = None
 
     def update_risk(self, status: RiskStatus) -> None:
         """Update the student's risk status."""

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from uuid import UUID
 
 from src.domain.value_objects.status import EmailStatus
 
@@ -11,11 +11,11 @@ from src.domain.value_objects.status import EmailStatus
 class InterventionEmail:
     """Represents an intervention email drafted or sent to a student."""
 
-    email_id: str
-    sid: str
-    advisor_id: Optional[str]
-    subject: Optional[str]
-    body: Optional[str]
-    status: EmailStatus
+    email_id: UUID
+    advisor_id: UUID | None
+    subject: str | None
+    body: str | None
     created_at: datetime
-    sent_at: Optional[datetime] = None
+    sent_at: datetime | None
+    status: EmailStatus
+    sid: UUID

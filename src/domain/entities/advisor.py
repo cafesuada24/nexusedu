@@ -1,13 +1,13 @@
 """Advisor domain entity."""
 
 from dataclasses import dataclass
-from typing import Optional
+from uuid import UUID
 
 
 @dataclass
 class Advisor:
     """Represents an academic advisor."""
 
-    advisor_id: str
-    name: Optional[str] = None
-    email: Optional[str] = None
+    advisor_id: UUID
+    name: str
+    email: str
