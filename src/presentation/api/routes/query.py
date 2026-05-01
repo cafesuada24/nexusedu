@@ -7,11 +7,7 @@ from arq import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.presentation.api.auth import Scope, User, require_scope
-from src.presentation.api.services.query import QueryService
-from src.presentation.dependencies.providers import (
-    get_arq_pool,
-    get_query_service,
-)
+from src.presentation.dependencies.providers import get_arq_pool
 
 router = APIRouter(prefix='/query', tags=['query'])
 
@@ -19,7 +15,6 @@ router = APIRouter(prefix='/query', tags=['query'])
 @router.post('', status_code=202)
 async def submit_query(
     query: str,
-    query_service: Annotated[QueryService, Depends(get_query_service)],
     arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
     user: Annotated[User, Depends(require_scope(Scope.QUERY_EXECUTE))],
     thread_id: str | None = Query(None, description='Existing thread identifier.'),
