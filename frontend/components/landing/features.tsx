@@ -1,81 +1,101 @@
-import { BrainCircuit, MailCheck, CalendarClock, LineChart, ShieldCheck, Users } from "lucide-react"
+import {
+    BrainCircuit,
+    MailCheck,
+    CalendarClock,
+    LineChart,
+    ShieldCheck,
+    Users,
+} from "lucide-react";
 
 const features = [
-  {
-    icon: BrainCircuit,
-    title: "AI Analysis",
-    desc: "Mô hình máy học phân tích điểm danh, điểm số và tài chính để phát hiện sớm sinh viên có nguy cơ — trước khi quá muộn.",
-  },
-  {
-    icon: MailCheck,
-    title: "HIL Emailing",
-    desc: "AI soạn email chăm sóc nhẹ nhàng theo từng tình huống. Cố vấn xem, chỉnh và gửi — con người luôn là người quyết định.",
-  },
-  {
-    icon: CalendarClock,
-    title: "Smart Booking",
-    desc: "Đồng bộ Google / School Calendar. Sinh viên chọn khung giờ phù hợp chỉ trong vài cú chạm, không email qua lại.",
-  },
-  {
-    icon: LineChart,
-    title: "BGH Dashboard",
-    desc: "Biểu đồ trực quan về tỷ lệ giữ chân, mức độ tham gia của cố vấn và hiệu quả can thiệp theo khoa.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Privacy-first",
-    desc: "Dữ liệu sinh viên được mã hoá, phân quyền chi tiết theo vai trò (SV / Cố vấn / BGH).",
-  },
-  {
-    icon: Users,
-    title: "Đồng hành cố vấn",
-    desc: "Theo dõi hoạt động hỗ trợ của đội ngũ cố vấn theo khoa, giúp nhà trường phân bổ nguồn lực và lan toả văn hoá quan tâm sinh viên.",
-  },
-]
+    {
+        icon: BrainCircuit,
+        title: "AI Analysis",
+        desc: "Mô hình máy học phân tích dữ liệu sinh viên để phát hiện nguy cơ bỏ học sớm.",
+        color: "blue",
+    },
+    {
+        icon: MailCheck,
+        title: "HIL Emailing",
+        desc: "Hệ thống email thông minh với sự kiểm soát của cố vấn trong mọi luồng.",
+        color: "purple",
+    },
+    {
+        icon: CalendarClock,
+        title: "Smart Booking",
+        desc: "Đặt lịch tư vấn thông minh, tự động đồng bộ hoá lịch học.",
+        color: "orange",
+    },
+    {
+        icon: LineChart,
+        title: "BGH Dashboard",
+        desc: "Trực quan hoá dữ liệu tỷ lệ giữ chân sinh viên cho nhà quản lý.",
+        color: "blue",
+    },
+    {
+        icon: ShieldCheck,
+        title: "Privacy-first",
+        desc: "Bảo mật dữ liệu tối đa với cơ chế phân quyền chi tiết.",
+        color: "purple",
+    },
+    {
+        icon: Users,
+        title: "Đồng hành cố vấn",
+        desc: "Hỗ trợ đội ngũ cố vấn theo dõi và chăm sóc sinh viên hiệu quả.",
+        color: "orange",
+    },
+];
+
+const colorMap: Record<string, string> = {
+    blue: "bg-blue-200/40",
+    purple: "bg-purple-200/40",
+    orange: "bg-orange-200/40",
+};
+
+const iconGlowMap: Record<string, string> = {
+    blue: "shadow-blue-500/30",
+    purple: "shadow-purple-500/30",
+    orange: "shadow-orange-500/30",
+};
 
 export function Features() {
-  return (
-    <section
-      id="features"
-      className="relative border-t border-border/60 bg-background py-20 md:py-28"
-    >
-      <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <span className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">
-            Tính năng cốt lõi
-          </span>
-          <h2 className="mt-3 text-balance font-serif text-3xl font-black tracking-tight md:text-5xl">
-            Một nền tảng, đủ cho hành trình đồng hành sinh viên.
-          </h2>
-          <p className="mt-4 text-pretty text-muted-foreground md:text-lg">
-            Kết hợp sức mạnh AI và sự tinh tế của con người để không sinh viên
-            nào bị bỏ lại phía sau.
-          </p>
-        </div>
+    return (
+        <section id="features" className="relative py-4">
+            <div className="mx-auto w-full max-w-7xl px-4">
+                <div className="mx-auto max-w-2xl text-center mb-10">
+                    <span className="text-xs font-semibold tracking-[0.2em] text-primary uppercase dark:text-blue-400">
+                        TÍNH NĂNG CỐT LÕI
+                    </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {features.map((f) => (
+                        <article
+                            key={f.title}
+                            className="group relative h-full p-[1px] rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 dark:from-blue-700 dark:to-cyan-600 hover:shadow-[0_0_25px_rgba(56,189,248,0.3)] transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02]"
+                        >
+                            {/* Inner Card */}
+                            <div className="h-full flex flex-col items-center text-center p-6 rounded-[14px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10">
+                                {/* Subtle background glow */}
+                                <div className={`absolute -inset-0.5 rounded-2xl ${colorMap[f.color]} blur-3xl opacity-10 group-hover:opacity-30 transition-opacity duration-500`} />
+                                
+                                <div className="relative z-10 flex flex-col items-center">
+                                    <div className={`relative flex size-12 items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800 shadow-sm ${iconGlowMap[f.color]} mb-4 group-hover:-translate-y-1 transition-transform duration-300`}>
+                                        <f.icon className="size-6 text-foreground dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300" />
+                                    </div>
 
-        <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => (
-            <article
-              key={f.title}
-              className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/10"
-            >
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -top-16 -right-16 size-40 rounded-full bg-primary/10 blur-2xl transition-opacity group-hover:opacity-100 opacity-60"
-              />
-              <div className="relative">
-                <span className="inline-grid size-11 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-                  <f.icon className="size-5" aria-hidden="true" />
-                </span>
-                <h3 className="mt-5 font-serif text-xl font-bold">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {f.desc}
-                </p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
+                                    <h3 className="text-lg font-bold text-foreground dark:text-white group-hover:opacity-100 transition-opacity">
+                                        {f.title}
+                                    </h3>
+
+                                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground dark:text-slate-300 group-hover:text-foreground dark:group-hover:text-white transition-colors duration-300">
+                                        {f.desc}
+                                    </p>
+                                </div>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
 }

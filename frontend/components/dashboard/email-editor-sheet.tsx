@@ -41,7 +41,11 @@ type Props = {
 export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
     // Only poll for draft status while there's an active draft job. If there's no
     // job, rely on the alert's stored draft fields to avoid excess requests.
-    const { data: draft } = useDraftStatus(alert?.draftJobId ? alert.id : null);
+    const {
+        data: draft,
+        isFetching,
+        isError,
+    } = useDraftStatus(alert?.draftJobId ? alert.id : null);
     const [subject, setSubject] = React.useState("");
     const [body, setBody] = React.useState("");
 
@@ -74,7 +78,8 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
     };
 
     const isGenerating =
-        draft?.is_generating ?? (!!alert?.draftJobId && !alert?.draftBody);
+        draft?.is_generating ??
+        (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
     const bookingUrl = alert
         ? `/booking/le-ha?sid=${alert.id}`
