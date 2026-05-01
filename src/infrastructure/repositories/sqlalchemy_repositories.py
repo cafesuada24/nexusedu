@@ -22,6 +22,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from src.domain.entities.alert import Alert
+from src.domain.value_objects.status import RiskStatus
+from src.infrastructure.database.config import DB_REGISTRY
+from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
     Advisor,
@@ -33,9 +37,19 @@ from src.infrastructure.database.models import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import Session
+
+    from src.domain.entities.advisor import Advisor as DomainAdvisor
+    from src.domain.entities.alert import Alert as DomainAlert
+    from src.domain.entities.intervention_email import (
+        InterventionEmail as DomainInterventionEmail,
+    )
+    from src.domain.entities.student import Student as DomainStudent
+    from src.domain.value_objects.status import InterventionStatus
 
 
 class SqlAlchemyStudentRepository:
@@ -45,32 +59,39 @@ class SqlAlchemyStudentRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def get_by_id(self, sid: str) -> Student | None:
+    async def get_by_id(self, sid: uuid.UUID) -> DomainStudent | None:
         """Retrieve a student by their unique ID."""
         stmt = select(Student).where(Student.sid == sid)
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        student = result.scalar_one_or_none()
+        return DataMapper.to_domain_student(student) if student else None
 
-    async def get_pii(self, sid: str) -> dict[str, Any] | None:
+    async def get_pii(self, sid: uuid.UUID) -> dict[str, Any] | None:
         """Retrieve student PII (name and email)."""
         stmt = select(Student.student_name, Student.email).where(Student.sid == sid)
         result = await self.session.execute(stmt)
         row = result.first()
         return {'student_name': row.student_name, 'email': row.email} if row else None
 
-    async def update_intervention_status(self, sid: str, status: str) -> None:
+    async def update_intervention_status(
+        self,
+        sid: uuid.UUID,
+        status: InterventionStatus,
+    ) -> None:
         """Update the intervention status for a student."""
         stmt = (
-            update(Student).where(Student.sid == sid).values(intervention_status=status)
+            update(Student)
+            .where(Student.sid == sid)
+            .values(intervention_status=status.value)
         )
         await self.session.execute(stmt)
 
-    async def update_draft_job_id(self, sid: str, job_id: str | None) -> None:
+    async def update_draft_job_id(self, sid: uuid.UUID, job_id: uuid.UUID | None) -> None:
         """Update the draft job ID for a student."""
         stmt = update(Student).where(Student.sid == sid).values(draft_job_id=job_id)
         await self.session.execute(stmt)
 
-    async def batch_update_draft_job_ids(self, updates: list[tuple[str, str]]) -> None:
+    async def batch_update_draft_job_ids(self, updates: Sequence[tuple[uuid.UUID, uuid.UUID]]) -> None:
         """Batch update draft job IDs for multiple students."""
         if not updates:
             return
@@ -82,7 +103,7 @@ class SqlAlchemyStudentRepository:
         await self.session.execute(update(Student), update_data)
         # await self.session.commit() removed
 
-    async def update_last_notified(self, sid: str) -> None:
+    async def update_last_notified(self, sid: uuid.UUID) -> None:
         """Update the last notified timestamp for a student."""
         stmt = (
             update(Student)
@@ -91,7 +112,7 @@ class SqlAlchemyStudentRepository:
         )
         await self.session.execute(stmt)
 
-    async def get_latest_status_timestamp(self, sid: str) -> datetime | None:
+    async def get_latest_status_timestamp(self, sid: uuid.UUID) -> datetime | None:
         """Retrieve the latest status recording timestamp for a student."""
         stmt = (
             select(StudentStatusHistory.status_recorded_at)
@@ -104,7 +125,7 @@ class SqlAlchemyStudentRepository:
 
     async def get_recent_performance(
         self,
-        sid: str,
+        sid: uuid.UUID,
         limit: int = 4,
     ) -> list[dict[str, Any]]:
         """Retrieve recent performance history for a student."""
@@ -132,6 +153,11 @@ class SqlAlchemyStudentRepository:
         if not records:
             return
 
+        # Ensure UUID fields are actual UUID objects (SQLAlchemy Uuid type requirement)
+        for record in records:
+            if 'sid' in record and isinstance(record['sid'], str):
+                record['sid'] = uuid.UUID(record['sid'])
+
         # Dynamically choose insert implementation based on dialect
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
         if dialect == 'postgresql':
@@ -147,14 +173,14 @@ class SqlAlchemyStudentRepository:
 
     async def update_risk_status(
         self,
-        sid: str,
-        risk_status: str,
-        intervention_status: str | None = None,
+        sid: uuid.UUID,
+        risk_status: RiskStatus,
+        intervention_status: InterventionStatus | None = None,
     ) -> None:
         """Update the risk and optionally intervention status for a student."""
-        values = {'current_risk_status': risk_status}
+        values = {'current_risk_status': risk_status.value}
         if intervention_status:
-            values['intervention_status'] = intervention_status
+            values['intervention_status'] = intervention_status.value
 
         stmt = update(Student).where(Student.sid == sid).values(values)
         await self.session.execute(stmt)
@@ -171,10 +197,15 @@ class SqlAlchemyActivityRepository:
         """Bulk ingest activity records using upsert logic."""
         if not records:
             return
-        # Ensure each record has an activity_id
+        # Ensure UUID fields are actual UUID objects (SQLAlchemy Uuid type requirement)
         for record in records:
             if not record.get('activity_id'):
-                record['activity_id'] = str(uuid.uuid4())
+                record['activity_id'] = uuid.uuid4()
+            elif isinstance(record['activity_id'], str):
+                record['activity_id'] = uuid.UUID(record['activity_id'])
+
+            if 'sid' in record and isinstance(record['sid'], str):
+                record['sid'] = uuid.UUID(record['sid'])
 
         # Dynamically choose insert implementation based on dialect
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
@@ -252,7 +283,7 @@ class SqlAlchemyStatusHistoryRepository:
         result = await self.session.execute(stmt)
         return [row._asdict() for row in result.all()]
 
-    async def get_latest_anomaly(self, sid: str) -> str | None:
+    async def get_latest_anomaly(self, sid: uuid.UUID) -> RiskStatus | None:
         """Get the most recent anomaly flag for a student."""
         stmt = (
             select(StudentStatusHistory.anomaly_flag)
@@ -265,7 +296,9 @@ class SqlAlchemyStatusHistoryRepository:
             .limit(1)
         )
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        result = result.scalar_one_or_none()
+
+        return RiskStatus(result) if result is not None else None
 
 
 class SqlAlchemyAdvisorRepository:
@@ -275,11 +308,12 @@ class SqlAlchemyAdvisorRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def get_by_id(self, advisor_id: str) -> Advisor | None:
+    async def get_by_id(self, advisor_id: uuid.UUID) -> DomainAdvisor | None:
         """Retrieve an advisor by their unique ID."""
         stmt = select(Advisor).where(Advisor.advisor_id == advisor_id)
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        advisor = result.scalar_one_or_none()
+        return DataMapper.to_domain_advisor(advisor) if advisor else None
 
     async def get_engagement_metrics(self) -> list[dict[str, Any]]:
         """Retrieve aggregated engagement metrics by major."""
@@ -297,7 +331,7 @@ class SqlAlchemyAdvisorRepository:
                     ),
                 ).label('sent'),
                 func.count(
-                    case((Student.intervention_status == 'new', 1)),
+                    case((Student.intervention_status == 'notified', 1)),
                 ).label('drafted'),
             )
             .group_by(Student.major)
@@ -345,8 +379,8 @@ class SqlAlchemyAdvisorRepository:
 
     async def record_points(
         self,
-        advisor_id: str,
-        sid: str,
+        advisor_id: uuid.UUID,
+        sid: uuid.UUID,
         action_type: str,
         points: int,
     ) -> None:
@@ -368,13 +402,13 @@ class SqlAlchemyIdempotencyRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def check_key(self, key: str) -> bool:
+    async def check_key(self, key: uuid.UUID) -> bool:
         """Check if an idempotency key exists."""
         stmt = select(IdempotencyKey).where(IdempotencyKey.key == key)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none() is not None
 
-    async def record_key(self, key: str) -> None:
+    async def record_key(self, key: uuid.UUID) -> None:
         """Record a new idempotency key."""
         entry = IdempotencyKey(key=key)
         self.session.add(entry)
@@ -387,6 +421,10 @@ class SqlAlchemyMetadataRepository:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with session."""
         self.session = session
+
+    async def get_db_registry(self) -> list[dict[str, Any]]:
+        """Get the available database registry."""
+        return DB_REGISTRY
 
     async def list_tables(self, db_id: str) -> list[str]:
         """List tables using SQLAlchemy inspection."""
@@ -405,8 +443,8 @@ class SqlAlchemyMetadataRepository:
         if table_name not in tables:
             raise ValueError(f"Table '{table_name}' does not exist.")
 
-
         table_name = quoted_name(table_name, quote=True)
+
         # 2. Use SQLAlchemy Inspector for dialect-agnostic column retrieval
         def get_columns(connection: Session) -> list[ReflectedColumn]:
             return inspect(connection.get_bind()).get_columns(table_name)
@@ -450,7 +488,7 @@ class SqlAlchemyEmailRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def get_latest_draft(self, sid: str) -> dict[str, Any] | None:
+    async def get_latest_draft(self, sid: uuid.UUID) -> DomainInterventionEmail | None:
         """Retrieve the latest draft email for a student."""
         stmt = (
             select(InterventionEmail)
@@ -463,25 +501,17 @@ class SqlAlchemyEmailRepository:
         )
         result = await self.session.execute(stmt)
         email = result.scalar_one_or_none()
-        return (
-            {
-                'email_id': email.email_id,
-                'subject': email.subject,
-                'body': email.body,
-            }
-            if email
-            else None
-        )
+        return DataMapper.to_domain_email(email) if email else None
 
     async def create_draft(
         self,
-        sid: str,
-        advisor_id: str | None,
+        sid: uuid.UUID,
+        advisor_id: uuid.UUID | None,
         subject: str,
         body: str,
-    ) -> str:
+    ) -> uuid.UUID:
         """Create a new draft email and return its ID."""
-        email_id = str(uuid.uuid4())
+        email_id = uuid.uuid4()
         email = InterventionEmail(
             email_id=email_id,
             sid=sid,
@@ -494,7 +524,7 @@ class SqlAlchemyEmailRepository:
         # await self.session.commit() removed
         return email_id
 
-    async def mark_as_sent(self, sid: str, body: str) -> None:
+    async def mark_as_sent(self, sid: uuid.UUID, body: str) -> None:
         """Mark the latest draft as sent for a student."""
         stmt = (
             select(InterventionEmail.email_id)
@@ -521,22 +551,15 @@ class SqlAlchemyEmailRepository:
             await self.session.execute(stmt)
             # await self.session.commit() removed
 
-    async def get_history(self, sid: str) -> list[dict[str, Any]]:
+    async def get_history(self, sid: uuid.UUID) -> list[DomainInterventionEmail]:
         """Retrieve the communication history for a student."""
         stmt = (
-            select(
-                InterventionEmail.email_id,
-                InterventionEmail.subject,
-                InterventionEmail.body,
-                InterventionEmail.status,
-                InterventionEmail.created_at,
-                InterventionEmail.sent_at,
-            )
+            select(InterventionEmail)
             .where(InterventionEmail.sid == sid)
             .order_by(desc(InterventionEmail.created_at))
         )
         result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
+        return [DataMapper.to_domain_email(row[0]) for row in result.all()]
 
 
 class SqlAlchemyAlertRepository:
@@ -549,7 +572,7 @@ class SqlAlchemyAlertRepository:
     async def get_active_alerts(
         self,
         status_filter: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[DomainAlert]:
         """Retrieve students with active alerts for the Kanban board."""
         # Subquery to get latest draft
         subq = (
@@ -571,16 +594,7 @@ class SqlAlchemyAlertRepository:
         latest_draft = select(subq).where(subq.c.rn == 1).subquery()
 
         stmt = (
-            select(
-                Student.sid,
-                Student.student_name,
-                Student.email,
-                Student.current_risk_status,
-                Student.intervention_status,
-                Student.draft_job_id,
-                latest_draft.c.subject.label('draft_subject'),
-                latest_draft.c.body.label('draft_body'),
-            )
+            select(Student, latest_draft.c.subject, latest_draft.c.body)
             .outerjoin(latest_draft, Student.sid == latest_draft.c.sid)
             .where(Student.intervention_status != 'none')
         )
@@ -589,7 +603,22 @@ class SqlAlchemyAlertRepository:
             stmt = stmt.where(Student.intervention_status == status_filter)
 
         result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
+        alerts: list[Alert] = []
+        for row in result.all():
+            row_tuple = row._tuple()
+            orm_student = row_tuple[0]
+            draft_subject = row_tuple[1]
+            draft_body = row_tuple[2]
+            alerts.append(
+                DataMapper.to_domain_alert(
+                    orm_student,
+                    {
+                        'draft_subject': draft_subject,
+                        'draft_body': draft_body,
+                    },
+                )
+            )
+        return alerts
 
 
 class SqlAlchemyMetricsRepository:
