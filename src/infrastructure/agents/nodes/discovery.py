@@ -20,7 +20,7 @@ MAX_DISCOVERY_CONTEXT_CHARS = 15_000
 class DiscoveryNode:
     """Performs schema discovery using database tools."""
 
-    def __call__(self, state: AgentState, config: RunnableConfig) -> dict[str, Any]:
+    async def __call__(self, state: AgentState, config: RunnableConfig) -> dict[str, Any]:
         """Execute the discovery node."""
         logger.info('Discovery: Executing tools...')
 
@@ -36,7 +36,7 @@ class DiscoveryNode:
         logger.info(f'Discovery: Processing {len(discovery_requests)} requests')
 
         for i, req in enumerate(discovery_requests):
-            res = self._process_request(db_manager, req, i)
+            res = await self._process_request(db_manager, req, i)
             if res:
                 new_context_parts.append(res)
 
@@ -61,7 +61,7 @@ class DiscoveryNode:
             },
         }
 
-    def _process_request(
+    async def _process_request(
         self,
         db_manager: 'DatabaseManager[Any, Any]',
         req: DiscoveryRequest | dict[str, Any],
@@ -82,11 +82,11 @@ class DiscoveryNode:
         try:
             match tool_name:
                 case 'get_db_list':
-                    res = db_manager.get_formatted_db_list()
+                    res = await db_manager.get_formatted_db_list()
                 case 'list_tables' if db_id:
-                    res = db_manager.get_formatted_table_list(db_id=db_id)
+                    res = await db_manager.get_formatted_table_list(db_id=db_id)
                 case 'describe_table' if db_id and table_name:
-                    res = db_manager.get_formatted_table_schema(
+                    res = await db_manager.get_formatted_table_schema(
                         db_id=db_id,
                         table_name=table_name,
                     )

@@ -1,6 +1,7 @@
 """Mappers between SQLAlchemy ORM models and Domain Entities."""
 
-from typing import Any, Dict
+from datetime import UTC, datetime
+from uuid import UUID
 
 from src.domain.entities.advisor import Advisor as DomainAdvisor
 from src.domain.entities.alert import Alert as DomainAlert
@@ -28,7 +29,7 @@ class DataMapper:
         """Map ORM Student to Domain Student."""
         return DomainStudent(
             sid=orm_student.sid,
-            name=orm_student.student_name,
+            student_name=orm_student.student_name,
             email=orm_student.email,
             major=orm_student.major,
             current_risk_status=RiskStatus(orm_student.current_risk_status),
@@ -62,10 +63,15 @@ class DataMapper:
         )
 
     @staticmethod
-    def to_domain_alert(orm_student: OrmStudent, alert_details: Dict[str, Any]) -> DomainAlert:
+    def to_domain_alert(
+        orm_student: OrmStudent,
+        alert_details: dict[str, object],
+    ) -> DomainAlert:
         """Map ORM Student and details to Domain Alert."""
         student = DataMapper.to_domain_student(orm_student)
         return DomainAlert(
+            id=student.sid,
             student=student,
             alert_details=alert_details,
+            created_at=datetime.now(UTC),
         )
