@@ -7,21 +7,27 @@ from fastapi import Depends, Request
 from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.domain.repositories.interfaces import (
-    ActivityRepository,
-    AdvisorRepository,
-    AlertRepository,
-    EmailRepository,
-    IdempotencyRepository,
-    MetadataRepository,
-    MetricsRepository,
-    StatusHistoryRepository,
-    StudentRepository,
-)
-from src.domain.services.agent_metadata import AgentMetadataService
-from src.domain.services.anomaly_engine import AnomalyEngine
+from src.application.commands.agent_commands import AgentCommandHandler
+from src.application.commands.alert_commands import AlertCommandHandler
+from src.application.commands.data_commands import DataCommandHandler
+from src.application.queries.alert_queries import AlertQueryHandler
+from src.application.queries.metrics_queries import MetricsQueryHandler
+from src.domain.repositories.activity_repository import ActivityRepository
+from src.domain.repositories.advisor_repository import AdvisorRepository
+from src.domain.repositories.alert_repository import AlertRepository
+from src.domain.repositories.email_repository import EmailRepository
+from src.domain.repositories.idempotency_repository import IdempotencyRepository
+from src.domain.repositories.metadata_repository import MetadataRepository
+from src.domain.repositories.metrics_repository import MetricsRepository
+from src.domain.repositories.status_history_repository import StatusHistoryRepository
+from src.domain.repositories.student_repository import StudentRepository
+from src.application.services.agent_metadata import AgentMetadataService
+from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
+from src.domain.services.anomaly_engine.zscore import ZScore
+from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
+from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
@@ -33,11 +39,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
 )
-from src.presentation.api.services.alerts import AlertService
-from src.presentation.api.services.data import DataService
-from src.presentation.api.services.gamification import GamificationService
-from src.presentation.api.services.metrics import MetricsService
-from src.presentation.api.services.query import QueryService
+from src.telemetry.logger import logger
 
 
 # Repository Providers
@@ -105,60 +107,82 @@ async def get_metadata_repository(
 
 
 # Service Providers
-async def get_gamification_service(
-    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-) -> GamificationService:
+def get_arq_pool(request: Request) -> ArqRedis:
+    """Dependency provider for the ARQ Redis pool."""
+    state = request.app.state.app_state
+    return state.arq_pool
+
+
+async def get_gamification_service() -> GamificationService:
     """Dependency provider for the GamificationService."""
-    return GamificationService(advisor_repo, student_repo)
+    return GamificationService()
 
 
-async def get_anomaly_engine(
-    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-    activity_repo: Annotated[ActivityRepository, Depends(get_activity_repository)],
-    history_repo: Annotated[
-        StatusHistoryRepository, Depends(get_status_history_repository)
-    ],
-) -> AnomalyEngine:
+async def get_anomaly_engine() -> AnomalyEngine:
     """Dependency provider for the AnomalyEngine."""
-    return AnomalyEngine(student_repo, activity_repo, history_repo)
+    return ZScore()
 
 
-async def get_alert_service(
-    alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
-    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+async def get_alert_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
+    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+    alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
+    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     idempotency_repo: Annotated[
         IdempotencyRepository, Depends(get_idempotency_repository)
     ],
     gamification_service: Annotated[
         GamificationService, Depends(get_gamification_service)
     ],
-) -> AlertService:
-    """Dependency provider for the AlertService."""
-    return AlertService(
-        alert_repo,
-        email_repo,
+    arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
+) -> AlertCommandHandler:
+    """Dependency provider for the AlertCommandHandler."""
+    return AlertCommandHandler(
         student_repo,
+        email_repo,
+        alert_repo,
+        advisor_repo,
         idempotency_repo,
         gamification_service,
+        email_drafting_service=BamlEmailDraftingService(),
+        arq_pool=arq_pool,
     )
 
 
-async def get_data_service(
+async def get_alert_query_handler(
+    alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
+    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+) -> AlertQueryHandler:
+    """Dependency provider for the AlertQueryHandler."""
+    return AlertQueryHandler(alert_repo, email_repo)
+
+
+async def get_data_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     activity_repo: Annotated[ActivityRepository, Depends(get_activity_repository)],
+    history_repo: Annotated[
+        StatusHistoryRepository, Depends(get_status_history_repository)
+    ],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
-) -> DataService:
-    """Dependency provider for the DataService."""
-    return DataService(student_repo, activity_repo, anomaly_engine)
+    alert_command_handler: Annotated[
+        AlertCommandHandler, Depends(get_alert_command_handler)
+    ],
+) -> DataCommandHandler:
+    """Dependency provider for the DataCommandHandler."""
+    return DataCommandHandler(
+        student_repo,
+        activity_repo,
+        history_repo,
+        anomaly_engine,
+        alert_command_handler,
+    )
 
 
-async def get_metrics_service(
+async def get_metrics_query_handler(
     metrics_repo: Annotated[MetricsRepository, Depends(get_metrics_repository)],
-) -> MetricsService:
-    """Dependency provider for the MetricsService."""
-    return MetricsService(metrics_repo)
+) -> MetricsQueryHandler:
+    """Dependency provider for the MetricsQueryHandler."""
+    return MetricsQueryHandler(metrics_repo)
 
 
 async def get_agent_metadata_service(
@@ -174,19 +198,13 @@ def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentStat
     return state.agent
 
 
-async def get_query_service(
+async def get_agent_command_handler(
     agent: Annotated[
         CompiledStateGraph[AgentState, Any, AgentState], Depends(get_agent)
     ],
     metadata_service: Annotated[
         AgentMetadataService, Depends(get_agent_metadata_service)
     ],
-) -> QueryService:
-    """Dependency provider for the QueryService."""
-    return QueryService(agent, metadata_service)
-
-
-def get_arq_pool(request: Request) -> ArqRedis:
-    """Dependency provider for the ARQ Redis pool."""
-    state = request.app.state.app_state
-    return state.arq_pool
+) -> AgentCommandHandler:
+    """Dependency provider for the AgentCommandHandler."""
+    return AgentCommandHandler(agent, metadata_service)
