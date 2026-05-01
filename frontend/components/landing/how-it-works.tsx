@@ -4,7 +4,7 @@ const steps = [
   {
     icon: FileSpreadsheet,
     title: "Nhập danh sách CSV",
-    desc: "Tải lên bảng điểm, điểm danh, trạng thái học phí. Không cần tích hợp phức tạp.",
+    desc: "Tải lên bảng điểm, trạng thái và thông tin học sinh.",
   },
   {
     icon: Cpu,
@@ -30,10 +30,10 @@ export function HowItWorks() {
       className="relative py-10"
     >
       <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <span className="text-xs font-semibold tracking-[0.2em] text-primary uppercase dark:text-blue-400">
+        <div className="mx-auto max-w-2xl text-center mb-16">
+          <h2 className="text-xl font-bold tracking-wide text-blue-600 dark:text-white uppercase">
             Cách hoạt động
-          </span>
+          </h2>
         </div>
 
         <ol className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
