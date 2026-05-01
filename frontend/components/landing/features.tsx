@@ -23,12 +23,12 @@ const features = [
     {
         icon: CalendarClock,
         title: "Smart Booking",
-        desc: "Đặt lịch tư vấn thông minh, tự động đồng bộ hoá lịch học.",
+        desc: "Đặt lịch tư vấn thông minh, tự động đồng bộ hoá với Google Calendar.",
         color: "orange",
     },
     {
         icon: LineChart,
-        title: "BGH Dashboard",
+        title: "Dashboard",
         desc: "Trực quan hoá dữ liệu tỷ lệ giữ chân sinh viên cho nhà quản lý.",
         color: "blue",
     },
@@ -62,10 +62,10 @@ export function Features() {
     return (
         <section id="features" className="relative py-4">
             <div className="mx-auto w-full max-w-7xl px-4">
-                <div className="mx-auto max-w-2xl text-center mb-10">
-                    <span className="text-xs font-semibold tracking-[0.2em] text-primary uppercase dark:text-blue-400">
+                <div className="mx-auto max-w-2xl text-center mb-16">
+                    <h2 className="text-xl font-bold tracking-wide text-blue-600 dark:text-white uppercase">
                         TÍNH NĂNG CỐT LÕI
-                    </span>
+                    </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {features.map((f) => (
