@@ -52,10 +52,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // After login, re-fetch profile to update cache and context
         await refetch()
         toast.success("Đăng nhập thành công")
-        router.push("/dashboard/analysis")
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Đăng nhập thất bại")
+        router.push("/dashboard")
+        }
+        } catch (error: any) {      toast.error(error.message || "Đăng nhập thất bại")
       throw error
     }
   }
