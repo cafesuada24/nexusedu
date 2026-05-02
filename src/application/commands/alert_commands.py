@@ -199,7 +199,20 @@ class AlertCommandHandler:
     ) -> None:
         """Orchestrate awarding points for an advisor action."""
         recorded_dt = await self.student_repo.get_latest_status_timestamp(sid)
-        points = self.gamification_service.calculate_points(action_type, recorded_dt)
+        
+        student = await self.student_repo.get_by_id(sid)
+        risk_level = student.current_risk_status if student else None
+
+        from src.domain.value_objects.status import RiskStatus
+        if isinstance(risk_level, str):
+            try:
+                risk_level = RiskStatus(risk_level)
+            except ValueError:
+                risk_level = RiskStatus.UNKNOWN
+        elif not risk_level:
+            risk_level = RiskStatus.UNKNOWN
+
+        points = self.gamification_service.calculate_points(action_type, recorded_dt, risk_level)
         if points > 0:
             await self.advisor_repo.record_points(advisor_id, sid, action_type, points)
 

@@ -1,6 +1,10 @@
 """Domain service for handling gamification and advisor rewards."""
 
 import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.domain.value_objects.status import RiskStatus
 
 
 class GamificationService:
@@ -18,16 +22,30 @@ class GamificationService:
         self.matrix = matrix or self.DEFAULT_MATRIX
 
     def calculate_points(
-        self, action_type: str, recorded_dt: datetime.datetime | None
+        self,
+        action_type: str,
+        recorded_dt: datetime.datetime | None,
+        risk_level: 'RiskStatus | None' = None,
     ) -> int:
         """Calculate points for an advisor action."""
         base_points = self.matrix.get(action_type, 0)
         if base_points == 0:
             return 0
 
+        # Risk multiplier
+        risk_multiplier = 0.3
+        if risk_level:
+            risk_multiplier = {
+                'Critical': 1.0,
+                'Elevated': 0.7,
+                'Normal': 0.3,
+                'Unknown': 0.3,
+            }.get(str(risk_level).split('.')[-1], 0.3)
+
+        points_after_risk = base_points * risk_multiplier
 
         if recorded_dt is None:
-            return base_points
+            return int(points_after_risk)
 
         # Calculate multiplier based on 24h SLA
         multiplier = 1.0
