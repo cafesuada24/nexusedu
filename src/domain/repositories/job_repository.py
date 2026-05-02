@@ -1,6 +1,6 @@
 """Job repository interface."""
 
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 
