@@ -9,29 +9,33 @@ from src.domain.entities.intervention_email import InterventionEmail
 class EmailRepository(Protocol):
     """Interface for managing intervention emails."""
 
-    async def get_latest_draft(self, sid: UUID) -> InterventionEmail | None:
-        """Retrieve the latest draft email for a student."""
-        ...
-
-    async def create_draft(
+    async def create_placeholder(
         self,
+        case_id: UUID,
         sid: UUID,
         advisor_id: UUID | None,
-        subject: str,
-        body: str,
-        case_id: UUID | None = None,
     ) -> UUID:
-        """Create a new draft email and return its ID."""
+        """Create a placeholder email with 'generating' status."""
         ...
 
-    async def mark_as_sent(self, sid: UUID, body: str) -> None:
-        """Mark the latest draft as sent for a student."""
+    async def update_content(
+        self,
+        case_id: UUID,
+        subject: str,
+        body: str,
+        status: str,
+    ) -> None:
+        """Update the content and status of an existing case email."""
+        ...
+
+    async def get_by_case(self, case_id: UUID) -> InterventionEmail | None:
+        """Retrieve the email associated with a specific case."""
+        ...
+
+    async def mark_as_sent(self, case_id: UUID, body: str) -> None:
+        """Mark the case email as sent."""
         ...
 
     async def get_history(self, sid: UUID) -> list[InterventionEmail]:
         """Retrieve the communication history for a student."""
-        ...
-
-    async def get_by_case(self, case_id: UUID) -> list[InterventionEmail]:
-        """Retrieve all emails associated with a specific case."""
         ...
