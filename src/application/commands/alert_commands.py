@@ -111,7 +111,7 @@ class AlertCommandHandler:
             InterventionStatus.RESOLVED,
             InterventionStatus.DISMISSED,
         ):
-            await self.case_repo.update_case_status(case.case_id, command.status.value)
+            await self.case_repo.update_case_status(case.case_id, command.status)
         elif (
             command.status != InterventionStatus.NONE and case.status != CaseStatus.OPEN
         ):

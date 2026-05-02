@@ -158,11 +158,11 @@ async def get_alert_command_handler(
     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
+        IdempotencyRepository, Depends(get_idempotency_repository),
     ],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     gamification_service: Annotated[
-        GamificationService, Depends(get_gamification_service)
+        GamificationService, Depends(get_gamification_service),
     ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
 ) -> AlertCommandHandler:
@@ -199,11 +199,8 @@ async def get_data_command_handler(
     history_repo: Annotated[
         StatusHistoryRepository, Depends(get_status_history_repository),
     ],
-    idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
-    ],
     settings_repo: Annotated[
-        UserSettingsRepository, Depends(get_user_settings_repository)
+        UserSettingsRepository, Depends(get_user_settings_repository),
     ],
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
@@ -217,7 +214,6 @@ async def get_data_command_handler(
         student_repo,
         activity_repo,
         history_repo,
-        idempotency_repo,
         settings_repo,
         case_repo,
         job_repo,
@@ -254,7 +250,7 @@ async def get_agent_command_handler(
         AgentMetadataService, Depends(get_agent_metadata_service),
     ],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
+        IdempotencyRepository, Depends(get_idempotency_repository),
     ],
 ) -> AgentCommandHandler:
     """Dependency provider for the AgentCommandHandler."""

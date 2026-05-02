@@ -74,3 +74,30 @@ class JobStatusResponse(BaseModel):
     created_at: str | None = Field(None, description='Job creation timestamp.')
     started_at: str | None = Field(None, description='Job start timestamp.')
     completed_at: str | None = Field(None, description='Job completion timestamp.')
+
+
+class CaseResponse(BaseModel):
+    """Schema for a student case."""
+
+    case_id: str
+    sid: str
+    status: str
+    created_at: str
+    resolved_at: str | None = None
+
+
+class AlertStudent(BaseModel):
+    """Schema for a student in the Kanban alert dashboard."""
+
+    sid: str = Field(..., description='Student identifier.')
+    student_name: str = Field(..., description='Student name.')
+    email: str = Field(..., description='Student email.')
+    current_risk_status: str = Field(..., description='The type of anomaly detected.')
+    intervention_status: str = Field(..., description='The current Kanban state.')
+    is_generating: bool = Field(
+        False,
+        description='Whether a background AI draft generation is running.',
+    )
+    active_case_id: str | None = Field(
+        None, description='The ID of the currently active case.'
+    )

@@ -50,7 +50,6 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
         student_repo=mock_repos['student'],
         activity_repo=mock_repos['activity'],
         history_repo=mock_repos['history'],
-        idempotency_repo=mock_repos['idempotency'],
         settings_repo=mock_repos['settings'],
         case_repo=mock_repos['case'],
         job_repo=mock_repos['job'],

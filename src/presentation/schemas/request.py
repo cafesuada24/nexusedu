@@ -108,3 +108,15 @@ class DataIngestionRequest(BaseModel):
         ...,
         description='List of data sources to ingest.',
     )
+
+
+class StatusUpdate(BaseModel):
+    """Schema for updating a student's intervention status."""
+
+    status: str = Field(..., description='The new Kanban state.')
+
+
+class SendEmailRequest(BaseModel):
+    """Schema for sending a personalized nudge email."""
+
+    body: str = Field(..., description='The final email body to send.')

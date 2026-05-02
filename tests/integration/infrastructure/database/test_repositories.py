@@ -78,7 +78,7 @@ async def test_email_repository(session: AsyncSession) -> None:
     assert eid is not None
 
     # 2. Update Content (Draft)
-    await repo.update_content(c1, 'Sub', 'Body', EmailStatus.DRAFT.value)
+    await repo.update_content(c1, 'Sub', 'Body', EmailStatus.DRAFT)
     await session.commit()
 
     # 3. Get By Case
