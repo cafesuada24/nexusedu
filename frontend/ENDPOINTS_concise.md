@@ -61,11 +61,11 @@ Endpoints are protected by **Scopes**. A user's **Role** (`admin`, `advisor`, `v
   {
     "job_id": "uuid",
     "status": "completed | failed | processing",
-    "result": {
-      "answer": "Natural language result",
-      "tables": [[{"col": "val"}]],
-      "visualizations": [{"data": [], "layout": {}}]
-    },
+    "progress": 0,
+    "created_at": "iso_timestamp",
+    "started_at": "iso_timestamp | null",
+    "completed_at": "iso_timestamp | null",
+    "result": {},
     "error": "string | null"
   }
   ```
@@ -78,7 +78,17 @@ Endpoints are protected by **Scopes**. A user's **Role** (`admin`, `advisor`, `v
 `GET /alerts`
 - **Scope**: `alerts:read`
 - **Query Params**: `status` (optional: `new`, `sent`, `booked`, `supporting`, `resolved`, `expired`)
-- **Response**: `List[AlertStudent]`
+- **Response**: `List[AlertStudent]` (includes `active_case_id`, `is_generating`)
+
+### Get Case History
+`GET /alerts/{sid}/cases`
+- **Scope**: `alerts:read`
+- **Response**: `List[Case]` (History of all at-risk periods for student)
+
+### Get Case Details
+`GET /alerts/cases/{case_id}`
+- **Scope**: `alerts:read`
+- **Response**: `CaseDetails` (Includes status, timestamps, and associated emails)
 
 ### Update Intervention Status
 `PATCH /alerts/{sid}/status`
@@ -143,7 +153,9 @@ Endpoints are protected by **Scopes**. A user's **Role** (`admin`, `advisor`, `v
   "student_name": "string",
   "email": "string",
   "current_risk_status": "string",
-  "intervention_status": "string"
+  "intervention_status": "string",
+  "is_generating": "boolean",
+  "active_case_id": "uuid | null"
 }
 ```
 
