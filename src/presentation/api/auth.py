@@ -24,10 +24,7 @@ from src.infrastructure.database.session import engine, get_async_session
 from src.utils.env import getenv
 
 # Configuration
-JWT_SECRET: str = getenv(
-    'JWT_SECRET',
-    'SET_ME_IN_PRODUCTION_HEHEHE',
-)
+JWT_SECRET: str = getenv('JWT_SECRET', 'dev-only-secret-do-not-use-in-prod')
 
 
 class Scope(StrEnum):

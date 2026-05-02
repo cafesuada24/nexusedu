@@ -1,7 +1,7 @@
 {
   "builds": [
     {
-      "src": "src/api/main.py",
+      "src": "src/presentation/api/main.py",
       "use": "@vercel/python"
     },
     {
@@ -12,11 +12,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "src/api/main.py"
-    },
-    {
-      "source": "/",
-      "destination": "src/ui.html"
+      "destination": "src/presentation/api/main.py"
     },
     {
       "source": "/(.*)\\.(js|css|json|svg|png|jpg|jpeg|gif|ico|txt)",

@@ -28,50 +28,50 @@ from src.telemetry.logger import logger
 
 
 async def run_email_draft_task(
-    _ctx: dict[Any, Any],
+    ctx: dict[str, Any],
     job_id: str,
     sid: str,
     booking_link: str | None = None,
-    async def run_email_draft_task(ctx: dict[str, Any], sid: str, job_id: str, booking_link: str | None = None, user_id: str | None = None) -> None:
-        """Worker task to generate email draft using AlertCommandHandler."""
-        logger.info(f"Worker: Starting email draft task for {sid}")
+    user_id: str | None = None,
+) -> None:
+    """Worker task to generate email draft using AlertCommandHandler."""
+    logger.info(f"Worker: Starting email draft task for {sid}")
 
-        async with async_session_maker() as session:
-            # Repositories
-            student_repo = SqlAlchemyStudentRepository(session)
-            advisor_repo = SqlAlchemyAdvisorRepository(session)
-            alert_repo = SqlAlchemyAlertRepository(session)
-            email_repo = SqlAlchemyEmailRepository(session)
-            idempotency_repo = SqlAlchemyIdempotencyRepository(session)
+    async with async_session_maker() as session:
+        # Repositories
+        student_repo = SqlAlchemyStudentRepository(session)
+        advisor_repo = SqlAlchemyAdvisorRepository(session)
+        alert_repo = SqlAlchemyAlertRepository(session)
+        email_repo = SqlAlchemyEmailRepository(session)
+        idempotency_repo = SqlAlchemyIdempotencyRepository(session)
 
-            # Domain Service
-            gamification_service = GamificationService()
+        # Domain Service
+        gamification_service = GamificationService()
 
-            # Task Queue (Adapter for worker context)
-            from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
-            task_queue = ArqTaskQueueAdapter(ctx['redis'])
+        # Task Queue (Adapter for worker context)
+        from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
+        task_queue = ArqTaskQueueAdapter(ctx['redis'])
 
-            # Command Handler
-            handler = AlertCommandHandler(
-                student_repo=student_repo,
-                email_repo=email_repo,
-                alert_repo=alert_repo,
-                advisor_repo=advisor_repo,
-                idempotency_repo=idempotency_repo,
-                gamification_service=gamification_service,
-                task_queue=task_queue,
-                email_drafting_service=BamlEmailDraftingService(),
-            )
+        # Command Handler
+        handler = AlertCommandHandler(
+            student_repo=student_repo,
+            email_repo=email_repo,
+            alert_repo=alert_repo,
+            advisor_repo=advisor_repo,
+            idempotency_repo=idempotency_repo,
+            gamification_service=gamification_service,
+            task_queue=task_queue,
+            email_drafting_service=BamlEmailDraftingService(),
         )
 
-        command = GenerateEmailDraftCommand(
-            sid=sid,
-            job_id=job_id,
-            booking_link=booking_link,
-            user_id=user_id,
-        )
+    command = GenerateEmailDraftCommand(
+        sid=sid,
+        job_id=job_id,
+        booking_link=booking_link,
+        user_id=user_id,
+    )
 
-        return await handler.handle_generate_email_draft(command)
+    return await handler.handle_generate_email_draft(command)
 
 
 async def run_agent_task(
