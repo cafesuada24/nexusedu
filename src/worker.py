@@ -13,6 +13,7 @@ from src.application.commands.alert_commands import (
 )
 from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
 from src.application.services.agent_metadata import AgentMetadataService
+from src.core.config import config
 from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker
@@ -29,7 +30,6 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyStudentRepository,
 )
 from src.telemetry.logger import logger
-from src.utils.env import getenv
 
 
 async def run_email_draft_task(
@@ -40,7 +40,7 @@ async def run_email_draft_task(
     user_id: str | None = None,
 ) -> None:
     """Worker task to generate email draft using AlertCommandHandler."""
-    logger.info(f"Worker: Starting email draft task for {case_id}")
+    logger.info(f'Worker: Starting email draft task for {case_id}')
 
     async with async_session_maker() as session:
         # Repositories
@@ -57,7 +57,7 @@ async def run_email_draft_task(
 
         # Task Queue (Adapter for worker context)
 
-        task_queue = ArqTaskQueueAdapter(ctx["redis"])
+        task_queue = ArqTaskQueueAdapter(ctx['redis'])
 
         # Command Handler
         handler = AlertCommandHandler(
@@ -93,7 +93,7 @@ async def run_agent_task(
     user_dict: dict[str, Any],
 ) -> AgentResponseDTO:
     """Worker task to process agent query using AgentCommandHandler."""
-    logger.info(f"Worker: Starting agent task for {job_id}")
+    logger.info(f'Worker: Starting agent task for {job_id}')
 
     checkpointer = MemorySaver()
     agent = create_graph(checkpointer=checkpointer)
@@ -119,10 +119,8 @@ class WorkerSettings:
 
     functions = [run_email_draft_task, run_agent_task]
     redis_settings = RedisSettings(
-        host=getenv("REDIS_HOST", "localhost"),
-        port=int(getenv("REDIS_PORT", "6379")),
+        host=config.redis_host,
+        port=config.redis_port,
     )
-    # Global concurrency limit
-    max_jobs = int(getenv("WORKER_MAX_JOBS", "5"))
-    # Default job timeout in seconds
-    job_timeout = int(getenv("WORKER_JOB_TIMEOUT", "60"))
+    max_jobs = config.worker_max_jobs
+    job_timeout = config.worker_job_timeout_sec

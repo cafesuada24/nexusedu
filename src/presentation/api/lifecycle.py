@@ -11,17 +11,16 @@ from typing import Any
 
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph.state import CompiledStateGraph
 from psycopg_pool import ConnectionPool
 
+from src.core.config import config
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.agents.state import AgentState
 from src.telemetry.logger import logger
-from src.utils.env import getenv
 
 
 @dataclass
@@ -36,17 +35,15 @@ class AppState:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manages the startup and shutdown lifecycle of the FastAPI application."""
-    load_dotenv()
-
     # ==== Database ====
     # Schema is managed by Alembic migrations. Run: alembic upgrade head
     logger.info('API Lifecycle: Starting up (DB managed by Alembic)...')
 
     # ==== Agent Checkpointer ====
-    postgres_uri = getenv('POSTGRES_DB_URI')
+    postgres_uri = config.pg_dsn
     pool = None
     if postgres_uri:
-        pool = ConnectionPool(conninfo=postgres_uri, max_size=20)
+        pool = ConnectionPool(conninfo=str(postgres_uri), max_size=20)
         checkpointer = PostgresSaver(pool)
         checkpointer.setup()
     else:
@@ -59,8 +56,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         arq_pool = await create_pool(
             RedisSettings(
-                host=getenv('REDIS_HOST', 'localhost'),
-                port=int(getenv('REDIS_PORT', '6379')),
+                host=config.redis_host,
+                port=config.redis_port,
             ),
         )
         logger.info('API Lifecycle: ARQ Redis Pool initialized.')
