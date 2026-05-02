@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from typing import Any
 
 from pydantic import UUID4
-from pydantic import UUID4
 
 from src.application.commands.alert_commands import (
     AlertCommandHandler,

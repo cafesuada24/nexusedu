@@ -40,7 +40,6 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
     mock_repos['history'].batch_create_history = AsyncMock()
     mock_repos['student'].get_by_id = AsyncMock()
     mock_repos['student'].update_risk_status = AsyncMock()
-    mock_repos['student'].batch_update_draft_job_ids = AsyncMock()
 
     mock_alert_handler.handle_trigger_draft = AsyncMock()
 

@@ -64,11 +64,8 @@ async def update_my_settings(
 ) -> UserSettingsRead:
     """Update the current authenticated user's settings."""
     if update.auto_draft_enabled is not None:
-        await settings_repo.set_auto_draft_enabled(user.id, update.auto_draft_enabled)
-        # Commit manually if settings_repo does not auto-commit, 
-        # but SqlAlchemyUserSettingsRepository has commit/flush logic if needed.
-        # Actually our SqlAlchemyUserSettingsRepository's set_auto_draft_enabled does session.commit().
-    
+        await settings_repo.update_auto_draft_enabled(user.id, update.auto_draft_enabled)
+
     auto_draft = await settings_repo.get_auto_draft_enabled(user.id)
     return UserSettingsRead(auto_draft_enabled=auto_draft)
 
