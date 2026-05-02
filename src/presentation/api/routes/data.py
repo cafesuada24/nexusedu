@@ -23,7 +23,7 @@ async def ingest_data(
     request: DataIngestionRequest,
     command_handler: Annotated[DataCommandHandler, Depends(get_data_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.DATA_INGEST))],
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    # session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> dict[str, object]:
     """Ingest multi-source data from JSON payload.
 
@@ -40,14 +40,13 @@ async def ingest_data(
                     DataSourceDTO(
                         source_type=source.source_type,
                         records=[r.model_dump(by_alias=True) for r in source.records],
-                    )
+                    ),
                 )
 
 
         command = DataIngestionCommand(data_sources=data_sources)
 
-        async with session.begin():
-            results = await command_handler.handle_ingest_data(command, user.id)
+        results = await command_handler.handle_ingest_data(command, user.id)
 
         return {
             'status': 'success',
