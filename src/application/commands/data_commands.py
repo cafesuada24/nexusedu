@@ -31,7 +31,6 @@ class DataCommandHandler:
         student_repo: StudentRepository,
         activity_repo: ActivityRepository,
         history_repo: StatusHistoryRepository,
-        idempotency_repo: IdempotencyRepository,
         settings_repo: UserSettingsRepository,
         case_repo: CaseRepository,
         job_repo: JobRepository,
@@ -41,7 +40,6 @@ class DataCommandHandler:
         self.student_repo = student_repo
         self.activity_repo = activity_repo
         self.history_repo = history_repo
-        self.idempotency_repo = idempotency_repo
         self.settings_repo = settings_repo
         self.case_repo = case_repo
         self.job_repo = job_repo
@@ -89,7 +87,7 @@ class DataCommandHandler:
                     update_db=False,
                 )
                 job_id = await self.alert_command_handler.handle_trigger_draft(
-                    trigger_command
+                    trigger_command,
                 )
                 triggered_jobs.append({'sid': sid, 'job_id': job_id})
                 db_updates.append((job_id, 'email_draft', correlation_id, correlation_type))
@@ -122,7 +120,7 @@ class DataCommandHandler:
 
         # 3. Call the pure domain service
         new_history_records, risk_statuses = self.anomaly_engine.run(
-            student_data, history_set
+            student_data, history_set,
         )
 
         # 4. Persist new history records
@@ -157,11 +155,3 @@ class DataCommandHandler:
                 await self.student_repo.update_risk_status(sid, risk_status=latest_risk)
 
         return new_at_risk_sids
-
-    async def check_idempotency(self, key: UUID4) -> bool:
-        """Check if an idempotency key has been used."""
-        return await self.idempotency_repo.check_key(key)
-
-    async def record_idempotency(self, key: UUID4) -> None:
-        """Record a new idempotency key."""
-        await self.idempotency_repo.record_key(key)
