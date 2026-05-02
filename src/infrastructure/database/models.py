@@ -198,6 +198,9 @@ class Case(Base):
         server_default=func.current_timestamp(),
     )
     resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    assigned_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey('advisors.advisor_id'), nullable=True
+    )
 
     # Relationships
     student: Mapped[Student] = relationship('Student')
