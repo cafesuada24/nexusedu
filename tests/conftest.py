@@ -16,6 +16,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
+    SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyMetadataRepository,
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from src.domain.repositories.activity_repository import ActivityRepository
     from src.domain.repositories.advisor_repository import AdvisorRepository
     from src.domain.repositories.alert_repository import AlertRepository
+    from src.domain.repositories.case_repository import CaseRepository
     from src.domain.repositories.email_repository import EmailRepository
     from src.domain.repositories.idempotency_repository import IdempotencyRepository
     from src.domain.repositories.metadata_repository import MetadataRepository
@@ -152,6 +154,12 @@ def advisor_repository(test_db_session: AsyncSession) -> AdvisorRepository:
 def alert_repository(test_db_session: AsyncSession) -> AlertRepository:
     """Provides a SqlAlchemyAlertRepository."""
     return SqlAlchemyAlertRepository(test_db_session)
+
+
+@pytest.fixture
+def case_repository(test_db_session: AsyncSession) -> CaseRepository:
+    """Provides a SqlAlchemyCaseRepository."""
+    return SqlAlchemyCaseRepository(test_db_session)
 
 
 @pytest.fixture

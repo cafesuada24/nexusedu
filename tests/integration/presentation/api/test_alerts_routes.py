@@ -7,12 +7,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from src.domain.entities.case import Case
 from src.domain.value_objects.status import InterventionStatus
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
 
-    from src.domain.repositories.interfaces import EmailRepository, StudentRepository
+    from src.domain.repositories.case_repository import CaseRepository
+    from src.domain.repositories.email_repository import EmailRepository
+    from src.domain.repositories.student_repository import StudentRepository
 
 
 @pytest.mark.asyncio
@@ -20,7 +23,7 @@ async def test_get_alerts(
     client: TestClient,
     student_repository: StudentRepository,
 ) -> None:
-    """Verify that /alerts/ returns students with active alerts."""
+    """Verify that /api/v1/alerts returns students with active alerts."""
     await student_repository.ingest_students(
         [
             {
@@ -39,7 +42,8 @@ async def test_get_alerts(
     )
     await student_repository.session.commit()
 
-    response = client.get('/api/v1/alerts/')
+    # Note: No trailing slash
+    response = client.get('/api/v1/alerts')
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
@@ -51,24 +55,28 @@ async def test_get_alerts(
 async def test_update_alert_status(
     client: TestClient,
     student_repository: StudentRepository,
+    case_repository: CaseRepository,
 ) -> None:
-    """Verify that status updates work correctly."""
+    """Verify that status updates work correctly via case_id."""
+    sid = uuid.uuid4()
+    cid = uuid.uuid4()
     await student_repository.ingest_students(
         [
             {
-                'sid': (a1 := uuid.uuid4()),
+                'sid': sid,
                 'student_name': 'P',
                 'email': 'p@ex.com',
                 'intervention_status': InterventionStatus.NOTIFIED.value,
             },
         ]
     )
+    await case_repository.create_case(Case(case_id=cid, sid=sid))
     await student_repository.session.commit()
 
-    response = client.patch(f'/api/v1/alerts/{a1}/status', json={'status': 'booked'})
+    response = client.patch(f'/api/v1/alerts/cases/{cid}/status', json={'status': 'booked'})
     assert response.status_code == 200
 
-    student = await student_repository.get_by_id(a1)
+    student = await student_repository.get_by_id(sid)
     assert student.intervention_status == InterventionStatus.BOOKED
 
 
@@ -76,21 +84,25 @@ async def test_update_alert_status(
 async def test_trigger_draft(
     client: TestClient,
     student_repository: StudentRepository,
+    case_repository: CaseRepository,
 ) -> None:
-    """Verify manual draft triggering."""
+    """Verify manual draft triggering via case_id."""
+    sid = uuid.uuid4()
+    cid = uuid.uuid4()
     await student_repository.ingest_students(
         [
             {
-                'sid': (s1 := uuid.uuid4()),
+                'sid': sid,
                 'student_name': 'T',
                 'email': 't@ex.com',
                 'intervention_status': InterventionStatus.NOTIFIED.value,
             },
         ]
     )
+    await case_repository.create_case(Case(case_id=cid, sid=sid))
     await student_repository.session.commit()
 
-    response = client.post(f'/api/v1/alerts/{s1}/draft/trigger')
+    response = client.post(f'/api/v1/alerts/cases/{cid}/draft', json={})
     assert response.status_code == 202
     assert 'job_id' in response.json()
 
@@ -99,35 +111,36 @@ async def test_trigger_draft(
 async def test_review_draft_idempotency(
     client: TestClient,
     student_repository: StudentRepository,
+    case_repository: CaseRepository,
 ) -> None:
-    """Verify points awarding for draft review."""
+    """Verify points awarding for draft review via case_id."""
     sid = uuid.uuid4()
+    cid = uuid.uuid4()
     await student_repository.ingest_students(
         [{'sid': sid, 'student_name': 'R', 'email': 'r@ex.com'}]
     )
+    await case_repository.create_case(Case(case_id=cid, sid=sid))
     await student_repository.session.commit()
 
     key = str(uuid.uuid4())
     headers = {'Idempotency-Key': key}
 
     # 1. First review
-    resp1 = client.post(f'/api/v1/alerts/{sid}/draft/review', headers=headers)
+    resp1 = client.post(f'/api/v1/alerts/cases/{cid}/draft/review', headers=headers)
     assert resp1.status_code == 200
     assert 'awarded' in resp1.json()['message']
-
-    # Note: Idempotency logic in routes was removed during refactor for simplicity 
-    # but we can restore it in command handlers if needed. 
-    # For now, let's just ensure the route works.
 
 
 @pytest.mark.asyncio
 async def test_send_email_flow(
     client: TestClient,
     student_repository: StudentRepository,
+    case_repository: CaseRepository,
     email_repository: EmailRepository,
 ) -> None:
-    """Verify the full email sending flow."""
+    """Verify the full email sending flow via case_id."""
     sid = uuid.uuid4()
+    cid = uuid.uuid4()
     await student_repository.ingest_students(
         [
             {
@@ -138,12 +151,13 @@ async def test_send_email_flow(
             }
         ]
     )
-    await email_repository.create_draft(sid, uuid.uuid4(), 'Subject', 'Body')
+    await case_repository.create_case(Case(case_id=cid, sid=sid))
+    await email_repository.create_placeholder(cid, sid, uuid.uuid4())
+    await email_repository.update_content(cid, 'Subject', 'Body', 'draft')
     await student_repository.session.commit()
 
     headers = {'Idempotency-Key': str(uuid.uuid4())}
-    response = client.post(f'/api/v1/alerts/{sid}/send', json={'body': 'Sent body'}, headers=headers)
-    print(response.json())
+    response = client.post(f'/api/v1/alerts/cases/{cid}/send', json={'body': 'Sent body'}, headers=headers)
     assert response.status_code == 200
 
     # Check status
@@ -151,7 +165,7 @@ async def test_send_email_flow(
     assert student.intervention_status == InterventionStatus.SENT
 
     # Check history
-    history = client.get(f'/api/v1/alerts/{sid}/history')
+    history = client.get(f'/api/v1/alerts/cases/{cid}/emails')
     hist = history.json()
     assert len(hist) == 1
     assert hist[0]['status'] == 'sent'
@@ -161,17 +175,21 @@ async def test_send_email_flow(
 async def test_get_email_draft(
     client: TestClient,
     student_repository: StudentRepository,
+    case_repository: CaseRepository,
     email_repository: EmailRepository,
 ) -> None:
-    """Verify retrieving the current draft content."""
+    """Verify retrieving the current draft content via case_id."""
     sid = uuid.uuid4()
+    cid = uuid.uuid4()
     await student_repository.ingest_students(
         [{'sid': sid, 'student_name': 'D', 'email': 'd@ex.com'}]
     )
-    await email_repository.create_draft(sid, uuid.uuid4(), 'Draft Sub', 'Draft Body')
+    await case_repository.create_case(Case(case_id=cid, sid=sid))
+    await email_repository.create_placeholder(cid, sid, uuid.uuid4())
+    await email_repository.update_content(cid, 'Draft Sub', 'Draft Body', 'draft')
     await student_repository.session.commit()
 
-    response = client.get(f'/api/v1/alerts/{sid}/draft')
+    response = client.get(f'/api/v1/alerts/cases/{cid}/draft')
     assert response.status_code == 200
     data = response.json()
     assert data['subject'] == 'Draft Sub'

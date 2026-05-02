@@ -132,8 +132,9 @@ async def test_auth_rbac_advisor_vs_viewer(
         data={'username': viewer_email, 'password': 'password'},
     )
     v_token = v_login.json()['access_token']
+    # Use case-centric route
     v_resp = raw_client.patch(
-        '/api/v1/alerts/S123/status',
+        f'/api/v1/alerts/cases/{uuid.uuid4()}/status',
         json={'status': 'sent'},
         headers={'Authorization': f'Bearer {v_token}'},
     )
@@ -146,11 +147,11 @@ async def test_auth_rbac_advisor_vs_viewer(
     )
     a_token = a_login.json()['access_token']
     a_resp = raw_client.patch(
-        '/api/v1/alerts/S123/status',
+        f'/api/v1/alerts/cases/{uuid.uuid4()}/status',
         json={'status': 'sent'},
         headers={'Authorization': f'Bearer {a_token}'},
     )
-    # Might be 500 because student S123 doesn't exist, but NOT 403
+    # Might be 404 because case doesn't exist, but NOT 403
     assert a_resp.status_code != 403
 
 
