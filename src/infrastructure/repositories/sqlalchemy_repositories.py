@@ -35,6 +35,7 @@ from src.infrastructure.database.models import (
     Student,
     StudentStatusHistory,
 )
+from src.utils.env import getenv
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -58,6 +59,7 @@ class SqlAlchemyStudentRepository:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
+        self.chunk_size = int(getenv('DB_INGEST_CHUNK_SIZE', '50'))
 
     async def get_by_id(self, sid: uuid.UUID) -> DomainStudent | None:
         """Retrieve a student by their unique ID."""
@@ -158,18 +160,23 @@ class SqlAlchemyStudentRepository:
             if 'sid' in record and isinstance(record['sid'], str):
                 record['sid'] = uuid.UUID(record['sid'])
 
-        # Dynamically choose insert implementation based on dialect
-        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
-        if dialect == 'postgresql':
-            from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
-                insert as pg_insert,
-            )
+        # Manual Chunking to avoid "too many variables" error (SQLite limit is ~999)
+        # Configurable via DB_INGEST_CHUNK_SIZE env var.
+        for i in range(0, len(records), self.chunk_size):
+            batch = records[i : i + self.chunk_size]
 
-            stmt = pg_insert(Student).values(records).on_conflict_do_nothing()
-        else:
-            stmt = sqlite_insert(Student).values(records).on_conflict_do_nothing()
+            # Dynamically choose insert implementation based on dialect
+            dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+            if dialect == 'postgresql':
+                from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
+                    insert as pg_insert,
+                )
 
-        await self.session.execute(stmt)
+                stmt = pg_insert(Student).values(batch).on_conflict_do_nothing()
+            else:
+                stmt = sqlite_insert(Student).values(batch).on_conflict_do_nothing()
+
+            await self.session.execute(stmt)
 
     async def update_risk_status(
         self,
@@ -192,6 +199,7 @@ class SqlAlchemyActivityRepository:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
+        self.chunk_size = int(getenv('DB_INGEST_CHUNK_SIZE', '50'))
 
     async def ingest_activities(self, records: list[dict[str, Any]]) -> None:
         """Bulk ingest activity records using upsert logic."""
@@ -207,18 +215,23 @@ class SqlAlchemyActivityRepository:
             if 'sid' in record and isinstance(record['sid'], str):
                 record['sid'] = uuid.UUID(record['sid'])
 
-        # Dynamically choose insert implementation based on dialect
-        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
-        if dialect == 'postgresql':
-            from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
-                insert as pg_insert,
-            )
+        # Manual Chunking to avoid "too many variables" error (SQLite limit is ~999)
+        # Configurable via DB_INGEST_CHUNK_SIZE env var.
+        for i in range(0, len(records), self.chunk_size):
+            batch = records[i : i + self.chunk_size]
 
-            stmt = pg_insert(Activity).values(records).on_conflict_do_nothing()
-        else:
-            stmt = sqlite_insert(Activity).values(records).on_conflict_do_nothing()
+            # Dynamically choose insert implementation based on dialect
+            dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+            if dialect == 'postgresql':
+                from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
+                    insert as pg_insert,
+                )
 
-        await self.session.execute(stmt)
+                stmt = pg_insert(Activity).values(batch).on_conflict_do_nothing()
+            else:
+                stmt = sqlite_insert(Activity).values(batch).on_conflict_do_nothing()
+
+            await self.session.execute(stmt)
 
     async def get_weekly_averages(self) -> list[dict[str, Any]]:
         """Retrieve average scores per student per week."""
