@@ -153,6 +153,7 @@ class AlertCommandHandler:
             raise ValueError('EmailDraftingService not provided.')
 
         logger.info(f'Generating email draft for student {command.sid}')
+        await self.job_repo.start_job(command.job_id)
 
         try:
             # 1. Fetch student PII
@@ -185,9 +186,11 @@ class AlertCommandHandler:
                 personalized_body,
                 case_id=active_case.case_id if active_case else None,
             )
-        finally:
-            # 5. Clear the job tracker
             await self.job_repo.complete_job(command.job_id)
+        except Exception as e:
+            logger.error(f'Failed to generate email draft: {str(e)}')
+            await self.job_repo.fail_job(command.job_id, str(e))
+            raise e
 
     async def handle_send_email(self, command: SendEmailCommand) -> str:
         """Execute the send email command."""

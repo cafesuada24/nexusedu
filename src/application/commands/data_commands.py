@@ -18,6 +18,7 @@ from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.value_objects.status import CaseStatus, InterventionStatus, RiskStatus
 
 
