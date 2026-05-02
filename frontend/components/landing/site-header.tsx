@@ -55,7 +55,7 @@ export function SiteHeader() {
                         <Link
                             key={l.href}
                             href={l.href}
-                            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            className="rounded-lg px-3 py-2 text-base font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         >
                             {l.label}
                         </Link>
@@ -70,7 +70,7 @@ export function SiteHeader() {
                                 variant: "ghost",
                                 size: "default",
                             }),
-                            "hidden rounded-xl md:inline-flex text-primary font-semibold",
+                            "hidden rounded-xl md:inline-flex text-primary font-semibold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-shadow duration-300",
                         )}
                     >
                         Đăng nhập
