@@ -12,7 +12,7 @@ from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.gamification import GamificationService
-from src.domain.value_objects.status import InterventionStatus
+from src.domain.value_objects.status import InterventionStatus, RiskStatus
 from src.telemetry.logger import logger
 
 
@@ -198,8 +198,25 @@ class AlertCommandHandler:
         action_type: str,
     ) -> None:
         """Orchestrate awarding points for an advisor action."""
+        if await self.advisor_repo.has_existing_action(advisor_id, sid, action_type):
+            logger.info(f"Gamification: Action {action_type} already recorded for advisor {advisor_id} and student {sid}. Skipping.")
+            return
+
         recorded_dt = await self.student_repo.get_latest_status_timestamp(sid)
-        points = self.gamification_service.calculate_points(action_type, recorded_dt)
+
+        student = await self.student_repo.get_by_id(sid)
+        risk_level = RiskStatus.UNKNOWN
+        if student:
+            raw = student.current_risk_status
+            if isinstance(raw, RiskStatus):
+                risk_level = raw
+            elif isinstance(raw, str):
+                try:
+                    risk_level = RiskStatus(raw)
+                except ValueError:
+                    risk_level = RiskStatus.UNKNOWN
+
+        points = self.gamification_service.calculate_points(action_type, recorded_dt, risk_level)
         if points > 0:
             await self.advisor_repo.record_points(advisor_id, sid, action_type, points)
 

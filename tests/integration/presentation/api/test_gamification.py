@@ -24,11 +24,11 @@ async def test_draft_review_points(
     student_repository: StudentRepository,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify that /alerts/{sid}/draft/review awards EXACTLY 5 points."""
+    """Verify that /alerts/{sid}/draft/review awards 7 points for a Critical student (<12h)."""
     sid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G1', 'email': 'g1@ex.com'},
+            {'sid': sid, 'student_name': 'G1', 'email': 'g1@ex.com', 'current_risk_status': 'Critical'},
         ]
     )
     test_db_session.add(
@@ -56,8 +56,8 @@ async def test_draft_review_points(
 
     assert len(ledger_entries) == 1
     assert ledger_entries[0].action_type == 'draft_reviewed'
-    # Strict assertion: 5 base * 1.2 bonus (since it happened just now) = 6
-    assert ledger_entries[0].points == 6
+    # Strict assertion: 5 base * 1.0 risk (Critical) * 1.5 bonus (<12h) = 7
+    assert ledger_entries[0].points == 7
 
 
 @pytest.mark.asyncio
@@ -100,6 +100,34 @@ async def test_idempotency_prevents_duplicate_review_points(
 
 
 @pytest.mark.asyncio
+async def test_duplicate_action_guard_prevents_double_points(
+    client: TestClient,
+    student_repository: StudentRepository,
+    test_db_session: AsyncSession,
+) -> None:
+    """Verify that the domain-level duplicate guard prevents double points even without Idempotency-Key."""
+    sid = uuid4()
+    await student_repository.ingest_students([
+        {'sid': sid, 'student_name': 'DupGuard', 'email': 'dg@ex.com', 'current_risk_status': 'Critical'},
+    ])
+    await test_db_session.commit()
+
+    # Act: Two requests WITHOUT Idempotency-Key (different keys generated server-side)
+    resp1 = client.post(f'/api/v1/alerts/{sid}/draft/review')
+    assert resp1.status_code == 200
+
+    resp2 = client.post(f'/api/v1/alerts/{sid}/draft/review')
+    assert resp2.status_code == 200
+
+    # Assert: Only ONE ledger entry should exist (duplicate guard blocked 2nd)
+    from sqlalchemy import select
+    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
+    assert len(ledger_entries) == 1
+    assert ledger_entries[0].action_type == 'draft_reviewed'
+
+
+@pytest.mark.asyncio
 async def test_email_sent_points(
     client: TestClient,
     student_repository: StudentRepository,
@@ -109,7 +137,7 @@ async def test_email_sent_points(
     sid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G2', 'email': 'g2@ex.com'},
+            {'sid': sid, 'student_name': 'G2', 'email': 'g2@ex.com', 'current_risk_status': 'Critical'},
         ]
     )
 
@@ -151,7 +179,7 @@ async def test_status_change_points(
     sid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G3', 'email': 'g3@ex.com'},
+            {'sid': sid, 'student_name': 'G3', 'email': 'g3@ex.com', 'current_risk_status': 'Critical'},
         ]
     )
     await student_repository.session.commit()
@@ -178,59 +206,61 @@ async def test_response_time_bonus(
     student_repository: StudentRepository,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify the 1.2x multiplier for <24h response using UTC-safe boundaries."""
+    """Verify tiered SLA multipliers (1.5x <12h, 1.2x <24h, 1.0x <72h, 0.8x >72h)."""
     sid_fast = uuid4()
+    sid_mid = uuid4()
     sid_slow = uuid4()
+    sid_penalty = uuid4()
 
     await student_repository.ingest_students(
         [
-            {'sid': sid_fast, 'student_name': 'Fast', 'email': 'f@ex.com'},
-            {'sid': sid_slow, 'student_name': 'Slow', 'email': 's@ex.com'},
+            {'sid': sid_fast, 'student_name': 'Fast', 'email': 'f@ex.com', 'current_risk_status': 'Critical'},
+            {'sid': sid_mid, 'student_name': 'Mid', 'email': 'm@ex.com', 'current_risk_status': 'Critical'},
+            {'sid': sid_slow, 'student_name': 'Slow', 'email': 's@ex.com', 'current_risk_status': 'Critical'},
+            {'sid': sid_penalty, 'student_name': 'Pen', 'email': 'p@ex.com', 'current_risk_status': 'Critical'},
         ]
     )
 
     # Use explicit UTC to avoid CI/CD timezone drift
     now = datetime.now(UTC)
-    fast_time = now - timedelta(hours=1)
-    slow_time = now - timedelta(days=2)
+    fast_time = now - timedelta(hours=1)       # < 12h (1.5x)
+    mid_time = now - timedelta(hours=18)       # < 24h (1.2x)
+    slow_time = now - timedelta(days=2)        # < 72h (1.0x)
+    penalty_time = now - timedelta(days=4)     # > 72h (0.8x)
 
     test_db_session.add_all(
         [
-            StudentStatusHistory(
-                history_id=uuid4(),
-                sid=sid_fast,
-                status_recorded_at=fast_time,
-                academic_year=2025,
-                semester=2,
-                week=1,
-            ),
-            StudentStatusHistory(
-                history_id=uuid4(),
-                sid=sid_slow,
-                status_recorded_at=slow_time,
-                academic_year=2025,
-                semester=2,
-                week=1,
-            ),
+            StudentStatusHistory(history_id=uuid4(), sid=sid_fast, status_recorded_at=fast_time, academic_year=2025, semester=2, week=1),
+            StudentStatusHistory(history_id=uuid4(), sid=sid_mid, status_recorded_at=mid_time, academic_year=2025, semester=2, week=1),
+            StudentStatusHistory(history_id=uuid4(), sid=sid_slow, status_recorded_at=slow_time, academic_year=2025, semester=2, week=1),
+            StudentStatusHistory(history_id=uuid4(), sid=sid_penalty, status_recorded_at=penalty_time, academic_year=2025, semester=2, week=1),
         ]
     )
     await test_db_session.commit()
 
-    # Trigger action for both
+    # Trigger action for all
     client.post(f'/api/v1/alerts/{sid_fast}/draft/review')
+    client.post(f'/api/v1/alerts/{sid_mid}/draft/review')
     client.post(f'/api/v1/alerts/{sid_slow}/draft/review')
+    client.post(f'/api/v1/alerts/{sid_penalty}/draft/review')
 
     from sqlalchemy import select
 
     stmt_fast = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_fast)
+    stmt_mid = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_mid)
     stmt_slow = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_slow)
+    stmt_penalty = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_penalty)
 
     res_fast = (await test_db_session.execute(stmt_fast)).scalar_one()
+    res_mid = (await test_db_session.execute(stmt_mid)).scalar_one()
     res_slow = (await test_db_session.execute(stmt_slow)).scalar_one()
+    res_penalty = (await test_db_session.execute(stmt_penalty)).scalar_one()
 
-    # Base is 5. Fast (<24h) = 5 * 1.2 = 6. Slow (>24h) = 5.
-    assert res_fast.points == 6
+    # Base is 5. Fast = 5 * 1.5 = 7. Mid = 5 * 1.2 = 6. Slow = 5 * 1.0 = 5. Penalty = 5 * 0.8 = 4
+    assert res_fast.points == 7
+    assert res_mid.points == 6
     assert res_slow.points == 5
+    assert res_penalty.points == 4
 
 
 @pytest.mark.asyncio
