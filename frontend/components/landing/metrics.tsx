@@ -9,7 +9,7 @@ export function Metrics() {
   return (
     <section
       id="metrics"
-      className="relative border-t border-border/60 bg-background py-20 md:py-28"
+      className="relative border-t border-border/60 bg-background py-20 md:py-28 scroll-mt-20"
     >
       <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
         <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-8 md:p-14">
