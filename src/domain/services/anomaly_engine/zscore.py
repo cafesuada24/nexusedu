@@ -122,7 +122,7 @@ class ZScore:
         record = None
         if not exists:
             record = {
-                'history_id': str(uuid.uuid4()),
+                'history_id': uuid.uuid4(),
                 'sid': sid,
                 'academic_year': week_data['academic_year'],
                 'semester': week_data['semester'],
