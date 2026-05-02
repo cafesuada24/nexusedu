@@ -7,6 +7,7 @@ from pydantic import UUID4
 
 from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO
 from src.domain.repositories.alert_repository import AlertRepository
+from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
@@ -35,11 +36,13 @@ class AlertQueryHandler:
         email_repo: EmailRepository,
         student_repo: StudentRepository,
         job_repo: JobRepository,
+        case_repo: CaseRepository,
     ):
         self.alert_repo = alert_repo
         self.email_repo = email_repo
         self.student_repo = student_repo
         self.job_repo = job_repo
+        self.case_repo = case_repo
 
     async def handle_get_active_alerts(
         self, query: GetActiveAlertsQuery
@@ -49,7 +52,17 @@ class AlertQueryHandler:
 
         dtos = []
         for a in domain_alerts:
-            active_job = await self.job_repo.get_active_job(a.student.sid, 'email_draft')
+            # Check for active case
+            active_case = await self.case_repo.get_active_case(a.student.sid)
+            
+            # Check for active job related to case or student
+            correlation_id = active_case.case_id if active_case else a.student.sid
+            correlation_type = 'case' if active_case else 'student'
+            
+            active_job = await self.job_repo.get_active_job(
+                correlation_id, correlation_type, 'email_draft'
+            )
+            
             dtos.append(
                 AlertDTO(
                     student=StudentDTO(
@@ -61,6 +74,7 @@ class AlertQueryHandler:
                         intervention_status=a.student.intervention_status,
                         last_notified_at=a.student.last_notified_timestamp,
                         is_generating=active_job is not None,
+                        active_case_id=active_case.case_id if active_case else None,
                     ),
                     alert_details=a.alert_details,
                 )
@@ -94,11 +108,18 @@ class AlertQueryHandler:
         history = await self.email_repo.get_history(sid)
         latest_draft = next((d for d in history if d.status.value == 'draft'), None)
 
-        active_job = await self.job_repo.get_active_job(sid, 'email_draft')
+        active_case = await self.case_repo.get_active_case(sid)
+        correlation_id = active_case.case_id if active_case else sid
+        correlation_type = 'case' if active_case else 'student'
+
+        active_job = await self.job_repo.get_active_job(
+            correlation_id, correlation_type, 'email_draft'
+        )
 
         return {
             'sid': sid,
             'is_generating': active_job is not None,
             'subject': latest_draft.subject if latest_draft else None,
             'body': latest_draft.body if latest_draft else None,
+            'active_case_id': str(active_case.case_id) if active_case else None,
         }
