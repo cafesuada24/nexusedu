@@ -14,7 +14,7 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.schemas.request import CoreDataSource, DataIngestionRequest
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 router = APIRouter(prefix='/data', tags=['data'])
 

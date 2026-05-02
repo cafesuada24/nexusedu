@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from src.infrastructure.agents.state import AgentState, MessageList
 from src.infrastructure.agents.utils import ResultSummarizer
 from src.infrastructure.extern.baml_client import b
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 
 class ResponderNode:

@@ -29,7 +29,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetadataRepository,
     SqlAlchemyStudentRepository,
 )
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 
 async def run_email_draft_task(

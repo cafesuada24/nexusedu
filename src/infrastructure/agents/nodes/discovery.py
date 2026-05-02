@@ -12,7 +12,7 @@ from src.infrastructure.agents.state import (
     DiscoveryRequest,
     RoutingMetadata,
 )
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 MAX_DISCOVERY_CONTEXT_CHARS = 15_000
 

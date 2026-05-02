@@ -29,7 +29,7 @@ from src.presentation.schemas.auth import (
     UserSettingsUpdate,
     UserUpdate,
 )
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 router = APIRouter(prefix='/users', tags=['users'])
 

@@ -21,7 +21,7 @@ from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
 )
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 
 @dataclass

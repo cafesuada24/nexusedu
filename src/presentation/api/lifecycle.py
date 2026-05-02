@@ -20,7 +20,7 @@ from psycopg_pool import ConnectionPool
 from src.core.config import config
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.agents.state import AgentState
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 
 @dataclass

@@ -9,7 +9,7 @@ from src.infrastructure.agents.state import (
     AgentState,
     RoutingMetadata,
 )
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 
 def route_after_sql(state: AgentState) -> Literal['email_agent', 'responder']:

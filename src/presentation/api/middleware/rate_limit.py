@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 # Note: For multi-worker production, always use Redis.
 # This implementation remains in-memory for this refactor phase

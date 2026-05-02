@@ -9,7 +9,7 @@ from src.infrastructure.agents.state import SQLTask
 from src.infrastructure.agents.utils import mask_pii_sql, stringify_to_yaml
 from src.infrastructure.extern.baml_client import b
 from src.infrastructure.extern.baml_client.types import RequestTableSchema
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 if TYPE_CHECKING:
     from src.application.services.agent_metadata import AgentMetadataService
