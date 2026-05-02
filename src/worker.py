@@ -34,13 +34,13 @@ from src.telemetry.logger import logger
 
 async def run_email_draft_task(
     ctx: dict[str, Any],
-    sid: str,
+    case_id: str,
     job_id: str,
     booking_link: str | None = None,
     user_id: str | None = None,
 ) -> None:
     """Worker task to generate email draft using AlertCommandHandler."""
-    logger.info(f"Worker: Starting email draft task for {sid}")
+    logger.info(f"Worker: Starting email draft task for {case_id}")
 
     async with async_session_maker() as session:
         # Repositories
@@ -56,7 +56,6 @@ async def run_email_draft_task(
         gamification_service = GamificationService()
 
         # Task Queue (Adapter for worker context)
-        from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 
         task_queue = ArqTaskQueueAdapter(ctx["redis"])
 
@@ -75,7 +74,7 @@ async def run_email_draft_task(
         )
 
         command = GenerateEmailDraftCommand(
-            sid=UUID(sid),
+            case_id=UUID(case_id),
             job_id=UUID(job_id),
             booking_link=booking_link,
             user_id=UUID(user_id) if user_id else None,
@@ -102,8 +101,9 @@ async def run_agent_task(
     async with async_session_maker() as session:
         metadata_repo = SqlAlchemyMetadataRepository(session)
         metadata_service = AgentMetadataService(metadata_repo)
+        idempotency_repo = SqlAlchemyIdempotencyRepository(session)
 
-        handler = AgentCommandHandler(agent, metadata_service)
+        handler = AgentCommandHandler(agent, metadata_service, idempotency_repo)
         command = RunAgentTaskCommand(
             job_id=UUID(job_id),
             query=query,
