@@ -84,7 +84,7 @@ class DataCommandHandler:
                 correlation_type = 'case' if active_case else 'student'
 
                 trigger_command = TriggerDraftCommand(
-                    sid=sid,
+                    case_id=correlation_id,
                     user_id=user_id,
                     update_db=False,
                 )

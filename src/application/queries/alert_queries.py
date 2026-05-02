@@ -55,14 +55,12 @@ class AlertQueryHandler:
             # Check for active case
             active_case = await self.case_repo.get_active_case(a.student.sid)
             
-            # Check for active job related to case or student
-            correlation_id = active_case.case_id if active_case else a.student.sid
-            correlation_type = 'case' if active_case else 'student'
-            
-            active_job = await self.job_repo.get_active_job(
-                correlation_id, correlation_type, 'email_draft'
-            )
-            
+            is_generating = False
+            if active_case:
+                email = await self.email_repo.get_by_case(active_case.case_id)
+                if email:
+                    is_generating = email.status.value == 'generating'
+
             dtos.append(
                 AlertDTO(
                     student=StudentDTO(
@@ -73,7 +71,7 @@ class AlertQueryHandler:
                         current_risk_status=a.student.current_risk_status,
                         intervention_status=a.student.intervention_status,
                         last_notified_at=a.student.last_notified_timestamp,
-                        is_generating=active_job is not None,
+                        is_generating=is_generating,
                         active_case_id=active_case.case_id if active_case else None,
                     ),
                     alert_details=a.alert_details,
@@ -100,12 +98,12 @@ class AlertQueryHandler:
         ]
 
     async def handle_get_case_details(self, case_id: UUID4) -> dict[str, Any]:
-        """Retrieve full details of a specific case, including associated emails."""
+        """Retrieve full details of a specific case, including its associated email."""
         case = await self.case_repo.get_by_id(case_id)
         if not case:
             raise ValueError(f'Case {case_id} not found.')
 
-        emails = await self.email_repo.get_by_case(case_id)
+        email = await self.email_repo.get_by_case(case_id)
 
         return {
             'case_id': str(case.case_id),
@@ -113,41 +111,51 @@ class AlertQueryHandler:
             'status': case.status.value,
             'created_at': case.created_at.isoformat(),
             'resolved_at': case.resolved_at.isoformat() if case.resolved_at else None,
-            'emails': [
-                {
-                    'email_id': str(e.email_id),
-                    'subject': e.subject,
-                    'body': e.body,
-                    'status': e.status.value,
-                    'created_at': e.created_at.isoformat(),
-                    'sent_at': e.sent_at.isoformat() if e.sent_at else None,
-                }
-                for e in emails
-            ]
+            'email': {
+                'email_id': str(email.email_id),
+                'subject': email.subject,
+                'body': email.body,
+                'status': email.status.value,
+                'created_at': email.created_at.isoformat(),
+                'sent_at': email.sent_at.isoformat() if email.sent_at else None,
+            } if email else None
         }
 
 
-    async def handle_get_draft_status(self, sid: UUID4) -> dict[str, Any]:
-        """Retrieve the current AI draft status and content for a student."""
-        student = await self.student_repo.get_by_id(sid)
-        if not student:
-            raise ValueError(f'Student {sid} not found.')
+    async def handle_get_draft_status(self, case_id: UUID4) -> dict[str, Any]:
+        """Retrieve the current AI draft status and content for a case."""
+        case = await self.case_repo.get_by_id(case_id)
+        if not case:
+            raise ValueError(f'Case {case_id} not found.')
 
-        history = await self.email_repo.get_history(sid)
-        latest_draft = next((d for d in history if d.status.value == 'draft'), None)
+        # 1. Look for existing email record for this case
+        email = await self.email_repo.get_by_case(case_id)
 
-        active_case = await self.case_repo.get_active_case(sid)
-        correlation_id = active_case.case_id if active_case else sid
-        correlation_type = 'case' if active_case else 'student'
+        is_generating = False
+        progress = 0
+        subject = None
+        body = None
 
-        active_job = await self.job_repo.get_active_job(
-            correlation_id, correlation_type, 'email_draft'
-        )
+        if email:
+            is_generating = email.status.value == 'generating'
+            subject = email.subject
+            body = email.body
+
+            # 2. If generating, optionally fetch fine-grained progress from JobRepository
+            if is_generating:
+                active_job = await self.job_repo.get_active_job(
+                    case_id, 'case', 'email_draft'
+                )
+                if active_job:
+                    job_details = await self.job_repo.get_job(active_job)
+                    if job_details:
+                        progress = job_details.get('progress', 0)
 
         return {
-            'sid': sid,
-            'is_generating': active_job is not None,
-            'subject': latest_draft.subject if latest_draft else None,
-            'body': latest_draft.body if latest_draft else None,
-            'active_case_id': str(active_case.case_id) if active_case else None,
+            'sid': str(case.sid),
+            'is_generating': is_generating,
+            'progress': progress,
+            'subject': subject,
+            'body': body,
+            'active_case_id': str(case.case_id),
         }
