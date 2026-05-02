@@ -760,6 +760,18 @@ class SqlAlchemyCaseRepository:
         orm_case = result.scalar_one_or_none()
         return DataMapper.to_domain_case(orm_case) if orm_case else None
 
+    async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
+        """Retrieve all cases for a specific student."""
+        from src.infrastructure.database.models import Case as OrmCase
+
+        stmt = (
+            select(OrmCase)
+            .where(OrmCase.sid == sid)
+            .order_by(desc(OrmCase.created_at))
+        )
+        result = await self.session.execute(stmt)
+        return [DataMapper.to_domain_case(row[0]) for row in result.all()]
+
 
 class SqlAlchemyJobRepository:
     """SQLAlchemy implementation of the JobRepository."""
@@ -864,6 +876,30 @@ class SqlAlchemyJobRepository:
             for job_id, job_type, corr_id, corr_type in jobs
         ]
         self.session.add_all(entries)
+
+    async def get_job(self, job_id: uuid.UUID) -> dict[str, Any] | None:
+        """Retrieve job details for observability."""
+        from src.infrastructure.database.models import BackgroundJobTracker
+        
+        stmt = select(BackgroundJobTracker).where(BackgroundJobTracker.job_id == job_id)
+        result = await self.session.execute(stmt)
+        orm_job = result.scalar_one_or_none()
+        
+        if not orm_job:
+            return None
+            
+        return {
+            'job_id': str(orm_job.job_id),
+            'job_type': orm_job.job_type,
+            'status': orm_job.status,
+            'progress': orm_job.progress,
+            'error_message': orm_job.error_message,
+            'created_at': orm_job.created_at.isoformat() if orm_job.created_at else None,
+            'started_at': orm_job.started_at.isoformat() if orm_job.started_at else None,
+            'completed_at': orm_job.completed_at.isoformat() if orm_job.completed_at else None,
+            'correlation_id': str(orm_job.correlation_id) if orm_job.correlation_id else None,
+            'correlation_type': orm_job.correlation_type,
+        }
 
 
 class SqlAlchemyUserSettingsRepository:
