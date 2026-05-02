@@ -6,17 +6,22 @@ import datetime
 class GamificationService:
     """Service for managing advisor points and SLAs."""
 
+    DEFAULT_MATRIX = {
+        'draft_reviewed': 5,
+        'email_sent': 10,
+        'meeting_booked': 50,
+        'student_resolved': 100,
+    }
+
+    def __init__(self, matrix: dict[str, int] | None = None) -> None:
+        """Initialize with an optional custom scoring matrix."""
+        self.matrix = matrix or self.DEFAULT_MATRIX
+
     def calculate_points(
         self, action_type: str, recorded_dt: datetime.datetime | None
     ) -> int:
         """Calculate points for an advisor action."""
-        matrix = {
-            'draft_reviewed': 5,
-            'email_sent': 10,
-            'meeting_booked': 50,
-            'student_resolved': 100,
-        }
-        base_points = matrix.get(action_type, 0)
+        base_points = self.matrix.get(action_type, 0)
         if base_points == 0:
             return 0
 
