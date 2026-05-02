@@ -8,8 +8,10 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
+    Integer,
     String,
     case,
+    cast,
     desc,
     func,
     inspect,
@@ -22,19 +24,21 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from src.domain.entities.alert import Alert
-from src.domain.value_objects.status import RiskStatus
-from src.infrastructure.database.config import DB_REGISTRY
+from src.domain.value_objects.status import CaseStatus, EmailStatus, RiskStatus
+from src.infrastructure.database.config import DB_REGISTRY, DBDescription
 from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
     Advisor,
     AdvisorPointsLedger,
+    BackgroundJobTracker,
     IdempotencyKey,
     InterventionEmail,
     Student,
     StudentStatusHistory,
+    UserSettings,
 )
+from src.infrastructure.database.models import Case as OrmCase
 from src.utils.env import getenv
 
 if TYPE_CHECKING:
@@ -45,6 +49,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from src.domain.entities.advisor import Advisor as DomainAdvisor
+    from src.domain.entities.alert import Alert
     from src.domain.entities.alert import Alert as DomainAlert
     from src.domain.entities.case import Case as DomainCase
     from src.domain.entities.intervention_email import (
@@ -372,7 +377,7 @@ class SqlAlchemyAdvisorRepository:
         ).order_by(desc('total_points'))
 
         result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
+        return [dict(row) for row in result.mappings().all()]
 
     async def record_points(
         self,
@@ -390,7 +395,7 @@ class SqlAlchemyAdvisorRepository:
         )
         self.session.add(entry)
         # await self.session.commit() removed
-        
+
     async def has_existing_action(
         self, advisor_id: uuid.UUID, sid: uuid.UUID, action_type: str
     ) -> bool:
@@ -431,7 +436,7 @@ class SqlAlchemyMetadataRepository:
         """Initialize with session."""
         self.session = session
 
-    async def get_db_registry(self) -> list[dict[str, Any]]:
+    async def get_db_registry(self) -> list[DBDescription]:
         """Get the available database registry."""
         return DB_REGISTRY
 
@@ -485,9 +490,7 @@ class SqlAlchemyMetadataRepository:
     async def execute_raw(self, db_id: str, sql: str) -> list[dict[str, Any]]:
         """Execute raw SQL for agent analysis."""
         res = await self.session.execute(text(sql))
-        if res.returns_rows:
-            return [dict(zip(res.keys(), row, strict=True)) for row in res.all()]
-        return []
+        return [dict(zip(res.keys(), row, strict=True)) for row in res.all()]
 
 
 class SqlAlchemyEmailRepository:
@@ -520,13 +523,13 @@ class SqlAlchemyEmailRepository:
         case_id: uuid.UUID,
         subject: str,
         body: str,
-        status: str,
+        status: EmailStatus,
     ) -> None:
         """Update the content and status of an existing case email."""
         stmt = (
             update(InterventionEmail)
             .where(InterventionEmail.case_id == case_id)
-            .values(subject=subject, body=body, status=status)
+            .values(subject=subject, body=body, status=status.value)
         )
         await self.session.execute(stmt)
 
@@ -546,7 +549,11 @@ class SqlAlchemyEmailRepository:
         stmt = (
             update(InterventionEmail)
             .where(InterventionEmail.case_id == case_id)
-            .values(body=body, status='sent', sent_at=func.current_timestamp())
+            .values(
+                body=body,
+                status=EmailStatus.SENT.value,
+                sent_at=func.current_timestamp(),
+            )
         )
         await self.session.execute(stmt)
 
@@ -570,8 +577,6 @@ class SqlAlchemyCaseRepository:
 
     async def create_case(self, case: DomainCase) -> None:
         """Create a new case."""
-        from src.infrastructure.database.models import Case as OrmCase
-
         orm_case = OrmCase(
             case_id=case.case_id,
             sid=case.sid,
@@ -582,29 +587,26 @@ class SqlAlchemyCaseRepository:
 
     async def get_active_case(self, sid: uuid.UUID) -> DomainCase | None:
         """Retrieve the active case for a student, if any."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = select(OrmCase).where(
-            OrmCase.sid == sid,
-            OrmCase.status == 'open'
-        ).limit(1)
+        stmt = (
+            select(OrmCase).where(OrmCase.sid == sid, OrmCase.status == 'open').limit(1)
+        )
         result = await self.session.execute(stmt)
         orm_case = result.scalar_one_or_none()
         return DataMapper.to_domain_case(orm_case) if orm_case else None
 
-    async def update_case_status(self, case_id: uuid.UUID, status: str) -> None:
+    async def update_case_status(self, case_id: uuid.UUID, status: CaseStatus) -> None:
         """Update the status of a case."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = update(OrmCase).where(OrmCase.case_id == case_id).values(status=status)
-        if status in ('resolved', 'closed'):
+        stmt = (
+            update(OrmCase)
+            .where(OrmCase.case_id == case_id)
+            .values(status=status.value)
+        )
+        if status in (CaseStatus.RESOLVED, CaseStatus.CLOSED):
             stmt = stmt.values(resolved_at=func.current_timestamp())
         await self.session.execute(stmt)
 
     async def get_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
         """Retrieve a case by its ID."""
-        from src.infrastructure.database.models import Case as OrmCase
-
         stmt = select(OrmCase).where(OrmCase.case_id == case_id)
         result = await self.session.execute(stmt)
         orm_case = result.scalar_one_or_none()
@@ -612,12 +614,8 @@ class SqlAlchemyCaseRepository:
 
     async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
         """Retrieve all cases for a specific student."""
-        from src.infrastructure.database.models import Case as OrmCase
-
         stmt = (
-            select(OrmCase)
-            .where(OrmCase.sid == sid)
-            .order_by(desc(OrmCase.created_at))
+            select(OrmCase).where(OrmCase.sid == sid).order_by(desc(OrmCase.created_at))
         )
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
@@ -666,7 +664,7 @@ class SqlAlchemyAlertRepository:
         result = await self.session.execute(stmt)
         alerts: list[Alert] = []
         for row in result.all():
-            row_tuple = row._tuple()
+            row_tuple = tuple(row)
             orm_student = row_tuple[0]
             draft_subject = row_tuple[1]
             draft_body = row_tuple[2]
@@ -677,7 +675,7 @@ class SqlAlchemyAlertRepository:
                         'draft_subject': draft_subject,
                         'draft_body': draft_body,
                     },
-                )
+                ),
             )
         return alerts
 
@@ -746,7 +744,7 @@ class SqlAlchemyMetricsRepository:
                 (
                     literal('W').concat(func.cast(StudentStatusHistory.week, String))
                 ).label('month'),
-                literal_column('80').label('baseline'),
+                cast(literal_column('80'), Integer).label('baseline'),
                 (
                     func.count(
                         case((StudentStatusHistory.anomaly_flag == 'Normal', 1)),
@@ -770,69 +768,7 @@ class SqlAlchemyMetricsRepository:
 
         result = await self.session.execute(stmt)
         # Reverse to get chronological order
-        return [row._asdict() for row in result.all()][::-1]
-
-
-class SqlAlchemyCaseRepository:
-    """SQLAlchemy implementation of the CaseRepository."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize with a SQLAlchemy async session."""
-        self.session = session
-
-    async def create_case(self, case: DomainCase) -> None:
-        """Create a new case."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        orm_case = OrmCase(
-            case_id=case.case_id,
-            sid=case.sid,
-            status=case.status.value,
-            created_at=case.created_at,
-        )
-        self.session.add(orm_case)
-
-    async def get_active_case(self, sid: uuid.UUID) -> DomainCase | None:
-        """Retrieve the active case for a student, if any."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = select(OrmCase).where(
-            OrmCase.sid == sid,
-            OrmCase.status == 'open'
-        ).limit(1)
-        result = await self.session.execute(stmt)
-        orm_case = result.scalar_one_or_none()
-        return DataMapper.to_domain_case(orm_case) if orm_case else None
-
-    async def update_case_status(self, case_id: uuid.UUID, status: str) -> None:
-        """Update the status of a case."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = update(OrmCase).where(OrmCase.case_id == case_id).values(status=status)
-        if status in ('resolved', 'closed'):
-            stmt = stmt.values(resolved_at=func.current_timestamp())
-        await self.session.execute(stmt)
-
-    async def get_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
-        """Retrieve a case by its ID."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = select(OrmCase).where(OrmCase.case_id == case_id)
-        result = await self.session.execute(stmt)
-        orm_case = result.scalar_one_or_none()
-        return DataMapper.to_domain_case(orm_case) if orm_case else None
-
-    async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
-        """Retrieve all cases for a specific student."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = (
-            select(OrmCase)
-            .where(OrmCase.sid == sid)
-            .order_by(desc(OrmCase.created_at))
-        )
-        result = await self.session.execute(stmt)
-        return [DataMapper.to_domain_case(row[0]) for row in result.all()]
+        return [dict(row) for row in result.mappings().all()][::-1]
 
 
 class SqlAlchemyJobRepository:
@@ -850,90 +786,95 @@ class SqlAlchemyJobRepository:
         correlation_type: str | None = None,
     ) -> None:
         """Record a new background job with optional correlation."""
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
         entry = BackgroundJobTracker(
             job_id=job_id,
             job_type=job_type,
             correlation_id=correlation_id,
             correlation_type=correlation_type,
-            status='running'
+            status='running',
         )
         self.session.add(entry)
 
     async def update_job_progress(
-        self, job_id: uuid.UUID, progress: int, status_message: str | None = None
+        self,
+        job_id: uuid.UUID,
+        progress: int,
+        status_message: str | None = None,
     ) -> None:
         """Update the progress and status message of a job."""
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
-        stmt = update(BackgroundJobTracker).where(
-            BackgroundJobTracker.job_id == job_id
-        ).values(progress=progress, error_message=status_message)
+        stmt = (
+            update(BackgroundJobTracker)
+            .where(BackgroundJobTracker.job_id == job_id)
+            .values(progress=progress, error_message=status_message)
+        )
         await self.session.execute(stmt)
 
     async def start_job(self, job_id: uuid.UUID) -> None:
         """Mark a job as started."""
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
-        stmt = update(BackgroundJobTracker).where(
-            BackgroundJobTracker.job_id == job_id
-        ).values(started_at=func.current_timestamp(), status='processing')
+        stmt = (
+            update(BackgroundJobTracker)
+            .where(BackgroundJobTracker.job_id == job_id)
+            .values(started_at=func.current_timestamp(), status='processing')
+        )
         await self.session.execute(stmt)
 
     async def complete_job(self, job_id: uuid.UUID) -> None:
         """Mark a background job as completed."""
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
-        stmt = update(BackgroundJobTracker).where(
-            BackgroundJobTracker.job_id == job_id
-        ).values(completed_at=func.current_timestamp(), status='completed', progress=100)
+        stmt = (
+            update(BackgroundJobTracker)
+            .where(BackgroundJobTracker.job_id == job_id)
+            .values(
+                completed_at=func.current_timestamp(),
+                status='completed',
+                progress=100,
+            )
+        )
         await self.session.execute(stmt)
 
     async def fail_job(self, job_id: uuid.UUID, error_message: str) -> None:
         """Mark a background job as failed."""
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
-        stmt = update(BackgroundJobTracker).where(
-            BackgroundJobTracker.job_id == job_id
-        ).values(
-            completed_at=func.current_timestamp(),
-            status='failed',
-            error_message=error_message
+        stmt = (
+            update(BackgroundJobTracker)
+            .where(BackgroundJobTracker.job_id == job_id)
+            .values(
+                completed_at=func.current_timestamp(),
+                status='failed',
+                error_message=error_message,
+            )
         )
         await self.session.execute(stmt)
 
     async def get_active_job(
-        self, correlation_id: uuid.UUID, correlation_type: str, job_type: str
+        self,
+        correlation_id: uuid.UUID,
+        correlation_type: str,
+        job_type: str,
     ) -> uuid.UUID | None:
         """Retrieve the active job ID for a specific correlation context."""
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
         stmt = select(BackgroundJobTracker.job_id).where(
             BackgroundJobTracker.correlation_id == correlation_id,
             BackgroundJobTracker.correlation_type == correlation_type,
             BackgroundJobTracker.job_type == job_type,
-            BackgroundJobTracker.status.in_(['running', 'processing'])
+            BackgroundJobTracker.status.in_(['running', 'processing']),
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
     async def batch_create_jobs(
-        self, jobs: Sequence[tuple[uuid.UUID, str, uuid.UUID | None, str | None]]
+        self,
+        jobs: Sequence[tuple[uuid.UUID, str, uuid.UUID | None, str | None]],
     ) -> None:
         """Batch record multiple background jobs."""
         if not jobs:
             return
-            
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
+
         entries = [
             BackgroundJobTracker(
                 job_id=job_id,
                 job_type=job_type,
                 correlation_id=corr_id,
                 correlation_type=corr_type,
-                status='running'
+                status='running',
             )
             for job_id, job_type, corr_id, corr_type in jobs
         ]
@@ -941,25 +882,31 @@ class SqlAlchemyJobRepository:
 
     async def get_job(self, job_id: uuid.UUID) -> dict[str, Any] | None:
         """Retrieve job details for observability."""
-        from src.infrastructure.database.models import BackgroundJobTracker
-        
         stmt = select(BackgroundJobTracker).where(BackgroundJobTracker.job_id == job_id)
         result = await self.session.execute(stmt)
         orm_job = result.scalar_one_or_none()
-        
+
         if not orm_job:
             return None
-            
+
         return {
             'job_id': str(orm_job.job_id),
             'job_type': orm_job.job_type,
             'status': orm_job.status,
             'progress': orm_job.progress,
             'error_message': orm_job.error_message,
-            'created_at': orm_job.created_at.isoformat() if orm_job.created_at else None,
-            'started_at': orm_job.started_at.isoformat() if orm_job.started_at else None,
-            'completed_at': orm_job.completed_at.isoformat() if orm_job.completed_at else None,
-            'correlation_id': str(orm_job.correlation_id) if orm_job.correlation_id else None,
+            'created_at': orm_job.created_at.isoformat()
+            if orm_job.created_at
+            else None,
+            'started_at': orm_job.started_at.isoformat()
+            if orm_job.started_at
+            else None,
+            'completed_at': orm_job.completed_at.isoformat()
+            if orm_job.completed_at
+            else None,
+            'correlation_id': str(orm_job.correlation_id)
+            if orm_job.correlation_id
+            else None,
             'correlation_type': orm_job.correlation_type,
         }
 
@@ -973,34 +920,46 @@ class SqlAlchemyUserSettingsRepository:
 
     async def get_auto_draft_enabled(self, user_id: uuid.UUID) -> bool:
         """Check if auto-drafting is enabled for a user."""
-        from src.infrastructure.database.models import UserSettings
-        
-        stmt = select(UserSettings.auto_draft_enabled).where(UserSettings.user_id == user_id)
+        stmt = select(UserSettings.auto_draft_enabled).where(
+            UserSettings.user_id == user_id,
+        )
         result = await self.session.execute(stmt)
         value = result.scalar_one_or_none()
-        
+
         # Lazy initialization: return True (default) if no setting exists
         return True if value is None else value
 
-    async def update_auto_draft_enabled(self, user_id: uuid.UUID, enabled: bool) -> None:
+    async def update_auto_draft_enabled(
+        self,
+        user_id: uuid.UUID,
+        enabled: bool,
+    ) -> None:
         """Update the auto-drafting setting for a user."""
-        from src.infrastructure.database.models import UserSettings
-        
         # Upsert logic
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
         values = {'user_id': user_id, 'auto_draft_enabled': enabled}
-        
+
         if dialect == 'postgresql':
             from sqlalchemy.dialects.postgresql import insert as pg_insert
-            stmt = pg_insert(UserSettings).values(**values).on_conflict_do_update(
-                index_elements=['user_id'],
-                set_={'auto_draft_enabled': enabled}
+
+            stmt = (
+                pg_insert(UserSettings)
+                .values(**values)
+                .on_conflict_do_update(
+                    index_elements=['user_id'],
+                    set_={'auto_draft_enabled': enabled},
+                )
             )
         else:
             from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-            stmt = sqlite_insert(UserSettings).values(**values).on_conflict_do_update(
-                index_elements=['user_id'],
-                set_={'auto_draft_enabled': enabled}
+
+            stmt = (
+                sqlite_insert(UserSettings)
+                .values(**values)
+                .on_conflict_do_update(
+                    index_elements=['user_id'],
+                    set_={'auto_draft_enabled': enabled},
+                )
             )
-            
+
         await self.session.execute(stmt)
