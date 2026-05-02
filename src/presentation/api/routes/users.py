@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.domain.repositories.idempotency_repository import IdempotencyRepository
+from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.presentation.api.auth import (
     Scope,
     User,
@@ -17,7 +19,16 @@ from src.presentation.api.auth import (
     get_user_manager,
     require_scope,
 )
-from src.presentation.schemas.auth import UserRead, UserUpdate
+from src.presentation.dependencies.providers import (
+    get_idempotency_repository,
+    get_user_settings_repository,
+)
+from src.presentation.schemas.auth import (
+    UserRead,
+    UserSettingsRead,
+    UserSettingsUpdate,
+    UserUpdate,
+)
 from src.telemetry.logger import logger
 
 router = APIRouter(prefix='/users', tags=['users'])
@@ -31,6 +42,37 @@ async def get_me(
     return user
 
 
+@router.get('/me/settings', response_model=UserSettingsRead)
+async def get_my_settings(
+    user: Annotated[User, Depends(current_active_user)],
+    settings_repo: Annotated[
+        UserSettingsRepository, Depends(get_user_settings_repository)
+    ],
+) -> UserSettingsRead:
+    """Get the current authenticated user's settings."""
+    auto_draft = await settings_repo.get_auto_draft_enabled(user.id)
+    return UserSettingsRead(auto_draft_enabled=auto_draft)
+
+
+@router.patch('/me/settings', response_model=UserSettingsRead)
+async def update_my_settings(
+    update: UserSettingsUpdate,
+    user: Annotated[User, Depends(current_active_user)],
+    settings_repo: Annotated[
+        UserSettingsRepository, Depends(get_user_settings_repository)
+    ],
+) -> UserSettingsRead:
+    """Update the current authenticated user's settings."""
+    if update.auto_draft_enabled is not None:
+        await settings_repo.set_auto_draft_enabled(user.id, update.auto_draft_enabled)
+        # Commit manually if settings_repo does not auto-commit, 
+        # but SqlAlchemyUserSettingsRepository has commit/flush logic if needed.
+        # Actually our SqlAlchemyUserSettingsRepository's set_auto_draft_enabled does session.commit().
+    
+    auto_draft = await settings_repo.get_auto_draft_enabled(user.id)
+    return UserSettingsRead(auto_draft_enabled=auto_draft)
+
+
 @router.patch('/{user_id}', response_model=UserRead)
 async def update_user(
     user_id: uuid.UUID,
@@ -38,21 +80,28 @@ async def update_user(
     request: Request,
     user_manager: Annotated[UserManager, Depends(get_user_manager)],
     _admin: Annotated[User, Depends(require_scope(Scope.USERS_WRITE))],
+    idempotency_repo: Annotated[
+        IdempotencyRepository, Depends(get_idempotency_repository)
+    ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> User:
     """Update a user's information, including their role (Admin only)."""
-    if idempotency_key:
-        idemp_key = UUID(idempotency_key)
-        # We'd need to check idempotency here too. 
-        # But fastapi-users manages its own lifecycle.
-        # For now, we'll just implement it manually if needed, but it's complex with the manager.
-        pass
-
     user = await user_manager.get(user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    return await user_manager.update(user_update, user, request=request)
+    if idempotency_key:
+        idemp_key = UUID(idempotency_key)
+        if await idempotency_repo.check_key(idemp_key):
+            logger.info(f'Idempotency hit for update_user: {idemp_key}')
+            return user
+
+    updated_user = await user_manager.update(user_update, user, request=request)
+
+    if idempotency_key:
+        await idempotency_repo.record_key(UUID(idempotency_key))
+
+    return updated_user
 
 
 @router.get('/', response_model=list[UserRead])

@@ -28,4 +28,18 @@ class UserUpdate(schemas.BaseUserUpdate):
 
     Attributes:
         role: The new role to assign to the user.
+    """
+
     role: UserRole | None = None
+
+
+class UserSettingsRead(schemas.BaseModel):
+    """Schema for reading user settings."""
+
+    auto_draft_enabled: bool
+
+
+class UserSettingsUpdate(schemas.BaseModel):
+    """Schema for updating user settings."""
+
+    auto_draft_enabled: bool | None = None

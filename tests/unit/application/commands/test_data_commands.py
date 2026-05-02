@@ -17,6 +17,7 @@ def mock_repos():
         'history': MagicMock(),
         'settings': MagicMock(),
         'idempotency': MagicMock(),
+        'job': MagicMock(),
     }
 
 
@@ -48,6 +49,8 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
         activity_repo=mock_repos['activity'],
         history_repo=mock_repos['history'],
         idempotency_repo=mock_repos['idempotency'],
+        settings_repo=mock_repos['settings'],
+        job_repo=mock_repos['job'],
         anomaly_engine=mock_engine,
         alert_command_handler=mock_alert_handler,
     )
@@ -85,6 +88,9 @@ async def test_run_anomaly_detection_orchestration(handler, mock_repos, mock_eng
     mock_student = MagicMock()
     mock_student.intervention_status = InterventionStatus.NONE
     mock_repos['student'].get_by_id.return_value = mock_student
+
+    # Mock settings return
+    mock_repos['settings'].get_auto_draft_enabled = AsyncMock(return_value=True)
 
     # Execute
     new_at_risk = await handler._run_anomaly_detection()

@@ -8,6 +8,7 @@ from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
+from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.gamification import GamificationService
@@ -71,6 +72,7 @@ class AlertCommandHandler:
         alert_repo: AlertRepository,
         advisor_repo: AdvisorRepository,
         idempotency_repo: IdempotencyRepository,
+        job_repo: JobRepository,
         gamification_service: GamificationService,
         task_queue: BackgroundTaskQueue,
         email_drafting_service: EmailDraftingService | None = None,
@@ -81,6 +83,7 @@ class AlertCommandHandler:
         self.alert_repo = alert_repo
         self.advisor_repo = advisor_repo
         self.idempotency_repo = idempotency_repo
+        self.job_repo = job_repo
         self.gamification_service = gamification_service
         self.email_drafting_service = email_drafting_service
         self.task_queue = task_queue
@@ -120,7 +123,7 @@ class AlertCommandHandler:
         )
 
         if command.update_db:
-            await self.student_repo.update_draft_job_id(command.sid, job_id)
+            await self.job_repo.create_job(job_id, command.sid, 'email_draft')
         return job_id
 
     async def handle_generate_email_draft(
@@ -164,7 +167,7 @@ class AlertCommandHandler:
             )
         finally:
             # 5. Clear the job tracker
-            await self.student_repo.update_draft_job_id(command.sid, None)
+            await self.job_repo.complete_job(command.job_id)
 
     async def handle_send_email(self, command: SendEmailCommand) -> str:
         """Execute the send email command."""

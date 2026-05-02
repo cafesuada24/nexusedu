@@ -41,9 +41,9 @@ class AlertStudent(BaseModel):
     email: str = Field(..., description='Student email.')
     current_risk_status: str = Field(..., description='The type of anomaly detected.')
     intervention_status: str = Field(..., description='The current Kanban state.')
-    draft_job_id: str | None = Field(
-        None,
-        description='Background Job ID for the AI draft.',
+    is_generating: bool = Field(
+        False,
+        description='Whether a background AI draft generation is running.',
     )
 
 
@@ -86,7 +86,7 @@ async def get_alerts(
                 'email': d.student.email,
                 'current_risk_status': d.student.current_risk_status.value,
                 'intervention_status': d.student.intervention_status.value,
-                'draft_job_id': d.alert_details.get('draft_job_id'),
+                'is_generating': d.student.is_generating,
             }
             for d in dtos
         ]

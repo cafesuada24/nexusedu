@@ -8,6 +8,7 @@ from pydantic import UUID4
 from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.email_repository import EmailRepository
+from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 
 
@@ -33,10 +34,12 @@ class AlertQueryHandler:
         alert_repo: AlertRepository,
         email_repo: EmailRepository,
         student_repo: StudentRepository,
+        job_repo: JobRepository,
     ):
         self.alert_repo = alert_repo
         self.email_repo = email_repo
         self.student_repo = student_repo
+        self.job_repo = job_repo
 
     async def handle_get_active_alerts(
         self, query: GetActiveAlertsQuery
@@ -44,23 +47,25 @@ class AlertQueryHandler:
         """Execute the get active alerts query."""
         domain_alerts = await self.alert_repo.get_active_alerts(query.status_filter)
 
-        # Map domain alerts to DTOs
-        return [
-            AlertDTO(
-                student=StudentDTO(
-                    sid=a.student.sid,
-                    student_name=a.student.student_name,
-                    email=a.student.email,
-                    major=a.student.major,
-                    current_risk_status=a.student.current_risk_status,
-                    intervention_status=a.student.intervention_status,
-                    last_notified_at=a.student.last_notified_timestamp,
-                    is_generating=a.student.draft_job_id is not None,
-                ),
-                alert_details=a.alert_details,
+        dtos = []
+        for a in domain_alerts:
+            active_job = await self.job_repo.get_active_job(a.student.sid, 'email_draft')
+            dtos.append(
+                AlertDTO(
+                    student=StudentDTO(
+                        sid=a.student.sid,
+                        student_name=a.student.student_name,
+                        email=a.student.email,
+                        major=a.student.major,
+                        current_risk_status=a.student.current_risk_status,
+                        intervention_status=a.student.intervention_status,
+                        last_notified_at=a.student.last_notified_timestamp,
+                        is_generating=active_job is not None,
+                    ),
+                    alert_details=a.alert_details,
+                )
             )
-            for a in domain_alerts
-        ]
+        return dtos
 
     async def handle_get_email_history(
         self, query: GetEmailHistoryQuery
@@ -89,9 +94,11 @@ class AlertQueryHandler:
         history = await self.email_repo.get_history(sid)
         latest_draft = next((d for d in history if d.status.value == 'draft'), None)
 
+        active_job = await self.job_repo.get_active_job(sid, 'email_draft')
+
         return {
             'sid': sid,
-            'is_generating': student.draft_job_id is not None,
+            'is_generating': active_job is not None,
             'subject': latest_draft.subject if latest_draft else None,
             'body': latest_draft.body if latest_draft else None,
         }
