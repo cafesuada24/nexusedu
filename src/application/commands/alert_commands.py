@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
+from src.domain.entities.alert import Alert
+from src.domain.entities.case import Case
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.case_repository import CaseRepository
@@ -107,7 +109,6 @@ class AlertCommandHandler:
             # ensure an active case exists
             active_case = await self.case_repo.get_active_case(command.sid)
             if not active_case:
-                from src.domain.entities.case import Case
                 new_case = Case(sid=command.sid, status=CaseStatus.OPEN)
                 await self.case_repo.create_case(new_case)
 

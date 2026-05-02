@@ -11,6 +11,7 @@ from src.application.commands.alert_commands import (
     TriggerDraftCommand,
 )
 from src.application.dtos.data_dtos import DataIngestionCommand
+from src.domain.entities.case import Case
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
@@ -150,7 +151,6 @@ class DataCommandHandler:
                 new_at_risk_sids.append(sid)
 
                 # Create a new Case for this student
-                from src.domain.entities.case import Case
                 new_case = Case(sid=sid, status=CaseStatus.OPEN)
                 await self.case_repo.create_case(new_case)
             else:

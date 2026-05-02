@@ -1,6 +1,7 @@
 """Endpoint for polling background job status."""
 
 from typing import Annotated
+from uuid import UUID
 
 from arq import ArqRedis
 from arq.jobs import Job
@@ -23,9 +24,9 @@ async def get_job_status(
 ) -> JobStatusResponse:
     """Poll for the status and results of a background job."""
     # 1. Fetch from DB for observability
-    from uuid import UUID
+
     db_job = await job_repo.get_job(UUID(job_id))
-    
+
     # 2. Check ARQ for immediate status/result if needed
     job = Job(job_id, redis=arq_pool)
     arq_status = await job.status()
