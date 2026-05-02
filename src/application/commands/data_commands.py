@@ -13,6 +13,7 @@ from src.application.commands.alert_commands import (
 )
 from src.application.dtos.data_dtos import DataIngestionCommand
 from src.domain.repositories.activity_repository import ActivityRepository
+from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
@@ -28,12 +29,14 @@ class DataCommandHandler:
         student_repo: StudentRepository,
         activity_repo: ActivityRepository,
         history_repo: StatusHistoryRepository,
+        idempotency_repo: IdempotencyRepository,
         anomaly_engine: AnomalyEngine,
         alert_command_handler: AlertCommandHandler,
     ):
         self.student_repo = student_repo
         self.activity_repo = activity_repo
         self.history_repo = history_repo
+        self.idempotency_repo = idempotency_repo
         self.anomaly_engine = anomaly_engine
         self.alert_command_handler = alert_command_handler
 
@@ -141,3 +144,11 @@ class DataCommandHandler:
                 await self.student_repo.update_risk_status(sid, risk_status=latest_risk)
 
         return new_at_risk_sids
+
+    async def check_idempotency(self, key: UUID4) -> bool:
+        """Check if an idempotency key has been used."""
+        return await self.idempotency_repo.check_key(key)
+
+    async def record_idempotency(self, key: UUID4) -> None:
+        """Record a new idempotency key."""
+        await self.idempotency_repo.record_key(key)

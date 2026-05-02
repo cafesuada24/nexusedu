@@ -46,12 +46,14 @@ async def run_email_draft_task(
         advisor_repo = SqlAlchemyAdvisorRepository(session)
         alert_repo = SqlAlchemyAlertRepository(session)
         email_repo = SqlAlchemyEmailRepository(session)
+        job_repo = SqlAlchemyJobRepository(session)
         idempotency_repo = SqlAlchemyIdempotencyRepository(session)
 
         # Domain Service
         gamification_service = GamificationService()
 
         # Task Queue (Adapter for worker context)
+        from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 
         task_queue = ArqTaskQueueAdapter(ctx["redis"])
 
@@ -61,6 +63,7 @@ async def run_email_draft_task(
             email_repo=email_repo,
             alert_repo=alert_repo,
             advisor_repo=advisor_repo,
+            job_repo=job_repo,
             idempotency_repo=idempotency_repo,
             gamification_service=gamification_service,
             task_queue=task_queue,
