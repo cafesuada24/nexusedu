@@ -21,6 +21,7 @@ from src.application.queries.alert_queries import (
     GetEmailHistoryQuery,
 )
 from src.domain.repositories.case_repository import CaseRepository
+from src.domain.repositories.email_repository import EmailRepository
 from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import Scope, User, require_scope
@@ -29,6 +30,7 @@ from src.presentation.dependencies.providers import (
     get_alert_query_handler,
     get_arq_pool,
     get_case_repository,
+    get_email_repository,
 )
 from src.telemetry.logger import logger
 
@@ -47,7 +49,9 @@ class AlertStudent(BaseModel):
         False,
         description='Whether a background AI draft generation is running.',
     )
-    active_case_id: str | None = Field(None, description='The ID of the currently active case.')
+    active_case_id: str | None = Field(
+        None, description='The ID of the currently active case.'
+    )
 
 
 class StatusUpdate(BaseModel):
@@ -140,7 +144,9 @@ async def get_alerts(
                 'current_risk_status': d.student.current_risk_status.value,
                 'intervention_status': d.student.intervention_status.value,
                 'is_generating': d.student.is_generating,
-                'active_case_id': str(d.student.active_case_id) if d.student.active_case_id else None,
+                'active_case_id': str(d.student.active_case_id)
+                if d.student.active_case_id
+                else None,
             }
             for d in dtos
         ]
@@ -149,9 +155,9 @@ async def get_alerts(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.patch('/{sid}/status')
+@router.patch('/cases/{case_id}/status')
 async def update_alert_status(
-    sid: str,
+    case_id: str,
     update: StatusUpdate,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
@@ -168,10 +174,10 @@ async def update_alert_status(
             idemp_key = UUID(idempotency_key)
             if await command_handler.check_idempotency(idemp_key):
                 logger.info(f'Idempotency hit for update_alert_status: {idemp_key}')
-                return {'sid': sid, 'new_status': update.status}
+                return {'case_id': case_id, 'new_status': update.status}
 
         command = UpdateStudentStatusCommand(
-            sid=UUID(sid),
+            case_id=UUID(case_id),
             status=status,
             user_id=user.id,
         )
@@ -180,15 +186,22 @@ async def update_alert_status(
         if idempotency_key:
             await command_handler.record_idempotency(UUID(idempotency_key))
 
-        return {'sid': sid, 'new_status': update.status}
+        return {'case_id': case_id, 'new_status': update.status}
     except Exception as e:
         logger.error(f'Error in update_alert_status: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post('/{sid}/draft/trigger', status_code=202)
+class TriggerDraftRequest(BaseModel):
+    """Schema for triggering a background AI draft generation."""
+
+    booking_link: str | None = Field(None, description='Optional custom booking link.')
+
+
+@router.post('/cases/{case_id}/draft', status_code=202)
 async def trigger_draft(
-    sid: str,
+    case_id: str,
+    request: TriggerDraftRequest,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     session: Annotated[AsyncSession, Depends(get_async_session)],
@@ -200,11 +213,14 @@ async def trigger_draft(
             idemp_key = UUID(idempotency_key)
             if await command_handler.check_idempotency(idemp_key):
                 logger.info(f'Idempotency hit for trigger_draft: {idemp_key}')
-                # We can't easily return the same job_id without storing it in idempotency_keys
-                # For now, returning success is sufficient as the user just wants the draft triggered.
-                return {'status': 'success', 'message': 'Draft already triggered (idempotent).'}
+                return {
+                    'status': 'success',
+                    'message': 'Draft already triggered (idempotent).',
+                }
 
-        command = TriggerDraftCommand(sid=UUID(sid), user_id=user.id)
+        command = TriggerDraftCommand(
+            case_id=UUID(case_id), user_id=user.id, booking_link=request.booking_link
+        )
         job_id = await command_handler.handle_trigger_draft(command)
 
         if idempotency_key:
@@ -215,9 +231,9 @@ async def trigger_draft(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post('/{sid}/draft/review')
+@router.post('/cases/{case_id}/draft/review')
 async def review_draft(
-    sid: str,
+    case_id: str,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
@@ -228,10 +244,13 @@ async def review_draft(
             idemp_key = UUID(idempotency_key)
             if await command_handler.check_idempotency(idemp_key):
                 logger.info(f'Idempotency hit for review_draft: {idemp_key}')
-                return {'status': 'success', 'message': 'Draft review points already awarded (idempotent).'}
+                return {
+                    'status': 'success',
+                    'message': 'Draft review points already awarded (idempotent).',
+                }
 
         # Note: Idempotency logic should ideally be in command handler
-        command = AwardReviewPointsCommand(sid=UUID(sid), user_id=user.id)
+        command = AwardReviewPointsCommand(case_id=UUID(case_id), user_id=user.id)
         await command_handler.handle_award_review_points(command)
 
         if idempotency_key:
@@ -242,49 +261,50 @@ async def review_draft(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get('/{sid}/draft')
+@router.get('/cases/{case_id}/draft')
 async def get_email_draft(
-    sid: str,
+    case_id: str,
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> dict[str, Any]:
-    """Retrieve the current AI draft status and content for a student."""
+    """Retrieve the current AI draft status and content for a case."""
     try:
-        return await query_handler.handle_get_draft_status(UUID(sid))
+        return await query_handler.handle_get_draft_status(UUID(case_id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
+        logger.error(f'Error in get_email_draft: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get('/{sid}/history')
-async def get_alert_history(
-    sid: str,
-    query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
+@router.get('/cases/{case_id}/email')
+async def get_case_email(
+    case_id: str,
+    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
-) -> list[dict[str, Any]]:
-    """Retrieve communication history for a specific student."""
+) -> dict[str, Any] | None:
+    """Retrieve the single intervention email associated with a specific case."""
     try:
-        query = GetEmailHistoryQuery(sid=UUID(sid))
-        dtos = await query_handler.handle_get_email_history(query)
-        return [
-            {
-                'email_id': d.email_id,
-                'subject': d.subject,
-                'body': d.body,
-                'status': d.status,
-                'created_at': d.created_at,
-                'sent_at': d.sent_at,
-            }
-            for d in dtos
-        ]
+        email = await email_repo.get_by_case(UUID(case_id))
+        if not email:
+            return None
+
+        return {
+            'email_id': str(email.email_id),
+            'subject': email.subject,
+            'body': email.body,
+            'status': email.status.value,
+            'created_at': email.created_at.isoformat(),
+            'sent_at': email.sent_at.isoformat() if email.sent_at else None,
+        }
     except Exception as e:
+        logger.error(f'Error in get_case_email: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.post('/{sid}/send')
+@router.post('/cases/{case_id}/send')
 async def send_nudge_email(
-    sid: str,
+    case_id: str,
     request: SendEmailRequest,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
@@ -292,10 +312,10 @@ async def send_nudge_email(
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle."""
-    idemp_key = UUID(idempotency_key)
+    idemp_key = UUID(idempotency_key) if idempotency_key else None
     try:
         # 1. Early Return: Check idempotency
-        if idempotency_key and await command_handler.check_idempotency(idemp_key):
+        if idemp_key and await command_handler.check_idempotency(idemp_key):
             return {
                 'status': 'success',
                 'message': 'Email already sent (idempotent).',
@@ -303,23 +323,25 @@ async def send_nudge_email(
 
         # 2. Database Write: Record state and get email address
         command = SendEmailCommand(
-            sid=UUID(sid), body=request.body, user_id=user.id
+            case_id=UUID(case_id), body=request.body, user_id=user.id
         )
         target_email = await command_handler.handle_send_email(command)
 
-        if idempotency_key:
+        if idemp_key:
             await command_handler.record_idempotency(idemp_key)
 
         # Explicitly commit the transaction before performing external I/O
         await session.commit()
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
-        # In a real app, this might be another port/service call
-        logger.info(f'DISPATCHING EMAIL to {target_email}: {request.body[:50]}...')
+        logger.info(
+            f'DISPATCHING EMAIL for case {case_id} to {target_email}: {request.body[:50]}...'
+        )
 
         return {'status': 'success', 'message': f'Email sent to {target_email}'}
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
+        logger.error(f'Error in send_nudge_email: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

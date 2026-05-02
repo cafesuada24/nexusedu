@@ -110,12 +110,14 @@ async def test_email_draft_no_pii_to_ai(
     student_repository,
     advisor_repository,
     alert_repository,
+    case_repository,
     activity_repository,
     status_history_repository,
     test_db_session,
 ) -> None:
     """Verify that student PII is not sent directly to the AI draft generator."""
     sid = uuid4()
+    cid = uuid4()
     student_name = "Real Name"
     email = "real@ex.com"
 
@@ -132,6 +134,10 @@ async def test_email_draft_no_pii_to_ai(
         intervention_status="new",
     )
     test_db_session.add(student)
+
+    # Setup dummy case
+    from src.domain.entities.case import Case
+    await case_repository.create_case(Case(case_id=cid, sid=sid))
 
     # Setup dummy history
     history = StudentStatusHistory(
@@ -164,7 +170,7 @@ async def test_email_draft_no_pii_to_ai(
     handler = AlertCommandHandler(
         student_repo=student_repository,
         email_repo=AsyncMock(),
-        case_repo=AsyncMock(),
+        case_repo=case_repository,
         job_repo=AsyncMock(),
         alert_repo=alert_repository,
         advisor_repo=advisor_repository,
@@ -174,7 +180,7 @@ async def test_email_draft_no_pii_to_ai(
         email_drafting_service=mock_email_drafting,
     )
 
-    command = GenerateEmailDraftCommand(sid=sid, job_id=job_id)
+    command = GenerateEmailDraftCommand(case_id=cid, job_id=job_id)
     await handler.handle_generate_email_draft(command)
 
     # Check email drafting was called

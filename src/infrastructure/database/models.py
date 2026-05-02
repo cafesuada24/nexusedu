@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
     func,
 )
@@ -175,6 +176,9 @@ class InterventionEmail(Base):
         server_default=func.current_timestamp(),
     )
     sent_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+
+    # Business rule: each intervention case has exactly one email record
+    __table_args__ = (UniqueConstraint('case_id', name='uq_intervention_emails_case_id'),)
 
 
 class Case(Base):

@@ -48,9 +48,8 @@ export const BackendAlertSchema = z.object({
     email: z.string(),
     current_risk_status: BackendRiskStatusSchema,
     intervention_status: BackendInterventionStatusSchema,
-    draft_job_id: z.string().nullable().optional(),
-    draft_subject: z.string().nullable().optional(),
-    draft_body: z.string().nullable().optional(),
+    is_generating: z.boolean().optional(),
+    active_case_id: z.string().nullable().optional(),
 });
 export type BackendAlert = z.infer<typeof BackendAlertSchema>;
 
@@ -73,10 +72,38 @@ export type BackendIngestRow = z.infer<typeof BackendIngestRowSchema>;
 export const JobResultSchema = z.object({
     job_id: z.string(),
     status: z.string(),
+    progress: z.number().optional(),
+    created_at: z.string().nullable().optional(),
+    started_at: z.string().nullable().optional(),
+    completed_at: z.string().nullable().optional(),
     result: z.any().optional(),
     error: z.string().nullable().optional(),
 });
 export type JobResult = z.infer<typeof JobResultSchema>;
+
+export const CaseResponseSchema = z.object({
+    case_id: z.string(),
+    sid: z.string(),
+    status: z.string(),
+    created_at: z.string(),
+    resolved_at: z.string().nullable().optional(),
+});
+export type CaseResponse = z.infer<typeof CaseResponseSchema>;
+
+export const EmailHistoryItemSchema = z.object({
+    email_id: z.string(),
+    subject: z.string(),
+    body: z.string(),
+    status: z.enum(["draft", "sent"]),
+    created_at: z.string(),
+    sent_at: z.string().nullable(),
+});
+export type EmailHistoryItem = z.infer<typeof EmailHistoryItemSchema>;
+
+export const CaseDetailsResponseSchema = CaseResponseSchema.extend({
+    email: EmailHistoryItemSchema.nullable().optional(),
+});
+export type CaseDetailsResponse = z.infer<typeof CaseDetailsResponseSchema>;
 
 export const DraftJobResponseSchema = z.object({
     job_id: z.string(),
@@ -126,21 +153,14 @@ export const RetentionTrendItemSchema = z.object({
 });
 export type RetentionTrendItem = z.infer<typeof RetentionTrendItemSchema>;
 
-export const EmailHistoryItemSchema = z.object({
-    email_id: z.string(),
-    subject: z.string(),
-    body: z.string(),
-    status: z.enum(["draft", "sent"]),
-    created_at: z.string(),
-    sent_at: z.string().nullable(),
-});
-export type EmailHistoryItem = z.infer<typeof EmailHistoryItemSchema>;
 
 export const DraftStatusResponseSchema = z.object({
     sid: z.string(),
     is_generating: z.boolean(),
+    progress: z.number().optional(),
     subject: z.string().nullable(),
     body: z.string().nullable(),
+    active_case_id: z.string().nullable().optional(),
 });
 export type DraftStatusResponse = z.infer<typeof DraftStatusResponseSchema>;
 
@@ -443,13 +463,13 @@ export async function fetchAlerts(): Promise<BackendAlert[]> {
  * Pushes a status transition for a single student.
  */
 export async function updateAlertStatus(
-    sid: string,
+    case_id: string,
     status: BackendInterventionStatus,
 ): Promise<void> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/status`),
+                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/status`),
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -496,22 +516,23 @@ export async function getJobStatus(job_id: string): Promise<JobResult> {
  * Send finalized email body to student.
  */
 export async function sendNudge(
-    sid: string,
-    body: { body: string },
+    case_id: string,
+    payload: { body: string },
 ): Promise<void> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/send`),
+                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/send`),
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body),
+                    body: JSON.stringify(payload),
                 },
                 signal,
             ),
         DEFAULT_TIMEOUT_MS,
     );
+
     if (!res.ok) {
         const errorBody = await res.json().catch(() => ({}));
         const message = errorBody.detail || res.statusText;
@@ -644,39 +665,41 @@ export async function fetchRetentionTrend(): Promise<RetentionTrendItem[]> {
 }
 
 /**
- * GET /alerts/{sid}/history — returns communication history for a student.
+ * GET /alerts/cases/{case_id}/email — returns the intervention email for a case.
  */
-export async function fetchAlertHistory(
-    sid: string,
-): Promise<EmailHistoryItem[]> {
+export async function fetchCaseEmail(
+    case_id: string,
+): Promise<EmailHistoryItem | null> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/history`),
+                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/email`),
                 { method: "GET" },
                 signal,
             ),
         DEFAULT_TIMEOUT_MS,
     );
+
     if (!res.ok) {
         const errorBody = await res.json().catch(() => ({}));
         const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể lấy lịch sử email: ${message}`);
+        throw new Error(`Không thể lấy email của case: ${message}`);
     }
     const data = await res.json();
-    return z.array(EmailHistoryItemSchema).parse(data);
+    if (!data) return null;
+    return EmailHistoryItemSchema.parse(data);
 }
 
 /**
- * GET /alerts/{sid}/draft — returns current draft status and content.
+ * GET /alerts/cases/{case_id}/draft — returns current draft status and content.
  */
 export async function fetchDraftStatus(
-    sid: string,
+    case_id: string,
 ): Promise<DraftStatusResponse> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
+                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/draft`),
                 { method: "GET" },
                 signal,
             ),
@@ -692,16 +715,52 @@ export async function fetchDraftStatus(
 }
 
 /**
- * POST /alerts/{sid}/draft — trigger async draft generation.
+ * GET /alerts/{sid}/cases — returns historical cases for a student.
+ */
+export async function fetchStudentCases(sid: string): Promise<CaseResponse[]> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(endpoint(`/alerts/${encodeURIComponent(sid)}/cases`), {
+                method: "GET",
+            }, signal),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+        throw new Error(`Không thể lấy lịch sử case: ${res.status}`);
+    }
+    const data = await res.json();
+    return z.array(CaseResponseSchema).parse(data);
+}
+
+/**
+ * GET /alerts/cases/{case_id} — returns full details for a case.
+ */
+export async function fetchCaseDetails(case_id: string): Promise<CaseDetailsResponse> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(endpoint(`/alerts/cases/${encodeURIComponent(case_id)}`), {
+                method: "GET",
+            }, signal),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+        throw new Error(`Không thể lấy chi tiết case: ${res.status}`);
+    }
+    const data = await res.json();
+    return CaseDetailsResponseSchema.parse(data);
+}
+
+/**
+ * POST /alerts/cases/{case_id}/draft — trigger async draft generation.
  */
 export async function generateAiDraft(
-    sid: string,
+    case_id: string,
     booking_link?: string,
 ): Promise<DraftJobResponse> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
+                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/draft`),
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },

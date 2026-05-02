@@ -10,6 +10,9 @@ export const queryKeys = {
     all: ["alerts"] as const,
     list: () => [...queryKeys.alerts.all, "list"] as const,
     detail: (sid: string) => [...queryKeys.alerts.all, "detail", sid] as const,
+    cases: (sid: string) => [...queryKeys.alerts.all, "detail", sid, "cases"] as const,
+    caseDetail: (caseId: string) => [...queryKeys.alerts.all, "case", caseId] as const,
+    draft: (sid: string) => [...queryKeys.alerts.all, sid, "draft"] as const,
   },
   schedule: {
     all: ["schedule"] as const,

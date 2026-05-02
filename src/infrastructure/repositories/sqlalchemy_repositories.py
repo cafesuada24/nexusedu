@@ -497,80 +497,58 @@ class SqlAlchemyEmailRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def get_latest_draft(self, sid: uuid.UUID) -> DomainInterventionEmail | None:
-        """Retrieve the latest draft email for a student."""
-        stmt = (
-            select(InterventionEmail)
-            .where(
-                InterventionEmail.sid == sid,
-                InterventionEmail.status == 'draft',
-            )
-            .order_by(desc(InterventionEmail.created_at))
-            .limit(1)
-        )
-        result = await self.session.execute(stmt)
-        email = result.scalar_one_or_none()
-        return DataMapper.to_domain_email(email) if email else None
-
-    async def get_by_case(self, case_id: uuid.UUID) -> list[DomainInterventionEmail]:
-        """Retrieve all emails associated with a specific case."""
-        stmt = (
-            select(InterventionEmail)
-            .where(InterventionEmail.case_id == case_id)
-            .order_by(desc(InterventionEmail.created_at))
-        )
-        result = await self.session.execute(stmt)
-        return [DataMapper.to_domain_email(row[0]) for row in result.all()]
-
-    async def create_draft(
+    async def create_placeholder(
         self,
+        case_id: uuid.UUID,
         sid: uuid.UUID,
         advisor_id: uuid.UUID | None,
-        subject: str,
-        body: str,
-        case_id: uuid.UUID | None = None,
     ) -> uuid.UUID:
-        """Create a new draft email and return its ID."""
+        """Create a placeholder email with 'generating' status."""
         email_id = uuid.uuid4()
         email = InterventionEmail(
             email_id=email_id,
             sid=sid,
             case_id=case_id,
             advisor_id=advisor_id,
-            subject=subject,
-            body=body,
-            status='draft',
+            status='generating',
         )
         self.session.add(email)
-        # await self.session.commit() removed
         return email_id
 
-    async def mark_as_sent(self, sid: uuid.UUID, body: str) -> None:
-        """Mark the latest draft as sent for a student."""
+    async def update_content(
+        self,
+        case_id: uuid.UUID,
+        subject: str,
+        body: str,
+        status: str,
+    ) -> None:
+        """Update the content and status of an existing case email."""
         stmt = (
-            select(InterventionEmail.email_id)
-            .where(
-                InterventionEmail.sid == sid,
-                InterventionEmail.status == 'draft',
-            )
-            .order_by(desc(InterventionEmail.created_at))
+            update(InterventionEmail)
+            .where(InterventionEmail.case_id == case_id)
+            .values(subject=subject, body=body, status=status)
+        )
+        await self.session.execute(stmt)
+
+    async def get_by_case(self, case_id: uuid.UUID) -> DomainInterventionEmail | None:
+        """Retrieve the email associated with a specific case."""
+        stmt = (
+            select(InterventionEmail)
+            .where(InterventionEmail.case_id == case_id)
             .limit(1)
         )
-        res = await self.session.execute(stmt)
-        email_id = res.scalar_one_or_none()
+        result = await self.session.execute(stmt)
+        email = result.scalar_one_or_none()
+        return DataMapper.to_domain_email(email) if email else None
 
-        if email_id:
-            stmt = (
-                update(InterventionEmail)
-                .where(InterventionEmail.email_id == email_id)
-                .values(
-                    status='sent',
-                    sent_at=func.current_timestamp(),
-                    body=body,
-                )
-            )
-            await self.session.execute(stmt)
-            # await self.session.commit() removed
+    async def mark_as_sent(self, case_id: uuid.UUID, body: str) -> None:
+        """Mark the case email as sent."""
+        stmt = (
+            update(InterventionEmail)
+            .where(InterventionEmail.case_id == case_id)
+            .values(body=body, status='sent', sent_at=func.current_timestamp())
+        )
+        await self.session.execute(stmt)
 
     async def get_history(self, sid: uuid.UUID) -> list[DomainInterventionEmail]:
         """Retrieve the communication history for a student."""
@@ -581,6 +559,68 @@ class SqlAlchemyEmailRepository:
         )
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_email(row[0]) for row in result.all()]
+
+
+class SqlAlchemyCaseRepository:
+    """SQLAlchemy implementation of the CaseRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+
+    async def create_case(self, case: DomainCase) -> None:
+        """Create a new case."""
+        from src.infrastructure.database.models import Case as OrmCase
+
+        orm_case = OrmCase(
+            case_id=case.case_id,
+            sid=case.sid,
+            status=case.status.value,
+            created_at=case.created_at,
+        )
+        self.session.add(orm_case)
+
+    async def get_active_case(self, sid: uuid.UUID) -> DomainCase | None:
+        """Retrieve the active case for a student, if any."""
+        from src.infrastructure.database.models import Case as OrmCase
+
+        stmt = select(OrmCase).where(
+            OrmCase.sid == sid,
+            OrmCase.status == 'open'
+        ).limit(1)
+        result = await self.session.execute(stmt)
+        orm_case = result.scalar_one_or_none()
+        return DataMapper.to_domain_case(orm_case) if orm_case else None
+
+    async def update_case_status(self, case_id: uuid.UUID, status: str) -> None:
+        """Update the status of a case."""
+        from src.infrastructure.database.models import Case as OrmCase
+
+        stmt = update(OrmCase).where(OrmCase.case_id == case_id).values(status=status)
+        if status in ('resolved', 'closed'):
+            stmt = stmt.values(resolved_at=func.current_timestamp())
+        await self.session.execute(stmt)
+
+    async def get_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
+        """Retrieve a case by its ID."""
+        from src.infrastructure.database.models import Case as OrmCase
+
+        stmt = select(OrmCase).where(OrmCase.case_id == case_id)
+        result = await self.session.execute(stmt)
+        orm_case = result.scalar_one_or_none()
+        return DataMapper.to_domain_case(orm_case) if orm_case else None
+
+    async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
+        """Retrieve all cases for a specific student."""
+        from src.infrastructure.database.models import Case as OrmCase
+
+        stmt = (
+            select(OrmCase)
+            .where(OrmCase.sid == sid)
+            .order_by(desc(OrmCase.created_at))
+        )
+        result = await self.session.execute(stmt)
+        return [DataMapper.to_domain_case(row[0]) for row in result.all()]
 
 
 class SqlAlchemyAlertRepository:
