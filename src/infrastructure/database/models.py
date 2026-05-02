@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     Double,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -126,6 +127,9 @@ class AdvisorPointsLedger(Base):
     """Ledger recording points earned by advisors for intervention actions."""
 
     __tablename__ = 'advisor_points_ledger'
+    __table_args__ = (
+        Index('ix_ledger_advisor_sid_action', 'advisor_id', 'sid', 'action_type'),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
