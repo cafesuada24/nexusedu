@@ -198,6 +198,10 @@ class AlertCommandHandler:
         action_type: str,
     ) -> None:
         """Orchestrate awarding points for an advisor action."""
+        if await self.advisor_repo.has_existing_action(advisor_id, sid, action_type):
+            logger.info(f"Gamification: Action {action_type} already recorded for advisor {advisor_id} and student {sid}. Skipping.")
+            return
+
         recorded_dt = await self.student_repo.get_latest_status_timestamp(sid)
         
         student = await self.student_repo.get_by_id(sid)
