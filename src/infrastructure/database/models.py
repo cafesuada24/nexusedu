@@ -7,7 +7,17 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
-from sqlalchemy import TIMESTAMP, Double, ForeignKey, Integer, String, Text, Uuid, func
+from sqlalchemy import (
+    TIMESTAMP,
+    Boolean,
+    Double,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -24,6 +34,7 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table, integrating with FastAPI-Users."""
 
     role: Mapped[str] = mapped_column(String, default='viewer')
+    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Student(Base):

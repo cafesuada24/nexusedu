@@ -21,6 +21,7 @@ class StudentDTO:
     current_risk_status: RiskStatus
     intervention_status: InterventionStatus
     last_notified_at: datetime
+    is_generating: bool = False
 
 
 @dataclass

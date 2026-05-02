@@ -1,12 +1,14 @@
 """Query handlers for alert-related operations."""
 
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import UUID4
 
 from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.email_repository import EmailRepository
+from src.domain.repositories.student_repository import StudentRepository
 
 
 @dataclass
@@ -26,9 +28,15 @@ class GetEmailHistoryQuery:
 class AlertQueryHandler:
     """Handler for alert-related queries."""
 
-    def __init__(self, alert_repo: AlertRepository, email_repo: EmailRepository):
+    def __init__(
+        self,
+        alert_repo: AlertRepository,
+        email_repo: EmailRepository,
+        student_repo: StudentRepository,
+    ):
         self.alert_repo = alert_repo
         self.email_repo = email_repo
+        self.student_repo = student_repo
 
     async def handle_get_active_alerts(
         self, query: GetActiveAlertsQuery
@@ -47,6 +55,7 @@ class AlertQueryHandler:
                     current_risk_status=a.student.current_risk_status,
                     intervention_status=a.student.intervention_status,
                     last_notified_at=a.student.last_notified_timestamp,
+                    is_generating=a.student.draft_job_id is not None,
                 ),
                 alert_details=a.alert_details,
             )
@@ -70,3 +79,19 @@ class AlertQueryHandler:
             )
             for e in history
         ]
+
+    async def handle_get_draft_status(self, sid: UUID4) -> dict[str, Any]:
+        """Retrieve the current AI draft status and content for a student."""
+        student = await self.student_repo.get_by_id(sid)
+        if not student:
+            raise ValueError(f'Student {sid} not found.')
+
+        history = await self.email_repo.get_history(sid)
+        latest_draft = next((d for d in history if d.status.value == 'draft'), None)
+
+        return {
+            'sid': sid,
+            'is_generating': student.draft_job_id is not None,
+            'subject': latest_draft.subject if latest_draft else None,
+            'body': latest_draft.body if latest_draft else None,
+        }
