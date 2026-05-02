@@ -94,6 +94,9 @@ async def get_case_history(
     except Exception as e:
         logger.error(f'Error in get_case_history: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get('', response_model=list[AlertStudent])
 async def get_alerts(
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
