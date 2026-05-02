@@ -37,7 +37,7 @@ export default function LandingClient() {
     const bentoCard =
         "p-[2px] rounded-3xl bg-gradient-to-br from-blue-500 to-cyan-400";
     const bentoContent =
-        "h-full rounded-[22px] bg-white/50 backdrop-blur-sm p-8 shadow-sm";
+        "h-full rounded-[22px] bg-white dark:bg-slate-900 p-8 shadow-sm";
 
     return (
         <>
