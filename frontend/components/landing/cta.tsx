@@ -28,7 +28,7 @@ export function Cta() {
                         asChild
                         size="lg"
                         variant="outline"
-                        className="h-12 rounded-xl px-6 text-base transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md hover:border-slate-300 dark:bg-slate-800 dark:text-white dark:border-white/20 hover:dark:bg-slate-700"
+                        className="h-12 rounded-xl px-6 text-base transition-transform transition-shadow duration-200 ease-out hover:-translate-y-1 hover:shadow-md hover:border-slate-300 dark:bg-slate-800 dark:text-white dark:border-white/20 hover:dark:bg-slate-700"
                     >
                         <Link href="/login">Đăng nhập với Workspace</Link>
                     </Button>
