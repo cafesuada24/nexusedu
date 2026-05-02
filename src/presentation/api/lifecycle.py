@@ -20,7 +20,6 @@ from psycopg_pool import ConnectionPool
 
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.agents.state import AgentState
-from src.presentation.api.auth import create_db_and_tables
 from src.telemetry.logger import logger
 from src.utils.env import getenv
 
@@ -39,9 +38,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manages the startup and shutdown lifecycle of the FastAPI application."""
     load_dotenv()
 
-    # ==== Unified DB Initialization ====
-    logger.info('API Lifecycle: Initializing Unified Database...')
-    await create_db_and_tables()
+    # ==== Database ====
+    # Schema is managed by Alembic migrations. Run: alembic upgrade head
+    logger.info('API Lifecycle: Starting up (DB managed by Alembic)...')
 
     # ==== Agent Checkpointer ====
     postgres_uri = getenv('POSTGRES_DB_URI')

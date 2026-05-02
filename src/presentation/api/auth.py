@@ -6,7 +6,7 @@ backend, and role-based access control (RBAC).
 
 import uuid
 from collections.abc import AsyncGenerator, Callable
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import Annotated, override
 
 from fastapi import Depends, HTTPException, Request, status
@@ -19,8 +19,8 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.database.models import Base, User
-from src.infrastructure.database.session import engine, get_async_session
+from src.infrastructure.database.models import User
+from src.infrastructure.database.session import get_async_session
 from src.utils.env import getenv
 
 # Configuration
@@ -68,11 +68,6 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
     },
 }
 
-
-async def create_db_and_tables() -> None:
-    """Creates the database and all tables defined in Base."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_user_db(
