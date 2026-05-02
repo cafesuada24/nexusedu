@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { GraduationCap } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -20,7 +22,8 @@ export function Logo({
   size = "md",
   href = "/",
   showMark = true,
-}: LogoProps) {
+  onClick,
+}: LogoProps & { onClick?: () => void }) {
   const s = sizeMap[size]
   const content = (
     <span className={cn("inline-flex items-center gap-2.5", className)}>
@@ -49,12 +52,17 @@ export function Logo({
 
   if (!href) return content
   return (
-    <Link
-      href={href}
-      className="inline-flex items-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <button
+      onClick={(e) => {
+        if (onClick) {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+      className="inline-flex items-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
       aria-label="NexusEdu, trang chủ"
     >
       {content}
-    </Link>
+    </button>
   )
 }
