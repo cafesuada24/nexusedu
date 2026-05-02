@@ -28,3 +28,7 @@ class CaseRepository(Protocol):
     async def get_student_cases(self, sid: UUID) -> list[Case]:
         """Retrieve all cases for a specific student."""
         ...
+
+    async def assign_case(self, case_id: UUID, advisor_id: UUID) -> None:
+        """Assign an advisor to a case."""
+        ...

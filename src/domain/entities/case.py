@@ -16,3 +16,4 @@ class Case:
     status: CaseStatus = CaseStatus.OPEN
     created_at: datetime = field(default_factory=datetime.now)
     resolved_at: datetime | None = None
+    assigned_advisor_id: UUID | None = None
