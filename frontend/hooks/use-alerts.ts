@@ -5,8 +5,10 @@ import {
     fetchAlerts,
     updateAlertStatus,
     type BackendInterventionStatus,
-    getAuthToken,
     fetchDraftStatus,
+    fetchStudentCases,
+    fetchCaseDetails,
+    fetchCaseEmail,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
@@ -45,15 +47,15 @@ export function useUpdateAlertStatus() {
 
     return useMutation({
         mutationFn: ({
-            sid,
+            case_id,
             status,
         }: {
-            sid: string;
+            case_id: string;
             status: BackendInterventionStatus;
-        }) => updateAlertStatus(sid, status),
+        }) => updateAlertStatus(case_id, status),
 
         // Optimistic Update logic
-        onMutate: async ({ sid, status }) => {
+        onMutate: async ({ case_id, status }) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
             await queryClient.cancelQueries({
                 queryKey: queryKeys.alerts.list(),
@@ -70,7 +72,7 @@ export function useUpdateAlertStatus() {
                 (old: any[] | undefined) => {
                     if (!old) return [];
                     return old.map((alert) =>
-                        alert.sid === sid
+                        alert.active_case_id === case_id
                             ? { ...alert, intervention_status: status }
                             : alert,
                     );
@@ -104,32 +106,70 @@ export function useUpdateAlertStatus() {
 }
 
 /**
- * Hook to poll draft status for a student.
+ * Hook to poll draft status for a case.
  */
-export function useDraftStatus(sid?: string | null) {
+export function useDraftStatus(case_id?: string | null) {
     return useQuery({
-        queryKey: sid ? ["alerts", sid, "draft"] : ["alerts", "draft", "none"],
+        queryKey: case_id ? queryKeys.alerts.draft(case_id) : ["alerts", "draft", "none"],
         queryFn: async () => {
-            if (!sid) return null;
-            return await fetchDraftStatus(sid);
+            if (!case_id) return null;
+            return await fetchDraftStatus(case_id);
         },
-        enabled: !!sid,
+        enabled: !!case_id,
         // Poll only if the query data suggests generation is in progress.
         refetchInterval: (query) => {
             const state = query.state;
             const data = state.data;
 
-            // Stop polling if the fetch errored, or we have data and generation is finished.
+            // Stop polling if the fetch errored.
             if (state.error) return false;
+            
+            // If we have data and it says NOT generating, we can stop.
             if (data && !data.is_generating) return false;
 
-            // Use a slightly longer interval to reduce load from many concurrent cards.
-            return 5000; // Poll every 5s while generating.
+            // Otherwise (no data yet or explicitly generating), poll every 5s.
+            return 5000;
         },
         // Prevent refetching on window focus to reduce noise during background polling.
         refetchOnWindowFocus: false,
         staleTime: 0,
         retry: 2,
         retryDelay: 3000,
+    });
+}
+
+/**
+ * Hook to fetch all historical cases for a student.
+ */
+export function useStudentCases(sid: string) {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: queryKeys.alerts.cases(sid),
+        queryFn: () => fetchStudentCases(sid),
+        enabled: isAuthenticated && !!sid,
+    });
+}
+
+/**
+ * Hook to fetch full details for a specific case.
+ */
+export function useCaseDetails(caseId: string) {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: queryKeys.alerts.caseDetail(caseId),
+        queryFn: () => fetchCaseDetails(caseId),
+        enabled: isAuthenticated && !!caseId,
+    });
+}
+
+/**
+ * Hook to fetch the single email for a specific case.
+ */
+export function useCaseEmail(caseId: string) {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: [...queryKeys.alerts.all, "case", caseId, "email"],
+        queryFn: () => fetchCaseEmail(caseId),
+        enabled: isAuthenticated && !!caseId,
     });
 }

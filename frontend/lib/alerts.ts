@@ -38,6 +38,8 @@ export type Alert = {
     draftJobId?: string | null;
     draftSubject?: string | null;
     draftBody?: string | null;
+    isGenerating?: boolean;
+    activeCaseId?: string | null;
     /** Thời gian cuộc hẹn (Unix seconds) — chỉ có khi đã đặt hẹn. */
     appointmentAt: number | null;
     /** Danh sách mục tiêu can thiệp. */

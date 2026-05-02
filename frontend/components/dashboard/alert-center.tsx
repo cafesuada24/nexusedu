@@ -107,14 +107,13 @@ export function AlertCenter() {
         problem: getProblemFromStatus(r.current_risk_status),
         summary: r.current_risk_status,
         severity: "high" as const,
-        subject: r.draft_subject || "",
-        body: r.draft_body || "",
+        subject: "",
+        body: "",
         lastContactedAt: null,
         status: fromBackendStatus(r.intervention_status),
         movedAt: now,
-        draftJobId: r.draft_job_id,
-        draftSubject: r.draft_subject,
-        draftBody: r.draft_body,
+        isGenerating: r.is_generating,
+        activeCaseId: r.active_case_id,
         appointmentAt: r.intervention_status === "booked" ? pickRandomAppointment() : null,
         goals: localAlertState[r.sid]?.goals || [],
       }))
@@ -202,9 +201,13 @@ export function AlertCenter() {
     return counts
   }, [alerts])
 
-  const moveTo = (id: string, status: AlertStatus, message?: string) => {
+  const moveTo = (alert: Alert, status: AlertStatus, message?: string) => {
+    if (!alert.activeCaseId) {
+      toast.error("Không tìm thấy Case ID cho sinh viên này.");
+      return;
+    }
     updateStatus(
-      { sid: id, status: toBackendStatus(status) },
+      { case_id: alert.activeCaseId, status: toBackendStatus(status) },
       {
         onSuccess: () => {
           if (message) toast.success(message)
@@ -218,11 +221,15 @@ export function AlertCenter() {
       toast.error("Chưa có nội dung email. Hãy nhấn Sửa để tạo bản nháp.")
       return
     }
+    if (!a.activeCaseId) {
+      toast.error("Không tìm thấy Case ID.")
+      return;
+    }
     const toastId = toast.loading("Đang gửi email...")
     try {
-      await sendNudge(a.id, { body: a.body })
+      await sendNudge(a.activeCaseId, { body: a.body })
       moveTo(
-        a.id,
+        a,
         "contacted",
         `Đã gửi email tới ${a.name}`,
       )
