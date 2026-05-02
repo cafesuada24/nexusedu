@@ -25,7 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from src.domain.value_objects.status import CaseStatus, EmailStatus, RiskStatus
-from src.infrastructure.database.config import DB_REGISTRY, DBDescription
+from src.infrastructure.database.config import DB_REGISTRY
 from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
@@ -56,6 +56,7 @@ if TYPE_CHECKING:
         InterventionEmail as DomainInterventionEmail,
     )
     from src.domain.entities.student import Student as DomainStudent
+    from src.domain.repositories.metadata_repository import DBDescription
     from src.domain.value_objects.status import InterventionStatus
 
 
