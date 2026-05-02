@@ -65,8 +65,12 @@ class JobStatusResponse(BaseModel):
         ...,
         description='The status of the job (processing, completed, failed).',
     )
+    progress: int = Field(0, description='The progress percentage of the job.')
     result: Any | None = Field(
         None,
         description='The result of the query if completed.',
     )
     error: str | None = Field(None, description='The error message if the job failed.')
+    created_at: str | None = Field(None, description='Job creation timestamp.')
+    started_at: str | None = Field(None, description='Job start timestamp.')
+    completed_at: str | None = Field(None, description='Job completion timestamp.')
