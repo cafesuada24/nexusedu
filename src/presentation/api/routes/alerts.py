@@ -101,6 +101,7 @@ async def update_alert_status(
     update: StatusUpdate,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Manually transitions a student's Kanban state."""
     try:
@@ -109,12 +110,22 @@ async def update_alert_status(
         raise HTTPException(status_code=400, detail='Invalid status.') from e
 
     try:
+        if idempotency_key:
+            idemp_key = UUID(idempotency_key)
+            if await command_handler.check_idempotency(idemp_key):
+                logger.info(f'Idempotency hit for update_alert_status: {idemp_key}')
+                return {'sid': sid, 'new_status': update.status}
+
         command = UpdateStudentStatusCommand(
             sid=UUID(sid),
             status=status,
             user_id=user.id,
         )
         await command_handler.handle_update_status(command)
+
+        if idempotency_key:
+            await command_handler.record_idempotency(UUID(idempotency_key))
+
         return {'sid': sid, 'new_status': update.status}
     except Exception as e:
         logger.error(f'Error in update_alert_status: {str(e)}', exc_info=True)
@@ -127,11 +138,24 @@ async def trigger_draft(
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Manually triggers a background AI draft generation."""
     try:
+        if idempotency_key:
+            idemp_key = UUID(idempotency_key)
+            if await command_handler.check_idempotency(idemp_key):
+                logger.info(f'Idempotency hit for trigger_draft: {idemp_key}')
+                # We can't easily return the same job_id without storing it in idempotency_keys
+                # For now, returning success is sufficient as the user just wants the draft triggered.
+                return {'status': 'success', 'message': 'Draft already triggered (idempotent).'}
+
         command = TriggerDraftCommand(sid=UUID(sid), user_id=user.id)
         job_id = await command_handler.handle_trigger_draft(command)
+
+        if idempotency_key:
+            await command_handler.record_idempotency(UUID(idempotency_key))
+
         return {'status': 'success', 'job_id': str(job_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -147,9 +171,18 @@ async def review_draft(
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft."""
     try:
+        if idempotency_key:
+            idemp_key = UUID(idempotency_key)
+            if await command_handler.check_idempotency(idemp_key):
+                logger.info(f'Idempotency hit for review_draft: {idemp_key}')
+                return {'status': 'success', 'message': 'Draft review points already awarded (idempotent).'}
+
         # Note: Idempotency logic should ideally be in command handler
         command = AwardReviewPointsCommand(sid=UUID(sid), user_id=user.id)
         await command_handler.handle_award_review_points(command)
+
+        if idempotency_key:
+            await command_handler.record_idempotency(UUID(idempotency_key))
 
         return {'status': 'success', 'message': 'Draft review points awarded.'}
     except Exception as e:

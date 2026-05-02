@@ -1,8 +1,9 @@
 """API routes for data ingestion and management."""
 
-from typing import Annotated
+from typing import Annotated, Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.commands.data_commands import DataCommandHandler
@@ -23,8 +24,9 @@ async def ingest_data(
     request: DataIngestionRequest,
     command_handler: Annotated[DataCommandHandler, Depends(get_data_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.DATA_INGEST))],
-    # session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> dict[str, object]:
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
+) -> dict[str, Any]:
     """Ingest multi-source data from JSON payload.
 
     Supports validated 'sis' and 'lms' sources, plus flexible 'custom' sources.
@@ -32,6 +34,15 @@ async def ingest_data(
     For students transitioning to 'new' risk status, triggers AI draft generation.
     """
     try:
+        if idempotency_key:
+            idemp_key = UUID(idempotency_key)
+            if await command_handler.check_idempotency(idemp_key):
+                logger.info(f'Idempotency hit for ingest_data: {idemp_key}')
+                return {
+                    'status': 'success',
+                    'batch_id': request.batch_id,
+                    'message': 'Data already ingested (idempotent).',
+                }
         # Map request to command DTO
         data_sources: list[DataSourceDTO] = []
         for source in request.data_sources:
@@ -47,6 +58,9 @@ async def ingest_data(
         command = DataIngestionCommand(data_sources=data_sources)
 
         results = await command_handler.handle_ingest_data(command, user.id)
+
+        if idempotency_key:
+            await command_handler.record_idempotency(UUID(idempotency_key))
 
         return {
             'status': 'success',

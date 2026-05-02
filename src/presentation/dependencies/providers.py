@@ -166,6 +166,9 @@ async def get_data_command_handler(
     history_repo: Annotated[
         StatusHistoryRepository, Depends(get_status_history_repository),
     ],
+    idempotency_repo: Annotated[
+        IdempotencyRepository, Depends(get_idempotency_repository)
+    ],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
     alert_command_handler: Annotated[
         AlertCommandHandler, Depends(get_alert_command_handler),
@@ -176,6 +179,7 @@ async def get_data_command_handler(
         student_repo,
         activity_repo,
         history_repo,
+        idempotency_repo,
         anomaly_engine,
         alert_command_handler,
     )
@@ -208,6 +212,9 @@ async def get_agent_command_handler(
     metadata_service: Annotated[
         AgentMetadataService, Depends(get_agent_metadata_service),
     ],
+    idempotency_repo: Annotated[
+        IdempotencyRepository, Depends(get_idempotency_repository)
+    ],
 ) -> AgentCommandHandler:
     """Dependency provider for the AgentCommandHandler."""
-    return AgentCommandHandler(agent, metadata_service)
+    return AgentCommandHandler(agent, metadata_service, idempotency_repo)
