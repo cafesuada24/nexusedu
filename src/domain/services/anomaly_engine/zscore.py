@@ -112,10 +112,10 @@ class ZScore:
             ((current_avg - baseline_avg) / baseline_std) if baseline_std > 0 else 0.0
         )
 
-        if z_score < self.config.threshold:
-            anomaly_flag = RiskStatus.ELEVATED
-        elif current_avg < baseline_avg * self.config.critical_drop_ratio:
+        if current_avg < baseline_avg * self.config.critical_drop_ratio:
             anomaly_flag = RiskStatus.CRITICAL
+        elif z_score < self.config.threshold:
+            anomaly_flag = RiskStatus.ELEVATED
         else:
             anomaly_flag = RiskStatus.NORMAL
 
