@@ -46,14 +46,14 @@ def generate_mock_data():
     # 1. Generate Students
     students = []
     for i in range(NUM_STUDENTS):
-        sid = f'S{1000 + i}'
+        sid = uuid.uuid4()
         name = f'Student {i}'
         profile = random.choices(
             ['steady', 'improving', 'degrading'], weights=[0.6, 0.2, 0.2]
         )[0]
         students.append(
             {
-                'sid': sid,
+                'sid': str(sid),
                 'student_name': name,
                 'email': f'student_{i}@university.edu',
                 'major': random.choice(MAJORS),
@@ -68,10 +68,10 @@ def generate_mock_data():
     # 2. Generate Advisors
     advisors = []
     for i in range(NUM_ADVISORS):
-        aid = f'ADV_{100 + i}'
+        aid = uuid.uuid4()
         advisors.append(
             {
-                'advisor_id': aid,
+                'advisor_id': str(aid),
                 'name': f'Advisor {i}',
                 'email': f'advisor_{i}@university.edu',
             }
@@ -138,7 +138,7 @@ def generate_mock_data():
                                     'academic_year': year,
                                     'semester': semester,
                                     'week': week,
-                                }
+                                },
                             )
 
     # Remove 'profile' from student records before saving

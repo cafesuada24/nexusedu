@@ -1,10 +1,22 @@
 import sqlite3
 import sys
+import os
+from urllib.parse import urlparse
 
 def dump_users() -> None:
     """Dumps user data from the local SQLite database."""
-    # Defaults to data/app.db in the new architecture
-    db_path = 'data/app.db'
+    # Respect DATABASE_URL if set, otherwise default to data/app.db
+    db_url = os.environ.get('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db')
+    
+    # Parse the SQLite path from the URL
+    if db_url.startswith('sqlite'):
+        # Handle sqlite+aiosqlite:///./data/app.db or sqlite:///data/app.db
+        db_path = db_url.split('///')[-1]
+        if db_path.startswith('./'):
+            db_path = db_path[2:]
+    else:
+        print(f"Error: DATABASE_URL {db_url} is not a SQLite database.")
+        return
     
     try:
         conn = sqlite3.connect(db_path)

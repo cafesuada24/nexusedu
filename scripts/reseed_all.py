@@ -26,7 +26,6 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
 )
-from src.domain.services.anomaly_engine import AnomalyEngine
 
 
 from src.presentation.api.auth import SQLAlchemyUserDatabase, UserManager, UserRole
@@ -46,17 +45,32 @@ async def reseed() -> None:
     # Load Advisors
     print('Importing advisors...')
     adv_df = pd.read_csv('data/v2_advisors.csv')
-    advisors = [Advisor(**row) for row in adv_df.to_dict(orient='records')]
+    advisors = [
+        Advisor(**{**row, 'advisor_id': uuid.UUID(row['advisor_id'])})
+        for row in adv_df.to_dict(orient='records')
+    ]
 
     # Load Students
     print('Importing students...')
     stu_df = pd.read_csv('data/v2_students.csv')
-    students = [Student(**row) for row in stu_df.to_dict(orient='records')]
+    students = [
+        Student(**{**row, 'sid': uuid.UUID(row['sid'])})
+        for row in stu_df.to_dict(orient='records')
+    ]
 
     # Load Activities
     print('Importing activities...')
     act_df = pd.read_csv('data/v2_activities.csv')
-    activities = [Activity(**row) for row in act_df.to_dict(orient='records')]
+    activities = [
+        Activity(
+            **{
+                **row,
+                'activity_id': uuid.UUID(row['activity_id']),
+                'sid': uuid.UUID(row['sid']),
+            }
+        )
+        for row in act_df.to_dict(orient='records')
+    ]
 
     async with async_session_maker() as session:
         session.add_all(advisors)
@@ -80,13 +94,62 @@ async def reseed() -> None:
         await session.commit()
 
         print('Running anomaly detection...')
+        from collections import defaultdict
+        from src.domain.services.anomaly_engine.zscore import ZScore
+        from src.domain.value_objects.status import InterventionStatus, RiskStatus
+
         student_repo = SqlAlchemyStudentRepository(session)
         activity_repo = SqlAlchemyActivityRepository(session)
         history_repo = SqlAlchemyStatusHistoryRepository(session)
 
-        anomaly_engine = AnomalyEngine(student_repo, activity_repo, history_repo)
-        new_sids = await anomaly_engine.run()
-        print(f"Anomaly detection complete. {len(new_sids)} students identified as 'new' at-risk.")
+        # 1. Fetch data
+        weekly_avgs = await activity_repo.get_weekly_averages()
+        existing_history = await history_repo.get_all_history()
+
+        # 2. Prepare data for the pure domain service
+        history_set = {
+            (h['sid'], h['academic_year'], h['semester'], h['week'])
+            for h in existing_history
+        }
+
+        student_data = defaultdict(list)
+        for avg in weekly_avgs:
+            student_data[avg['sid']].append(avg)
+
+        # 3. Call the pure domain service
+        anomaly_engine = ZScore()
+        new_history_records, risk_statuses = anomaly_engine.run(
+            student_data, history_set
+        )
+
+        # 4. Persist new history records
+        if new_history_records:
+            await history_repo.batch_create_history(new_history_records)
+
+        # 5. Transition student statuses and identify new at-risk students
+        new_at_risk_sids = []
+        for sid, latest_risk in risk_statuses.items():
+            if latest_risk == RiskStatus.NORMAL:
+                continue
+
+            student = await student_repo.get_by_id(sid)
+            if not student:
+                continue
+
+            if student.intervention_status in (
+                InterventionStatus.NONE,
+                InterventionStatus.RESOLVED,
+            ):
+                await student_repo.update_risk_status(
+                    sid,
+                    risk_status=latest_risk,
+                    intervention_status=InterventionStatus.NOTIFIED,
+                )
+                new_at_risk_sids.append(sid)
+            else:
+                await student_repo.update_risk_status(sid, risk_status=latest_risk)
+
+        print(f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk.")
 
         print('Seeding advisor points ledger...')
         actions = [
@@ -105,7 +168,7 @@ async def reseed() -> None:
                 ts = datetime.now() - timedelta(days=random.randint(0, 14))
                 ledger_entries.append(
                     AdvisorPointsLedger(
-                        id=str(uuid.uuid4()),
+                        id=uuid.uuid4(),
                         advisor_id=aid,
                         action_type=action,
                         points=points,
