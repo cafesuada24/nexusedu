@@ -54,7 +54,7 @@ class DataCommandHandler:
         # Orchestrate Anomaly Detection
         new_sids = await self._run_anomaly_detection()
         results.append(
-            f'Anomaly engine execution completed. Found {len(new_sids)} new transitions.'
+            f'Anomaly engine execution completed. Found {len(new_sids)} new transitions.',
         )
 
         # Trigger automatic draft generation for new at-risk students

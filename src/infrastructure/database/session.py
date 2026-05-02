@@ -16,8 +16,16 @@ async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for getting an asynchronous SQLAlchemy session.
 
+    Automatically handles the transaction lifecycle by committing on success
+    and rolling back on exceptions.
+
     Yields:
         An async SQLAlchemy session.
     """
     async with async_session_maker() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise

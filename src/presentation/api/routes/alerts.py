@@ -110,16 +110,15 @@ async def update_alert_status(
         raise HTTPException(status_code=400, detail='Invalid status.') from e
 
     try:
-        async with session.begin():
-            command = UpdateStudentStatusCommand(
-                sid=UUID(sid),
-                status=status,
-                user_id=user.id,
-            )
-            await command_handler.handle_update_status(command)
+        command = UpdateStudentStatusCommand(
+            sid=UUID(sid),
+            status=status,
+            user_id=user.id,
+        )
+        await command_handler.handle_update_status(command)
         return {'sid': sid, 'new_status': update.status}
     except Exception as e:
-        logger.error(f'Error in get_alerts_status: {str(e)}', exc_info=True)
+        logger.error(f'Error in update_alert_status: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -132,9 +131,8 @@ async def trigger_draft(
 ) -> dict[str, str]:
     """Manually triggers a background AI draft generation."""
     try:
-        async with session.begin():
-            command = TriggerDraftCommand(sid=UUID(sid), user_id=user.id)
-            job_id = await command_handler.handle_trigger_draft(command)
+        command = TriggerDraftCommand(sid=UUID(sid), user_id=user.id)
+        job_id = await command_handler.handle_trigger_draft(command)
         return {'status': 'success', 'job_id': str(job_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -150,10 +148,9 @@ async def review_draft(
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft."""
     try:
-        async with session.begin():
-            # Note: Idempotency logic should ideally be in command handler
-            command = AwardReviewPointsCommand(sid=UUID(sid), user_id=user.id)
-            await command_handler.handle_award_review_points(command)
+        # Note: Idempotency logic should ideally be in command handler
+        command = AwardReviewPointsCommand(sid=UUID(sid), user_id=user.id)
+        await command_handler.handle_award_review_points(command)
 
         return {'status': 'success', 'message': 'Draft review points awarded.'}
     except Exception as e:
@@ -219,22 +216,24 @@ async def send_nudge_email(
     """Dispatches the email and updates the intervention lifecycle."""
     idemp_key = UUID(idempotency_key)
     try:
-        async with session.begin():
-            # 1. Early Return: Check idempotency INSIDE the transaction
-            if idempotency_key and await command_handler.check_idempotency(idemp_key):
-                return {
-                    'status': 'success',
-                    'message': 'Email already sent (idempotent).',
-                }
+        # 1. Early Return: Check idempotency
+        if idempotency_key and await command_handler.check_idempotency(idemp_key):
+            return {
+                'status': 'success',
+                'message': 'Email already sent (idempotent).',
+            }
 
-            # 2. Database Write: Record state and get email address
-            command = SendEmailCommand(
-                sid=UUID(sid), body=request.body, user_id=user.id
-            )
-            target_email = await command_handler.handle_send_email(command)
+        # 2. Database Write: Record state and get email address
+        command = SendEmailCommand(
+            sid=UUID(sid), body=request.body, user_id=user.id
+        )
+        target_email = await command_handler.handle_send_email(command)
 
-            if idempotency_key:
-                await command_handler.record_idempotency(idemp_key)
+        if idempotency_key:
+            await command_handler.record_idempotency(idemp_key)
+
+        # Explicitly commit the transaction before performing external I/O
+        await session.commit()
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
         # In a real app, this might be another port/service call

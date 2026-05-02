@@ -3,16 +3,19 @@
 import argparse
 import asyncio
 
+from dotenv import load_dotenv
 from sqlalchemy import update
 
+from src.infrastructure.database.models import User
+from src.infrastructure.database.session import async_session_maker
 from src.presentation.api.auth import (
     SQLAlchemyUserDatabase,
     UserManager,
     UserRole,
 )
 from src.presentation.schemas.auth import UserCreate  # noqa: E402
-from src.infrastructure.database.models import User
-from src.infrastructure.database.session import async_session_maker
+
+load_dotenv()
 
 
 async def create_user(email: str, password: str, role: str) -> None:
