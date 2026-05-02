@@ -100,6 +100,34 @@ async def test_idempotency_prevents_duplicate_review_points(
 
 
 @pytest.mark.asyncio
+async def test_duplicate_action_guard_prevents_double_points(
+    client: TestClient,
+    student_repository: StudentRepository,
+    test_db_session: AsyncSession,
+) -> None:
+    """Verify that the domain-level duplicate guard prevents double points even without Idempotency-Key."""
+    sid = uuid4()
+    await student_repository.ingest_students([
+        {'sid': sid, 'student_name': 'DupGuard', 'email': 'dg@ex.com', 'current_risk_status': 'Critical'},
+    ])
+    await test_db_session.commit()
+
+    # Act: Two requests WITHOUT Idempotency-Key (different keys generated server-side)
+    resp1 = client.post(f'/api/v1/alerts/{sid}/draft/review')
+    assert resp1.status_code == 200
+
+    resp2 = client.post(f'/api/v1/alerts/{sid}/draft/review')
+    assert resp2.status_code == 200
+
+    # Assert: Only ONE ledger entry should exist (duplicate guard blocked 2nd)
+    from sqlalchemy import select
+    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
+    assert len(ledger_entries) == 1
+    assert ledger_entries[0].action_type == 'draft_reviewed'
+
+
+@pytest.mark.asyncio
 async def test_email_sent_points(
     client: TestClient,
     student_repository: StudentRepository,
