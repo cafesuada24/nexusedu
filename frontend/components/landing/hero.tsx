@@ -78,18 +78,18 @@ export function Hero() {
                         <Button
                             asChild
                             size="lg"
-                            className="h-12 rounded-xl px-6 text-base transition-all duration-300 ease-out hover:scale-[1.05] hover:shadow-xl hover:shadow-blue-500/50 group"
+                            className="h-12 rounded-xl px-6 text-base transition-transform duration-200 ease-out hover:scale-[1.03] hover:shadow-md group"
                         >
                             <Link href="/login">
-                              Bắt đầu với NexusEdu
-                              <ArrowRight className="size-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" />
+                                Bắt đầu với NexusEdu
+                                <ArrowRight className="size-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" />
                             </Link>
                         </Button>
                         <Button
                             asChild
                             size="lg"
                             variant="outline"
-                            className="h-12 rounded-xl px-6 text-base transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md hover:shadow-gray-200/50 dark:hover:bg-white/5"
+                            className="h-12 rounded-xl px-6 text-base transition-transform transition-shadow duration-200 ease-out hover:-translate-y-1 hover:shadow-md hover:shadow-gray-200/50 dark:hover:bg-white/5"
                         >
                             <Link href="#features">Xem tính năng</Link>
                         </Button>

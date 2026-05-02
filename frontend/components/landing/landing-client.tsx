@@ -1,20 +1,46 @@
-import { SiteHeader } from "@/components/landing/site-header";
-import { AnimatedBackground } from "@/components/landing/animated-background";
-import { Hero } from "@/components/landing/hero";
-import { SiteFooter } from "@/components/landing/site-footer";
-import { Features } from "@/components/landing/features";
-import { HowItWorks } from "@/components/landing/how-it-works";
-import { Metrics } from "@/components/landing/metrics";
-import { Cta } from "@/components/landing/cta";
+"use client";
 
-export default function LandingPage() {
+import dynamic from "next/dynamic";
+
+const SiteHeader = dynamic(
+    () =>
+        import("@/components/landing/site-header").then(
+            (mod) => mod.SiteHeader,
+        ),
+    { ssr: false },
+);
+const Hero = dynamic(
+    () => import("@/components/landing/hero").then((mod) => mod.Hero),
+    { ssr: false },
+);
+const Features = dynamic(
+    () => import("@/components/landing/features").then((mod) => mod.Features),
+    { ssr: false },
+);
+const HowItWorks = dynamic(
+    () =>
+        import("@/components/landing/how-it-works").then(
+            (mod) => mod.HowItWorks,
+        ),
+    { ssr: false },
+);
+const Metrics = dynamic(
+    () => import("@/components/landing/metrics").then((mod) => mod.Metrics),
+    { ssr: false },
+);
+const Cta = dynamic(
+    () => import("@/components/landing/cta").then((mod) => mod.Cta),
+    { ssr: false },
+);
+
+export default function LandingClient() {
     const bentoCard =
         "p-[2px] rounded-3xl bg-gradient-to-br from-blue-500 to-cyan-400";
-    const bentoContent = "h-full rounded-[22px] bg-white/50 p-8 shadow-sm";
+    const bentoContent =
+        "h-full rounded-[22px] bg-white dark:bg-slate-900 p-8 shadow-sm";
 
     return (
-        <div className="flex min-h-screen flex-col bg-transparent">
-            <AnimatedBackground />
+        <>
             <SiteHeader />
             <main className="flex-1 space-y-6 p-6">
                 <div className={bentoCard}>
@@ -48,7 +74,6 @@ export default function LandingPage() {
                     </div>
                 </div>
             </main>
-            <SiteFooter />
-        </div>
+        </>
     );
 }
