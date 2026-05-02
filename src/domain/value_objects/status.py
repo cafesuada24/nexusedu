@@ -24,6 +24,14 @@ class InterventionStatus(StrEnum):
     EXPIRED = "expired"
 
 
+class CaseStatus(StrEnum):
+    """Status of a student case."""
+
+    OPEN = "open"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+
 class EmailStatus(StrEnum):
     """Status of an intervention email."""
 

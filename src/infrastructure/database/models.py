@@ -156,6 +156,9 @@ class InterventionEmail(Base):
         default=uuid.uuid4,
     )
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    case_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey('cases.case_id'), nullable=True
+    )
     advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey('advisors.advisor_id'),
@@ -168,6 +171,28 @@ class InterventionEmail(Base):
         server_default=func.current_timestamp(),
     )
     sent_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+
+
+class Case(Base):
+    """Represents an intervention case for a student."""
+
+    __tablename__ = 'cases'
+
+    case_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    status: Mapped[str] = mapped_column(String, default='open')
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+
+    # Relationships
+    student: Mapped[Student] = relationship('Student')
 
 
 class IdempotencyKey(Base):
@@ -196,7 +221,7 @@ class UserSettings(Base):
 
 
 class BackgroundJobTracker(Base):
-    """Tracker for ephemeral background jobs tied to a student."""
+    """Tracker for background jobs with observability and correlation."""
 
     __tablename__ = 'background_job_tracker'
 
@@ -205,6 +230,19 @@ class BackgroundJobTracker(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
     job_type: Mapped[str] = mapped_column(String, default='email_draft')
     status: Mapped[str] = mapped_column(String, default='running')
+
+    # Observability
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+    started_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Correlation to connect jobs with other entities (e.g., cases, students)
+    correlation_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    correlation_type: Mapped[str | None] = mapped_column(String)
