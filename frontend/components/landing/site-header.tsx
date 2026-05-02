@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -63,20 +63,19 @@ export function SiteHeader() {
                 </nav>
 
                 <div className="flex items-center gap-2">
+                    <Link
+                        href="/login"
+                        className={cn(
+                            buttonVariants({
+                                variant: "ghost",
+                                size: "default",
+                            }),
+                            "hidden rounded-xl md:inline-flex text-primary font-semibold",
+                        )}
+                    >
+                        Đăng nhập
+                    </Link>
                     <ThemeToggle />
-                    <Button
-                        asChild
-                        variant="ghost"
-                        className="hidden rounded-xl md:inline-flex"
-                    >
-                        <Link href="/login">Đăng nhập</Link>
-                    </Button>
-                    <Button
-                        asChild
-                        className="hidden rounded-xl md:inline-flex"
-                    >
-                        <Link href="/dashboard">Dùng thử</Link>
-                    </Button>
                     <Button
                         variant="ghost"
                         size="icon"
@@ -110,17 +109,19 @@ export function SiteHeader() {
                                 {l.label}
                             </Link>
                         ))}
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                            <Button
-                                asChild
-                                variant="outline"
-                                className="rounded-xl"
+                        <div className="mt-2 flex flex-col gap-2">
+                            <Link
+                                href="/login"
+                                className={cn(
+                                    buttonVariants({
+                                        variant: "outline",
+                                        size: "default",
+                                    }),
+                                    "w-full rounded-xl text-primary font-semibold",
+                                )}
                             >
-                                <Link href="/login">Đăng nhập</Link>
-                            </Button>
-                            <Button asChild className="rounded-xl">
-                                <Link href="/dashboard">Dùng thử</Link>
-                            </Button>
+                                Đăng nhập
+                            </Link>
                         </div>
                     </nav>
                 </div>
