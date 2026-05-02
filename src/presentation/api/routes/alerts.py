@@ -166,7 +166,6 @@ async def review_draft(
     sid: str,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
-    session: Annotated[AsyncSession, Depends(get_async_session)],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft."""

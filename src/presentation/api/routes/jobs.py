@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from arq import ArqRedis
+from arq.jobs import Job
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.presentation.api.auth import Scope, User, require_scope
@@ -19,19 +20,17 @@ async def get_job_status(
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
 ) -> JobStatusResponse:
     """Poll for the status and results of a background job."""
-    job = await arq_pool.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail='Job not found')
-
+    job = Job(job_id, redis=arq_pool)
     status = await job.status()
+
+    if status == 'not_found':
+        raise HTTPException(status_code=404, detail='Job not found')
 
     # Map ARQ JobStatus to our JobStatusResponse status
     # arq.jobs.JobStatus: deferred, queued, in_progress, complete, failed
     mapped_status = 'processing'
     if status == 'complete':
         mapped_status = 'completed'
-    elif status == 'failed':
-        mapped_status = 'failed'
     elif status in ('queued', 'deferred', 'in_progress'):
         mapped_status = 'processing'
 
@@ -40,11 +39,6 @@ async def get_job_status(
 
     if mapped_status == 'completed':
         result = await job.result()
-    elif mapped_status == 'failed':
-        try:
-            await job.result()
-        except Exception as e:
-            error = str(e)
 
     return JobStatusResponse(
         job_id=job_id,
