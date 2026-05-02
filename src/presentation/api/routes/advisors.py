@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import get_advisor_repository
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 

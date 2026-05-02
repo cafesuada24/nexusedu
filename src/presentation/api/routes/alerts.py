@@ -31,7 +31,7 @@ from src.presentation.dependencies.providers import (
 )
 from src.presentation.schemas.request import SendEmailRequest, StatusUpdate
 from src.presentation.schemas.response import AlertStudent, CaseResponse
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 

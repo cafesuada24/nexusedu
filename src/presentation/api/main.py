@@ -26,7 +26,7 @@ from src.presentation.api.routes import (
     users,
 )
 from src.presentation.schemas.auth import UserCreate, UserRead
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 app = FastAPI(
     title='Agent Assistant API',

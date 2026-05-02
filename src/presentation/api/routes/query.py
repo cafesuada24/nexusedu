@@ -13,7 +13,7 @@ from src.presentation.dependencies.providers import (
     get_arq_pool,
     get_idempotency_repository,
 )
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 router = APIRouter(prefix='/query', tags=['query'])
 

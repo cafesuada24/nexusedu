@@ -12,7 +12,7 @@ from src.infrastructure.agents.state import (
 )
 from src.infrastructure.agents.utils import MessageSerializer
 from src.infrastructure.extern.baml_client import b
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 
 class PlannerNode:
