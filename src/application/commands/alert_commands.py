@@ -12,7 +12,7 @@ from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.gamification import GamificationService
-from src.domain.value_objects.status import InterventionStatus
+from src.domain.value_objects.status import InterventionStatus, RiskStatus
 from src.telemetry.logger import logger
 
 
@@ -203,18 +203,18 @@ class AlertCommandHandler:
             return
 
         recorded_dt = await self.student_repo.get_latest_status_timestamp(sid)
-        
-        student = await self.student_repo.get_by_id(sid)
-        risk_level = student.current_risk_status if student else None
 
-        from src.domain.value_objects.status import RiskStatus
-        if isinstance(risk_level, str):
-            try:
-                risk_level = RiskStatus(risk_level)
-            except ValueError:
-                risk_level = RiskStatus.UNKNOWN
-        elif not risk_level:
-            risk_level = RiskStatus.UNKNOWN
+        student = await self.student_repo.get_by_id(sid)
+        risk_level = RiskStatus.UNKNOWN
+        if student:
+            raw = student.current_risk_status
+            if isinstance(raw, RiskStatus):
+                risk_level = raw
+            elif isinstance(raw, str):
+                try:
+                    risk_level = RiskStatus(raw)
+                except ValueError:
+                    risk_level = RiskStatus.UNKNOWN
 
         points = self.gamification_service.calculate_points(action_type, recorded_dt, risk_level)
         if points > 0:
