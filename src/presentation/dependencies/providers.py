@@ -16,6 +16,7 @@ from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
+from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
@@ -35,6 +36,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
+    SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyJobRepository,
@@ -74,6 +76,13 @@ async def get_email_repository(
 ) -> EmailRepository:
     """Dependency provider for the EmailRepository."""
     return SqlAlchemyEmailRepository(session)
+
+
+async def get_case_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> CaseRepository:
+    """Dependency provider for the CaseRepository."""
+    return SqlAlchemyCaseRepository(session)
 
 
 async def get_alert_repository(
@@ -145,6 +154,7 @@ async def get_anomaly_engine() -> AnomalyEngine:
 async def get_alert_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     idempotency_repo: Annotated[
@@ -161,6 +171,7 @@ async def get_alert_command_handler(
     return AlertCommandHandler(
         student_repo,
         email_repo,
+        case_repo,
         alert_repo,
         advisor_repo,
         idempotency_repo,
@@ -176,9 +187,10 @@ async def get_alert_query_handler(
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
 ) -> AlertQueryHandler:
     """Dependency provider for the AlertQueryHandler."""
-    return AlertQueryHandler(alert_repo, email_repo, student_repo, job_repo)
+    return AlertQueryHandler(alert_repo, email_repo, student_repo, job_repo, case_repo)
 
 
 async def get_data_command_handler(
@@ -193,6 +205,7 @@ async def get_data_command_handler(
     settings_repo: Annotated[
         UserSettingsRepository, Depends(get_user_settings_repository)
     ],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
     alert_command_handler: Annotated[
@@ -206,6 +219,7 @@ async def get_data_command_handler(
         history_repo,
         idempotency_repo,
         settings_repo,
+        case_repo,
         job_repo,
         anomaly_engine,
         alert_command_handler,
