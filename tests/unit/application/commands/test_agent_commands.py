@@ -26,11 +26,23 @@ def mock_metadata_service() -> MagicMock:
 
 
 @pytest.fixture
+def mock_idempotency_repo() -> MagicMock:
+    """Fixture providing a mock for the IdempotencyRepository."""
+    return MagicMock()
+
+
+@pytest.fixture
 def agent_command_handler(
-    mock_agent: MagicMock, mock_metadata_service: MagicMock
+    mock_agent: MagicMock,
+    mock_metadata_service: MagicMock,
+    mock_idempotency_repo: MagicMock,
 ) -> AgentCommandHandler:
     """Fixture providing an AgentCommandHandler with mocked dependencies."""
-    return AgentCommandHandler(agent=mock_agent, metadata_service=mock_metadata_service)
+    return AgentCommandHandler(
+        agent=mock_agent,
+        metadata_service=mock_metadata_service,
+        idempotency_repo=mock_idempotency_repo,
+    )
 
 
 @pytest.mark.asyncio

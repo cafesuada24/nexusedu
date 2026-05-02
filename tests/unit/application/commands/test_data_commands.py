@@ -11,7 +11,13 @@ from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
 @pytest.fixture
 def mock_repos():
-    return {'student': MagicMock(), 'activity': MagicMock(), 'history': MagicMock()}
+    return {
+        'student': MagicMock(),
+        'activity': MagicMock(),
+        'history': MagicMock(),
+        'settings': MagicMock(),
+        'idempotency': MagicMock(),
+    }
 
 
 @pytest.fixture
@@ -41,6 +47,8 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
         student_repo=mock_repos['student'],
         activity_repo=mock_repos['activity'],
         history_repo=mock_repos['history'],
+        settings_repo=mock_repos['settings'],
+        idempotency_repo=mock_repos['idempotency'],
         anomaly_engine=mock_engine,
         alert_command_handler=mock_alert_handler,
     )
