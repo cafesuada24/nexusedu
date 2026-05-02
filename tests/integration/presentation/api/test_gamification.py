@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 import pytest
 
 from src.domain.value_objects.status import InterventionStatus
-from src.infrastructure.database.models import AdvisorPointsLedger, StudentStatusHistory
+from src.infrastructure.database.models import AdvisorPointsLedger, IdempotencyKey, StudentStatusHistory
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from src.domain.repositories.interfaces import StudentRepository
+    from src.domain.repositories.student_repository import StudentRepository
 
 
 @pytest.mark.asyncio
@@ -24,14 +24,24 @@ async def test_draft_review_points(
     student_repository: StudentRepository,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify that /alerts/{sid}/draft/review awards points."""
+    """Verify that /alerts/{sid}/draft/review awards EXACTLY 5 points."""
     sid = uuid4()
     await student_repository.ingest_students(
         [
             {'sid': sid, 'student_name': 'G1', 'email': 'g1@ex.com'},
         ]
     )
-    await student_repository.session.commit()
+    test_db_session.add(
+        StudentStatusHistory(
+            history_id=uuid4(),
+            sid=sid,
+            status_recorded_at=datetime.now(UTC),
+            academic_year=2024,
+            semester=1,
+            week=1,
+        )
+    )
+    await test_db_session.commit()
 
     response = client.post(f'/api/v1/alerts/{sid}/draft/review')
     assert response.status_code == 200
@@ -46,8 +56,47 @@ async def test_draft_review_points(
 
     assert len(ledger_entries) == 1
     assert ledger_entries[0].action_type == 'draft_reviewed'
-    # Base points for draft_reviewed is 5.
-    assert ledger_entries[0].points >= 5
+    # Strict assertion: 5 base * 1.2 bonus (since it happened just now) = 6
+    assert ledger_entries[0].points == 6
+
+
+@pytest.mark.asyncio
+async def test_idempotency_prevents_duplicate_review_points(
+    client: TestClient,
+    student_repository: StudentRepository,
+    test_db_session: AsyncSession,
+) -> None:
+    """Verify that submitting the same Idempotency-Key twice does not double-award points."""
+    sid = uuid4()
+    idemp_key = str(uuid4())
+
+    # Arrange
+    await student_repository.ingest_students([
+        {'sid': sid, 'student_name': 'Idemp', 'email': 'i@ex.com'}
+    ])
+    await test_db_session.commit()
+    headers = {'Idempotency-Key': idemp_key}
+
+    # Act 1: First request (Should succeed and award points)
+    resp1 = client.post(f'/api/v1/alerts/{sid}/draft/review', headers=headers)
+    assert resp1.status_code == 200
+
+    # Act 2: Second request with IDENTICAL key (Should succeed but NOT award points)
+    resp2 = client.post(f'/api/v1/alerts/{sid}/draft/review', headers=headers)
+    assert resp2.status_code == 200
+    assert "already awarded (idempotent)" in resp2.json()['message']
+
+    # Assert
+    # Check that only ONE ledger entry was created
+    from sqlalchemy import select
+    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
+    assert len(ledger_entries) == 1
+
+    # Check that key was registered in the DB
+    key_stmt = select(IdempotencyKey).where(IdempotencyKey.key == UUID(idemp_key))
+    registered_key = (await test_db_session.execute(key_stmt)).scalar_one_or_none()
+    assert registered_key is not None
 
 
 @pytest.mark.asyncio
@@ -129,7 +178,7 @@ async def test_response_time_bonus(
     student_repository: StudentRepository,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify the 1.2x multiplier for <24h response."""
+    """Verify the 1.2x multiplier for <24h response using UTC-safe boundaries."""
     sid_fast = uuid4()
     sid_slow = uuid4()
 
@@ -140,10 +189,10 @@ async def test_response_time_bonus(
         ]
     )
 
-    # Fast: alert happened 1 hour ago
-    fast_time = datetime.now() - timedelta(hours=1)
-    # Slow: alert happened 2 days ago
-    slow_time = datetime.now() - timedelta(days=2)
+    # Use explicit UTC to avoid CI/CD timezone drift
+    now = datetime.now(UTC)
+    fast_time = now - timedelta(hours=1)
+    slow_time = now - timedelta(days=2)
 
     test_db_session.add_all(
         [
@@ -179,7 +228,7 @@ async def test_response_time_bonus(
     res_fast = (await test_db_session.execute(stmt_fast)).scalar_one()
     res_slow = (await test_db_session.execute(stmt_slow)).scalar_one()
 
-    # Base is 5. Fast should be 5 * 1.2 = 6. Slow should be 5.
+    # Base is 5. Fast (<24h) = 5 * 1.2 = 6. Slow (>24h) = 5.
     assert res_fast.points == 6
     assert res_slow.points == 5
 
