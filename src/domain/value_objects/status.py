@@ -19,6 +19,7 @@ class InterventionStatus(StrEnum):
     NOTIFIED = "notified"
     BOOKED = "booked"
     SENT = "sent"
+    SUPPORTING = "supporting"
     RESOLVED = "resolved"
     DISMISSED = "dismissed"
     EXPIRED = "expired"
@@ -35,5 +36,6 @@ class CaseStatus(StrEnum):
 class EmailStatus(StrEnum):
     """Status of an intervention email."""
 
+    GENERATING = "generating"
     DRAFT = "draft"
     SENT = "sent"
