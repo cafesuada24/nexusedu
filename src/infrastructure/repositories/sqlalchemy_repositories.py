@@ -505,12 +505,14 @@ class SqlAlchemyEmailRepository:
         advisor_id: uuid.UUID | None,
         subject: str,
         body: str,
+        case_id: uuid.UUID | None = None,
     ) -> uuid.UUID:
         """Create a new draft email and return its ID."""
         email_id = uuid.uuid4()
         email = InterventionEmail(
             email_id=email_id,
             sid=sid,
+            case_id=case_id,
             advisor_id=advisor_id,
             subject=subject,
             body=body,

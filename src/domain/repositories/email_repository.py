@@ -19,6 +19,7 @@ class EmailRepository(Protocol):
         advisor_id: UUID | None,
         subject: str,
         body: str,
+        case_id: UUID | None = None,
     ) -> UUID:
         """Create a new draft email and return its ID."""
         ...
