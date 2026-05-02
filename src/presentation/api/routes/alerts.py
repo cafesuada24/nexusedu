@@ -96,6 +96,22 @@ async def get_case_history(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.get('/cases/{case_id}')
+async def get_case_details(
+    case_id: str,
+    query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
+    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+) -> dict[str, Any]:
+    """Retrieve full details of a specific case, including associated emails."""
+    try:
+        return await query_handler.handle_get_case_details(UUID(case_id))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error in get_case_details: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get('', response_model=list[AlertStudent])
 async def get_alerts(
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],

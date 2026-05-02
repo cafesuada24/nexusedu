@@ -13,7 +13,7 @@ from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.gamification import GamificationService
-from src.domain.value_objects.status import InterventionStatus
+from src.domain.value_objects.status import CaseStatus, InterventionStatus, RiskStatus
 from src.telemetry.logger import logger
 
 
@@ -102,6 +102,14 @@ class AlertCommandHandler:
                 await self.case_repo.update_case_status(
                     active_case.case_id, command.status.value
                 )
+        elif command.status != InterventionStatus.NONE:
+            # If moving to an intervention status (NOTIFIED, BOOKED, etc.)
+            # ensure an active case exists
+            active_case = await self.case_repo.get_active_case(command.sid)
+            if not active_case:
+                from src.domain.entities.case import Case
+                new_case = Case(sid=command.sid, status=CaseStatus.OPEN)
+                await self.case_repo.create_case(new_case)
 
         # Gamification hooks for status changes
         if command.status == InterventionStatus.BOOKED:

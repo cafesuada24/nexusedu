@@ -85,7 +85,7 @@ class AlertQueryHandler:
         self, query: GetEmailHistoryQuery
     ) -> list[EmailDTO]:
         """Execute the get email history query."""
-        history = await self.email_repo.get_history(query.sid)
+        domain_emails = await self.email_repo.get_history(query.sid)
         return [
             EmailDTO(
                 email_id=e.email_id,
@@ -96,8 +96,36 @@ class AlertQueryHandler:
                 created_at=e.created_at.isoformat(),
                 sent_at=e.sent_at.isoformat() if e.sent_at else None,
             )
-            for e in history
+            for e in domain_emails
         ]
+
+    async def handle_get_case_details(self, case_id: UUID4) -> dict[str, Any]:
+        """Retrieve full details of a specific case, including associated emails."""
+        case = await self.case_repo.get_by_id(case_id)
+        if not case:
+            raise ValueError(f'Case {case_id} not found.')
+
+        emails = await self.email_repo.get_by_case(case_id)
+
+        return {
+            'case_id': str(case.case_id),
+            'sid': str(case.sid),
+            'status': case.status.value,
+            'created_at': case.created_at.isoformat(),
+            'resolved_at': case.resolved_at.isoformat() if case.resolved_at else None,
+            'emails': [
+                {
+                    'email_id': str(e.email_id),
+                    'subject': e.subject,
+                    'body': e.body,
+                    'status': e.status.value,
+                    'created_at': e.created_at.isoformat(),
+                    'sent_at': e.sent_at.isoformat() if e.sent_at else None,
+                }
+                for e in emails
+            ]
+        }
+
 
     async def handle_get_draft_status(self, sid: UUID4) -> dict[str, Any]:
         """Retrieve the current AI draft status and content for a student."""

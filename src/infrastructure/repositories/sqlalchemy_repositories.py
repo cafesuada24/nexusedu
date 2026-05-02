@@ -500,6 +500,16 @@ class SqlAlchemyEmailRepository:
         email = result.scalar_one_or_none()
         return DataMapper.to_domain_email(email) if email else None
 
+    async def get_by_case(self, case_id: uuid.UUID) -> list[DomainInterventionEmail]:
+        """Retrieve all emails associated with a specific case."""
+        stmt = (
+            select(InterventionEmail)
+            .where(InterventionEmail.case_id == case_id)
+            .order_by(desc(InterventionEmail.created_at))
+        )
+        result = await self.session.execute(stmt)
+        return [DataMapper.to_domain_email(row[0]) for row in result.all()]
+
     async def create_draft(
         self,
         sid: uuid.UUID,

@@ -31,3 +31,7 @@ class EmailRepository(Protocol):
     async def get_history(self, sid: UUID) -> list[InterventionEmail]:
         """Retrieve the communication history for a student."""
         ...
+
+    async def get_by_case(self, case_id: UUID) -> list[InterventionEmail]:
+        """Retrieve all emails associated with a specific case."""
+        ...
