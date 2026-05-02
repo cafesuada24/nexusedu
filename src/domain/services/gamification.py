@@ -47,17 +47,22 @@ class GamificationService:
         if recorded_dt is None:
             return int(points_after_risk)
 
-        # Calculate multiplier based on 24h SLA
-        multiplier = 1.0
+        # Calculate multiplier based on tiered SLA
+        sla_multiplier = 1.0
 
         now = datetime.datetime.now(datetime.UTC)
-        # Ensure recorded_dt is timezone-aware if it's not
         if recorded_dt.tzinfo is None:
             recorded_dt = recorded_dt.replace(tzinfo=datetime.UTC)
 
-        # 24h SLA in seconds
-        sla_24h = 86400
-        if (now - recorded_dt).total_seconds() < sla_24h:
-            multiplier = 1.2
+        delta_seconds = (now - recorded_dt).total_seconds()
+        
+        if delta_seconds < 12 * 3600:
+            sla_multiplier = 1.5
+        elif delta_seconds < 24 * 3600:
+            sla_multiplier = 1.2
+        elif delta_seconds < 72 * 3600:
+            sla_multiplier = 1.0
+        else:
+            sla_multiplier = 0.8  # Penalty for taking longer than 72h
 
-        return int(base_points * multiplier)
+        return int(points_after_risk * sla_multiplier)
