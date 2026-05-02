@@ -20,6 +20,7 @@ from src.application.queries.alert_queries import (
     GetActiveAlertsQuery,
     GetEmailHistoryQuery,
 )
+from src.domain.repositories.case_repository import CaseRepository
 from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import Scope, User, require_scope
@@ -27,6 +28,7 @@ from src.presentation.dependencies.providers import (
     get_alert_command_handler,
     get_alert_query_handler,
     get_arq_pool,
+    get_case_repository,
 )
 from src.telemetry.logger import logger
 
@@ -45,6 +47,7 @@ class AlertStudent(BaseModel):
         False,
         description='Whether a background AI draft generation is running.',
     )
+    active_case_id: str | None = Field(None, description='The ID of the currently active case.')
 
 
 class StatusUpdate(BaseModel):
@@ -59,7 +62,38 @@ class SendEmailRequest(BaseModel):
     body: str = Field(..., description='The final email body to send.')
 
 
-@router.get('', response_model=list[AlertStudent])
+class CaseResponse(BaseModel):
+    """Schema for a student case."""
+
+    case_id: str
+    sid: str
+    status: str
+    created_at: str
+    resolved_at: str | None = None
+
+
+@router.get('/{sid}/cases', response_model=list[CaseResponse])
+async def get_case_history(
+    sid: str,
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
+    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+) -> list[dict[str, Any]]:
+    """Retrieve historical cases for a specific student."""
+    try:
+        cases = await case_repo.get_student_cases(UUID(sid))
+        return [
+            {
+                'case_id': str(c.case_id),
+                'sid': str(c.sid),
+                'status': c.status.value,
+                'created_at': c.created_at.isoformat(),
+                'resolved_at': c.resolved_at.isoformat() if c.resolved_at else None,
+            }
+            for c in cases
+        ]
+    except Exception as e:
+        logger.error(f'Error in get_case_history: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 async def get_alerts(
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
     _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
@@ -87,6 +121,7 @@ async def get_alerts(
                 'current_risk_status': d.student.current_risk_status.value,
                 'intervention_status': d.student.intervention_status.value,
                 'is_generating': d.student.is_generating,
+                'active_case_id': str(d.student.active_case_id) if d.student.active_case_id else None,
             }
             for d in dtos
         ]
