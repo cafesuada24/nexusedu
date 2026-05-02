@@ -89,7 +89,7 @@ export function Hero() {
                             asChild
                             size="lg"
                             variant="outline"
-                            className="h-12 rounded-xl px-6 text-base transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-md hover:shadow-gray-200/50 dark:hover:bg-white/5"
+                            className="h-12 rounded-xl px-6 text-base transition-transform transition-shadow duration-200 ease-out hover:-translate-y-1 hover:shadow-md hover:shadow-gray-200/50 dark:hover:bg-white/5"
                         >
                             <Link href="#features">Xem tính năng</Link>
                         </Button>

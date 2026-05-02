@@ -52,6 +52,12 @@ const colorMap: Record<string, string> = {
     orange: "bg-orange-200/40",
 };
 
+const stripeMap: Record<string, string> = {
+    blue: "border-t-2 border-t-blue-50 dark:border-t-blue-800/40",
+    purple: "border-t-2 border-t-purple-50 dark:border-t-purple-800/40",
+    orange: "border-t-2 border-t-orange-50 dark:border-t-orange-800/40",
+};
+
 const iconGlowMap: Record<string, string> = {
     blue: "shadow-blue-500/10",
     purple: "shadow-purple-500/10",
@@ -72,14 +78,12 @@ export function Features() {
                         <article
                             key={f.title}
                             className="group relative h-full p-[1px] rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 dark:from-blue-700 dark:to-cyan-600 transition-transform duration-300 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(56,189,248,0.06)]"
+                            style={{ willChange: "transform" }}
                         >
-                            {/* Inner Card */}
-                            <div className="h-full flex flex-col items-center text-center p-6 rounded-[14px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border border-white/20 dark:border-white/10">
-                                {/* Subtle background glow */}
-                                <div
-                                    className={`absolute -inset-0.5 rounded-2xl ${colorMap[f.color]} blur-sm opacity-[0.06] group-hover:opacity-[0.14] transition-opacity duration-500`}
-                                />
-
+                            {/* Inner Card (opaque to avoid costly alpha compositing) */}
+                            <div
+                                className={`h-full flex flex-col items-center text-center p-6 rounded-[14px] bg-white dark:bg-slate-900 border border-white/10 dark:border-white/10 ${stripeMap[f.color]}`}
+                            >
                                 <div className="relative z-10 flex flex-col items-center">
                                     <div
                                         className={`relative flex size-12 items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800 shadow-sm ${iconGlowMap[f.color]} mb-4 group-hover:-translate-y-1 transition-transform duration-300`}
