@@ -4,15 +4,18 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
+from src.domain.entities.alert import Alert
+from src.domain.entities.case import Case
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
+from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.gamification import GamificationService
-from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.domain.value_objects.status import CaseStatus, InterventionStatus, RiskStatus
 from src.telemetry.logger import logger
 
 
@@ -69,6 +72,7 @@ class AlertCommandHandler:
         self,
         student_repo: StudentRepository,
         email_repo: EmailRepository,
+        case_repo: CaseRepository,
         alert_repo: AlertRepository,
         advisor_repo: AdvisorRepository,
         idempotency_repo: IdempotencyRepository,
@@ -80,6 +84,7 @@ class AlertCommandHandler:
         """Initialize the handler with required dependencies."""
         self.student_repo = student_repo
         self.email_repo = email_repo
+        self.case_repo = case_repo
         self.alert_repo = alert_repo
         self.advisor_repo = advisor_repo
         self.idempotency_repo = idempotency_repo
@@ -91,6 +96,22 @@ class AlertCommandHandler:
     async def handle_update_status(self, command: UpdateStudentStatusCommand) -> None:
         """Execute the status update command."""
         await self.student_repo.update_intervention_status(command.sid, command.status)
+        
+        # Case transition logic
+        if command.status in (InterventionStatus.RESOLVED, InterventionStatus.DISMISSED):
+            active_case = await self.case_repo.get_active_case(command.sid)
+            if active_case:
+                await self.case_repo.update_case_status(
+                    active_case.case_id, command.status.value
+                )
+        elif command.status != InterventionStatus.NONE:
+            # If moving to an intervention status (NOTIFIED, BOOKED, etc.)
+            # ensure an active case exists
+            active_case = await self.case_repo.get_active_case(command.sid)
+            if not active_case:
+                new_case = Case(sid=command.sid, status=CaseStatus.OPEN)
+                await self.case_repo.create_case(new_case)
+
         # Gamification hooks for status changes
         if command.status == InterventionStatus.BOOKED:
             await self._award_points(command.user_id, command.sid, 'meeting_booked')
@@ -113,6 +134,10 @@ class AlertCommandHandler:
         # if not await self.task_queue.is_available():
         #     raise RuntimeError('Task queue is not available. Task cannot be enqueued.')
 
+        active_case = await self.case_repo.get_active_case(command.sid)
+        correlation_id = active_case.case_id if active_case else command.sid
+        correlation_type = 'case' if active_case else 'student'
+
         job_id = uuid4()
         await self.task_queue.enqueue(
             'run_email_draft_task',
@@ -123,7 +148,9 @@ class AlertCommandHandler:
         )
 
         if command.update_db:
-            await self.job_repo.create_job(job_id, command.sid, 'email_draft')
+            await self.job_repo.create_job(
+                job_id, 'email_draft', correlation_id, correlation_type
+            )
         return job_id
 
     async def handle_generate_email_draft(
@@ -135,6 +162,7 @@ class AlertCommandHandler:
             raise ValueError('EmailDraftingService not provided.')
 
         logger.info(f'Generating email draft for student {command.sid}')
+        await self.job_repo.start_job(command.job_id)
 
         try:
             # 1. Fetch student PII
@@ -159,15 +187,19 @@ class AlertCommandHandler:
             )
 
             # 4. Persistent storage
+            active_case = await self.case_repo.get_active_case(command.sid)
             await self.email_repo.create_draft(
                 command.sid,
                 command.user_id,
                 'Checking in on your academic progress',
                 personalized_body,
+                case_id=active_case.case_id if active_case else None,
             )
-        finally:
-            # 5. Clear the job tracker
             await self.job_repo.complete_job(command.job_id)
+        except Exception as e:
+            logger.error(f'Failed to generate email draft: {str(e)}')
+            await self.job_repo.fail_job(command.job_id, str(e))
+            raise e
 
     async def handle_send_email(self, command: SendEmailCommand) -> str:
         """Execute the send email command."""

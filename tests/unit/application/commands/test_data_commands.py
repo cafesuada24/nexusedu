@@ -18,6 +18,7 @@ def mock_repos():
         'settings': MagicMock(),
         'idempotency': MagicMock(),
         'job': MagicMock(),
+        'case': MagicMock(),
     }
 
 
@@ -40,6 +41,8 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
     mock_repos['history'].batch_create_history = AsyncMock()
     mock_repos['student'].get_by_id = AsyncMock()
     mock_repos['student'].update_risk_status = AsyncMock()
+    mock_repos['case'].create_case = AsyncMock()
+    mock_repos['case'].get_active_case = AsyncMock()
 
     mock_alert_handler.handle_trigger_draft = AsyncMock()
 
@@ -49,6 +52,7 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
         history_repo=mock_repos['history'],
         idempotency_repo=mock_repos['idempotency'],
         settings_repo=mock_repos['settings'],
+        case_repo=mock_repos['case'],
         job_repo=mock_repos['job'],
         anomaly_engine=mock_engine,
         alert_command_handler=mock_alert_handler,

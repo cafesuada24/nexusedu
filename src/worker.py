@@ -22,6 +22,7 @@ from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
+    SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyJobRepository,
@@ -46,6 +47,7 @@ async def run_email_draft_task(
         student_repo = SqlAlchemyStudentRepository(session)
         advisor_repo = SqlAlchemyAdvisorRepository(session)
         alert_repo = SqlAlchemyAlertRepository(session)
+        case_repo = SqlAlchemyCaseRepository(session)
         email_repo = SqlAlchemyEmailRepository(session)
         job_repo = SqlAlchemyJobRepository(session)
         idempotency_repo = SqlAlchemyIdempotencyRepository(session)
@@ -62,6 +64,7 @@ async def run_email_draft_task(
         handler = AlertCommandHandler(
             student_repo=student_repo,
             email_repo=email_repo,
+            case_repo=case_repo,
             alert_repo=alert_repo,
             advisor_repo=advisor_repo,
             job_repo=job_repo,

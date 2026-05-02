@@ -22,6 +22,7 @@ class StudentDTO:
     intervention_status: InterventionStatus
     last_notified_at: datetime
     is_generating: bool = False
+    active_case_id: UUID4 | None = None
 
 
 @dataclass

@@ -11,14 +11,16 @@ from src.application.commands.alert_commands import (
     TriggerDraftCommand,
 )
 from src.application.dtos.data_dtos import DataIngestionCommand
+from src.domain.entities.case import Case
 from src.domain.repositories.activity_repository import ActivityRepository
+from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
-from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.domain.value_objects.status import CaseStatus, InterventionStatus, RiskStatus
 
 
 class DataCommandHandler:
@@ -31,6 +33,7 @@ class DataCommandHandler:
         history_repo: StatusHistoryRepository,
         idempotency_repo: IdempotencyRepository,
         settings_repo: UserSettingsRepository,
+        case_repo: CaseRepository,
         job_repo: JobRepository,
         anomaly_engine: AnomalyEngine,
         alert_command_handler: AlertCommandHandler,
@@ -40,6 +43,7 @@ class DataCommandHandler:
         self.history_repo = history_repo
         self.idempotency_repo = idempotency_repo
         self.settings_repo = settings_repo
+        self.case_repo = case_repo
         self.job_repo = job_repo
         self.anomaly_engine = anomaly_engine
         self.alert_command_handler = alert_command_handler
@@ -68,13 +72,17 @@ class DataCommandHandler:
 
         # Trigger automatic draft generation for new at-risk students
         triggered_jobs: list[dict[str, Any]] = []
-        db_updates: list[tuple[UUID4, UUID4]] = []
+        db_updates: list[tuple[UUID4, str, UUID4 | None, str | None]] = []
 
         # Check user policy for automatic drafts
         auto_draft_enabled = await self.settings_repo.get_auto_draft_enabled(user_id)
 
         if auto_draft_enabled:
             for sid in new_sids:
+                active_case = await self.case_repo.get_active_case(sid)
+                correlation_id = active_case.case_id if active_case else sid
+                correlation_type = 'case' if active_case else 'student'
+
                 trigger_command = TriggerDraftCommand(
                     sid=sid,
                     user_id=user_id,
@@ -84,7 +92,7 @@ class DataCommandHandler:
                     trigger_command
                 )
                 triggered_jobs.append({'sid': sid, 'job_id': job_id})
-                db_updates.append((job_id, sid, 'email_draft'))
+                db_updates.append((job_id, 'email_draft', correlation_id, correlation_type))
 
         # Batch create job tracking records
         if db_updates:
@@ -141,6 +149,10 @@ class DataCommandHandler:
                     intervention_status=InterventionStatus.NOTIFIED,
                 )
                 new_at_risk_sids.append(sid)
+
+                # Create a new Case for this student
+                new_case = Case(sid=sid, status=CaseStatus.OPEN)
+                await self.case_repo.create_case(new_case)
             else:
                 await self.student_repo.update_risk_status(sid, risk_status=latest_risk)
 
