@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from pydantic import UUID4
+from sqlalchemy import select
 
 from src.application.commands.alert_commands import (
     AlertCommandHandler,
@@ -16,6 +17,7 @@ from src.domain.repositories.status_history_repository import StatusHistoryRepos
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.infrastructure.database.models import User
 
 
 class DataCommandHandler:
@@ -61,17 +63,24 @@ class DataCommandHandler:
         triggered_jobs: list[dict[str, Any]] = []
         db_updates: list[tuple[UUID4, UUID4]] = []
 
-        for sid in new_sids:
-            trigger_command = TriggerDraftCommand(
-                sid=sid,
-                user_id=user_id,
-                update_db=False,
-            )
-            job_id = await self.alert_command_handler.handle_trigger_draft(
-                trigger_command
-            )
-            triggered_jobs.append({'sid': sid, 'job_id': job_id})
-            db_updates.append((job_id, sid))
+        # Check user policy for automatic drafts
+        # Accessing session through student_repo (Infrastructure detail leaky but practical here)
+        user_stmt = select(User.auto_draft_enabled).where(User.id == user_id)
+        user_res = await self.student_repo.session.execute(user_stmt)
+        auto_draft_enabled = user_res.scalar_one_or_none()
+
+        if auto_draft_enabled:
+            for sid in new_sids:
+                trigger_command = TriggerDraftCommand(
+                    sid=sid,
+                    user_id=user_id,
+                    update_db=False,
+                )
+                job_id = await self.alert_command_handler.handle_trigger_draft(
+                    trigger_command
+                )
+                triggered_jobs.append({'sid': sid, 'job_id': job_id})
+                db_updates.append((job_id, sid))
 
         # Batch update draft_job_id
         if db_updates:
