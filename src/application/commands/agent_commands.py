@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
 from src.application.services.agent_metadata import AgentMetadataService
+from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.telemetry.logger import logger
 
 if TYPE_CHECKING:
@@ -21,9 +22,11 @@ class AgentCommandHandler:
         self,
         agent: 'CompiledStateGraph[AgentState, None, AgentState]',
         metadata_service: AgentMetadataService,
+        idempotency_repo: IdempotencyRepository,
     ):
         self.agent = agent
         self.metadata_service = metadata_service
+        self.idempotency_repo = idempotency_repo
 
     async def handle_run_agent_task(
         self, command: RunAgentTaskCommand
@@ -91,3 +94,11 @@ class AgentCommandHandler:
             raise
         finally:
             logger.clear_context()
+
+    async def check_idempotency(self, key: uuid.UUID) -> bool:
+        """Check if an idempotency key has been used."""
+        return await self.idempotency_repo.check_key(key)
+
+    async def record_idempotency(self, key: uuid.UUID) -> None:
+        """Record a new idempotency key."""
+        await self.idempotency_repo.record_key(key)
