@@ -88,23 +88,6 @@ class SqlAlchemyStudentRepository:
         )
         await self.session.execute(stmt)
 
-    async def update_draft_job_id(self, sid: uuid.UUID, job_id: uuid.UUID | None) -> None:
-        """Update the draft job ID for a student."""
-        stmt = update(Student).where(Student.sid == sid).values(draft_job_id=job_id)
-        await self.session.execute(stmt)
-
-    async def batch_update_draft_job_ids(self, updates: Sequence[tuple[uuid.UUID, uuid.UUID]]) -> None:
-        """Batch update draft job IDs for multiple students."""
-        if not updates:
-            return
-
-        # Prepare bulk update data
-        update_data = [{'sid': sid, 'draft_job_id': job_id} for job_id, sid in updates]
-
-        # Execute single bulk update
-        await self.session.execute(update(Student), update_data)
-        # await self.session.commit() removed
-
     async def update_last_notified(self, sid: uuid.UUID) -> None:
         """Update the last notified timestamp for a student."""
         stmt = (
@@ -723,3 +706,95 @@ class SqlAlchemyMetricsRepository:
         result = await self.session.execute(stmt)
         # Reverse to get chronological order
         return [row._asdict() for row in result.all()][::-1]
+
+
+class SqlAlchemyJobRepository:
+    """SQLAlchemy implementation of the JobRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+
+    async def create_job(self, job_id: uuid.UUID, sid: uuid.UUID, job_type: str) -> None:
+        """Record a new background job."""
+        # Using model import locally to avoid circular dependency issues at module level
+        from src.infrastructure.database.models import BackgroundJobTracker
+        
+        entry = BackgroundJobTracker(job_id=job_id, sid=sid, job_type=job_type, status='running')
+        self.session.add(entry)
+
+    async def get_active_job(self, sid: uuid.UUID, job_type: str) -> uuid.UUID | None:
+        """Retrieve the active job ID for a student and job type, if any."""
+        from src.infrastructure.database.models import BackgroundJobTracker
+        
+        stmt = select(BackgroundJobTracker.job_id).where(
+            BackgroundJobTracker.sid == sid,
+            BackgroundJobTracker.job_type == job_type,
+            BackgroundJobTracker.status == 'running'
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def complete_job(self, job_id: uuid.UUID) -> None:
+        """Mark a background job as completed."""
+        from src.infrastructure.database.models import BackgroundJobTracker
+        
+        stmt = update(BackgroundJobTracker).where(
+            BackgroundJobTracker.job_id == job_id
+        ).values(status='completed')
+        await self.session.execute(stmt)
+
+    async def batch_create_jobs(self, jobs: Sequence[tuple[uuid.UUID, uuid.UUID, str]]) -> None:
+        """Batch record multiple background jobs."""
+        if not jobs:
+            return
+            
+        from src.infrastructure.database.models import BackgroundJobTracker
+        
+        entries = [
+            BackgroundJobTracker(job_id=job_id, sid=sid, job_type=job_type, status='running')
+            for job_id, sid, job_type in jobs
+        ]
+        self.session.add_all(entries)
+
+
+class SqlAlchemyUserSettingsRepository:
+    """SQLAlchemy implementation of the UserSettingsRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+
+    async def get_auto_draft_enabled(self, user_id: uuid.UUID) -> bool:
+        """Check if auto-drafting is enabled for a user."""
+        from src.infrastructure.database.models import UserSettings
+        
+        stmt = select(UserSettings.auto_draft_enabled).where(UserSettings.user_id == user_id)
+        result = await self.session.execute(stmt)
+        value = result.scalar_one_or_none()
+        
+        # Lazy initialization: return True (default) if no setting exists
+        return True if value is None else value
+
+    async def update_auto_draft_enabled(self, user_id: uuid.UUID, enabled: bool) -> None:
+        """Update the auto-drafting setting for a user."""
+        from src.infrastructure.database.models import UserSettings
+        
+        # Upsert logic
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+        values = {'user_id': user_id, 'auto_draft_enabled': enabled}
+        
+        if dialect == 'postgresql':
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(UserSettings).values(**values).on_conflict_do_update(
+                index_elements=['user_id'],
+                set_={'auto_draft_enabled': enabled}
+            )
+        else:
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+            stmt = sqlite_insert(UserSettings).values(**values).on_conflict_do_update(
+                index_elements=['user_id'],
+                set_={'auto_draft_enabled': enabled}
+            )
+            
+        await self.session.execute(stmt)

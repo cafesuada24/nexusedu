@@ -36,7 +36,6 @@ class DataMapper:
             intervention_status=InterventionStatus(orm_student.intervention_status),
             last_notified_timestamp=orm_student.last_notified_timestamp,
             last_notified_satisfaction=orm_student.last_notified_satisfaction,
-            draft_job_id=orm_student.draft_job_id,
         )
 
     @staticmethod

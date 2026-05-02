@@ -19,7 +19,6 @@ class Student:
     current_risk_status: RiskStatus
     intervention_status: InterventionStatus
     last_notified_satisfaction: int = 0
-    draft_job_id: str | None = None
 
     def update_risk(self, status: RiskStatus) -> None:
         """Update the student's risk status."""

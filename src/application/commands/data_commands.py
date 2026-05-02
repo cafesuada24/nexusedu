@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from typing import Any
 
 from pydantic import UUID4
-from sqlalchemy import select
 
 from src.application.commands.alert_commands import (
     AlertCommandHandler,
@@ -14,11 +13,12 @@ from src.application.commands.alert_commands import (
 from src.application.dtos.data_dtos import DataIngestionCommand
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
+from src.domain.repositories.job_repository import JobRepository
+from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
-from src.infrastructure.database.models import User
 
 
 class DataCommandHandler:
@@ -30,6 +30,8 @@ class DataCommandHandler:
         activity_repo: ActivityRepository,
         history_repo: StatusHistoryRepository,
         idempotency_repo: IdempotencyRepository,
+        settings_repo: UserSettingsRepository,
+        job_repo: JobRepository,
         anomaly_engine: AnomalyEngine,
         alert_command_handler: AlertCommandHandler,
     ):
@@ -37,6 +39,8 @@ class DataCommandHandler:
         self.activity_repo = activity_repo
         self.history_repo = history_repo
         self.idempotency_repo = idempotency_repo
+        self.settings_repo = settings_repo
+        self.job_repo = job_repo
         self.anomaly_engine = anomaly_engine
         self.alert_command_handler = alert_command_handler
 
@@ -67,10 +71,7 @@ class DataCommandHandler:
         db_updates: list[tuple[UUID4, UUID4]] = []
 
         # Check user policy for automatic drafts
-        # Accessing session through student_repo (Infrastructure detail leaky but practical here)
-        user_stmt = select(User.auto_draft_enabled).where(User.id == user_id)
-        user_res = await self.student_repo.session.execute(user_stmt)
-        auto_draft_enabled = user_res.scalar_one_or_none()
+        auto_draft_enabled = await self.settings_repo.get_auto_draft_enabled(user_id)
 
         if auto_draft_enabled:
             for sid in new_sids:
@@ -83,11 +84,11 @@ class DataCommandHandler:
                     trigger_command
                 )
                 triggered_jobs.append({'sid': sid, 'job_id': job_id})
-                db_updates.append((job_id, sid))
+                db_updates.append((job_id, sid, 'email_draft'))
 
-        # Batch update draft_job_id
+        # Batch create job tracking records
         if db_updates:
-            await self.student_repo.batch_update_draft_job_ids(db_updates)
+            await self.job_repo.batch_create_jobs(db_updates)
 
         return {
             'results': results,

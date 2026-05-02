@@ -34,7 +34,6 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table, integrating with FastAPI-Users."""
 
     role: Mapped[str] = mapped_column(String, default='viewer')
-    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Student(Base):
@@ -50,7 +49,6 @@ class Student(Base):
     intervention_status: Mapped[str] = mapped_column(String, default='none')
     last_notified_timestamp: Mapped[float] = mapped_column(Double, default=0)
     last_notified_satisfaction: Mapped[int] = mapped_column(Integer, default=0)
-    draft_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     # Relationships
     activities: Mapped[list[Activity]] = relationship(
@@ -182,3 +180,31 @@ class IdempotencyKey(Base):
         TIMESTAMP,
         server_default=func.current_timestamp(),
     )
+
+
+class UserSettings(Base):
+    """Configuration settings for a specific user."""
+
+    __tablename__ = 'user_settings'
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('user.id'),
+        primary_key=True,
+    )
+    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class BackgroundJobTracker(Base):
+    """Tracker for ephemeral background jobs tied to a student."""
+
+    __tablename__ = 'background_job_tracker'
+
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    job_type: Mapped[str] = mapped_column(String, default='email_draft')
+    status: Mapped[str] = mapped_column(String, default='running')

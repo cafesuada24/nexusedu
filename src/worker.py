@@ -24,6 +24,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyAlertRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
+    SqlAlchemyJobRepository,
     SqlAlchemyMetadataRepository,
     SqlAlchemyStudentRepository,
 )
