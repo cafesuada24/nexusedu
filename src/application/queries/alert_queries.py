@@ -87,9 +87,9 @@ class AlertQueryHandler:
             )
         return dtos
 
-    async def handle_get_task_list(self) -> list[TaskDTO]:
+    async def handle_get_task_list(self, query: GetTaskListQuery) -> list[TaskDTO]:
         """Execute the get task list query."""
-        from src.domain.services.gamification import RISK_MULTIPLIERS
+        from src.domain.services.gamification import GamificationService
         from src.application.dtos.student_dtos import TaskDTO
 
         raw_tasks = await self.case_repo.get_task_list()
@@ -110,7 +110,7 @@ class AlertQueryHandler:
                 
             # Determine points reward (Phase 1 SLA -> 1.5x)
             risk_status = RiskStatus(row['current_risk_status'])
-            multiplier = RISK_MULTIPLIERS.get(risk_status, 1.0)
+            multiplier = GamificationService.RISK_MULTIPLIERS.get(risk_status, 1.0)
             points_reward = int(100 * multiplier * 1.5)
             
             dtos.append(

@@ -19,6 +19,7 @@ from src.application.queries.alert_queries import (
     AlertQueryHandler,
     GetActiveAlertsQuery,
     GetEmailHistoryQuery,
+    GetTaskListQuery,
 )
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
@@ -52,6 +53,25 @@ class AlertStudent(BaseModel):
     active_case_id: str | None = Field(
         None, description='The ID of the currently active case.'
     )
+
+
+class TaskItem(BaseModel):
+    """Schema for a task in the advisor task list."""
+
+    case_id: str = Field(..., description='Case identifier.')
+    created_at: str = Field(..., description='When the case was created.')
+    assigned_advisor_id: str | None = Field(None, description='Advisor assigned to the case.')
+    student_name: str | None = Field(None, description='Student name.')
+    email: str | None = Field(None, description='Student email.')
+    major: str = Field(..., description='Student major.')
+    current_risk_status: str = Field(..., description='Risk status.')
+    intervention_status: str = Field(..., description='Intervention status.')
+    draft_subject: str | None = Field(None, description='Draft email subject.')
+    draft_body: str | None = Field(None, description='Draft email body.')
+    draft_status: str | None = Field(None, description='Draft email status.')
+    assigned_to: str | None = Field(None, description='Name of assigned advisor.')
+    suggested_action: str = Field(..., description='Computed action to take.')
+    points_reward: int = Field(..., description='Points for completing action.')
 
 
 class StatusUpdate(BaseModel):
@@ -152,6 +172,43 @@ async def get_alerts(
         ]
     except Exception as e:
         logger.error(f'Error in get_alerts: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get('/tasks', response_model=list[TaskItem])
+async def get_task_list(
+    query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+) -> list[dict[str, Any]]:
+    """Retrieve the unified list of tasks for the advisor dashboard.
+    
+    Includes SLA-driven risk assessment, draft statuses, and gamification points.
+    """
+    try:
+        query = GetTaskListQuery()
+        dtos = await query_handler.handle_get_task_list(query)
+        
+        return [
+            {
+                'case_id': str(d.case_id),
+                'created_at': d.created_at.isoformat() + 'Z',
+                'assigned_advisor_id': str(d.assigned_advisor_id) if d.assigned_advisor_id else None,
+                'student_name': d.student_name,
+                'email': d.email,
+                'major': d.major,
+                'current_risk_status': d.current_risk_status,
+                'intervention_status': d.intervention_status,
+                'draft_subject': d.draft_subject,
+                'draft_body': d.draft_body,
+                'draft_status': d.draft_status,
+                'assigned_to': d.assigned_to,
+                'suggested_action': d.suggested_action,
+                'points_reward': d.points_reward,
+            }
+            for d in dtos
+        ]
+    except Exception as e:
+        logger.error(f'Error in get_task_list: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
