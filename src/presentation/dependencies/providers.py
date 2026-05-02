@@ -46,7 +46,6 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyStudentRepository,
     SqlAlchemyUserSettingsRepository,
 )
-from src.telemetry.logger import logger
 
 
 # Repository Providers
