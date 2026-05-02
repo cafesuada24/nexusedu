@@ -4,6 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from src.domain.entities.intervention_email import InterventionEmail
+from src.domain.value_objects.status import EmailStatus
 
 
 class EmailRepository(Protocol):
@@ -23,7 +24,7 @@ class EmailRepository(Protocol):
         case_id: UUID,
         subject: str,
         body: str,
-        status: str,
+        status: EmailStatus,
     ) -> None:
         """Update the content and status of an existing case email."""
         ...

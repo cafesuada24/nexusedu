@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class StudentSatisfaction(str, Enum):
+class StudentSatisfaction(StrEnum):
     """Student statisfaction."""
 
     VERY_BAD = "very_bad"

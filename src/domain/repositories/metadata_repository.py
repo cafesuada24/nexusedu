@@ -1,12 +1,21 @@
 """Metadata repository interface."""
 
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict
+
+
+class DBDescription(TypedDict):
+    """Database description for DB_REGISTRY."""
+
+    id: str
+    description: str
+    dialect: str
+    keywords: list[str]
 
 
 class MetadataRepository(Protocol):
     """Interface for retrieving database metadata."""
 
-    async def get_db_registry(self) -> list[dict[str, Any]]:
+    async def get_db_registry(self) -> list[DBDescription]:
         """Get the available database registry."""
         ...
 
