@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
-    from datetime import datetime
+    pass
 
 
 class Base(DeclarativeBase):
