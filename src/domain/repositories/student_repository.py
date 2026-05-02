@@ -27,14 +27,6 @@ class StudentRepository(Protocol):
         """Update the intervention status for a student."""
         ...
 
-    async def update_draft_job_id(self, sid: UUID, job_id: UUID | None) -> None:
-        """Update the draft job ID for a student."""
-        ...
-
-    async def batch_update_draft_job_ids(self, updates: list[tuple[UUID, UUID]]) -> None:
-        """Batch update draft job IDs for multiple students."""
-        ...
-
     async def get_latest_status_timestamp(self, sid: UUID) -> datetime | None:
         """Retrieve the latest status recording timestamp for a student."""
         ...

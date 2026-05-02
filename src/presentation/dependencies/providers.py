@@ -18,8 +18,10 @@ from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
+from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.metadata_repository import MetadataRepository
 from src.domain.repositories.metrics_repository import MetricsRepository
+from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
@@ -35,10 +37,12 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyAlertRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
+    SqlAlchemyJobRepository,
     SqlAlchemyMetadataRepository,
     SqlAlchemyMetricsRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
+    SqlAlchemyUserSettingsRepository,
 )
 from src.telemetry.logger import logger
 
@@ -107,6 +111,20 @@ async def get_metadata_repository(
     return SqlAlchemyMetadataRepository(session)
 
 
+async def get_job_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> JobRepository:
+    """Dependency provider for the JobRepository."""
+    return SqlAlchemyJobRepository(session)
+
+
+async def get_user_settings_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> UserSettingsRepository:
+    """Dependency provider for the UserSettingsRepository."""
+    return SqlAlchemyUserSettingsRepository(session)
+
+
 # Service Providers
 def get_arq_pool(request: Request) -> ArqRedis:
     """Dependency provider for the ARQ Redis pool."""
@@ -132,6 +150,7 @@ async def get_alert_command_handler(
     idempotency_repo: Annotated[
         IdempotencyRepository, Depends(get_idempotency_repository)
     ],
+    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     gamification_service: Annotated[
         GamificationService, Depends(get_gamification_service)
     ],
@@ -145,6 +164,7 @@ async def get_alert_command_handler(
         alert_repo,
         advisor_repo,
         idempotency_repo,
+        job_repo,
         gamification_service,
         task_queue,
         email_drafting_service=BamlEmailDraftingService(),
@@ -155,9 +175,10 @@ async def get_alert_query_handler(
     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
+    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
 ) -> AlertQueryHandler:
     """Dependency provider for the AlertQueryHandler."""
-    return AlertQueryHandler(alert_repo, email_repo, student_repo)
+    return AlertQueryHandler(alert_repo, email_repo, student_repo, job_repo)
 
 
 async def get_data_command_handler(
@@ -169,6 +190,10 @@ async def get_data_command_handler(
     idempotency_repo: Annotated[
         IdempotencyRepository, Depends(get_idempotency_repository)
     ],
+    settings_repo: Annotated[
+        UserSettingsRepository, Depends(get_user_settings_repository)
+    ],
+    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
     alert_command_handler: Annotated[
         AlertCommandHandler, Depends(get_alert_command_handler),
@@ -180,6 +205,8 @@ async def get_data_command_handler(
         activity_repo,
         history_repo,
         idempotency_repo,
+        settings_repo,
+        job_repo,
         anomaly_engine,
         alert_command_handler,
     )
