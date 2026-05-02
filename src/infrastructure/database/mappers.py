@@ -80,6 +80,7 @@ class DataMapper:
             status=CaseStatus(orm_case.status),
             created_at=orm_case.created_at,
             resolved_at=orm_case.resolved_at,
+            assigned_advisor_id=orm_case.assigned_advisor_id,
         )
 
     @staticmethod

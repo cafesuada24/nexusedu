@@ -32,3 +32,7 @@ class CaseRepository(Protocol):
     async def assign_case(self, case_id: UUID, advisor_id: UUID) -> None:
         """Assign an advisor to a case."""
         ...
+
+    async def get_task_list(self) -> list[dict]:
+        """Retrieve task list table for advisors."""
+        ...

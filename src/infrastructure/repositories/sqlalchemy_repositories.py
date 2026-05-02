@@ -592,6 +592,15 @@ class SqlAlchemyCaseRepository:
         orm_case = result.scalar_one_or_none()
         return DataMapper.to_domain_case(orm_case) if orm_case else None
 
+    async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> None:
+        """Assign an advisor to a case."""
+        from src.infrastructure.database.models import Case as OrmCase
+
+        stmt = update(OrmCase).where(OrmCase.case_id == case_id).values(
+            assigned_advisor_id=advisor_id
+        )
+        await self.session.execute(stmt)
+
     async def update_case_status(self, case_id: uuid.UUID, status: str) -> None:
         """Update the status of a case."""
         from src.infrastructure.database.models import Case as OrmCase
@@ -621,6 +630,37 @@ class SqlAlchemyCaseRepository:
         )
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
+
+    async def get_task_list(self) -> list[dict]:
+        """Retrieve task list table for advisors."""
+        from src.infrastructure.database.models import Case as OrmCase
+        from src.infrastructure.database.models import Student as OrmStudent
+        from src.infrastructure.database.models import InterventionEmail as OrmEmail
+        from src.infrastructure.database.models import Advisor as OrmAdvisor
+
+        stmt = (
+            select(
+                OrmCase.case_id,
+                OrmCase.created_at,
+                OrmCase.assigned_advisor_id,
+                OrmStudent.student_name,
+                OrmStudent.email,
+                OrmStudent.major,
+                OrmStudent.current_risk_status,
+                OrmStudent.intervention_status,
+                OrmEmail.subject.label('draft_subject'),
+                OrmEmail.body.label('draft_body'),
+                OrmEmail.status.label('draft_status'),
+                OrmAdvisor.name.label('assigned_to')
+            )
+            .join(OrmStudent, OrmCase.sid == OrmStudent.sid)
+            .outerjoin(OrmEmail, OrmCase.case_id == OrmEmail.case_id)
+            .outerjoin(OrmAdvisor, OrmCase.assigned_advisor_id == OrmAdvisor.advisor_id)
+            .where(OrmCase.status == 'open')
+            .order_by(desc(OrmCase.created_at))
+        )
+        result = await self.session.execute(stmt)
+        return [row._asdict() for row in result.all()]
 
 
 class SqlAlchemyAlertRepository:
