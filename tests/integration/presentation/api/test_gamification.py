@@ -24,7 +24,7 @@ async def test_draft_review_points(
     student_repository: StudentRepository,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify that /alerts/{sid}/draft/review awards EXACTLY 5 points."""
+    """Verify that /alerts/{sid}/draft/review awards 7 points for a Critical student (<12h)."""
     sid = uuid4()
     await student_repository.ingest_students(
         [
@@ -109,7 +109,7 @@ async def test_email_sent_points(
     sid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G2', 'email': 'g2@ex.com'},
+            {'sid': sid, 'student_name': 'G2', 'email': 'g2@ex.com', 'current_risk_status': 'Critical'},
         ]
     )
 
@@ -151,7 +151,7 @@ async def test_status_change_points(
     sid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G3', 'email': 'g3@ex.com'},
+            {'sid': sid, 'student_name': 'G3', 'email': 'g3@ex.com', 'current_risk_status': 'Critical'},
         ]
     )
     await student_repository.session.commit()
@@ -178,7 +178,7 @@ async def test_response_time_bonus(
     student_repository: StudentRepository,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify the 1.2x multiplier for <24h response using UTC-safe boundaries."""
+    """Verify tiered SLA multipliers (1.5x <12h, 1.2x <24h, 1.0x <72h, 0.8x >72h)."""
     sid_fast = uuid4()
     sid_mid = uuid4()
     sid_slow = uuid4()
