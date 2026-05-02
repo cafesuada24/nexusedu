@@ -5,12 +5,13 @@ from typing import Any
 
 from pydantic import UUID4
 
-from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO
+from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO, TaskDTO
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
 
 @dataclass
@@ -25,6 +26,13 @@ class GetEmailHistoryQuery:
     """Query to retrieve communication history for a student."""
 
     sid: UUID4
+
+
+@dataclass
+class GetTaskListQuery:
+    """Query to retrieve advisor task list."""
+
+    pass
 
 
 class AlertQueryHandler:
@@ -75,6 +83,52 @@ class AlertQueryHandler:
                         active_case_id=active_case.case_id if active_case else None,
                     ),
                     alert_details=a.alert_details,
+                )
+            )
+        return dtos
+
+    async def handle_get_task_list(self) -> list[TaskDTO]:
+        """Execute the get task list query."""
+        from src.domain.services.gamification import RISK_MULTIPLIERS
+        from src.application.dtos.student_dtos import TaskDTO
+
+        raw_tasks = await self.case_repo.get_task_list()
+        
+        dtos = []
+        for row in raw_tasks:
+            draft_status = row.get('draft_status')
+            
+            # Determine suggested action
+            if draft_status == 'draft':
+                suggested_action = "Review & Send Email"
+            elif draft_status == 'generating':
+                suggested_action = "Wait for Draft"
+            elif draft_status == 'sent':
+                suggested_action = "Follow up"
+            else:
+                suggested_action = "Initiate Intervention"
+                
+            # Determine points reward (Phase 1 SLA -> 1.5x)
+            risk_status = RiskStatus(row['current_risk_status'])
+            multiplier = RISK_MULTIPLIERS.get(risk_status, 1.0)
+            points_reward = int(100 * multiplier * 1.5)
+            
+            dtos.append(
+                TaskDTO(
+                    case_id=row['case_id'],
+                    created_at=row['created_at'],
+                    assigned_advisor_id=row['assigned_advisor_id'],
+                    student_name=row['student_name'],
+                    email=row['email'],
+                    major=row['major'],
+                    current_risk_status=risk_status,
+                    intervention_status=InterventionStatus(row['intervention_status']),
+                    draft_subject=row.get('draft_subject'),
+                    draft_body=row.get('draft_body'),
+                    draft_status=draft_status,
+                    assigned_to=row.get('assigned_to'),
+                    suggested_action=suggested_action,
+                    points_reward=points_reward,
                 )
             )
         return dtos

@@ -44,3 +44,23 @@ class EmailDTO:
     status: str
     created_at: str
     sent_at: str | None = None
+
+
+@dataclass
+class TaskDTO:
+    """DTO for a task in the advisor task list."""
+
+    case_id: UUID
+    created_at: datetime
+    assigned_advisor_id: UUID | None
+    student_name: str | None
+    email: str | None
+    major: str
+    current_risk_status: RiskStatus
+    intervention_status: InterventionStatus
+    draft_subject: str | None
+    draft_body: str | None
+    draft_status: str | None
+    assigned_to: str | None
+    suggested_action: str
+    points_reward: int
