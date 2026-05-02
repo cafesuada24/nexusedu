@@ -1,6 +1,5 @@
 """ARQ Worker for background job processing."""
 
-import os
 from typing import Any
 from uuid import UUID
 
@@ -30,6 +29,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyStudentRepository,
 )
 from src.telemetry.logger import logger
+from src.utils.env import getenv
 
 
 async def run_email_draft_task(
@@ -119,10 +119,10 @@ class WorkerSettings:
 
     functions = [run_email_draft_task, run_agent_task]
     redis_settings = RedisSettings(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", "6379")),
+        host=getenv("REDIS_HOST", "localhost"),
+        port=int(getenv("REDIS_PORT", "6379")),
     )
     # Global concurrency limit
-    max_jobs = int(os.getenv("WORKER_MAX_JOBS", "5"))
+    max_jobs = int(getenv("WORKER_MAX_JOBS", "5"))
     # Default job timeout in seconds
-    job_timeout = int(os.getenv("WORKER_JOB_TIMEOUT", "60"))
+    job_timeout = int(getenv("WORKER_JOB_TIMEOUT", "60"))
