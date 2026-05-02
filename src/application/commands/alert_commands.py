@@ -107,8 +107,8 @@ class AlertCommandHandler:
 
     async def handle_trigger_draft(self, command: TriggerDraftCommand) -> UUID:
         """Execute the trigger draft command."""
-        if not await self.task_queue.is_available():
-            raise RuntimeError('Task queue is not available. Task cannot be enqueued.')
+        # if not await self.task_queue.is_available():
+        #     raise RuntimeError('Task queue is not available. Task cannot be enqueued.')
 
         job_id = uuid4()
         await self.task_queue.enqueue(
@@ -124,7 +124,8 @@ class AlertCommandHandler:
         return job_id
 
     async def handle_generate_email_draft(
-        self, command: GenerateEmailDraftCommand,
+        self,
+        command: GenerateEmailDraftCommand,
     ) -> None:
         """Execute the generate email draft command (Worker task logic)."""
         if not self.email_drafting_service:
@@ -132,35 +133,38 @@ class AlertCommandHandler:
 
         logger.info(f'Generating email draft for student {command.sid}')
 
-        # 1. Fetch student PII
-        student_data = await self.student_repo.get_pii(command.sid)
-        if not student_data:
-            raise ValueError(f'Student {command.sid} not found.')
+        try:
+            # 1. Fetch student PII
+            student_data = await self.student_repo.get_pii(command.sid)
+            if not student_data:
+                raise ValueError(f'Student {command.sid} not found.')
 
-        # 2. Fetch performance data
-        perf_raw = await self.student_repo.get_recent_performance(command.sid)
-        history_lines = [
-            f'Year {p["yr"]} Sem {p["sem"]} Week {p["wk"]}: Score {p["score"]} ({p["status"]})'
-            for p in perf_raw
-        ]
-        context_str = 'Trend: ' + ' | '.join(history_lines)
+            # 2. Fetch performance data
+            perf_raw = await self.student_repo.get_recent_performance(command.sid)
+            history_lines = [
+                f'Year {p["yr"]} Sem {p["sem"]} Week {p["wk"]}: Score {p["score"]} ({p["status"]})'
+                for p in perf_raw
+            ]
+            context_str = 'Trend: ' + ' | '.join(history_lines)
 
-        # 3. Generate via AI port
-        booking_link = command.booking_link or 'https://calendly.com/advisor-help'
-        personalized_body = await self.email_drafting_service.generate_draft(
-            student_data['student_name'], context_str, booking_link,
-        )
+            # 3. Generate via AI port
+            booking_link = command.booking_link or 'https://calendly.com/advisor-help'
+            personalized_body = await self.email_drafting_service.generate_draft(
+                student_data['student_name'],
+                context_str,
+                booking_link,
+            )
 
-        # 4. Persistent storage
-        await self.email_repo.create_draft(
-            command.sid,
-            command.user_id,
-            'Checking in on your academic progress',
-            personalized_body,
-        )
-
-        # 5. Clear the job tracker
-        await self.student_repo.update_draft_job_id(command.sid, None)
+            # 4. Persistent storage
+            await self.email_repo.create_draft(
+                command.sid,
+                command.user_id,
+                'Checking in on your academic progress',
+                personalized_body,
+            )
+        finally:
+            # 5. Clear the job tracker
+            await self.student_repo.update_draft_job_id(command.sid, None)
 
     async def handle_send_email(self, command: SendEmailCommand) -> str:
         """Execute the send email command."""

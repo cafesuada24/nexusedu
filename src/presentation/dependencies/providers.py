@@ -154,9 +154,10 @@ async def get_alert_command_handler(
 async def get_alert_query_handler(
     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
 ) -> AlertQueryHandler:
     """Dependency provider for the AlertQueryHandler."""
-    return AlertQueryHandler(alert_repo, email_repo)
+    return AlertQueryHandler(alert_repo, email_repo, student_repo)
 
 
 async def get_data_command_handler(

@@ -101,7 +101,6 @@ async def update_alert_status(
     update: StatusUpdate,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
-    session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> dict[str, str]:
     """Manually transitions a student's Kanban state."""
     try:
@@ -165,16 +164,9 @@ async def get_email_draft(
 ) -> dict[str, Any]:
     """Retrieve the current AI draft status and content for a student."""
     try:
-        query = GetEmailHistoryQuery(sid=UUID(sid))
-        history = await query_handler.handle_get_email_history(query)
-        latest_draft = next((d for d in history if d.status == 'draft'), None)
-
-        return {
-            'sid': sid,
-            'is_generating': False,  # Placeholder
-            'subject': latest_draft.subject if latest_draft else None,
-            'body': latest_draft.body if latest_draft else None,
-        }
+        return await query_handler.handle_get_draft_status(UUID(sid))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
