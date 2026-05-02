@@ -19,15 +19,17 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import config
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import get_async_session
-from src.utils.env import getenv
 
 # Configuration
-JWT_SECRET: str = getenv(
-    'JWT_SECRET',
-    'SET_ME_IN_PRODUCTION_HEHEHE',
-)
+if config.jwt_secret is None:
+    if config.environment == 'production':
+        raise ValueError(
+            'config.jwt_secret variable is required in production environment.',
+        )
+    config.jwt_secret = 'SET_ME_IN_PRODUCTION_HAHAH'
 
 
 class Scope(StrEnum):
@@ -69,7 +71,6 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
 }
 
 
-
 async def get_user_db(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> AsyncGenerator[SQLAlchemyUserDatabase[User, uuid.UUID], None]:
@@ -81,8 +82,8 @@ async def get_user_db(
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     """User manager for handling user registration, login, and security tokens."""
 
-    reset_password_token_secret = JWT_SECRET
-    verification_token_secret = JWT_SECRET
+    reset_password_token_secret = config.jwt_secret
+    verification_token_secret = config.jwt_secret
 
     @override
     async def on_after_register(
@@ -107,7 +108,7 @@ bearer_transport = BearerTransport(tokenUrl='api/v1/auth/jwt/login')
 
 def get_jwt_strategy() -> JWTStrategy:
     """Strategy for generating and validating JWT tokens."""
-    return JWTStrategy(secret=JWT_SECRET, lifetime_seconds=3600)
+    return JWTStrategy(secret=config.jwt_secret, lifetime_seconds=3600)
 
 
 auth_backend = AuthenticationBackend(

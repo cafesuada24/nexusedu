@@ -2,10 +2,11 @@
 
 import json
 import logging
-import os
 import sys
 from contextvars import ContextVar
 from datetime import UTC, datetime
+
+from src.core.config import config
 
 # Global context for correlation IDs (e.g., thread_id, request_id)
 # This allows logs to include context without passing it explicitly to every log call.
@@ -69,7 +70,7 @@ class IndustryLogger:
         """
         self.logger = logging.getLogger(name)
         # Use env var for log level, default to INFO
-        log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+        log_level = config.log_level
         self.logger.setLevel(getattr(logging, log_level, logging.INFO))
 
         # Clear existing handlers to avoid duplicates during re-init

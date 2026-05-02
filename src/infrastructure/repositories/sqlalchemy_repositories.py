@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from src.core.config import config
 from src.domain.value_objects.status import CaseStatus, EmailStatus, RiskStatus
 from src.infrastructure.database.config import DB_REGISTRY
 from src.infrastructure.database.mappers import DataMapper
@@ -39,7 +40,6 @@ from src.infrastructure.database.models import (
     UserSettings,
 )
 from src.infrastructure.database.models import Case as OrmCase
-from src.utils.env import getenv
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -66,7 +66,7 @@ class SqlAlchemyStudentRepository:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
-        self.chunk_size = int(getenv('DB_INGEST_CHUNK_SIZE', '50'))
+        self.chunk_size = config.db_ingest_chunk_size
 
     async def get_by_id(self, sid: uuid.UUID) -> DomainStudent | None:
         """Retrieve a student by their unique ID."""
@@ -189,7 +189,7 @@ class SqlAlchemyActivityRepository:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
-        self.chunk_size = int(getenv('DB_INGEST_CHUNK_SIZE', '50'))
+        self.chunk_size = config.db_ingest_chunk_size
 
     async def ingest_activities(self, records: list[dict[str, Any]]) -> None:
         """Bulk ingest activity records using upsert logic."""
