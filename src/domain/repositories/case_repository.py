@@ -24,3 +24,7 @@ class CaseRepository(Protocol):
     async def get_by_id(self, case_id: UUID) -> Case | None:
         """Retrieve a case by its ID."""
         ...
+
+    async def get_student_cases(self, sid: UUID) -> list[Case]:
+        """Retrieve all cases for a specific student."""
+        ...

@@ -46,3 +46,7 @@ class JobRepository(Protocol):
     ) -> None:
         """Batch record multiple background jobs."""
         ...
+
+    async def get_job(self, job_id: UUID) -> dict[str, Any] | None:
+        """Retrieve job details for observability."""
+        ...
