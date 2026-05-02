@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from src.domain.entities.case import Case
-from src.domain.value_objects.status import InterventionStatus
+from src.domain.value_objects.status import EmailStatus, InterventionStatus
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -148,12 +148,12 @@ async def test_send_email_flow(
                 'student_name': 'S',
                 'email': 's@ex.com',
                 'intervention_status': InterventionStatus.NOTIFIED.value,
-            }
-        ]
+            },
+        ],
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     await email_repository.create_placeholder(cid, sid, uuid.uuid4())
-    await email_repository.update_content(cid, 'Subject', 'Body', 'draft')
+    await email_repository.update_content(cid, 'Subject', 'Body', EmailStatus.DRAFT)
     await student_repository.session.commit()
 
     headers = {'Idempotency-Key': str(uuid.uuid4())}
@@ -165,10 +165,9 @@ async def test_send_email_flow(
     assert student.intervention_status == InterventionStatus.SENT
 
     # Check history
-    history = client.get(f'/api/v1/alerts/cases/{cid}/emails')
+    history = client.get(f'/api/v1/alerts/cases/{cid}/email')
     hist = history.json()
-    assert len(hist) == 1
-    assert hist[0]['status'] == 'sent'
+    assert hist['status'] == 'sent'
 
 
 @pytest.mark.asyncio
@@ -186,7 +185,7 @@ async def test_get_email_draft(
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     await email_repository.create_placeholder(cid, sid, uuid.uuid4())
-    await email_repository.update_content(cid, 'Draft Sub', 'Draft Body', 'draft')
+    await email_repository.update_content(cid, 'Draft Sub', 'Draft Body', EmailStatus.DRAFT)
     await student_repository.session.commit()
 
     response = client.get(f'/api/v1/alerts/cases/{cid}/draft')
