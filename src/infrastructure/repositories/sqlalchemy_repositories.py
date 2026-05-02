@@ -813,66 +813,7 @@ class SqlAlchemyMetricsRepository:
         return [row._asdict() for row in result.all()][::-1]
 
 
-class SqlAlchemyCaseRepository:
-    """SQLAlchemy implementation of the CaseRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize with a SQLAlchemy async session."""
-        self.session = session
-
-    async def create_case(self, case: DomainCase) -> None:
-        """Create a new case."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        orm_case = OrmCase(
-            case_id=case.case_id,
-            sid=case.sid,
-            status=case.status.value,
-            created_at=case.created_at,
-        )
-        self.session.add(orm_case)
-
-    async def get_active_case(self, sid: uuid.UUID) -> DomainCase | None:
-        """Retrieve the active case for a student, if any."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = select(OrmCase).where(
-            OrmCase.sid == sid,
-            OrmCase.status == 'open'
-        ).limit(1)
-        result = await self.session.execute(stmt)
-        orm_case = result.scalar_one_or_none()
-        return DataMapper.to_domain_case(orm_case) if orm_case else None
-
-    async def update_case_status(self, case_id: uuid.UUID, status: str) -> None:
-        """Update the status of a case."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = update(OrmCase).where(OrmCase.case_id == case_id).values(status=status)
-        if status in ('resolved', 'closed'):
-            stmt = stmt.values(resolved_at=func.current_timestamp())
-        await self.session.execute(stmt)
-
-    async def get_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
-        """Retrieve a case by its ID."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = select(OrmCase).where(OrmCase.case_id == case_id)
-        result = await self.session.execute(stmt)
-        orm_case = result.scalar_one_or_none()
-        return DataMapper.to_domain_case(orm_case) if orm_case else None
-
-    async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
-        """Retrieve all cases for a specific student."""
-        from src.infrastructure.database.models import Case as OrmCase
-
-        stmt = (
-            select(OrmCase)
-            .where(OrmCase.sid == sid)
-            .order_by(desc(OrmCase.created_at))
-        )
-        result = await self.session.execute(stmt)
-        return [DataMapper.to_domain_case(row[0]) for row in result.all()]
 
 
 class SqlAlchemyJobRepository:
