@@ -53,9 +53,9 @@ const colorMap: Record<string, string> = {
 };
 
 const iconGlowMap: Record<string, string> = {
-    blue: "shadow-blue-500/30",
-    purple: "shadow-purple-500/30",
-    orange: "shadow-orange-500/30",
+    blue: "shadow-blue-500/10",
+    purple: "shadow-purple-500/10",
+    orange: "shadow-orange-500/10",
 };
 
 export function Features() {
@@ -71,15 +71,19 @@ export function Features() {
                     {features.map((f) => (
                         <article
                             key={f.title}
-                            className="group relative h-full p-[1px] rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 dark:from-blue-700 dark:to-cyan-600 hover:shadow-[0_0_25px_rgba(56,189,248,0.3)] transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02]"
+                            className="group relative h-full p-[1px] rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 dark:from-blue-700 dark:to-cyan-600 transition-transform duration-300 hover:-translate-y-2 hover:scale-[1.02] hover:shadow-[0_8px_20px_rgba(56,189,248,0.06)]"
                         >
                             {/* Inner Card */}
-                            <div className="h-full flex flex-col items-center text-center p-6 rounded-[14px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10">
+                            <div className="h-full flex flex-col items-center text-center p-6 rounded-[14px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border border-white/20 dark:border-white/10">
                                 {/* Subtle background glow */}
-                                <div className={`absolute -inset-0.5 rounded-2xl ${colorMap[f.color]} blur-3xl opacity-10 group-hover:opacity-30 transition-opacity duration-500`} />
-                                
+                                <div
+                                    className={`absolute -inset-0.5 rounded-2xl ${colorMap[f.color]} blur-sm opacity-[0.06] group-hover:opacity-[0.14] transition-opacity duration-500`}
+                                />
+
                                 <div className="relative z-10 flex flex-col items-center">
-                                    <div className={`relative flex size-12 items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800 shadow-sm ${iconGlowMap[f.color]} mb-4 group-hover:-translate-y-1 transition-transform duration-300`}>
+                                    <div
+                                        className={`relative flex size-12 items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800 shadow-sm ${iconGlowMap[f.color]} mb-4 group-hover:-translate-y-1 transition-transform duration-300`}
+                                    >
                                         <f.icon className="size-6 text-foreground dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300" />
                                     </div>
 
