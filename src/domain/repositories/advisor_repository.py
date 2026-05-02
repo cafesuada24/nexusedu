@@ -30,3 +30,9 @@ class AdvisorRepository(Protocol):
     ) -> None:
         """Record gamification points for an advisor action."""
         ...
+
+    async def has_existing_action(
+        self, advisor_id: UUID, sid: UUID, action_type: str
+    ) -> bool:
+        """Check if an action has already been recorded for this advisor/student combination."""
+        ...

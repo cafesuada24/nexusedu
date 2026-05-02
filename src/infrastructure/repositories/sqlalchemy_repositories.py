@@ -390,6 +390,18 @@ class SqlAlchemyAdvisorRepository:
         )
         self.session.add(entry)
         # await self.session.commit() removed
+        
+    async def has_existing_action(
+        self, advisor_id: uuid.UUID, sid: uuid.UUID, action_type: str
+    ) -> bool:
+        """Check if an action has already been recorded for this advisor/student combination."""
+        stmt = select(AdvisorPointsLedger).where(
+            AdvisorPointsLedger.advisor_id == advisor_id,
+            AdvisorPointsLedger.sid == sid,
+            AdvisorPointsLedger.action_type == action_type,
+        )
+        result = await self.session.execute(stmt)
+        return result.first() is not None
 
 
 class SqlAlchemyIdempotencyRepository:
