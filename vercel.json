@@ -15,6 +15,10 @@
       "destination": "src/presentation/api/main.py"
     },
     {
+      "source": "/",
+      "destination": "src/ui.html"
+    },
+    {
       "source": "/(.*)\\.(js|css|json|svg|png|jpg|jpeg|gif|ico|txt)",
       "destination": "src/$1.$2"
     }
