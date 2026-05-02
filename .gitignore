@@ -226,3 +226,11 @@ auth.db
 auth.db-journal
 
 .ai-log/
+
+# Database files
+*.db
+data/*.db
+
+# Alembic
+alembic/versions/__pycache__/
+alembic/__pycache__/
