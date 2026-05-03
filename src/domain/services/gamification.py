@@ -71,45 +71,40 @@ class GamificationService:
 
         return int(points_after_risk * sla_multiplier)
 
-    @staticmethod
-    def check_badges(advisor_stats: dict[str, int | float]) -> list[str]:
-        """Evaluate which badges an advisor qualifies for.
+    def check_badges(self, advisor_stats: dict) -> list[str]:
+        """Check which badges the advisor qualifies for based on their stats.
 
-        Args:
-            advisor_stats: Dictionary containing aggregated advisor metrics:
-                - total_points: int — cumulative points earned
-                - fast_actions_count: int — number of actions taken within 12h SLA
-                - avg_response_hours: float — average response time in hours (0 if no data)
-                - recovery_rate: float — percentage of resolved students (0.0–1.0)
-
-        Returns:
-            List of badge_ids the advisor is eligible for.
+        Expected stats dict:
+            total_points: int
+            fast_action_count: int
+            avg_response_hours: float
+            total_actions: int
+            recovery_rate: float
+            total_resolves: int
         """
-        eligible: list[str] = []
+        earned_badges = []
 
         total_points = advisor_stats.get('total_points', 0)
-        fast_actions = advisor_stats.get('fast_actions_count', 0)
-        avg_response = advisor_stats.get('avg_response_hours', float('inf'))
+        fast_action_count = advisor_stats.get('fast_action_count', 0)
+        avg_response_hours = advisor_stats.get('avg_response_hours', 999.0)
+        total_actions = advisor_stats.get('total_actions', 0)
         recovery_rate = advisor_stats.get('recovery_rate', 0.0)
+        total_resolves = advisor_stats.get('total_resolves', 0)
 
-        # Points milestones
+        if fast_action_count >= 3:
+            earned_badges.append('speed_demon')
+            
         if total_points >= 100:
-            eligible.append('century_club')
+            earned_badges.append('century_club')
+            
         if total_points >= 500:
-            eligible.append('five_hundred')
+            earned_badges.append('five_hundred')
+            
+        if total_actions >= 5 and avg_response_hours < 4.0:
+            earned_badges.append('fastest_avg_response')
+            
+        if total_resolves >= 5 and recovery_rate > 0.8:
+            earned_badges.append('highest_recovery_rate')
 
-        # Speed-based
-        if fast_actions >= 3:
-            eligible.append('speed_demon')
-
-        # Average response time under 6 hours (requires at least 1 action)
-        if avg_response < 6.0 and total_points > 0:
-            eligible.append('fastest_response')
-
-        # Recovery rate above 80% (requires at least 5 assigned students)
-        assigned_count = advisor_stats.get('assigned_students', 0)
-        if assigned_count >= 5 and recovery_rate > 0.80:
-            eligible.append('highest_recovery')
-
-        return eligible
+        return earned_badges
 

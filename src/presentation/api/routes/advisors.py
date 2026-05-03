@@ -7,7 +7,10 @@ from pydantic import BaseModel, Field
 
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.presentation.api.auth import Scope, User, require_scope
-from src.presentation.dependencies.providers import get_advisor_repository
+from src.presentation.dependencies.providers import (
+    get_advisor_repository,
+    get_badge_repository,
+)
 from src.presentation.schemas.response import PaginationMetadata
 from src.core.logger import logger
 
@@ -99,4 +102,37 @@ async def get_leaderboard(
         logger.error(f'Failed to fetch leaderboard: {e}')
         raise HTTPException(
             status_code=500, detail='Failed to retrieve leaderboard'
+        ) from e
+
+
+@router.get('/{advisor_id}/badges')
+async def get_advisor_badges(
+    advisor_id: str,
+    badge_repo: Annotated[Any, Depends(get_badge_repository)],
+    _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+) -> list[dict[str, Any]]:
+    """Retrieve the badges earned by an advisor."""
+    from uuid import UUID
+    from src.domain.value_objects.badges import BADGE_MAP
+    try:
+        adv_uuid = UUID(advisor_id)
+        badge_ids = await badge_repo.get_advisor_badges(adv_uuid)
+        
+        badges = []
+        for b_id in badge_ids:
+            if b_id in BADGE_MAP:
+                b = BADGE_MAP[b_id]
+                badges.append({
+                    'badge_id': b.badge_id,
+                    'name': b.name,
+                    'description': b.description,
+                    'icon': b.icon,
+                })
+        return badges
+    except ValueError:
+        raise HTTPException(status_code=400, detail='Invalid advisor ID format')
+    except Exception as e:
+        logger.error(f'Failed to fetch badges for advisor {advisor_id}: {e}')
+        raise HTTPException(
+            status_code=500, detail='Failed to retrieve advisor badges'
         ) from e

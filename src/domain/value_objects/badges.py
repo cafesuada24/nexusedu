@@ -1,51 +1,49 @@
-"""Badge definitions for the advisor gamification system."""
+"""Value objects and definitions for Achievement Badges."""
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class BadgeDefinition:
-    """Immutable definition of an achievement badge."""
+    """Defines an achievement badge."""
 
     badge_id: str
     name: str
     description: str
-    icon: str  # Emoji or icon key for frontend rendering
+    icon: str
 
 
-# ── Badge Registry ──────────────────────────────────────────────
-# Add new badges here. The GamificationService checks eligibility
-# against this registry using advisor statistics.
-
-BADGE_REGISTRY: dict[str, BadgeDefinition] = {
-    'speed_demon': BadgeDefinition(
+BADGE_REGISTRY = [
+    BadgeDefinition(
         badge_id='speed_demon',
         name='Speed Demon',
-        description='Completed 3 actions within the 12-hour SLA window.',
+        description='Take 3 actions within the 12-hour SLA window.',
         icon='⚡',
     ),
-    'century_club': BadgeDefinition(
+    BadgeDefinition(
         badge_id='century_club',
         name='Century Club',
-        description='Earned 100 total gamification points.',
+        description='Earn a total of 100 gamification points.',
         icon='💯',
     ),
-    'five_hundred': BadgeDefinition(
+    BadgeDefinition(
         badge_id='five_hundred',
         name='Elite Advisor',
-        description='Earned 500 total gamification points.',
-        icon='🏆',
+        description='Earn a total of 500 gamification points.',
+        icon='👑',
     ),
-    'fastest_response': BadgeDefinition(
-        badge_id='fastest_response',
-        name='Fastest Responder',
-        description='Maintained an average response time under 6 hours.',
+    BadgeDefinition(
+        badge_id='fastest_avg_response',
+        name='Fast Responder',
+        description='Maintain an average response time of under 4 hours (min 5 actions).',
         icon='🚀',
     ),
-    'highest_recovery': BadgeDefinition(
-        badge_id='highest_recovery',
-        name='Recovery Champion',
-        description='Achieved a student recovery rate above 80%.',
-        icon='🌟',
+    BadgeDefinition(
+        badge_id='highest_recovery_rate',
+        name='Recovery Expert',
+        description='Achieve a student recovery rate of over 80% (min 5 resolves).',
+        icon='🛡️',
     ),
-}
+]
+
+BADGE_MAP = {b.badge_id: b for b in BADGE_REGISTRY}
