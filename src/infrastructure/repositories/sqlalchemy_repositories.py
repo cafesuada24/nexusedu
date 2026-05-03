@@ -17,6 +17,7 @@ from sqlalchemy import (
     inspect,
     literal,
     literal_column,
+    or_,
     quoted_name,
     select,
     text,
@@ -632,7 +633,10 @@ class SqlAlchemyCaseRepository:
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
 
-    async def get_task_list(self) -> list['TaskItemRecord']:
+    async def get_task_list(
+        self,
+        advisor_id: uuid.UUID | None = None,
+    ) -> list['TaskItemRecord']:
         """Retrieve task list table for advisors."""
         from src.infrastructure.database.models import Case as OrmCase
         from src.infrastructure.database.models import Student as OrmStudent
@@ -662,6 +666,13 @@ class SqlAlchemyCaseRepository:
             .where(OrmCase.status == 'open')
             .order_by(desc(OrmCase.created_at))
         )
+        if advisor_id is not None:
+            stmt = stmt.where(
+                or_(
+                    OrmCase.assigned_advisor_id == advisor_id,
+                    OrmCase.assigned_advisor_id.is_(None),
+                )
+            )
         result = await self.session.execute(stmt)
         
         tasks = []

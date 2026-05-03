@@ -24,7 +24,7 @@ from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.session import get_async_session
-from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.api.auth import Scope, User, UserRole, require_scope
 from src.presentation.dependencies.providers import (
     get_alert_command_handler,
     get_alert_query_handler,
@@ -144,7 +144,8 @@ async def get_task_list(
     Includes SLA-driven risk assessment, draft statuses, and gamification points.
     """
     try:
-        query = GetTaskListQuery()
+        advisor_id = None if user.role == UserRole.ADMIN.value else user.id
+        query = GetTaskListQuery(advisor_id=advisor_id)
         dtos = await query_handler.handle_get_task_list(query)
         
         return [

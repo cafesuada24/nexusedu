@@ -34,6 +34,6 @@ class CaseRepository(Protocol):
         """Assign an advisor to a case. Returns True if successful, False if already assigned."""
         ...
 
-    async def get_task_list(self) -> list[TaskItemRecord]:
+    async def get_task_list(self, advisor_id: UUID | None = None) -> list[TaskItemRecord]:
         """Retrieve task list table for advisors."""
         ...
