@@ -17,7 +17,6 @@ from src.application.commands.alert_commands import (
 from src.application.queries.alert_queries import (
     AlertQueryHandler,
     GetActiveAlertsQuery,
-    GetEmailHistoryQuery,
     GetTaskListQuery,
 )
 from src.core.logger import logger
@@ -35,7 +34,11 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.schemas.request import SendEmailRequest, StatusUpdate
-from src.presentation.schemas.response import AlertStudent, CaseResponse
+from src.presentation.schemas.response import (
+    AlertPagedResponse,
+    CaseResponse,
+    TaskPagedResponse,
+)
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
@@ -101,7 +104,7 @@ async def get_alerts(
     try:
         query = GetActiveAlertsQuery(status_filter=status, limit=limit, offset=offset)
         paged_dto = await query_handler.handle_get_active_alerts(query)
-        
+
         return {
             'items': [
                 {
@@ -137,20 +140,22 @@ async def get_task_list(
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     """Retrieve the unified list of tasks for the advisor dashboard.
-    
+
     Includes SLA-driven risk assessment, draft statuses, and gamification points.
     """
     try:
         advisor_id = None if user.role == UserRole.ADMIN.value else user.id
         query = GetTaskListQuery(advisor_id=advisor_id, limit=limit, offset=offset)
         paged_dto = await query_handler.handle_get_task_list(query)
-        
+
         return {
             'items': [
                 {
                     'case_id': str(d.case_id),
                     'created_at': d.created_at.isoformat() + 'Z',
-                    'assigned_advisor_id': str(d.assigned_advisor_id) if d.assigned_advisor_id else None,
+                    'assigned_advisor_id': str(d.assigned_advisor_id)
+                    if d.assigned_advisor_id
+                    else None,
                     'student_name': d.student_name,
                     'email': d.email,
                     'major': d.major,
@@ -183,6 +188,9 @@ async def update_alert_status(
     update: StatusUpdate,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    idempotency_repo: Annotated[
+        IdempotencyRepository, Depends(get_idempotency_repository),
+    ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Manually transitions a student's Kanban state."""
@@ -194,7 +202,7 @@ async def update_alert_status(
     try:
         if idempotency_key:
             idemp_key = UUID(idempotency_key)
-            if await command_handler.check_idempotency(idemp_key):
+            if await idempotency_repo.check_key(idemp_key):
                 logger.info(f'Idempotency hit for update_alert_status: {idemp_key}')
                 return {'case_id': case_id, 'new_status': update.status}
 
@@ -206,7 +214,7 @@ async def update_alert_status(
         await command_handler.handle_update_status(command)
 
         if idempotency_key:
-            await command_handler.record_idempotency(UUID(idempotency_key))
+            await idempotency_repo.record_key(UUID(idempotency_key))
 
         return {'case_id': case_id, 'new_status': update.status}
     except Exception as e:
@@ -260,13 +268,16 @@ async def review_draft(
     case_id: str,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    idempotency_repo: Annotated[
+        IdempotencyRepository, Depends(get_idempotency_repository),
+    ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Explicitly rewards the advisor for reviewing the LLM draft."""
     try:
         if idempotency_key:
             idemp_key = UUID(idempotency_key)
-            if await command_handler.check_idempotency(idemp_key):
+            if await idempotency_repo.check_key(idemp_key):
                 logger.info(f'Idempotency hit for review_draft: {idemp_key}')
                 return {
                     'status': 'success',
@@ -278,7 +289,7 @@ async def review_draft(
         await command_handler.handle_award_review_points(command)
 
         if idempotency_key:
-            await command_handler.record_idempotency(UUID(idempotency_key))
+            await idempotency_repo.record_key(UUID(idempotency_key))
 
         return {'status': 'success', 'message': 'Draft review points awarded.'}
     except Exception as e:
@@ -333,13 +344,16 @@ async def send_nudge_email(
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     session: Annotated[AsyncSession, Depends(get_async_session)],
+    idempotency_repo: Annotated[
+        IdempotencyRepository, Depends(get_idempotency_repository),
+    ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Dispatches the email and updates the intervention lifecycle."""
     idemp_key = UUID(idempotency_key) if idempotency_key else None
     try:
         # 1. Early Return: Check idempotency
-        if idemp_key and await command_handler.check_idempotency(idemp_key):
+        if idemp_key and await idempotency_repo.check_key(idemp_key):
             return {
                 'status': 'success',
                 'message': 'Email already sent (idempotent).',
@@ -354,7 +368,7 @@ async def send_nudge_email(
         target_email = await command_handler.handle_send_email(command)
 
         if idemp_key:
-            await command_handler.record_idempotency(idemp_key)
+            await idempotency_repo.record_key(idemp_key)
 
         # Explicitly commit the transaction before performing external I/O
         await session.commit()
