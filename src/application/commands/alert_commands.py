@@ -271,7 +271,15 @@ class AlertCommandHandler:
         # 3. Gamification
         await self._award_points(command.user_id, case.sid, 'email_sent')
 
-        # 4. Return recipient email for dispatching
+        # 4. Queue the actual email dispatch to ARQ worker
+        await self.task_queue.enqueue(
+            'run_dispatch_email_task',
+            case_id=str(case.case_id),
+            body=command.body,
+            target_email=recipient_email,
+        )
+
+        # 5. Return recipient email for logging
         return recipient_email
 
     async def _award_points(

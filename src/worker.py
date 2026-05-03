@@ -112,13 +112,27 @@ async def run_agent_task(
         return await handler.handle_run_agent_task(command)
 
 
+async def run_dispatch_email_task(
+    ctx: dict[str, Any],
+    case_id: str,
+    body: str,
+    target_email: str,
+) -> None:
+    """Worker task to send an email to the student."""
+    logger.info(f'Worker: Dispatching email for case {case_id} to {target_email}')
+    # Placeholder for actual external email service integration (e.g. SendGrid, AWS SES)
+    logger.info(f'Email body preview: {body[:50]}...')
+    # Mock success
+    return None
+
 class WorkerSettings:
     """ARQ Worker configuration."""
 
-    functions = [run_email_draft_task, run_agent_task]
+    functions = [run_email_draft_task, run_agent_task, run_dispatch_email_task]
     redis_settings = RedisSettings(
         host=config.redis_host,
         port=config.redis_port,
     )
     max_jobs = config.worker_max_jobs
     job_timeout = config.worker_job_timeout_sec
+
