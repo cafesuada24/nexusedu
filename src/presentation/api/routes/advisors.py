@@ -7,12 +7,15 @@ from pydantic import BaseModel, Field
 
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.presentation.api.auth import Scope, User, require_scope
+from src.core.logger import logger
 from src.presentation.dependencies.providers import (
     get_advisor_repository,
     get_badge_repository,
+    get_arq_pool,
 )
 from src.presentation.schemas.response import PaginationMetadata
-from src.core.logger import logger
+from arq import ArqRedis
+import json
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 
@@ -109,12 +112,21 @@ async def get_leaderboard(
 async def get_advisor_badges(
     advisor_id: str,
     badge_repo: Annotated[Any, Depends(get_badge_repository)],
+    arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
     _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
 ) -> list[dict[str, Any]]:
-    """Retrieve the badges earned by an advisor."""
+    """Retrieve the badges earned by an advisor (with Redis caching)."""
     from uuid import UUID
     from src.domain.value_objects.badges import BADGE_MAP
+    
+    cache_key = f"advisor_badges:{advisor_id}"
     try:
+        # 1. Try to get from cache
+        cached_data = await arq_pool.get(cache_key)
+        if cached_data:
+            return json.loads(cached_data)
+
+        # 2. If not in cache, fetch from DB
         adv_uuid = UUID(advisor_id)
         badge_ids = await badge_repo.get_advisor_badges(adv_uuid)
         
@@ -128,6 +140,10 @@ async def get_advisor_badges(
                     'description': b.description,
                     'icon': b.icon,
                 })
+        
+        # 3. Store in cache for 5 minutes (300s)
+        await arq_pool.setex(cache_key, 300, json.dumps(badges))
+        
         return badges
     except ValueError:
         raise HTTPException(status_code=400, detail='Invalid advisor ID format')
