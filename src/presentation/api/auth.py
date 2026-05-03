@@ -16,12 +16,17 @@ from fastapi_users.authentication import (
     BearerTransport,
     JWTStrategy,
 )
-from fastapi_users.db import SQLAlchemyUserDatabase
+from fastapi_users.db import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import config
+from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import get_async_session
+from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyUserSettingsRepository,
+)
+from src.presentation.dependencies.providers import get_user_settings_repository
 
 # Configuration
 if config.jwt_secret is None:
@@ -73,7 +78,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
 
 async def get_user_db(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> AsyncGenerator[SQLAlchemyUserDatabase[User, uuid.UUID], None]:
+) -> AsyncGenerator[BaseUserDatabase[User, uuid.UUID], None]:
     """Dependency for getting the user database adapter."""
     yield SQLAlchemyUserDatabase(session, User)
 
@@ -85,6 +90,14 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = config.jwt_secret
     verification_token_secret = config.jwt_secret
 
+    def __init__(
+        self,
+        user_db: BaseUserDatabase[User, uuid.UUID],
+        user_settings_db: UserSettingsRepository,
+    ):
+        super().__init__(user_db)
+        self._user_setting_db = user_settings_db
+
     @override
     async def on_after_register(
         self,
@@ -93,13 +106,15 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ) -> None:
         """Callback triggered after a user successfully registers."""
         print(f'User {user.id} has registered.')
+        await self._user_setting_db.create_user_settings(user.id)
 
 
 async def get_user_manager(
     user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
+    user_settings_db: Annotated[SqlAlchemyUserSettingsRepository, Depends(get_user_settings_repository)],
 ) -> AsyncGenerator[UserManager, None]:
     """Dependency for getting the user manager instance."""
-    yield UserManager(user_db)
+    yield UserManager(user_db, user_settings_db)
 
 
 # Authentication Backend
@@ -122,6 +137,14 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
     get_user_manager,
     [auth_backend],
 )
+
+
+async def current_active_user() -> User | None:
+    user = await fastapi_users.current_user(active=True)()
+    if user is None:
+        return None
+    return user
+
 
 current_active_user: Callable[..., User] = fastapi_users.current_user(active=True)
 
