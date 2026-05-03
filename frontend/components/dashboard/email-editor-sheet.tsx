@@ -82,10 +82,10 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
         (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
     const bookingUrl = alert
-        ? `/booking/le-ha?sid=${alert.id}`
+        ? `/booking/le-ha?cid=${alert.activeCaseId}`
         : "/booking/le-ha";
     const displayUrl = alert
-        ? `nexusedu.app/booking/le-ha?sid=${alert.id}`
+        ? `nexusedu.app/booking/le-ha?cid=${alert.activeCaseId}`
         : "nexusedu.app/booking/le-ha";
 
     return (

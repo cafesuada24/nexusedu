@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
+    CursorResult,
     Integer,
     String,
     case,
@@ -719,7 +720,7 @@ class SqlAlchemyCaseRepository:
             )
         )
         result = await self.session.execute(stmt)
-        return result.all().count() > 0
+        return result.rowcount > 0 # type: ignore
 
     async def update_case_status(self, case_id: uuid.UUID, status: CaseStatus) -> None:
         """Update the status of a case."""

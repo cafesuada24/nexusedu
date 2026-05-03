@@ -33,17 +33,18 @@ export default async function PublicBookingPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { token } = await params
-  const { sid } = await searchParams
+  const { cid } = await searchParams
 
   const meta = advisors[token] ?? {
     advisor: "Cố vấn học tập",
     role: "NexusEdu",
   }
 
-  const studentId = typeof sid === "string" ? sid : undefined
-  const studentName = studentId ? mockStudents[studentId] : undefined
+  const caseId = typeof cid === "string" ? cid : undefined
+  const studentName = undefined // Mock student lookup by SID is deprecated here
 
-  if (!studentId) {
+
+  if (!caseId) {
     return (
       <div className="flex min-h-screen flex-col bg-muted/30">
         <PublicBookingHeader />
@@ -93,7 +94,7 @@ export default async function PublicBookingPage({
             </p>
           </div>
 
-          <BookingView studentId={studentId} studentName={studentName} />
+          <BookingView studentId={caseId} studentName={studentName} />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người được mời qua email này, bạn có thể bỏ
