@@ -345,8 +345,13 @@ class SqlAlchemyAdvisorRepository:
         result = await self.session.execute(stmt)
         return [row._asdict() for row in result.all()]
 
-    async def get_leaderboard(self, time_window: str) -> list[dict[str, Any]]:
-        """Retrieve the advisor leaderboard for a specific time window."""
+    async def get_leaderboard(
+        self,
+        time_window: str,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Retrieve the advisor leaderboard for a specific time window with pagination."""
         interval_map = {
             'weekly': timedelta(days=7),
             'monthly': timedelta(days=30),
@@ -378,8 +383,15 @@ class SqlAlchemyAdvisorRepository:
             Advisor.name,
         ).order_by(desc('total_points'))
 
+        # Count total items
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await self.session.execute(count_stmt)
+        total_count = count_result.scalar() or 0
+
+        # Apply paging
+        stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
-        return [dict(row) for row in result.mappings().all()]
+        return [dict(row) for row in result.mappings().all()], total_count
 
     async def record_points(
         self,

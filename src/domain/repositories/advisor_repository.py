@@ -17,8 +17,17 @@ class AdvisorRepository(Protocol):
         """Retrieve aggregated engagement metrics by major."""
         ...
 
-    async def get_leaderboard(self, time_window: str) -> list[dict[str, Any]]:
-        """Retrieve the advisor leaderboard for a specific time window."""
+    async def get_leaderboard(
+        self,
+        time_window: str,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Retrieve the advisor leaderboard for a specific time window with pagination.
+        
+        Returns:
+            Tuple of (list of leaderboard entries, total count)
+        """
         ...
 
     async def record_points(
