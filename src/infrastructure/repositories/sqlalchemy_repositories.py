@@ -1086,3 +1086,12 @@ class SqlAlchemyUserSettingsRepository:
             )
 
         await self.session.execute(stmt)
+
+    async def create_user_settings(self, user_id: uuid.UUID) -> None:
+        """Create a new default settings for an user."""
+        new_settings = UserSettings(
+            user_id=user_id,
+            auto_draft_enabled=True,
+        )
+
+        self.session.add(new_settings)

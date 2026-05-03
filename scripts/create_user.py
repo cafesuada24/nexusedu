@@ -8,6 +8,9 @@ from sqlalchemy import update
 
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import async_session_maker
+from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyUserSettingsRepository,
+)
 from src.presentation.api.auth import (
     SQLAlchemyUserDatabase,
     UserManager,
@@ -22,7 +25,8 @@ async def create_user(email: str, password: str, role: str) -> None:
     """Create a user and optionally update their role."""
     async with async_session_maker() as session:
         user_db = SQLAlchemyUserDatabase(session, User)
-        user_manager = UserManager(user_db)
+        settings_repo = SqlAlchemyUserSettingsRepository(session)
+        user_manager = UserManager(user_db, settings_repo)
 
         # 1. Create user
         user_create = UserCreate(email=email, password=password)

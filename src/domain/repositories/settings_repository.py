@@ -14,3 +14,7 @@ class UserSettingsRepository(Protocol):
     async def update_auto_draft_enabled(self, user_id: UUID, enabled: bool) -> None:
         """Update the auto-drafting setting for a user."""
         ...
+
+    async def create_user_settings(self, user_id: UUID) -> None:
+        """Create a new user settings."""
+        ...
