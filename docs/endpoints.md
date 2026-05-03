@@ -2489,7 +2489,7 @@ OAuth2PasswordBearer
 
 ```shell
 # You can also use wget
-curl -X PATCH /api/v1/alerts/{sid}/status \
+curl -X PATCH /api/v1/cases/{case_id}/status \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json' \
   -H 'Authorization: Bearer {access-token}'
@@ -2497,7 +2497,7 @@ curl -X PATCH /api/v1/alerts/{sid}/status \
 ```
 
 ```http
-PATCH /api/v1/alerts/{sid}/status HTTP/1.1
+PATCH /api/v1/cases/{case_id}/status HTTP/1.1
 
 Content-Type: application/json
 Accept: application/json
@@ -2514,7 +2514,7 @@ const headers = {
   'Authorization':'Bearer {access-token}'
 };
 
-fetch('/api/v1/alerts/{sid}/status',
+fetch('/api/v1/cases/{case_id}/status',
 {
   method: 'PATCH',
   body: inputBody,
@@ -2538,7 +2538,7 @@ headers = {
   'Authorization' => 'Bearer {access-token}'
 }
 
-result = RestClient.patch '/api/v1/alerts/{sid}/status',
+result = RestClient.patch '/api/v1/cases/{case_id}/status',
   params: {
   }, headers: headers
 
@@ -2554,7 +2554,7 @@ headers = {
   'Authorization': 'Bearer {access-token}'
 }
 
-r = requests.patch('/api/v1/alerts/{sid}/status', headers = headers)
+r = requests.patch('/api/v1/cases/{case_id}/status', headers = headers)
 
 print(r.json())
 
@@ -2577,7 +2577,7 @@ $client = new \GuzzleHttp\Client();
 $request_body = array();
 
 try {
-    $response = $client->request('PATCH','/api/v1/alerts/{sid}/status', array(
+    $response = $client->request('PATCH','/api/v1/cases/{case_id}/status', array(
         'headers' => $headers,
         'json' => $request_body,
        )
@@ -2594,7 +2594,7 @@ try {
 ```
 
 ```java
-URL obj = new URL("/api/v1/alerts/{sid}/status");
+URL obj = new URL("/api/v1/cases/{case_id}/status");
 HttpURLConnection con = (HttpURLConnection) obj.openConnection();
 con.setRequestMethod("PATCH");
 int responseCode = con.getResponseCode();
@@ -2627,7 +2627,7 @@ func main() {
     }
 
     data := bytes.NewBuffer([]byte{jsonReq})
-    req, err := http.NewRequest("PATCH", "/api/v1/alerts/{sid}/status", data)
+    req, err := http.NewRequest("PATCH", "/api/v1/cases/{case_id}/status", data)
     req.Header = headers
 
     client := &http.Client{}
@@ -2637,7 +2637,7 @@ func main() {
 
 ```
 
-`PATCH /api/v1/alerts/{sid}/status`
+`PATCH /api/v1/cases/{case_id}/status`
 
 *Update Alert Status*
 
@@ -2708,14 +2708,14 @@ OAuth2PasswordBearer
 
 ```shell
 # You can also use wget
-curl -X POST /api/v1/alerts/{sid}/draft/review \
+curl -X POST /api/v1/cases/{case_id}/draft/review \
   -H 'Accept: application/json' \
   -H 'Authorization: Bearer {access-token}'
 
 ```
 
 ```http
-POST /api/v1/alerts/{sid}/draft/review HTTP/1.1
+POST /api/v1/cases/{case_id}/draft/review HTTP/1.1
 
 Accept: application/json
 
@@ -2728,7 +2728,7 @@ const headers = {
   'Authorization':'Bearer {access-token}'
 };
 
-fetch('/api/v1/alerts/{sid}/draft/review',
+fetch('/api/v1/cases/{case_id}/draft/review',
 {
   method: 'POST',
 
@@ -2751,7 +2751,7 @@ headers = {
   'Authorization' => 'Bearer {access-token}'
 }
 
-result = RestClient.post '/api/v1/alerts/{sid}/draft/review',
+result = RestClient.post '/api/v1/cases/{case_id}/draft/review',
   params: {
   }, headers: headers
 
@@ -2766,7 +2766,7 @@ headers = {
   'Authorization': 'Bearer {access-token}'
 }
 
-r = requests.post('/api/v1/alerts/{sid}/draft/review', headers = headers)
+r = requests.post('/api/v1/cases/{case_id}/draft/review', headers = headers)
 
 print(r.json())
 
@@ -2788,7 +2788,7 @@ $client = new \GuzzleHttp\Client();
 $request_body = array();
 
 try {
-    $response = $client->request('POST','/api/v1/alerts/{sid}/draft/review', array(
+    $response = $client->request('POST','/api/v1/cases/{case_id}/draft/review', array(
         'headers' => $headers,
         'json' => $request_body,
        )
@@ -2805,7 +2805,7 @@ try {
 ```
 
 ```java
-URL obj = new URL("/api/v1/alerts/{sid}/draft/review");
+URL obj = new URL("/api/v1/cases/{case_id}/draft/review");
 HttpURLConnection con = (HttpURLConnection) obj.openConnection();
 con.setRequestMethod("POST");
 int responseCode = con.getResponseCode();
@@ -2837,7 +2837,7 @@ func main() {
     }
 
     data := bytes.NewBuffer([]byte{jsonReq})
-    req, err := http.NewRequest("POST", "/api/v1/alerts/{sid}/draft/review", data)
+    req, err := http.NewRequest("POST", "/api/v1/cases/{case_id}/draft/review", data)
     req.Header = headers
 
     client := &http.Client{}
@@ -2847,7 +2847,7 @@ func main() {
 
 ```
 
-`POST /api/v1/alerts/{sid}/draft/review`
+`POST /api/v1/cases/{case_id}/draft/review`
 
 *Review Draft*
 
@@ -2908,7 +2908,7 @@ OAuth2PasswordBearer
 
 ```shell
 # You can also use wget
-curl -X POST /api/v1/alerts/{sid}/draft \
+curl -X POST /api/v1/cases/{case_id}/draft \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json' \
   -H 'Authorization: Bearer {access-token}'
@@ -2916,7 +2916,7 @@ curl -X POST /api/v1/alerts/{sid}/draft \
 ```
 
 ```http
-POST /api/v1/alerts/{sid}/draft HTTP/1.1
+POST /api/v1/cases/{case_id}/draft HTTP/1.1
 
 Content-Type: application/json
 Accept: application/json
@@ -2933,7 +2933,7 @@ const headers = {
   'Authorization':'Bearer {access-token}'
 };
 
-fetch('/api/v1/alerts/{sid}/draft',
+fetch('/api/v1/cases/{case_id}/draft',
 {
   method: 'POST',
   body: inputBody,
@@ -2957,7 +2957,7 @@ headers = {
   'Authorization' => 'Bearer {access-token}'
 }
 
-result = RestClient.post '/api/v1/alerts/{sid}/draft',
+result = RestClient.post '/api/v1/cases/{case_id}/draft',
   params: {
   }, headers: headers
 
@@ -2973,7 +2973,7 @@ headers = {
   'Authorization': 'Bearer {access-token}'
 }
 
-r = requests.post('/api/v1/alerts/{sid}/draft', headers = headers)
+r = requests.post('/api/v1/cases/{case_id}/draft', headers = headers)
 
 print(r.json())
 
@@ -2996,7 +2996,7 @@ $client = new \GuzzleHttp\Client();
 $request_body = array();
 
 try {
-    $response = $client->request('POST','/api/v1/alerts/{sid}/draft', array(
+    $response = $client->request('POST','/api/v1/cases/{case_id}/draft', array(
         'headers' => $headers,
         'json' => $request_body,
        )
@@ -3013,7 +3013,7 @@ try {
 ```
 
 ```java
-URL obj = new URL("/api/v1/alerts/{sid}/draft");
+URL obj = new URL("/api/v1/cases/{case_id}/draft");
 HttpURLConnection con = (HttpURLConnection) obj.openConnection();
 con.setRequestMethod("POST");
 int responseCode = con.getResponseCode();
@@ -3046,7 +3046,7 @@ func main() {
     }
 
     data := bytes.NewBuffer([]byte{jsonReq})
-    req, err := http.NewRequest("POST", "/api/v1/alerts/{sid}/draft", data)
+    req, err := http.NewRequest("POST", "/api/v1/cases/{case_id}/draft", data)
     req.Header = headers
 
     client := &http.Client{}
@@ -3056,7 +3056,7 @@ func main() {
 
 ```
 
-`POST /api/v1/alerts/{sid}/draft`
+`POST /api/v1/cases/{case_id}/draft`
 
 *Generate Email Draft*
 
@@ -3119,7 +3119,7 @@ OAuth2PasswordBearer
 
 ```shell
 # You can also use wget
-curl -X POST /api/v1/alerts/{sid}/send \
+curl -X POST /api/v1/cases/{case_id}/send \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json' \
   -H 'Authorization: Bearer {access-token}'
@@ -3127,7 +3127,7 @@ curl -X POST /api/v1/alerts/{sid}/send \
 ```
 
 ```http
-POST /api/v1/alerts/{sid}/send HTTP/1.1
+POST /api/v1/cases/{case_id}/send HTTP/1.1
 
 Content-Type: application/json
 Accept: application/json
@@ -3144,7 +3144,7 @@ const headers = {
   'Authorization':'Bearer {access-token}'
 };
 
-fetch('/api/v1/alerts/{sid}/send',
+fetch('/api/v1/cases/{case_id}/send',
 {
   method: 'POST',
   body: inputBody,
@@ -3168,7 +3168,7 @@ headers = {
   'Authorization' => 'Bearer {access-token}'
 }
 
-result = RestClient.post '/api/v1/alerts/{sid}/send',
+result = RestClient.post '/api/v1/cases/{case_id}/send',
   params: {
   }, headers: headers
 
@@ -3184,7 +3184,7 @@ headers = {
   'Authorization': 'Bearer {access-token}'
 }
 
-r = requests.post('/api/v1/alerts/{sid}/send', headers = headers)
+r = requests.post('/api/v1/cases/{case_id}/send', headers = headers)
 
 print(r.json())
 
@@ -3207,7 +3207,7 @@ $client = new \GuzzleHttp\Client();
 $request_body = array();
 
 try {
-    $response = $client->request('POST','/api/v1/alerts/{sid}/send', array(
+    $response = $client->request('POST','/api/v1/cases/{case_id}/send', array(
         'headers' => $headers,
         'json' => $request_body,
        )
@@ -3224,7 +3224,7 @@ try {
 ```
 
 ```java
-URL obj = new URL("/api/v1/alerts/{sid}/send");
+URL obj = new URL("/api/v1/cases/{case_id}/send");
 HttpURLConnection con = (HttpURLConnection) obj.openConnection();
 con.setRequestMethod("POST");
 int responseCode = con.getResponseCode();
@@ -3257,7 +3257,7 @@ func main() {
     }
 
     data := bytes.NewBuffer([]byte{jsonReq})
-    req, err := http.NewRequest("POST", "/api/v1/alerts/{sid}/send", data)
+    req, err := http.NewRequest("POST", "/api/v1/cases/{case_id}/send", data)
     req.Header = headers
 
     client := &http.Client{}
@@ -3267,7 +3267,7 @@ func main() {
 
 ```
 
-`POST /api/v1/alerts/{sid}/send`
+`POST /api/v1/cases/{case_id}/send`
 
 *Send Nudge Email*
 
