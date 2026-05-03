@@ -17,3 +17,4 @@ class DataIngestionCommand:
     """Command to ingest data from multiple sources."""
 
     data_sources: list[DataSourceDTO]
+    auto_generate_draft_email: bool
