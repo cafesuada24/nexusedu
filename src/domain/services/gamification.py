@@ -70,3 +70,46 @@ class GamificationService:
             sla_multiplier = 0.8  # Penalty for taking longer than 72h
 
         return int(points_after_risk * sla_multiplier)
+
+    @staticmethod
+    def check_badges(advisor_stats: dict[str, int | float]) -> list[str]:
+        """Evaluate which badges an advisor qualifies for.
+
+        Args:
+            advisor_stats: Dictionary containing aggregated advisor metrics:
+                - total_points: int — cumulative points earned
+                - fast_actions_count: int — number of actions taken within 12h SLA
+                - avg_response_hours: float — average response time in hours (0 if no data)
+                - recovery_rate: float — percentage of resolved students (0.0–1.0)
+
+        Returns:
+            List of badge_ids the advisor is eligible for.
+        """
+        eligible: list[str] = []
+
+        total_points = advisor_stats.get('total_points', 0)
+        fast_actions = advisor_stats.get('fast_actions_count', 0)
+        avg_response = advisor_stats.get('avg_response_hours', float('inf'))
+        recovery_rate = advisor_stats.get('recovery_rate', 0.0)
+
+        # Points milestones
+        if total_points >= 100:
+            eligible.append('century_club')
+        if total_points >= 500:
+            eligible.append('five_hundred')
+
+        # Speed-based
+        if fast_actions >= 3:
+            eligible.append('speed_demon')
+
+        # Average response time under 6 hours (requires at least 1 action)
+        if avg_response < 6.0 and total_points > 0:
+            eligible.append('fastest_response')
+
+        # Recovery rate above 80% (requires at least 5 assigned students)
+        assigned_count = advisor_stats.get('assigned_students', 0)
+        if assigned_count >= 5 and recovery_rate > 0.80:
+            eligible.append('highest_recovery')
+
+        return eligible
+
