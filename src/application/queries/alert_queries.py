@@ -11,6 +11,7 @@ from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.domain.services.gamification import GamificationService
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
 
@@ -32,7 +33,7 @@ class GetEmailHistoryQuery:
 class GetTaskListQuery:
     """Query to retrieve advisor task list."""
 
-    pass
+    advisor_id: UUID4 | None = None
 
 
 class AlertQueryHandler:
@@ -89,44 +90,48 @@ class AlertQueryHandler:
 
     async def handle_get_task_list(self, query: GetTaskListQuery) -> list[TaskDTO]:
         """Execute the get task list query."""
-        from src.domain.services.gamification import GamificationService
-        from src.application.dtos.student_dtos import TaskDTO
-
+        gamification = GamificationService()
         raw_tasks = await self.case_repo.get_task_list()
         
         dtos = []
         for row in raw_tasks:
-            draft_status = row.get('draft_status')
+            draft_status = row.draft_status
             
             # Determine suggested action
             if draft_status == 'draft':
                 suggested_action = "Review & Send Email"
+                action_type = 'email_sent'
             elif draft_status == 'generating':
                 suggested_action = "Wait for Draft"
+                action_type = 'email_sent'
             elif draft_status == 'sent':
                 suggested_action = "Follow up"
+                action_type = 'student_resolved' # Or another action
             else:
                 suggested_action = "Initiate Intervention"
+                action_type = 'email_sent'
                 
-            # Determine points reward (Phase 1 SLA -> 1.5x)
-            risk_status = RiskStatus(row['current_risk_status'])
-            multiplier = GamificationService.RISK_MULTIPLIERS.get(risk_status, 1.0)
-            points_reward = int(100 * multiplier * 1.5)
+            # Determine points reward based on GamificationService
+            points_reward = gamification.calculate_points(
+                action_type=action_type,
+                recorded_dt=row.created_at,
+                risk_level=row.current_risk_status
+            )
             
             dtos.append(
                 TaskDTO(
-                    case_id=row['case_id'],
-                    created_at=row['created_at'],
-                    assigned_advisor_id=row['assigned_advisor_id'],
-                    student_name=row['student_name'],
-                    email=row['email'],
-                    major=row['major'],
-                    current_risk_status=risk_status,
-                    intervention_status=InterventionStatus(row['intervention_status']),
-                    draft_subject=row.get('draft_subject'),
-                    draft_body=row.get('draft_body'),
-                    draft_status=draft_status,
-                    assigned_to=row.get('assigned_to'),
+                    case_id=row.case_id,
+                    created_at=row.created_at,
+                    assigned_advisor_id=row.assigned_advisor_id,
+                    student_name=row.student_name,
+                    email=row.email,
+                    major=row.major,
+                    current_risk_status=row.current_risk_status,
+                    intervention_status=row.intervention_status,
+                    draft_subject=row.draft_subject,
+                    draft_body=row.draft_body,
+                    draft_status=str(draft_status) if draft_status else None,
+                    assigned_to=row.assigned_to,
                     suggested_action=suggested_action,
                     points_reward=points_reward,
                 )
