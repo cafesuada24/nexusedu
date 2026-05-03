@@ -636,8 +636,10 @@ class SqlAlchemyCaseRepository:
     async def get_task_list(
         self,
         advisor_id: uuid.UUID | None = None,
-    ) -> list['TaskItemRecord']:
-        """Retrieve task list table for advisors."""
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list['TaskItemRecord'], int]:
+        """Retrieve task list table for advisors with pagination."""
         from src.infrastructure.database.models import Case as OrmCase
         from src.infrastructure.database.models import Student as OrmStudent
         from src.infrastructure.database.models import InterventionEmail as OrmEmail
@@ -673,6 +675,14 @@ class SqlAlchemyCaseRepository:
                     OrmCase.assigned_advisor_id.is_(None),
                 )
             )
+
+        # Count total items before applying limit/offset
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await self.session.execute(count_stmt)
+        total_count = count_result.scalar() or 0
+
+        # Apply limit and offset
+        stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         
         tasks = []
