@@ -5,6 +5,15 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class PaginationMetadata(BaseModel):
+    """Metadata for paged results."""
+
+    total_count: int = Field(..., description='Total number of items available.')
+    limit: int = Field(..., description='Number of items per page.')
+    offset: int = Field(..., description='Number of items skipped.')
+    has_next: bool = Field(..., description='True if there are more pages.')
+
+
 class EmailDraft(BaseModel):
     """Schema for a personalized email draft."""
 
@@ -101,3 +110,36 @@ class AlertStudent(BaseModel):
     active_case_id: str | None = Field(
         None, description='The ID of the currently active case.'
     )
+
+
+class TaskItem(BaseModel):
+    """Schema for a task in the advisor task list."""
+
+    case_id: str = Field(..., description='Case identifier.')
+    created_at: str = Field(..., description='When the case was created.')
+    assigned_advisor_id: str | None = Field(None, description='Advisor assigned to the case.')
+    student_name: str | None = Field(None, description='Student name.')
+    email: str | None = Field(None, description='Student email.')
+    major: str = Field(..., description='Student major.')
+    current_risk_status: str = Field(..., description='Risk status.')
+    intervention_status: str = Field(..., description='Intervention status.')
+    draft_subject: str | None = Field(None, description='Draft email subject.')
+    draft_body: str | None = Field(None, description='Draft email body.')
+    draft_status: str | None = Field(None, description='Draft email status.')
+    assigned_to: str | None = Field(None, description='Name of assigned advisor.')
+    suggested_action: str = Field(..., description='Computed action to take.')
+    points_reward: int = Field(..., description='Points for completing action.')
+
+
+class TaskPagedResponse(BaseModel):
+    """Paged response for task list."""
+
+    items: list[TaskItem]
+    metadata: PaginationMetadata
+
+
+class AlertPagedResponse(BaseModel):
+    """Paged response for active alerts."""
+
+    items: list[AlertStudent]
+    metadata: PaginationMetadata

@@ -32,29 +32,19 @@ from src.presentation.dependencies.providers import (
     get_email_repository,
 )
 from src.presentation.schemas.request import SendEmailRequest, StatusUpdate
-from src.presentation.schemas.response import AlertStudent, CaseResponse
+from src.presentation.schemas.response import (
+    AlertPagedResponse,
+    AlertStudent,
+    CaseResponse,
+    PaginationMetadata,
+    TaskItem,
+    TaskPagedResponse,
+)
 from src.core.logger import logger
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
 
-class TaskItem(BaseModel):
-    """Schema for a task in the advisor task list."""
-
-    case_id: str = Field(..., description='Case identifier.')
-    created_at: str = Field(..., description='When the case was created.')
-    assigned_advisor_id: str | None = Field(None, description='Advisor assigned to the case.')
-    student_name: str | None = Field(None, description='Student name.')
-    email: str | None = Field(None, description='Student email.')
-    major: str = Field(..., description='Student major.')
-    current_risk_status: str = Field(..., description='Risk status.')
-    intervention_status: str = Field(..., description='Intervention status.')
-    draft_subject: str | None = Field(None, description='Draft email subject.')
-    draft_body: str | None = Field(None, description='Draft email body.')
-    draft_status: str | None = Field(None, description='Draft email status.')
-    assigned_to: str | None = Field(None, description='Name of assigned advisor.')
-    suggested_action: str = Field(..., description='Computed action to take.')
-    points_reward: int = Field(..., description='Points for completing action.')
 @router.get('/{sid}/cases', response_model=list[CaseResponse])
 async def get_case_history(
     sid: str,
@@ -95,12 +85,14 @@ async def get_case_details(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get('', response_model=list[AlertStudent])
+@router.get('', response_model=AlertPagedResponse)
 async def get_alerts(
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
     _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
     status: str | None = Query(None),
-) -> list[dict[str, Any]]:
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
     """Retrieve students who have an active alert for the Kanban board."""
     if status:
         try:
@@ -112,61 +104,79 @@ async def get_alerts(
             ) from e
 
     try:
-        query = GetActiveAlertsQuery(status_filter=status)
-        dtos = await query_handler.handle_get_active_alerts(query)
-        # Map DTOs to response schema
-        return [
-            {
-                'sid': str(d.student.sid),
-                'student_name': d.student.student_name,
-                'email': d.student.email,
-                'current_risk_status': d.student.current_risk_status.value,
-                'intervention_status': d.student.intervention_status.value,
-                'is_generating': d.student.is_generating,
-                'active_case_id': str(d.student.active_case_id)
-                if d.student.active_case_id
-                else None,
-            }
-            for d in dtos
-        ]
+        query = GetActiveAlertsQuery(status_filter=status, limit=limit, offset=offset)
+        paged_dto = await query_handler.handle_get_active_alerts(query)
+        
+        return {
+            'items': [
+                {
+                    'sid': str(d.student.sid),
+                    'student_name': d.student.student_name,
+                    'email': d.student.email,
+                    'current_risk_status': d.student.current_risk_status.value,
+                    'intervention_status': d.student.intervention_status.value,
+                    'is_generating': d.student.is_generating,
+                    'active_case_id': str(d.student.active_case_id)
+                    if d.student.active_case_id
+                    else None,
+                }
+                for d in paged_dto.items
+            ],
+            'metadata': {
+                'total_count': paged_dto.metadata.total_count,
+                'limit': paged_dto.metadata.limit,
+                'offset': paged_dto.metadata.offset,
+                'has_next': paged_dto.metadata.has_next,
+            },
+        }
     except Exception as e:
         logger.error(f'Error in get_alerts: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get('/tasks', response_model=list[TaskItem])
+@router.get('/tasks', response_model=TaskPagedResponse)
 async def get_task_list(
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
-) -> list[dict[str, Any]]:
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
     """Retrieve the unified list of tasks for the advisor dashboard.
     
     Includes SLA-driven risk assessment, draft statuses, and gamification points.
     """
     try:
         advisor_id = None if user.role == UserRole.ADMIN.value else user.id
-        query = GetTaskListQuery(advisor_id=advisor_id)
-        dtos = await query_handler.handle_get_task_list(query)
+        query = GetTaskListQuery(advisor_id=advisor_id, limit=limit, offset=offset)
+        paged_dto = await query_handler.handle_get_task_list(query)
         
-        return [
-            {
-                'case_id': str(d.case_id),
-                'created_at': d.created_at.isoformat() + 'Z',
-                'assigned_advisor_id': str(d.assigned_advisor_id) if d.assigned_advisor_id else None,
-                'student_name': d.student_name,
-                'email': d.email,
-                'major': d.major,
-                'current_risk_status': d.current_risk_status.value,
-                'intervention_status': d.intervention_status.value,
-                'draft_subject': d.draft_subject,
-                'draft_body': d.draft_body,
-                'draft_status': d.draft_status,
-                'assigned_to': d.assigned_to,
-                'suggested_action': d.suggested_action,
-                'points_reward': d.points_reward,
-            }
-            for d in dtos
-        ]
+        return {
+            'items': [
+                {
+                    'case_id': str(d.case_id),
+                    'created_at': d.created_at.isoformat() + 'Z',
+                    'assigned_advisor_id': str(d.assigned_advisor_id) if d.assigned_advisor_id else None,
+                    'student_name': d.student_name,
+                    'email': d.email,
+                    'major': d.major,
+                    'current_risk_status': d.current_risk_status.value,
+                    'intervention_status': d.intervention_status.value,
+                    'draft_subject': d.draft_subject,
+                    'draft_body': d.draft_body,
+                    'draft_status': d.draft_status,
+                    'assigned_to': d.assigned_to,
+                    'suggested_action': d.suggested_action,
+                    'points_reward': d.points_reward,
+                }
+                for d in paged_dto.items
+            ],
+            'metadata': {
+                'total_count': paged_dto.metadata.total_count,
+                'limit': paged_dto.metadata.limit,
+                'offset': paged_dto.metadata.offset,
+                'has_next': paged_dto.metadata.has_next,
+            },
+        }
     except Exception as e:
         logger.error(f'Error in get_task_list: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
