@@ -80,6 +80,11 @@ Endpoints are protected by **Scopes**. A user's **Role** (`admin`, `advisor`, `v
 - **Query Params**: `status` (optional: `new`, `sent`, `booked`, `supporting`, `resolved`, `expired`)
 - **Response**: `List[AlertStudent]` (includes `active_case_id`, `is_generating`)
 
+### Get Advisor Task List
+`GET /alerts/tasks`
+- **Scope**: `alerts:read`
+- **Response**: `List[TaskItem]` (Unified view for Advisor Dashboard, includes points and draft info)
+
 ### Get Case History
 `GET /alerts/{sid}/cases`
 - **Scope**: `alerts:read`
@@ -156,6 +161,26 @@ Endpoints are protected by **Scopes**. A user's **Role** (`admin`, `advisor`, `v
   "intervention_status": "string",
   "is_generating": "boolean",
   "active_case_id": "uuid | null"
+}
+```
+
+### TaskItem
+```json
+{
+  "case_id": "uuid",
+  "created_at": "iso_timestamp",
+  "assigned_advisor_id": "uuid | null",
+  "student_name": "string",
+  "email": "string",
+  "major": "string",
+  "current_risk_status": "string",
+  "intervention_status": "string",
+  "draft_subject": "string | null",
+  "draft_body": "string | null",
+  "draft_status": "string | null",
+  "assigned_to": "string | null",
+  "suggested_action": "string",
+  "points_reward": "integer"
 }
 ```
 

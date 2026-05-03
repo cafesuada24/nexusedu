@@ -91,7 +91,7 @@ class AlertQueryHandler:
     async def handle_get_task_list(self, query: GetTaskListQuery) -> list[TaskDTO]:
         """Execute the get task list query."""
         gamification = GamificationService()
-        raw_tasks = await self.case_repo.get_task_list()
+        raw_tasks = await self.case_repo.get_task_list(advisor_id=query.advisor_id)
         
         dtos = []
         for row in raw_tasks:
