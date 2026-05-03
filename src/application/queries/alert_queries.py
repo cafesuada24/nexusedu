@@ -66,12 +66,6 @@ class AlertQueryHandler:
             query.status_filter, limit=query.limit, offset=query.offset
         )
 
-        dtos = []
-        for a in domain_alerts:
-            # Check for active case
-            active_case = await self.case_repo.get_active_case(a.student.sid)
-            
-            is_generating = False
         return PagedResult(
             items=[
                 AlertDTO(
@@ -82,13 +76,13 @@ class AlertQueryHandler:
                         major=alert.student.major,
                         current_risk_status=alert.student.current_risk_status,
                         intervention_status=alert.student.intervention_status,
-                        last_notified_at=alert.student.last_notified_at,
-                        is_generating=alert.student.is_generating,
-                        active_case_id=alert.student.active_case_id,
+                        last_notified_at=alert.student.last_notified_timestamp,
+                        is_generating=False,
+                        active_case_id=None,
                     ),
                     alert_details={
-                        "latest_draft_subject": alert.latest_draft_subject,
-                        "latest_draft_body": alert.latest_draft_body,
+                        "latest_draft_subject": alert.alert_details.get("draft_subject"),
+                        "latest_draft_body": alert.alert_details.get("draft_body"),
                     },
                 )
                 for alert in domain_alerts
@@ -123,11 +117,11 @@ class AlertQueryHandler:
                     draft_body=task.draft_body,
                     draft_status=task.draft_status,
                     assigned_to=task.assigned_to,
-                    suggested_action=gamification.get_suggested_action(
+                    suggested_action=self._get_suggested_action(
                         task.current_risk_status, task.intervention_status
                     ),
                     points_reward=gamification.calculate_points(
-                        task.current_risk_status, task.intervention_status
+                        'email_sent', task.created_at, task.current_risk_status
                     ),
                 )
                 for task in raw_tasks
@@ -139,6 +133,14 @@ class AlertQueryHandler:
                 has_next=(query.offset + query.limit) < total_count,
             ),
         )
+
+    def _get_suggested_action(self, risk: RiskStatus, intervention: InterventionStatus) -> str:
+        """Helper to determine suggested action."""
+        if intervention == InterventionStatus.NOTIFIED:
+            return "Schedule Meeting"
+        if risk == RiskStatus.CRITICAL:
+            return "Immediate Outreach"
+        return "Review Draft"
 
     async def handle_get_email_history(
         self, query: GetEmailHistoryQuery

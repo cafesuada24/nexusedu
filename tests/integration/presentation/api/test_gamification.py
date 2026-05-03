@@ -419,23 +419,26 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
     resp = client.get('/api/v1/advisors/leaderboard?time_window=all_time')
     assert resp.status_code == 200
     data = resp.json()
+    items = data['items']
+    assert data['metadata']['total_count'] >= 2
     # adv_1: 150, adv_2: 90
-    assert data[0]['advisor_id'] == str(adv1_id)
-    assert data[0]['total_points'] == 150
-    assert 'sent_count' in data[0]
-    assert 'resolved_count' in data[0]
-    assert data[1]['advisor_id'] == str(adv2_id)
-    assert data[1]['total_points'] == 90
+    assert items[0]['advisor_id'] == str(adv1_id)
+    assert items[0]['total_points'] == 150
+    assert 'sent_count' in items[0]
+    assert 'resolved_count' in items[0]
+    assert items[1]['advisor_id'] == str(adv2_id)
+    assert items[1]['total_points'] == 90
 
     # Weekly (adv_2's L4 should be excluded)
     resp = client.get('/api/v1/advisors/leaderboard?time_window=weekly')
     assert resp.status_code == 200
     # adv_1: 150, adv_2: 80
     data = resp.json()
-    assert data[0]['advisor_id'] == str(adv1_id)
-    assert data[0]['total_points'] == 150
-    assert data[1]['advisor_id'] == str(adv2_id)
-    assert data[1]['total_points'] == 80
+    items = data['items']
+    assert items[0]['advisor_id'] == str(adv1_id)
+    assert items[0]['total_points'] == 150
+    assert items[1]['advisor_id'] == str(adv2_id)
+    assert items[1]['total_points'] == 80
 
 
 @pytest.mark.asyncio

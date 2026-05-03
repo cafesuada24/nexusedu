@@ -46,9 +46,11 @@ async def test_get_alerts(
     response = client.get('/api/v1/alerts')
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 1
-    assert data[0]['sid'] == str(a1)
-    assert data[0]['intervention_status'] == InterventionStatus.NOTIFIED.value
+    assert 'items' in data
+    assert 'metadata' in data
+    assert len(data['items']) == 1
+    assert data['items'][0]['sid'] == str(a1)
+    assert data['items'][0]['intervention_status'] == InterventionStatus.NOTIFIED.value
 
 
 @pytest.mark.asyncio

@@ -59,9 +59,11 @@ async def test_get_task_list(
     assert response.status_code == 200
     
     data = response.json()
-    assert len(data) == 1
+    assert 'items' in data
+    assert 'metadata' in data
+    assert len(data['items']) == 1
     
-    task = data[0]
+    task = data['items'][0]
     assert task['case_id'] == str(cid)
     assert task['assigned_advisor_id'] == str(adv_id)
     assert task['student_name'] == 'Task Test Student'
@@ -82,7 +84,9 @@ async def test_get_task_list_empty(
     """Verify that an empty task list returns successfully."""
     response = client.get('/api/v1/alerts/tasks')
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    assert data['items'] == []
+    assert data['metadata']['total_count'] == 0
 
 
 @pytest.mark.asyncio

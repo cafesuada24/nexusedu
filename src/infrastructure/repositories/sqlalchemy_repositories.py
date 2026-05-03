@@ -732,7 +732,7 @@ class SqlAlchemyCaseRepository:
                 assigned_to=row['assigned_to'],
                 suggested_action='N/A',  # Will be populated by the application layer
             ))
-        return tasks
+        return tasks, total_count
 
 
 class SqlAlchemyAlertRepository:
@@ -800,7 +800,7 @@ class SqlAlchemyAlertRepository:
                     },
                 ),
             )
-        return alerts
+        return alerts, total_count
 
 
 class SqlAlchemyMetricsRepository:
