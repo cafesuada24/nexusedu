@@ -9,10 +9,13 @@ export const queryKeys = {
   alerts: {
     all: ["alerts"] as const,
     list: () => [...queryKeys.alerts.all, "list"] as const,
-    detail: (sid: string) => [...queryKeys.alerts.all, "detail", sid] as const,
-    cases: (sid: string) => [...queryKeys.alerts.all, "detail", sid, "cases"] as const,
-    caseDetail: (caseId: string) => [...queryKeys.alerts.all, "case", caseId] as const,
-    draft: (sid: string) => [...queryKeys.alerts.all, sid, "draft"] as const,
+  },
+  cases: {
+    all: ["cases"] as const,
+    tasks: () => [...queryKeys.cases.all, "tasks"] as const,
+    detail: (caseId: string) => [...queryKeys.cases.all, "detail", caseId] as const,
+    student: (sid: string) => [...queryKeys.cases.all, "student", sid] as const,
+    draft: (caseId: string) => [...queryKeys.cases.all, "draft", caseId] as const,
   },
   schedule: {
     all: ["schedule"] as const,

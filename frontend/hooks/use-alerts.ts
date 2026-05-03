@@ -9,6 +9,7 @@ import {
     fetchStudentCases,
     fetchCaseDetails,
     fetchCaseEmail,
+    fetchTasks,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
@@ -110,7 +111,7 @@ export function useUpdateAlertStatus() {
  */
 export function useDraftStatus(case_id?: string | null) {
     return useQuery({
-        queryKey: case_id ? queryKeys.alerts.draft(case_id) : ["alerts", "draft", "none"],
+        queryKey: case_id ? queryKeys.cases.draft(case_id) : ["cases", "draft", "none"],
         queryFn: async () => {
             if (!case_id) return null;
             return await fetchDraftStatus(case_id);
@@ -144,7 +145,7 @@ export function useDraftStatus(case_id?: string | null) {
 export function useStudentCases(sid: string) {
     const { isAuthenticated } = useAuth();
     return useQuery({
-        queryKey: queryKeys.alerts.cases(sid),
+        queryKey: queryKeys.cases.student(sid),
         queryFn: () => fetchStudentCases(sid),
         enabled: isAuthenticated && !!sid,
     });
@@ -156,7 +157,7 @@ export function useStudentCases(sid: string) {
 export function useCaseDetails(caseId: string) {
     const { isAuthenticated } = useAuth();
     return useQuery({
-        queryKey: queryKeys.alerts.caseDetail(caseId),
+        queryKey: queryKeys.cases.detail(caseId),
         queryFn: () => fetchCaseDetails(caseId),
         enabled: isAuthenticated && !!caseId,
     });
@@ -168,8 +169,28 @@ export function useCaseDetails(caseId: string) {
 export function useCaseEmail(caseId: string) {
     const { isAuthenticated } = useAuth();
     return useQuery({
-        queryKey: [...queryKeys.alerts.all, "case", caseId, "email"],
+        queryKey: [...queryKeys.cases.all, "case", caseId, "email"],
         queryFn: () => fetchCaseEmail(caseId),
         enabled: isAuthenticated && !!caseId,
+    });
+}
+
+/**
+ * Hook to fetch the unified advisor task list.
+ */
+export function useTasks(limit: number = 20, offset: number = 0) {
+    const { isAuthenticated } = useAuth();
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    return useQuery({
+        queryKey: [...queryKeys.cases.tasks(), limit, offset],
+        queryFn: () => fetchTasks(limit, offset),
+        enabled: isMounted && isAuthenticated,
+        refetchOnWindowFocus: true,
+        refetchInterval: 10000,
     });
 }

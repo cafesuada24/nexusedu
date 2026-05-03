@@ -116,6 +116,7 @@ class TaskItem(BaseModel):
     """Schema for a task in the advisor task list."""
 
     case_id: str = Field(..., description='Case identifier.')
+    sid: str = Field(..., description='Student id')
     created_at: str = Field(..., description='When the case was created.')
     assigned_advisor_id: str | None = Field(None, description='Advisor assigned to the case.')
     student_name: str | None = Field(None, description='Student name.')

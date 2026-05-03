@@ -5,8 +5,9 @@ from typing import Any
 
 from pydantic import UUID4
 
+from src.application.dtos.case_dtos import CaseDTO
 from src.application.dtos.pagination_dtos import PagedResult, PaginationMetadata
-from src.application.dtos.student_dtos import EmailDTO, TaskDTO
+from src.application.dtos.student_dtos import EmailDTO
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
@@ -46,38 +47,45 @@ class CaseQueryHandler:
         self.job_repo = job_repo
         self.case_repo = case_repo
 
-    async def handle_get_task_list(
-        self, query: GetTaskListQuery
-    ) -> PagedResult[TaskDTO]:
+    async def handle_get_cases_list(
+        self,
+        query: GetTaskListQuery,
+    ) -> PagedResult[CaseDTO]:
         """Execute the get task list query."""
         gamification = GamificationService()
-        raw_tasks, total_count = await self.case_repo.get_task_list(
-            advisor_id=query.advisor_id, limit=query.limit, offset=query.offset
+        raw_cases, total_count = await self.case_repo.get_cases_list(
+            advisor_id=query.advisor_id,
+            limit=query.limit,
+            offset=query.offset,
         )
 
         return PagedResult(
             items=[
-                TaskDTO(
-                    case_id=task.case_id,
-                    created_at=task.created_at,
-                    assigned_advisor_id=task.assigned_advisor_id,
-                    student_name=task.student_name,
-                    email=task.email,
-                    major=task.major,
-                    current_risk_status=task.current_risk_status,
-                    intervention_status=task.intervention_status,
-                    draft_subject=task.draft_subject,
-                    draft_body=task.draft_body,
-                    draft_status=task.draft_status,
-                    assigned_to=task.assigned_to,
+                CaseDTO(
+                    case_id=case.case_id,
+                    sid=case.sid,
+                    created_at=case.created_at,
+                    assigned_advisor_id=case.assigned_advisor_id,
+                    student_name=case.student_name,
+                    email=case.email,
+                    major=case.major,
+                    current_risk_status=case.current_risk_status,
+                    intervention_status=case.intervention_status,
+                    draft_subject=case.draft_subject,
+                    draft_body=case.draft_body,
+                    draft_status=case.draft_status,
+                    assigned_to=case.assigned_to,
                     suggested_action=self._get_suggested_action(
-                        task.current_risk_status, task.intervention_status
+                        case.current_risk_status,
+                        case.intervention_status,
                     ),
                     points_reward=gamification.calculate_points(
-                        'email_sent', task.created_at, task.current_risk_status
+                        'email_sent',
+                        case.created_at,
+                        case.current_risk_status,
                     ),
                 )
-                for task in raw_tasks
+                for case in raw_cases
             ],
             metadata=PaginationMetadata(
                 total_count=total_count,

@@ -80,12 +80,13 @@ async def get_cases_list(
     try:
         advisor_id = None if user.role == UserRole.ADMIN.value else user.id
         query = GetTaskListQuery(advisor_id=advisor_id, limit=limit, offset=offset)
-        paged_dto = await query_handler.handle_get_task_list(query)
+        paged_dto = await query_handler.handle_get_cases_list(query)
 
         return {
             'items': [
                 {
                     'case_id': str(d.case_id),
+                    'sid': str(d.sid),
                     'created_at': d.created_at.isoformat() + 'Z',
                     'assigned_advisor_id': str(d.assigned_advisor_id)
                     if d.assigned_advisor_id
@@ -112,7 +113,7 @@ async def get_cases_list(
             },
         }
     except Exception as e:
-        logger.error(f'Error in get_task_list: {str(e)}', exc_info=True)
+        logger.error(f'Error in get_case_list: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

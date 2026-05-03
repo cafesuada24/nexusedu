@@ -34,14 +34,14 @@ class CaseRepository(Protocol):
         """Assign an advisor to a case. Returns True if successful, False if already assigned."""
         ...
 
-    async def get_task_list(
+    async def get_cases_list(
         self,
         advisor_id: UUID | None = None,
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[TaskItemRecord], int]:
         """Retrieve task list table for advisors with pagination.
-        
+
         Returns:
             Tuple of (list of records, total count)
         """

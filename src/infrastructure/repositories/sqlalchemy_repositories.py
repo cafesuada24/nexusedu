@@ -26,7 +26,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from src.core.config import config
-from src.domain.value_objects.status import CaseStatus, EmailStatus, RiskStatus
+from src.domain.entities.case import TaskItemRecord
+from src.domain.value_objects.status import (
+    CaseStatus,
+    EmailStatus,
+    InterventionStatus,
+    RiskStatus,
+)
 from src.infrastructure.database.config import DB_REGISTRY
 from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
@@ -41,7 +47,10 @@ from src.infrastructure.database.models import (
     StudentStatusHistory,
     UserSettings,
 )
+from src.infrastructure.database.models import Advisor as OrmAdvisor
 from src.infrastructure.database.models import Case as OrmCase
+from src.infrastructure.database.models import InterventionEmail as OrmEmail
+from src.infrastructure.database.models import Student as OrmStudent
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -51,7 +60,6 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from src.domain.entities.advisor import Advisor as DomainAdvisor
-    from src.domain.entities.alert import Alert
     from src.domain.entities.alert import Alert as DomainAlert
     from src.domain.entities.case import Case as DomainCase
     from src.domain.entities.intervention_email import (
@@ -451,14 +459,15 @@ class SqlAlchemyBadgeRepository:
         self.session = session
 
     async def get_advisor_badges(self, advisor_id: uuid.UUID) -> list[str]:
-        stmt = select(AdvisorBadge.badge_id).where(AdvisorBadge.advisor_id == advisor_id)
+        stmt = select(AdvisorBadge.badge_id).where(
+            AdvisorBadge.advisor_id == advisor_id
+        )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def award_badge(self, advisor_id: uuid.UUID, badge_id: str) -> bool:
         stmt = select(AdvisorBadge).where(
-            AdvisorBadge.advisor_id == advisor_id,
-            AdvisorBadge.badge_id == badge_id
+            AdvisorBadge.advisor_id == advisor_id, AdvisorBadge.badge_id == badge_id
         )
         existing = (await self.session.execute(stmt)).first()
         if existing:
@@ -471,10 +480,9 @@ class SqlAlchemyBadgeRepository:
     async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
         # Get total points and action count
         stmt = select(
-            func.sum(AdvisorPointsLedger.points),
-            func.count(AdvisorPointsLedger.id)
+            func.sum(AdvisorPointsLedger.points), func.count(AdvisorPointsLedger.id)
         ).where(AdvisorPointsLedger.advisor_id == advisor_id)
-        
+
         row = (await self.session.execute(stmt)).first()
         total_points = row[0] or 0
         total_actions = row[1] or 0
@@ -482,18 +490,18 @@ class SqlAlchemyBadgeRepository:
         # Get resolves
         stmt_resolves = select(func.count(AdvisorPointsLedger.id)).where(
             AdvisorPointsLedger.advisor_id == advisor_id,
-            AdvisorPointsLedger.action_type == 'student_resolved'
+            AdvisorPointsLedger.action_type == 'student_resolved',
         )
         total_resolves = (await self.session.execute(stmt_resolves)).scalar() or 0
 
-        # Fast actions (Approximate: assuming >10 points per action often means fast SLA multiplier was hit, 
+        # Fast actions (Approximate: assuming >10 points per action often means fast SLA multiplier was hit,
         # Calculate real response metrics by comparing case creation vs action time
         stmt_times = (
             select(OrmCase.created_at, AdvisorPointsLedger.timestamp)
             .join(
                 AdvisorPointsLedger,
-                (OrmCase.sid == AdvisorPointsLedger.sid) &
-                (OrmCase.assigned_advisor_id == AdvisorPointsLedger.advisor_id)
+                (OrmCase.sid == AdvisorPointsLedger.sid)
+                & (OrmCase.assigned_advisor_id == AdvisorPointsLedger.advisor_id),
             )
             .where(OrmCase.assigned_advisor_id == advisor_id)
         )
@@ -504,7 +512,9 @@ class SqlAlchemyBadgeRepository:
         valid_pairs = 0
         for created_at, action_time in time_pairs:
             if created_at and action_time:
-                delta_hours = (action_time.replace(tzinfo=None) - created_at.replace(tzinfo=None)).total_seconds() / 3600.0
+                delta_hours = (
+                    action_time.replace(tzinfo=None) - created_at.replace(tzinfo=None)
+                ).total_seconds() / 3600.0
                 if delta_hours < 0:
                     delta_hours = 0.0
                 total_hours += delta_hours
@@ -529,6 +539,7 @@ class SqlAlchemyBadgeRepository:
             'recovery_rate': recovery_rate,
             'total_resolves': total_resolves,
         }
+
 
 class SqlAlchemyMetadataRepository:
     """SQLAlchemy implementation for metadata retrieval."""
@@ -697,14 +708,18 @@ class SqlAlchemyCaseRepository:
 
     async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> bool:
         """Assign an advisor to a case."""
-        stmt = update(OrmCase).where(
-            OrmCase.case_id == case_id,
-            OrmCase.assigned_advisor_id.is_(None)
-        ).values(
-            assigned_advisor_id=advisor_id
+        stmt = (
+            update(OrmCase)
+            .where(
+                OrmCase.case_id == case_id,
+                OrmCase.assigned_advisor_id.is_(None),
+            )
+            .values(
+                assigned_advisor_id=advisor_id,
+            )
         )
         result = await self.session.execute(stmt)
-        return result.rowcount > 0
+        return result.all().count() > 0
 
     async def update_case_status(self, case_id: uuid.UUID, status: CaseStatus) -> None:
         """Update the status of a case."""
@@ -732,23 +747,17 @@ class SqlAlchemyCaseRepository:
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
 
-    async def get_task_list(
+    async def get_cases_list(
         self,
         advisor_id: uuid.UUID | None = None,
         limit: int = 20,
         offset: int = 0,
-    ) -> tuple[list['TaskItemRecord'], int]:
+    ) -> tuple[list[TaskItemRecord], int]:
         """Retrieve task list table for advisors with pagination."""
-        from src.infrastructure.database.models import Case as OrmCase
-        from src.infrastructure.database.models import Student as OrmStudent
-        from src.infrastructure.database.models import InterventionEmail as OrmEmail
-        from src.infrastructure.database.models import Advisor as OrmAdvisor
-        from src.domain.entities.case import TaskItemRecord
-        from src.domain.value_objects.status import RiskStatus, InterventionStatus
-
         stmt = (
             select(
                 OrmCase.case_id,
+                OrmCase.sid,
                 OrmCase.created_at,
                 OrmCase.assigned_advisor_id,
                 OrmStudent.student_name,
@@ -759,7 +768,7 @@ class SqlAlchemyCaseRepository:
                 OrmEmail.subject.label('draft_subject'),
                 OrmEmail.body.label('draft_body'),
                 OrmEmail.status.label('draft_status'),
-                OrmAdvisor.name.label('assigned_to')
+                OrmAdvisor.name.label('assigned_to'),
             )
             .join(OrmStudent, OrmCase.sid == OrmStudent.sid)
             .outerjoin(OrmEmail, OrmCase.case_id == OrmEmail.case_id)
@@ -783,7 +792,7 @@ class SqlAlchemyCaseRepository:
         # Apply limit and offset
         stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
-        
+
         tasks = []
         for row in result.mappings().all():
             risk_status_val = row['current_risk_status']
@@ -804,21 +813,24 @@ class SqlAlchemyCaseRepository:
             else:
                 intervention_status = InterventionStatus.NONE
 
-            tasks.append(TaskItemRecord(
-                case_id=row['case_id'],
-                created_at=row['created_at'],
-                assigned_advisor_id=row['assigned_advisor_id'],
-                student_name=row['student_name'],
-                email=row['email'],
-                major=row['major'] or 'Unknown',
-                current_risk_status=risk_status,
-                intervention_status=intervention_status,
-                draft_subject=row['draft_subject'],
-                draft_body=row['draft_body'],
-                draft_status=row['draft_status'],
-                assigned_to=row['assigned_to'],
-                suggested_action='N/A',  # Will be populated by the application layer
-            ))
+            tasks.append(
+                TaskItemRecord(
+                    case_id=row['case_id'],
+                    sid=row['sid'],
+                    created_at=row['created_at'],
+                    assigned_advisor_id=row['assigned_advisor_id'],
+                    student_name=row['student_name'],
+                    email=row['email'],
+                    major=row['major'] or 'Unknown',
+                    current_risk_status=risk_status,
+                    intervention_status=intervention_status,
+                    draft_subject=row['draft_subject'],
+                    draft_body=row['draft_body'],
+                    draft_status=row['draft_status'],
+                    assigned_to=row['assigned_to'],
+                    suggested_action='N/A',  # Will be populated by the application layer
+                )
+            )
         return tasks, total_count
 
 
