@@ -3,7 +3,7 @@
 from typing import Protocol
 from uuid import UUID
 
-from src.domain.entities.case import Case
+from src.domain.entities.case import Case, TaskItemRecord
 from src.domain.value_objects.status import CaseStatus
 
 
@@ -30,10 +30,10 @@ class CaseRepository(Protocol):
         """Retrieve all cases for a specific student."""
         ...
 
-    async def assign_case(self, case_id: UUID, advisor_id: UUID) -> None:
-        """Assign an advisor to a case."""
+    async def assign_case(self, case_id: UUID, advisor_id: UUID) -> bool:
+        """Assign an advisor to a case. Returns True if successful, False if already assigned."""
         ...
 
-    async def get_task_list(self) -> list[dict]:
+    async def get_task_list(self) -> list[TaskItemRecord]:
         """Retrieve task list table for advisors."""
         ...

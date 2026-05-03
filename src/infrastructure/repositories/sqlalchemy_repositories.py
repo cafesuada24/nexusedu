@@ -595,12 +595,16 @@ class SqlAlchemyCaseRepository:
         orm_case = result.scalar_one_or_none()
         return DataMapper.to_domain_case(orm_case) if orm_case else None
 
-    async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> None:
+    async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> bool:
         """Assign an advisor to a case."""
-        stmt = update(OrmCase).where(OrmCase.case_id == case_id).values(
+        stmt = update(OrmCase).where(
+            OrmCase.case_id == case_id,
+            OrmCase.assigned_advisor_id.is_(None)
+        ).values(
             assigned_advisor_id=advisor_id
         )
-        await self.session.execute(stmt)
+        result = await self.session.execute(stmt)
+        return result.rowcount > 0
 
     async def update_case_status(self, case_id: uuid.UUID, status: CaseStatus) -> None:
         """Update the status of a case."""
@@ -628,12 +632,14 @@ class SqlAlchemyCaseRepository:
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
 
-    async def get_task_list(self) -> list[dict]:
+    async def get_task_list(self) -> list['TaskItemRecord']:
         """Retrieve task list table for advisors."""
         from src.infrastructure.database.models import Case as OrmCase
         from src.infrastructure.database.models import Student as OrmStudent
         from src.infrastructure.database.models import InterventionEmail as OrmEmail
         from src.infrastructure.database.models import Advisor as OrmAdvisor
+        from src.domain.entities.case import TaskItemRecord
+        from src.domain.value_objects.status import RiskStatus, InterventionStatus
 
         stmt = (
             select(
@@ -657,7 +663,43 @@ class SqlAlchemyCaseRepository:
             .order_by(desc(OrmCase.created_at))
         )
         result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
+        
+        tasks = []
+        for row in result.mappings().all():
+            risk_status_val = row['current_risk_status']
+            if isinstance(risk_status_val, str):
+                try:
+                    risk_status = RiskStatus(risk_status_val)
+                except ValueError:
+                    risk_status = RiskStatus.UNKNOWN
+            else:
+                risk_status = RiskStatus.UNKNOWN
+
+            intervention_status_val = row['intervention_status']
+            if isinstance(intervention_status_val, str):
+                try:
+                    intervention_status = InterventionStatus(intervention_status_val)
+                except ValueError:
+                    intervention_status = InterventionStatus.NONE
+            else:
+                intervention_status = InterventionStatus.NONE
+
+            tasks.append(TaskItemRecord(
+                case_id=row['case_id'],
+                created_at=row['created_at'],
+                assigned_advisor_id=row['assigned_advisor_id'],
+                student_name=row['student_name'],
+                email=row['email'],
+                major=row['major'] or 'Unknown',
+                current_risk_status=risk_status,
+                intervention_status=intervention_status,
+                draft_subject=row['draft_subject'],
+                draft_body=row['draft_body'],
+                draft_status=row['draft_status'],
+                assigned_to=row['assigned_to'],
+                suggested_action='N/A',  # Will be populated by the application layer
+            ))
+        return tasks
 
 
 class SqlAlchemyAlertRepository:
