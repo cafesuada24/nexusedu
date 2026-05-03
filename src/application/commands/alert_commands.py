@@ -313,22 +313,5 @@ class AlertCommandHandler:
         if points > 0:
             await self.advisor_repo.record_points(advisor_id, sid, action_type, points)
             if self.badge_repo:
-                await self._check_and_award_badges(advisor_id)
-
-    async def _check_and_award_badges(self, advisor_id: UUID) -> None:
-        """Check and award badges based on updated stats."""
-        # 1. Get current stats
-        stats = await self.badge_repo.get_advisor_stats(advisor_id)
-        
-        # 2. Check eligible badges
-        eligible_badges = self.gamification_service.check_badges(stats)
-        
-        # 3. Check what they already have
-        existing_badges = await self.badge_repo.get_advisor_badges(advisor_id)
-        
-        # 4. Award new ones
-        for badge_id in eligible_badges:
-            if badge_id not in existing_badges:
-                awarded = await self.badge_repo.award_badge(advisor_id, badge_id)
-                if awarded:
-                    logger.info(f'Gamification: Advisor {advisor_id} earned badge {badge_id}!')
+                # Trigger background task to evaluate badges without blocking API
+                await self.task_queue.enqueue('run_evaluate_badges_task', advisor_id=str(advisor_id))

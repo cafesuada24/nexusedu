@@ -125,10 +125,40 @@ async def run_dispatch_email_task(
     # Mock success
     return None
 
+async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None:
+    """Worker task to evaluate and award achievement badges for an advisor."""
+    logger.info(f'Worker: Evaluating badges for advisor {advisor_id}')
+    
+    from src.infrastructure.database.session import get_async_session
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyBadgeRepository
+    from src.domain.services.gamification import GamificationService
+
+    async for session in get_async_session():
+        try:
+            badge_repo = SqlAlchemyBadgeRepository(session)
+            stats = await badge_repo.get_advisor_stats(UUID(advisor_id))
+            
+            gamification = GamificationService()
+            eligible_badges = gamification.check_badges(stats)
+            existing_badges = await badge_repo.get_advisor_badges(UUID(advisor_id))
+            
+            for badge in eligible_badges:
+                if badge not in existing_badges:
+                    await badge_repo.award_badge(UUID(advisor_id), badge)
+            
+            await session.commit()
+            logger.info(f'Worker: Badge evaluation completed for {advisor_id}')
+        except Exception as e:
+            logger.error(f'Worker: Failed to evaluate badges: {e}')
+            await session.rollback()
+            raise
+        break # Only need one session
+
+
 class WorkerSettings:
     """ARQ Worker configuration."""
 
-    functions = [run_email_draft_task, run_agent_task, run_dispatch_email_task]
+    functions = [run_email_draft_task, run_agent_task, run_dispatch_email_task, run_evaluate_badges_task]
     redis_settings = RedisSettings(
         host=config.redis_host,
         port=config.redis_port,
