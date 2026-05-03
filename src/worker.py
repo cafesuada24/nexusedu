@@ -14,6 +14,7 @@ from src.application.commands.alert_commands import (
 from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
 from src.application.services.agent_metadata import AgentMetadataService
 from src.core.config import config
+from src.core.logger import logger
 from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker
@@ -29,7 +30,6 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetadataRepository,
     SqlAlchemyStudentRepository,
 )
-from src.core.logger import logger
 
 
 async def run_email_draft_task(
@@ -50,7 +50,6 @@ async def run_email_draft_task(
         case_repo = SqlAlchemyCaseRepository(session)
         email_repo = SqlAlchemyEmailRepository(session)
         job_repo = SqlAlchemyJobRepository(session)
-        idempotency_repo = SqlAlchemyIdempotencyRepository(session)
 
         # Domain Service
         gamification_service = GamificationService()
@@ -67,7 +66,6 @@ async def run_email_draft_task(
             alert_repo=alert_repo,
             advisor_repo=advisor_repo,
             job_repo=job_repo,
-            idempotency_repo=idempotency_repo,
             gamification_service=gamification_service,
             task_queue=task_queue,
             email_drafting_service=BamlEmailDraftingService(),
@@ -86,7 +84,7 @@ async def run_email_draft_task(
 
 
 async def run_agent_task(
-    _ctx: dict[Any, Any],
+    _: dict[Any, Any],
     job_id: str,
     query: str,
     thread_id: str | None,
