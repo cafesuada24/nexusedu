@@ -733,7 +733,9 @@ class SqlAlchemyAlertRepository:
     async def get_active_alerts(
         self,
         status_filter: str | None = None,
-    ) -> list[DomainAlert]:
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[DomainAlert], int]:
         """Retrieve students with active alerts for the Kanban board."""
         # Subquery to get latest draft
         subq = (
@@ -763,8 +765,15 @@ class SqlAlchemyAlertRepository:
         if status_filter:
             stmt = stmt.where(Student.intervention_status == status_filter)
 
+        # Count total items
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await self.session.execute(count_stmt)
+        total_count = count_result.scalar() or 0
+
+        # Apply paging
+        stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
-        alerts: list[Alert] = []
+        alerts: list[DomainAlert] = []
         for row in result.all():
             row_tuple = tuple(row)
             orm_student = row_tuple[0]
