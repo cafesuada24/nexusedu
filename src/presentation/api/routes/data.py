@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
+from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
@@ -14,7 +15,6 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.schemas.request import CoreDataSource, DataIngestionRequest
-from src.core.logger import logger
 
 router = APIRouter(prefix='/data', tags=['data'])
 
@@ -55,7 +55,7 @@ async def ingest_data(
                 )
 
 
-        command = DataIngestionCommand(data_sources=data_sources)
+        command = DataIngestionCommand(data_sources=data_sources, auto_generate_draft_email=user.preferences.auto_draft_enabled)
 
         results = await command_handler.handle_ingest_data(command, user.id)
 

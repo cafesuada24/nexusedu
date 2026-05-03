@@ -156,9 +156,6 @@ async def get_alert_command_handler(
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository),
-    ],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     gamification_service: Annotated[
         GamificationService, Depends(get_gamification_service),
@@ -173,7 +170,6 @@ async def get_alert_command_handler(
         case_repo,
         alert_repo,
         advisor_repo,
-        idempotency_repo,
         job_repo,
         gamification_service,
         task_queue,
@@ -198,9 +194,6 @@ async def get_data_command_handler(
     history_repo: Annotated[
         StatusHistoryRepository, Depends(get_status_history_repository),
     ],
-    settings_repo: Annotated[
-        UserSettingsRepository, Depends(get_user_settings_repository),
-    ],
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
@@ -213,7 +206,6 @@ async def get_data_command_handler(
         student_repo,
         activity_repo,
         history_repo,
-        settings_repo,
         case_repo,
         job_repo,
         anomaly_engine,
