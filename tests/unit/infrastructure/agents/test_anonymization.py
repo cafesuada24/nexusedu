@@ -174,7 +174,6 @@ async def test_email_draft_no_pii_to_ai(
         job_repo=AsyncMock(),
         alert_repo=alert_repository,
         advisor_repo=advisor_repository,
-        idempotency_repo=mock_idempotency,
         gamification_service=gamification_service,
         task_queue=mock_task_queue,
         email_drafting_service=mock_email_drafting,

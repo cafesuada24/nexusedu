@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.infrastructure.database.models import Base
+from src.infrastructure.database.models import Base, UserSettings
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
@@ -113,7 +113,7 @@ def mock_agent() -> MagicMock:
 @pytest.fixture
 def mock_user() -> User:
     """Provides a mock authenticated User with admin role."""
-    return User(
+    user = User(
         id=uuid.uuid4(),
         email='test@example.com',
         hashed_password='hashed_password',
@@ -122,6 +122,8 @@ def mock_user() -> User:
         is_superuser=False,
         is_verified=True,
     )
+    user.preferences = UserSettings(auto_draft_enabled=True)
+    return user
 
 
 @pytest.fixture
