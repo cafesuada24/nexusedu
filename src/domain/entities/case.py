@@ -24,6 +24,7 @@ class TaskItemRecord:
     """Represents a task for an advisor."""
 
     case_id: UUID
+    sid: UUID
     created_at: datetime
     assigned_advisor_id: UUID | None
     student_name: str | None
