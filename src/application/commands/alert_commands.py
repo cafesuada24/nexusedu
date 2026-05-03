@@ -1,6 +1,7 @@
 """Command handlers for alert-related operations."""
 
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID, uuid4
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
@@ -82,6 +83,7 @@ class AlertCommandHandler:
         gamification_service: GamificationService,
         task_queue: BackgroundTaskQueue,
         email_drafting_service: EmailDraftingService | None = None,
+        badge_repo: Any | None = None,
     ) -> None:
         """Initialize the handler with required dependencies."""
         self.student_repo = student_repo
@@ -93,6 +95,7 @@ class AlertCommandHandler:
         self.gamification_service = gamification_service
         self.email_drafting_service = email_drafting_service
         self.task_queue = task_queue
+        self.badge_repo = badge_repo
 
     async def handle_update_status(self, command: UpdateStudentStatusCommand) -> None:
         """Execute the status update command."""
@@ -309,3 +312,6 @@ class AlertCommandHandler:
         )
         if points > 0:
             await self.advisor_repo.record_points(advisor_id, sid, action_type, points)
+            if self.badge_repo:
+                # Trigger background task to evaluate badges without blocking API
+                await self.task_queue.enqueue('run_evaluate_badges_task', advisor_id=str(advisor_id))

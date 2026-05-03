@@ -150,6 +150,16 @@ async def get_anomaly_engine() -> AnomalyEngine:
     return ZScore()
 
 
+from src.domain.repositories.badge_repository import BadgeRepository
+
+async def get_badge_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> BadgeRepository:
+    """Dependency provider for the BadgeRepository."""
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyBadgeRepository
+    return SqlAlchemyBadgeRepository(session)
+
+
 async def get_alert_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
@@ -161,6 +171,7 @@ async def get_alert_command_handler(
         GamificationService, Depends(get_gamification_service),
     ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+    badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
 ) -> AlertCommandHandler:
     """Dependency provider for the AlertCommandHandler."""
     task_queue = ArqTaskQueueAdapter(arq_pool)
@@ -174,6 +185,7 @@ async def get_alert_command_handler(
         gamification_service,
         task_queue,
         email_drafting_service=BamlEmailDraftingService(),
+        badge_repo=badge_repo,
     )
 
 

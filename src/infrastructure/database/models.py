@@ -164,6 +164,30 @@ class AdvisorPointsLedger(Base):
     )
 
 
+class AdvisorBadge(Base):
+    """Registry of achievement badges earned by advisors."""
+
+    __tablename__ = 'advisor_badges'
+    __table_args__ = (
+        UniqueConstraint('advisor_id', 'badge_id', name='uq_advisor_badge'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    advisor_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('advisors.advisor_id'),
+    )
+    badge_id: Mapped[str] = mapped_column(String)
+    awarded_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+
+
 class InterventionEmail(Base):
     """Record of intervention emails drafted or sent to students."""
 

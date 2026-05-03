@@ -70,3 +70,41 @@ class GamificationService:
             sla_multiplier = 0.8  # Penalty for taking longer than 72h
 
         return int(points_after_risk * sla_multiplier)
+
+    def check_badges(self, advisor_stats: dict) -> list[str]:
+        """Check which badges the advisor qualifies for based on their stats.
+
+        Expected stats dict:
+            total_points: int
+            fast_action_count: int
+            avg_response_hours: float
+            total_actions: int
+            recovery_rate: float
+            total_resolves: int
+        """
+        earned_badges = []
+
+        total_points = advisor_stats.get('total_points', 0)
+        fast_action_count = advisor_stats.get('fast_action_count', 0)
+        avg_response_hours = advisor_stats.get('avg_response_hours', 999.0)
+        total_actions = advisor_stats.get('total_actions', 0)
+        recovery_rate = advisor_stats.get('recovery_rate', 0.0)
+        total_resolves = advisor_stats.get('total_resolves', 0)
+
+        if fast_action_count >= 3:
+            earned_badges.append('speed_demon')
+            
+        if total_points >= 100:
+            earned_badges.append('century_club')
+            
+        if total_points >= 500:
+            earned_badges.append('five_hundred')
+            
+        if total_actions >= 5 and avg_response_hours < 4.0:
+            earned_badges.append('fastest_avg_response')
+            
+        if total_resolves >= 5 and recovery_rate > 0.8:
+            earned_badges.append('highest_recovery_rate')
+
+        return earned_badges
+

@@ -32,6 +32,7 @@ from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
     Advisor,
+    AdvisorBadge,
     AdvisorPointsLedger,
     BackgroundJobTracker,
     IdempotencyKey,
@@ -442,6 +443,92 @@ class SqlAlchemyIdempotencyRepository:
         self.session.add(entry)
         # await self.session.commit() removed
 
+
+class SqlAlchemyBadgeRepository:
+    """SQLAlchemy implementation of the BadgeRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def get_advisor_badges(self, advisor_id: uuid.UUID) -> list[str]:
+        stmt = select(AdvisorBadge.badge_id).where(AdvisorBadge.advisor_id == advisor_id)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def award_badge(self, advisor_id: uuid.UUID, badge_id: str) -> bool:
+        stmt = select(AdvisorBadge).where(
+            AdvisorBadge.advisor_id == advisor_id,
+            AdvisorBadge.badge_id == badge_id
+        )
+        existing = (await self.session.execute(stmt)).first()
+        if existing:
+            return False
+
+        entry = AdvisorBadge(advisor_id=advisor_id, badge_id=badge_id)
+        self.session.add(entry)
+        return True
+
+    async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
+        # Get total points and action count
+        stmt = select(
+            func.sum(AdvisorPointsLedger.points),
+            func.count(AdvisorPointsLedger.id)
+        ).where(AdvisorPointsLedger.advisor_id == advisor_id)
+        
+        row = (await self.session.execute(stmt)).first()
+        total_points = row[0] or 0
+        total_actions = row[1] or 0
+
+        # Get resolves
+        stmt_resolves = select(func.count(AdvisorPointsLedger.id)).where(
+            AdvisorPointsLedger.advisor_id == advisor_id,
+            AdvisorPointsLedger.action_type == 'student_resolved'
+        )
+        total_resolves = (await self.session.execute(stmt_resolves)).scalar() or 0
+
+        # Fast actions (Approximate: assuming >10 points per action often means fast SLA multiplier was hit, 
+        # Calculate real response metrics by comparing case creation vs action time
+        stmt_times = (
+            select(OrmCase.created_at, AdvisorPointsLedger.timestamp)
+            .join(
+                AdvisorPointsLedger,
+                (OrmCase.sid == AdvisorPointsLedger.sid) &
+                (OrmCase.assigned_advisor_id == AdvisorPointsLedger.advisor_id)
+            )
+            .where(OrmCase.assigned_advisor_id == advisor_id)
+        )
+        time_pairs = (await self.session.execute(stmt_times)).all()
+
+        total_hours = 0.0
+        fast_action_count = 0
+        valid_pairs = 0
+        for created_at, action_time in time_pairs:
+            if created_at and action_time:
+                delta_hours = (action_time.replace(tzinfo=None) - created_at.replace(tzinfo=None)).total_seconds() / 3600.0
+                if delta_hours < 0:
+                    delta_hours = 0.0
+                total_hours += delta_hours
+                valid_pairs += 1
+                if delta_hours <= 12.0:
+                    fast_action_count += 1
+
+        avg_response_hours = total_hours / valid_pairs if valid_pairs > 0 else 999.0
+
+        # Get total cases assigned
+        stmt_cases = select(func.count(OrmCase.case_id)).where(
+            OrmCase.assigned_advisor_id == advisor_id
+        )
+        total_cases = (await self.session.execute(stmt_cases)).scalar() or 0
+        recovery_rate = total_resolves / total_cases if total_cases > 0 else 0.0
+
+        return {
+            'total_points': total_points,
+            'fast_action_count': fast_action_count,
+            'avg_response_hours': avg_response_hours,
+            'total_actions': total_actions,
+            'recovery_rate': recovery_rate,
+            'total_resolves': total_resolves,
+        }
 
 class SqlAlchemyMetadataRepository:
     """SQLAlchemy implementation for metadata retrieval."""
