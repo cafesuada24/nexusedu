@@ -85,6 +85,8 @@ def mock_arq_pool(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Mock ARQ Redis pool creation."""
     mock_pool = AsyncMock()
     mock_pool.enqueue_job = AsyncMock(return_value=MagicMock(job_id='test_job_id'))
+    mock_pool.get = AsyncMock(return_value=None)
+    mock_pool.setex = AsyncMock(return_value=True)
 
     monkeypatch.setattr(
         'src.presentation.api.lifecycle.create_pool',
