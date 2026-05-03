@@ -209,29 +209,23 @@ const INGEST_TIMEOUT_MS = 60_000;
 const TOKEN_STORAGE_KEY = "nexusedu:auth:token";
 
 function getApiBase(): string {
-    const env =
-        typeof process !== "undefined"
-            ? (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined)
-            : undefined;
+    // On the client, we MUST use the relative proxy path so that proxy.ts can
+    // intercept the request, extract the httpOnly cookie, and inject the Bearer token.
+    if (typeof window !== "undefined") {
+        return "/api/v1";
+    }
 
+    // On the server, we can talk directly to the backend URL to avoid double-proxying.
+    const env = process.env.NEXT_PUBLIC_API_BASE_URL;
     if (env && env.trim()) {
         const base = env.trim().replace(/\/+$/, "");
-        // If we're on the server and the base is relative, we need to make it absolute.
-        // However, it's better to use a dedicated server-only env var or a known backend URL.
-        if (typeof window === "undefined" && base.startsWith("/")) {
-            // Fallback to localhost if we're in a relative proxy mode but on the server
+        if (base.startsWith("/")) {
             return `http://localhost:8000${base}`;
         }
         return base;
     }
 
-    // Default to the documented base path.
-    // On the server, we must use an absolute URL.
-    if (typeof window === "undefined") {
-        return "http://localhost:8000/api/v1";
-    }
-
-    return "/api/v1";
+    return "http://localhost:8000/api/v1";
 }
 
 export function endpoint(path: string): string {
@@ -303,10 +297,11 @@ export async function logout() {
  */
 export async function authFetch(
     url: string,
-    opts: RequestInit = {},
+    opts: RequestInit & { suppressUnauthorizedEvent?: boolean } = {},
     signal?: AbortSignal,
 ): Promise<Response> {
-    const headers = new Headers(opts.headers || undefined);
+    const { suppressUnauthorizedEvent, ...fetchOpts } = opts;
+    const headers = new Headers(fetchOpts.headers || undefined);
     headers.set("Accept", headers.get("Accept") || "application/json");
 
     // On the server, we must manually inject the token from cookies
@@ -320,15 +315,18 @@ export async function authFetch(
     // for all requests to /api/v1/*
 
     const merged: RequestInit = {
-        ...opts,
+        ...fetchOpts,
         headers,
-        signal: opts.signal ?? signal,
+        signal: fetchOpts.signal ?? signal,
     };
 
     const res = await fetch(url, merged);
 
-    if (res.status === 401) {
+    if (res.status === 401 && !suppressUnauthorizedEvent) {
         warnLog("authFetch: 401 Unauthorized", url);
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("nexusedu:unauthorized"));
+        }
     }
 
     return res;
@@ -339,7 +337,6 @@ export async function authFetch(
 /* ----------------------------------------------------------------------- */
 
 function warnLog(...args: any[]) {
-    // eslint-disable-next-line no-console
     console.warn("[lib/api]", ...args);
 }
 
@@ -401,7 +398,7 @@ export async function register(email: string, password: string): Promise<any> {
  */
 export async function getCurrentUser(): Promise<UserRead | null> {
     const res = await withTimeout(
-        (signal) => authFetch(endpoint("/users/me"), { method: "GET" }, signal),
+        (signal) => authFetch(endpoint("/users/me"), { method: "GET", suppressUnauthorizedEvent: true }, signal),
         DEFAULT_TIMEOUT_MS,
     );
 

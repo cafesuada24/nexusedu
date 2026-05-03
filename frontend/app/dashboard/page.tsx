@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Upload, LineChart, BellRing, LayoutDashboard } from "lucide-react"
+import { Upload, LayoutDashboard, BellRing } from "lucide-react"
 import { SuccessCaseStudies } from "@/components/dashboard/success-case-studies"
 import { Button } from "@/components/ui/button"
 

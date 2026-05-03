@@ -3,16 +3,11 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { useQueryClient } from "@tanstack/react-query"
-import {
-  login as apiLogin,
-  logout as apiLogout,
-  type UserRead,
-} from "@/lib/api"
+import { type UserRead } from "@/lib/api"
 import { useProfile } from "@/hooks/use-profile"
+import { loginAction, logoutAction } from "@/app/actions/auth"
 
 function warnLog(...args: any[]) {
-  // eslint-disable-next-line no-console
   console.warn("[hooks/use-auth]", ...args)
 }
 
@@ -29,7 +24,6 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const queryClient = useQueryClient()
   
   // Use TanStack Query for profile management
   const { data: user, isLoading, refetch, isFetched, error } = useProfile()
@@ -37,40 +31,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Explicitly handle session expiration (401)
   React.useEffect(() => {
     if (isFetched && !user && !isLoading) {
-       // If we were on a protected route, the middleware would have redirected us.
-       // But if we are already here and the profile fetch fails, we might want to clear state.
        if (error) {
          warnLog("Session invalid or fetch failed", error)
        }
     }
   }, [isFetched, user, isLoading, error])
 
+  const isLoggingOut = React.useRef(false);
+
+  const logout = React.useCallback(async () => {
+    if (isLoggingOut.current) return;
+    isLoggingOut.current = true;
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("nexusedu:auth:token");
+      }
+      await logoutAction()
+      
+      // HARD BREAK: Use window.location.href instead of router.push.
+      // This forcefully unloads the React app and stops all active TanStack Query refetches.
+      toast.success("Đã đăng xuất")
+      window.location.href = "/login"
+    } catch (error: any) {
+      toast.error("Lỗi khi đăng xuất")
+      warnLog("Logout error", error)
+    } finally {
+      isLoggingOut.current = false;
+    }
+  }, [])
+
+  // Global unauthorized listener
+  React.useEffect(() => {
+    const handleUnauthorized = () => {
+      warnLog("Global unauthorized event detected, logging out...")
+      logout()
+    }
+
+    window.addEventListener("nexusedu:unauthorized", handleUnauthorized)
+    return () => window.removeEventListener("nexusedu:unauthorized", handleUnauthorized)
+  }, [logout])
+
   const login = async (username: string, password: string) => {
     try {
-      const result = await apiLogin(username, password)
+      const result = await loginAction(username, password)
       if (result?.success) {
         // After login, re-fetch profile to update cache and context
         await refetch()
         toast.success("Đăng nhập thành công")
         router.push("/dashboard")
-        }
-        } catch (error: any) {      toast.error(error.message || "Đăng nhập thất bại")
+      } else {
+        toast.error(result?.error || "Đăng nhập thất bại")
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Đăng nhập thất bại")
       throw error
     }
   }
-
-  const logout = React.useCallback(async () => {
-    try {
-      await apiLogout()
-      // Clear all queries to remove user-specific data from cache
-      queryClient.clear()
-      toast.success("Đã đăng xuất")
-      router.push("/login")
-    } catch (error: any) {
-      toast.error("Lỗi khi đăng xuất")
-      warnLog("Logout error", error)
-    }
-  }, [router, queryClient])
 
   const value = React.useMemo(
     () => ({
