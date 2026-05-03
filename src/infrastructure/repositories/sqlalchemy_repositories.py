@@ -487,13 +487,32 @@ class SqlAlchemyBadgeRepository:
         total_resolves = (await self.session.execute(stmt_resolves)).scalar() or 0
 
         # Fast actions (Approximate: assuming >10 points per action often means fast SLA multiplier was hit, 
-        # or we just mock fast_action_count for now since historical SLA delta is not stored)
-        # A proper implementation would join StudentStatusHistory and compare timestamps.
-        # For phase 1, let's just do a basic fast action mock based on recent actions
-        stmt_fast = select(func.count(AdvisorPointsLedger.id)).where(
-            AdvisorPointsLedger.advisor_id == advisor_id
+        # Calculate real response metrics by comparing case creation vs action time
+        stmt_times = (
+            select(OrmCase.created_at, AdvisorPointsLedger.timestamp)
+            .join(
+                AdvisorPointsLedger,
+                (OrmCase.sid == AdvisorPointsLedger.sid) &
+                (OrmCase.assigned_advisor_id == AdvisorPointsLedger.advisor_id)
+            )
+            .where(OrmCase.assigned_advisor_id == advisor_id)
         )
-        fast_action_count = (await self.session.execute(stmt_fast)).scalar() or 0 # Simplified
+        time_pairs = (await self.session.execute(stmt_times)).all()
+
+        total_hours = 0.0
+        fast_action_count = 0
+        valid_pairs = 0
+        for created_at, action_time in time_pairs:
+            if created_at and action_time:
+                delta_hours = (action_time.replace(tzinfo=None) - created_at.replace(tzinfo=None)).total_seconds() / 3600.0
+                if delta_hours < 0:
+                    delta_hours = 0.0
+                total_hours += delta_hours
+                valid_pairs += 1
+                if delta_hours <= 24.0:
+                    fast_action_count += 1
+
+        avg_response_hours = total_hours / valid_pairs if valid_pairs > 0 else 999.0
 
         # Get total cases assigned
         stmt_cases = select(func.count(OrmCase.case_id)).where(
@@ -501,9 +520,6 @@ class SqlAlchemyBadgeRepository:
         )
         total_cases = (await self.session.execute(stmt_cases)).scalar() or 0
         recovery_rate = total_resolves / total_cases if total_cases > 0 else 0.0
-
-        # Avg response hours (simplified mock: 3.5 hours if actions exist)
-        avg_response_hours = 3.5 if total_actions > 0 else 999.0
 
         return {
             'total_points': total_points,
