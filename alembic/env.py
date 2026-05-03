@@ -10,7 +10,6 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from src.core.config import config as cfg
 
 # Ensure we don't trigger production-only checks during migrations
 os.environ.setdefault('ENVIRONMENT', 'development')
@@ -23,7 +22,10 @@ config = context.config
 
 # Override sqlalchemy.url from the same env var used by the app
 
-config.set_main_option('sqlalchemy.url', cfg.database_url)
+config.set_main_option(
+    'sqlalchemy.url',
+    os.getenv('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db'),
+)
 
 # Setup Python logging from the ini file
 if config.config_file_name is not None:

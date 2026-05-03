@@ -138,14 +138,6 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
     [auth_backend],
 )
 
-
-async def current_active_user() -> User | None:
-    user = await fastapi_users.current_user(active=True)()
-    if user is None:
-        return None
-    return user
-
-
 current_active_user: Callable[..., User] = fastapi_users.current_user(active=True)
 
 

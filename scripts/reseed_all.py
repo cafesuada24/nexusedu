@@ -26,8 +26,6 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
 )
-
-
 from src.presentation.api.auth import SQLAlchemyUserDatabase, UserManager, UserRole
 from src.presentation.schemas.auth import UserCreate
 
@@ -76,31 +74,17 @@ async def reseed() -> None:
         session.add_all(advisors)
         session.add_all(students)
         session.add_all(activities)
-        
-        # Create default admin user
-        print('Creating default admin user (admin@example.com / password123)...')
-        from src.infrastructure.repositories.sqlalchemy_repositories import (
-            SqlAlchemyUserSettingsRepository,
-        )
-        user_db = SQLAlchemyUserDatabase(session, User)
-        settings_repo = SqlAlchemyUserSettingsRepository(session)
-        user_manager = UserManager(user_db, settings_repo)
-        user = await user_manager.create(
-            UserCreate(email='admin@example.com', password='password123'),
-            safe=True
-        )
->>>>
-<<<<
+
         # Create default admin user
         print('Creating default admin user (admin@example.com / password123)...')
         user_db = SQLAlchemyUserDatabase(session, User)
         user_manager = UserManager(user_db)
         user = await user_manager.create(
-            UserCreate(email='admin@example.com', password='password123'),
-            safe=True
+            UserCreate(email='admin@example.com', password='password123'), safe=True
         )
         # Update role to admin
         from sqlalchemy import update
+
         await session.execute(
             update(User).where(User.id == user.id).values(role=UserRole.ADMIN.value)
         )
@@ -163,7 +147,9 @@ async def reseed() -> None:
             else:
                 await student_repo.update_risk_status(sid, risk_status=latest_risk)
 
-        print(f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk.")
+        print(
+            f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk."
+        )
 
         print('Seeding advisor points ledger...')
         actions = [
