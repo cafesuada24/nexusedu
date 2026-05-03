@@ -8,9 +8,10 @@ from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.commands.agent_commands import AgentCommandHandler
-from src.application.commands.alert_commands import AlertCommandHandler
+from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.queries.alert_queries import AlertQueryHandler
+from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -160,11 +161,39 @@ async def get_badge_repository(
     return SqlAlchemyBadgeRepository(session)
 
 
-async def get_alert_command_handler(
+# async def get_alert_command_handler(
+#     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
+#     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+#     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
+#     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
+#     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+#     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
+#     gamification_service: Annotated[
+#         GamificationService, Depends(get_gamification_service),
+#     ],
+#     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+#     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
+# ) -> AlertCommandHandler:
+#     """Dependency provider for the AlertCommandHandler."""
+#     task_queue = ArqTaskQueueAdapter(arq_pool)
+#     return AlertCommandHandler(
+#         student_repo,
+#         email_repo,
+#         case_repo,
+#         alert_repo,
+#         advisor_repo,
+#         job_repo,
+#         gamification_service,
+#         task_queue,
+#         email_drafting_service=BamlEmailDraftingService(),
+#         badge_repo=badge_repo,
+#     )
+
+
+async def get_case_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-    alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     gamification_service: Annotated[
@@ -172,14 +201,13 @@ async def get_alert_command_handler(
     ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
-) -> AlertCommandHandler:
-    """Dependency provider for the AlertCommandHandler."""
+) -> CaseCommandHandler:
+    """Dependency provider for the CaseCommandHandler."""
     task_queue = ArqTaskQueueAdapter(arq_pool)
-    return AlertCommandHandler(
+    return CaseCommandHandler(
         student_repo,
         email_repo,
         case_repo,
-        alert_repo,
         advisor_repo,
         job_repo,
         gamification_service,
@@ -193,11 +221,19 @@ async def get_alert_query_handler(
     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
-    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
 ) -> AlertQueryHandler:
     """Dependency provider for the AlertQueryHandler."""
-    return AlertQueryHandler(alert_repo, email_repo, student_repo, job_repo, case_repo)
+    return AlertQueryHandler(alert_repo, email_repo, student_repo)
+
+
+async def get_case_query_handler(
+    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
+    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
+) -> CaseQueryHandler:
+    """Dependency provider for the CaseQueryHandler."""
+    return CaseQueryHandler(email_repo, student_repo, job_repo, case_repo)
 
 
 async def get_data_command_handler(
@@ -209,8 +245,8 @@ async def get_data_command_handler(
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
-    alert_command_handler: Annotated[
-        AlertCommandHandler, Depends(get_alert_command_handler),
+    case_command_handler: Annotated[
+        CaseCommandHandler, Depends(get_case_command_handler),
     ],
 ) -> DataCommandHandler:
     """Dependency provider for the DataCommandHandler."""
@@ -221,7 +257,7 @@ async def get_data_command_handler(
         case_repo,
         job_repo,
         anomaly_engine,
-        alert_command_handler,
+        case_command_handler,
     )
 
 
