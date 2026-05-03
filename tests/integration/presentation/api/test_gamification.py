@@ -30,7 +30,7 @@ async def test_draft_review_points(
     case_repository: CaseRepository,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify that /alerts/cases/{cid}/draft/review awards 7 points for a Critical student (<12h)."""
+    """Verify that /cases/{cid}/draft/review awards 7 points for a Critical student (<12h)."""
     sid = uuid4()
     cid = uuid4()
     await student_repository.ingest_students(
@@ -56,7 +56,7 @@ async def test_draft_review_points(
     )
     await test_db_session.commit()
 
-    response = client.post(f'/api/v1/alerts/cases/{cid}/draft/review')
+    response = client.post(f'/api/v1/cases/{cid}/email/draft/review')
     assert response.status_code == 200
     assert response.json()['status'] == 'success'
 
@@ -93,11 +93,11 @@ async def test_idempotency_prevents_duplicate_review_points(
     headers = {'Idempotency-Key': idemp_key}
 
     # Act 1: First request (Should succeed and award points)
-    resp1 = client.post(f'/api/v1/alerts/cases/{cid}/draft/review', headers=headers)
+    resp1 = client.post(f'/api/v1/cases/{cid}/email/draft/review', headers=headers)
     assert resp1.status_code == 200
 
     # Act 2: Second request with IDENTICAL key (Should succeed but NOT award points)
-    resp2 = client.post(f'/api/v1/alerts/cases/{cid}/draft/review', headers=headers)
+    resp2 = client.post(f'/api/v1/cases/{cid}/email/draft/review', headers=headers)
     assert resp2.status_code == 200
     assert (
         'already triggered (idempotent)' in resp2.json()['message']
@@ -137,10 +137,10 @@ async def test_duplicate_action_guard_prevents_double_points(
     await test_db_session.commit()
 
     # Act: Two requests WITHOUT Idempotency-Key
-    resp1 = client.post(f'/api/v1/alerts/cases/{cid}/draft/review')
+    resp1 = client.post(f'/api/v1/cases/{cid}/email/draft/review')
     assert resp1.status_code == 200
 
-    resp2 = client.post(f'/api/v1/alerts/cases/{cid}/draft/review')
+    resp2 = client.post(f'/api/v1/cases/{cid}/email/draft/review')
     assert resp2.status_code == 200
 
     # Assert: Only ONE ledger entry should exist
@@ -191,7 +191,7 @@ async def test_email_sent_points(
     key = str(uuid4())
     headers = {'Idempotency-Key': key}
     response = client.post(
-        f'/api/v1/alerts/cases/{cid}/send',
+        f'/api/v1/cases/{cid}/email/send',
         json={'body': 'test'},
         headers=headers,
     )
@@ -230,9 +230,9 @@ async def test_status_change_points(
     await student_repository.session.commit()
 
     # Booked
-    client.patch(f'/api/v1/alerts/cases/{cid}/status', json={'status': 'booked'})
+    client.patch(f'/api/v1/cases/{cid}/status', json={'status': 'booked'})
     # Resolved
-    client.patch(f'/api/v1/alerts/cases/{cid}/status', json={'status': 'resolved'})
+    client.patch(f'/api/v1/cases/{cid}/status', json={'status': 'resolved'})
 
     from sqlalchemy import select
 
@@ -342,10 +342,10 @@ async def test_response_time_bonus(
     await test_db_session.commit()
 
     # Trigger action for all
-    client.post(f'/api/v1/alerts/cases/{cid_fast}/draft/review')
-    client.post(f'/api/v1/alerts/cases/{cid_mid}/draft/review')
-    client.post(f'/api/v1/alerts/cases/{cid_slow}/draft/review')
-    client.post(f'/api/v1/alerts/cases/{cid_penalty}/draft/review')
+    client.post(f'/api/v1/cases/{cid_fast}/email/draft/review')
+    client.post(f'/api/v1/cases/{cid_mid}/email/draft/review')
+    client.post(f'/api/v1/cases/{cid_slow}/email/draft/review')
+    client.post(f'/api/v1/cases/{cid_penalty}/email/draft/review')
 
     from sqlalchemy import select
 

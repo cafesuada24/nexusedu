@@ -29,12 +29,12 @@ def mock_engine():
 
 
 @pytest.fixture
-def mock_alert_handler():
+def mock_case_handler():
     return MagicMock()
 
 
 @pytest.fixture
-def handler(mock_repos, mock_engine, mock_alert_handler):
+def handler(mock_repos, mock_engine, mock_case_handler):
     # Initialize all awaited methods as AsyncMock
     mock_repos['activity'].get_weekly_averages = AsyncMock()
     mock_repos['history'].get_all_history = AsyncMock()
@@ -44,7 +44,7 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
     mock_repos['case'].create_case = AsyncMock()
     mock_repos['case'].get_active_case = AsyncMock()
 
-    mock_alert_handler.handle_trigger_draft = AsyncMock()
+    mock_case_handler.handle_trigger_draft = AsyncMock()
 
     return DataCommandHandler(
         student_repo=mock_repos['student'],
@@ -53,7 +53,7 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
         case_repo=mock_repos['case'],
         job_repo=mock_repos['job'],
         anomaly_engine=mock_engine,
-        alert_command_handler=mock_alert_handler,
+        case_command_handler=mock_case_handler,
     )
 
 

@@ -134,7 +134,7 @@ async def test_auth_rbac_advisor_vs_viewer(
     v_token = v_login.json()['access_token']
     # Use case-centric route
     v_resp = raw_client.patch(
-        f'/api/v1/alerts/cases/{uuid.uuid4()}/status',
+        f'/api/v1/cases/{uuid.uuid4()}/status',
         json={'status': 'sent'},
         headers={'Authorization': f'Bearer {v_token}'},
     )
@@ -147,7 +147,7 @@ async def test_auth_rbac_advisor_vs_viewer(
     )
     a_token = a_login.json()['access_token']
     a_resp = raw_client.patch(
-        f'/api/v1/alerts/cases/{uuid.uuid4()}/status',
+        f'/api/v1/cases/{uuid.uuid4()}/status',
         json={'status': 'sent'},
         headers={'Authorization': f'Bearer {a_token}'},
     )

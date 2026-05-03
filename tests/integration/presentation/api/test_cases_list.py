@@ -1,11 +1,13 @@
-import pytest
 from uuid import uuid4
-from starlette.testclient import TestClient
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.testclient import TestClient
 
 from src.domain.entities.case import Case, CaseStatus
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.student_repository import StudentRepository
+
 
 @pytest.mark.asyncio
 async def test_get_task_list(
@@ -18,7 +20,7 @@ async def test_get_task_list(
     sid = uuid4()
     cid = uuid4()
     adv_id = uuid4()
-    
+
     # 1. Ingest a student
     await student_repository.ingest_students(
         [
@@ -28,11 +30,11 @@ async def test_get_task_list(
                 'email': 'task@test.com',
                 'current_risk_status': 'Critical',
                 'intervention_status': 'notified',
-                'major': 'CS'
+                'major': 'CS',
             },
         ]
     )
-    
+
     # 2. Create a case
     await case_repository.create_case(
         Case(case_id=cid, sid=sid, status=CaseStatus.OPEN)
@@ -42,6 +44,7 @@ async def test_get_task_list(
 
     # 3. Add an email draft to see it join
     from src.infrastructure.database.models import InterventionEmail
+
     test_db_session.add(
         InterventionEmail(
             email_id=uuid4(),
@@ -55,14 +58,14 @@ async def test_get_task_list(
     await test_db_session.commit()
 
     # 4. Fetch tasks
-    response = client.get('/api/v1/alerts/tasks')
+    response = client.get('/api/v1/cases')
     assert response.status_code == 200
-    
+
     data = response.json()
     assert 'items' in data
     assert 'metadata' in data
     assert len(data['items']) == 1
-    
+
     task = data['items'][0]
     assert task['case_id'] == str(cid)
     assert task['assigned_advisor_id'] == str(adv_id)
@@ -71,7 +74,7 @@ async def test_get_task_list(
     assert task['draft_subject'] == 'Draft Subj'
     assert task['draft_body'] == 'Draft Body'
     assert task['draft_status'] == 'draft'
-    
+
     # GamificationService: 10 base * 1.0 risk * 1.5 SLA = 15 points
     assert task['points_reward'] == 15
 
@@ -82,7 +85,7 @@ async def test_get_task_list_empty(
     test_db_session: AsyncSession,
 ) -> None:
     """Verify that an empty task list returns successfully."""
-    response = client.get('/api/v1/alerts/tasks')
+    response = client.get('/api/v1/cases')
     assert response.status_code == 200
     data = response.json()
     assert data['items'] == []
@@ -98,20 +101,20 @@ async def test_assign_case_idempotency(
     cid = uuid4()
     adv_1 = uuid4()
     adv_2 = uuid4()
-    
+
     # 1. Create a case
     await case_repository.create_case(
         Case(case_id=cid, sid=sid, status=CaseStatus.OPEN)
     )
-    
+
     # 2. First assignment should succeed
     success_1 = await case_repository.assign_case(cid, adv_1)
     assert success_1 is True
-    
+
     # 3. Second assignment to a different advisor should fail
     success_2 = await case_repository.assign_case(cid, adv_2)
     assert success_2 is False
-    
+
     # 4. Verify original advisor is still assigned
     case = await case_repository.get_by_id(cid)
     assert case.assigned_advisor_id == adv_1
