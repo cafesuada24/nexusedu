@@ -3,13 +3,33 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import get_advisor_repository
+from src.presentation.schemas.response import PaginationMetadata
 from src.core.logger import logger
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
+
+
+class LeaderboardEntry(BaseModel):
+    """Schema for a single entry in the advisor leaderboard."""
+
+    advisor_id: str = Field(..., description='Unique advisor identifier.')
+    name: str = Field(..., description='Advisor name.')
+    total_points: int = Field(..., description='Total points earned.')
+    actions_count: int = Field(..., description='Total actions taken.')
+    sent_count: int = Field(..., description='Emails sent.')
+    resolved_count: int = Field(..., description='Students resolved.')
+
+
+class LeaderboardPagedResponse(BaseModel):
+    """Paged response for advisor leaderboard."""
+
+    items: list[LeaderboardEntry]
+    metadata: PaginationMetadata
 
 
 @router.get('/engagement')
@@ -31,7 +51,7 @@ async def get_engagement_metrics(
         ) from e
 
 
-@router.get('/leaderboard')
+@router.get('/leaderboard', response_model=LeaderboardPagedResponse)
 async def get_leaderboard(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
@@ -39,7 +59,9 @@ async def get_leaderboard(
         'all_time',
         pattern='^(weekly|monthly|semester|all_time)$',
     ),
-) -> list[dict[str, Any]]:
+    limit: int = Query(10, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+) -> dict[str, Any]:
     """Retrieve the advisor leaderboard based on gamification points.
 
     Args:
@@ -51,7 +73,28 @@ async def get_leaderboard(
         List of advisors and their scores.
     """
     try:
-        return await advisor_repo.get_leaderboard(time_window)
+        items, total_count = await advisor_repo.get_leaderboard(
+            time_window, limit=limit, offset=offset
+        )
+        return {
+            'items': [
+                {
+                    'advisor_id': str(i['advisor_id']),
+                    'name': i['name'],
+                    'total_points': i['total_points'],
+                    'actions_count': i['actions_count'],
+                    'sent_count': i['sent_count'],
+                    'resolved_count': i['resolved_count'],
+                }
+                for i in items
+            ],
+            'metadata': {
+                'total_count': total_count,
+                'limit': limit,
+                'offset': offset,
+                'has_next': (offset + limit) < total_count,
+            },
+        }
     except Exception as e:
         logger.error(f'Failed to fetch leaderboard: {e}')
         raise HTTPException(
