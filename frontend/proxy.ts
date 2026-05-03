@@ -14,18 +14,24 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 2. Token Injection for API requests
-  // If we are calling the backend API via the rewrite, inject the token from the cookie
-  if (pathname.startsWith("/api/v1") && token) {
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("Authorization", `Bearer ${token}`);
+  // 2. Authenticated user visiting login page
+  if (pathname === "/login" && token) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
 
-    const response = NextResponse.next({
+  // 3. Token Injection & API Proxying
+  if (pathname.startsWith("/api/v1")) {
+    const requestHeaders = new Headers(request.headers);
+    if (token) {
+      requestHeaders.set("Authorization", `Bearer ${token}`);
+    }
+
+    // Pass through to next.config.mjs rewrites with injected headers
+    return NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
-    return response;
   }
 
   return NextResponse.next();
