@@ -110,13 +110,14 @@ export function useUpdateAlertStatus() {
  * Hook to poll draft status for a case.
  */
 export function useDraftStatus(case_id?: string | null) {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: case_id ? queryKeys.cases.draft(case_id) : ["cases", "draft", "none"],
         queryFn: async () => {
             if (!case_id) return null;
             return await fetchDraftStatus(case_id);
         },
-        enabled: !!case_id,
+        enabled: isAuthenticated && !!case_id,
         // Poll only if the query data suggests generation is in progress.
         refetchInterval: (query) => {
             const state = query.state;
