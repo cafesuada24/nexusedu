@@ -11,7 +11,6 @@ export const metadata: Metadata = {
     title: "NexusEdu — Hệ sinh thái AI hỗ trợ đào tạo và quản lý sinh viên",
     description:
         "NexusEdu là nền tảng AI phát hiện sớm sinh viên có nguy cơ, hỗ trợ cố vấn học tập gửi email chăm sóc và đặt lịch tư vấn thông minh.",
-    generator: "v0.app",
     keywords: [
         "NexusEdu",
         "AI giáo dục",
