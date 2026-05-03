@@ -33,7 +33,7 @@ import { useDraftStatus } from "@/hooks/use-alerts";
 import { Progress } from "@/components/ui/progress";
 import {
     type Alert,
-    type AlertStatus,
+    type CaseStatus,
     problemMeta,
     COLUMNS,
     getInitials,
@@ -46,7 +46,7 @@ type KanbanCardProps = {
     onSend: (updated: Alert) => void;
     onEdit: () => void;
     onRemove: () => void;
-    onMove: (status: AlertStatus, message?: string) => void;
+    onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
 };
 
@@ -336,7 +336,7 @@ function CardActions({
     alert: Alert;
     onSend: (updated: Alert) => void;
     onEdit: () => void;
-    onMove: (status: AlertStatus, message?: string) => void;
+    onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     isGenerating?: boolean;
 }) {

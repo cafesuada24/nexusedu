@@ -7,10 +7,11 @@ import { z } from "zod";
  * Endpoints (per src/DEMO_UIXx8/ENDPOINTS.md / frontend/ENDPOINTS_concise.md):
  *   POST   /data/ingest                — push raw test rows (wrapped).
  *   GET    /alerts                     — pull current at-risk students + status.
- *   PATCH  /alerts/{sid}/status        — update a student's intervention status.
- *   POST   /alerts/{sid}/draft         — trigger async draft generation (returns job_id).
+ *   GET    /cases                      — pull unified advisor task list.
+ *   PATCH  /cases/{case_id}/status     — update a case status.
+ *   POST   /cases/{case_id}/draft      — trigger async draft generation (returns job_id).
  *   GET    /jobs/{job_id}              — poll status/result for background jobs.
- *   POST   /alerts/{sid}/send          — send email for student.
+ *   POST   /cases/{case_id}/send       — send email for case.
  *   POST   /query                      — async agent query (returns job_id).
  *   GET    /advisors/leaderboard       — leaderboard by time window.
  *   POST   /auth/register              — register (public)
@@ -52,6 +53,36 @@ export const BackendAlertSchema = z.object({
     active_case_id: z.string().nullable().optional(),
 });
 export type BackendAlert = z.infer<typeof BackendAlertSchema>;
+
+export const TaskItemSchema = z.object({
+    case_id: z.string(),
+    created_at: z.string(),
+    sid: z.string(),
+    assigned_advisor_id: z.string().nullable().optional(),
+    student_name: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    major: z.string(),
+    current_risk_status: BackendRiskStatusSchema,
+    intervention_status: BackendInterventionStatusSchema,
+    draft_subject: z.string().nullable().optional(),
+    draft_body: z.string().nullable().optional(),
+    draft_status: z.string().nullable().optional(),
+    assigned_to: z.string().nullable().optional(),
+    suggested_action: z.string().optional(),
+    points_reward: z.number().optional(),
+});
+export type TaskItem = z.infer<typeof TaskItemSchema>;
+
+export const TaskPagedResponseSchema = z.object({
+    items: z.array(TaskItemSchema),
+    metadata: z.object({
+        total_count: z.number(),
+        limit: z.number(),
+        offset: z.number(),
+        has_next: z.boolean(),
+    }),
+});
+export type TaskPagedResponse = z.infer<typeof TaskPagedResponseSchema>;
 
 export const BackendIngestRowSchema = z.object({
     sid: z.string(),
@@ -460,6 +491,31 @@ export async function fetchAlerts(): Promise<BackendAlert[]> {
 }
 
 /**
+ * Pulls the unified list of tasks for the advisor dashboard.
+ */
+export async function fetchTasks(
+    limit: number = 20,
+    offset: number = 0,
+): Promise<TaskPagedResponse> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                endpoint(`/cases?limit=${limit}&offset=${offset}`),
+                { method: "GET" },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        const message = errorBody.detail || res.statusText;
+        throw new Error(`Không thể lấy danh sách nhiệm vụ: ${message}`);
+    }
+    const data = await res.json();
+    return TaskPagedResponseSchema.parse(data);
+}
+
+/**
  * Pushes a status transition for a single student.
  */
 export async function updateAlertStatus(
@@ -469,7 +525,7 @@ export async function updateAlertStatus(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/status`),
+                endpoint(`/cases/${encodeURIComponent(case_id)}/status`),
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -522,7 +578,7 @@ export async function sendNudge(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/send`),
+                endpoint(`/cases/${encodeURIComponent(case_id)}/email/send`),
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -665,7 +721,7 @@ export async function fetchRetentionTrend(): Promise<RetentionTrendItem[]> {
 }
 
 /**
- * GET /alerts/cases/{case_id}/email — returns the intervention email for a case.
+ * GET /cases/{case_id}/email — returns the intervention email for a case.
  */
 export async function fetchCaseEmail(
     case_id: string,
@@ -673,7 +729,7 @@ export async function fetchCaseEmail(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/email`),
+                endpoint(`/cases/${encodeURIComponent(case_id)}/email`),
                 { method: "GET" },
                 signal,
             ),
@@ -691,7 +747,7 @@ export async function fetchCaseEmail(
 }
 
 /**
- * GET /alerts/cases/{case_id}/draft — returns current draft status and content.
+ * GET /cases/{case_id}/email/draft — returns current draft status and content.
  */
 export async function fetchDraftStatus(
     case_id: string,
@@ -699,7 +755,7 @@ export async function fetchDraftStatus(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/draft`),
+                endpoint(`/cases/${encodeURIComponent(case_id)}/email/draft`),
                 { method: "GET" },
                 signal,
             ),
@@ -715,12 +771,12 @@ export async function fetchDraftStatus(
 }
 
 /**
- * GET /alerts/{sid}/cases — returns historical cases for a student.
+ * GET /cases/student/{sid} — returns historical cases for a student.
  */
 export async function fetchStudentCases(sid: string): Promise<CaseResponse[]> {
     const res = await withTimeout(
         (signal) =>
-            authFetch(endpoint(`/alerts/${encodeURIComponent(sid)}/cases`), {
+            authFetch(endpoint(`/cases/student/${encodeURIComponent(sid)}`), {
                 method: "GET",
             }, signal),
         DEFAULT_TIMEOUT_MS,
@@ -733,12 +789,12 @@ export async function fetchStudentCases(sid: string): Promise<CaseResponse[]> {
 }
 
 /**
- * GET /alerts/cases/{case_id} — returns full details for a case.
+ * GET /cases/{case_id} — returns full details for a case.
  */
 export async function fetchCaseDetails(case_id: string): Promise<CaseDetailsResponse> {
     const res = await withTimeout(
         (signal) =>
-            authFetch(endpoint(`/alerts/cases/${encodeURIComponent(case_id)}`), {
+            authFetch(endpoint(`/cases/${encodeURIComponent(case_id)}`), {
                 method: "GET",
             }, signal),
         DEFAULT_TIMEOUT_MS,
@@ -751,7 +807,7 @@ export async function fetchCaseDetails(case_id: string): Promise<CaseDetailsResp
 }
 
 /**
- * POST /alerts/cases/{case_id}/draft — trigger async draft generation.
+ * POST /cases/{case_id}/draft — trigger async draft generation.
  */
 export async function generateAiDraft(
     case_id: string,
@@ -760,7 +816,7 @@ export async function generateAiDraft(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/alerts/cases/${encodeURIComponent(case_id)}/draft`),
+                endpoint(`/cases/${encodeURIComponent(case_id)}/draft`),
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
