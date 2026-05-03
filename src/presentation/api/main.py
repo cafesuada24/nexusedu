@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.core.config import config
+from src.core.logger import logger
 from src.presentation.api.auth import auth_backend, fastapi_users
 from src.presentation.api.lifecycle import lifespan
 from src.presentation.api.middleware.rate_limit import rate_limit_middleware
@@ -26,7 +27,6 @@ from src.presentation.api.routes import (
     users,
 )
 from src.presentation.schemas.auth import UserCreate, UserRead
-from src.core.logger import logger
 
 app = FastAPI(
     title='Agent Assistant API',
