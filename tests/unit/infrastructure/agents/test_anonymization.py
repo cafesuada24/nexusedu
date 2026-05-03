@@ -8,8 +8,8 @@ from uuid import uuid4
 
 import pytest
 
-from src.application.commands.alert_commands import (
-    AlertCommandHandler,
+from src.application.commands.case_commands import (
+    CaseCommandHandler,
     GenerateEmailDraftCommand,
 )
 from src.application.services.agent_metadata import AgentMetadataService
@@ -167,12 +167,11 @@ async def test_email_draft_no_pii_to_ai(
 
     mock_task_queue = AsyncMock()
 
-    handler = AlertCommandHandler(
+    handler = CaseCommandHandler(
         student_repo=student_repository,
         email_repo=AsyncMock(),
         case_repo=case_repository,
         job_repo=AsyncMock(),
-        alert_repo=alert_repository,
         advisor_repo=advisor_repository,
         gamification_service=gamification_service,
         task_queue=mock_task_queue,

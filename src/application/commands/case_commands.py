@@ -1,16 +1,14 @@
-"""Command handlers for alert-related operations."""
+"""Command handlers for case-related operations."""
 
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID, uuid4
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.core.logger import logger
 from src.domain.repositories.advisor_repository import AdvisorRepository
-from src.domain.repositories.alert_repository import AlertRepository
+from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
-from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
@@ -69,27 +67,25 @@ class SendEmailCommand:
     user_id: UUID
 
 
-class AlertCommandHandler:
-    """Handler for alert-related commands."""
+class CaseCommandHandler:
+    """Handler for case-related commands."""
 
     def __init__(
         self,
         student_repo: StudentRepository,
         email_repo: EmailRepository,
         case_repo: CaseRepository,
-        alert_repo: AlertRepository,
         advisor_repo: AdvisorRepository,
         job_repo: JobRepository,
         gamification_service: GamificationService,
         task_queue: BackgroundTaskQueue,
         email_drafting_service: EmailDraftingService | None = None,
-        badge_repo: Any | None = None,
+        badge_repo: BadgeRepository | None = None,
     ) -> None:
         """Initialize the handler with required dependencies."""
         self.student_repo = student_repo
         self.email_repo = email_repo
         self.case_repo = case_repo
-        self.alert_repo = alert_repo
         self.advisor_repo = advisor_repo
         self.job_repo = job_repo
         self.gamification_service = gamification_service
@@ -110,11 +106,11 @@ class AlertCommandHandler:
             InterventionStatus.RESOLVED,
             InterventionStatus.DISMISSED,
         ):
-            await self.case_repo.update_case_status(case.case_id, command.status)
+            await self.case_repo.update_case_status(case.case_id, CaseStatus.CLOSED)
         elif (
             command.status != InterventionStatus.NONE and case.status != CaseStatus.OPEN
         ):
-            await self.case_repo.update_case_status(case.case_id, CaseStatus.OPEN.value)
+            await self.case_repo.update_case_status(case.case_id, CaseStatus.OPEN)
 
         # Gamification hooks for status changes
         if command.status == InterventionStatus.BOOKED:
@@ -147,8 +143,6 @@ class AlertCommandHandler:
         existing_email = await self.email_repo.get_by_case(case.case_id)
         if existing_email:
             # If already generating or drafted, we might want to skip or just return current job
-            # For now, we'll allow re-triggering by updating status back to generating
-            # but usually, we'd check if it's already 'generating'.
             if existing_email.status.value == 'generating':
                 # Already in progress, just find the job_id
                 active_job = await self.job_repo.get_active_job(
@@ -263,18 +257,17 @@ class AlertCommandHandler:
         )
         await self.email_repo.mark_as_sent(case.case_id, command.body)
         await self.student_repo.update_last_notified(case.sid)
-        
+
         # Auto-assign the case to the advisor who sent the email
         assigned = await self.case_repo.assign_case(command.case_id, command.user_id)
         if not assigned:
             logger.info(
-                f"Case {command.case_id} already assigned. Skipping auto-assignment for advisor {command.user_id}."
+                f'Case {command.case_id} already assigned. Skipping auto-assignment for advisor {command.user_id}.'
             )
 
         # 3. Gamification
         await self._award_points(command.user_id, case.sid, 'email_sent')
 
-        # 4. Queue the actual email dispatch to ARQ worker
         await self.task_queue.enqueue(
             'run_dispatch_email_task',
             case_id=str(case.case_id),
@@ -282,7 +275,7 @@ class AlertCommandHandler:
             target_email=recipient_email,
         )
 
-        # 5. Return recipient email for logging
+        # 4. Return recipient email for dispatching
         return recipient_email
 
     async def _award_points(
