@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import UUID4
 
+from src.application.dtos.pagination_dtos import PagedResult, PaginationMetadata
 from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO, TaskDTO
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.case_repository import CaseRepository
@@ -20,6 +21,8 @@ class GetActiveAlertsQuery:
     """Query to retrieve active alerts."""
 
     status_filter: str | None = None
+    limit: int = 20
+    offset: int = 0
 
 
 @dataclass
@@ -34,6 +37,8 @@ class GetTaskListQuery:
     """Query to retrieve advisor task list."""
 
     advisor_id: UUID4 | None = None
+    limit: int = 20
+    offset: int = 0
 
 
 class AlertQueryHandler:
@@ -55,9 +60,11 @@ class AlertQueryHandler:
 
     async def handle_get_active_alerts(
         self, query: GetActiveAlertsQuery
-    ) -> list[AlertDTO]:
+    ) -> PagedResult[AlertDTO]:
         """Execute the get active alerts query."""
-        domain_alerts = await self.alert_repo.get_active_alerts(query.status_filter)
+        domain_alerts, total_count = await self.alert_repo.get_active_alerts(
+            query.status_filter, limit=query.limit, offset=query.offset
+        )
 
         dtos = []
         for a in domain_alerts:
@@ -65,78 +72,73 @@ class AlertQueryHandler:
             active_case = await self.case_repo.get_active_case(a.student.sid)
             
             is_generating = False
-            if active_case:
-                email = await self.email_repo.get_by_case(active_case.case_id)
-                if email:
-                    is_generating = email.status.value == 'generating'
-
-            dtos.append(
+        return PagedResult(
+            items=[
                 AlertDTO(
                     student=StudentDTO(
-                        sid=a.student.sid,
-                        student_name=a.student.student_name,
-                        email=a.student.email,
-                        major=a.student.major,
-                        current_risk_status=a.student.current_risk_status,
-                        intervention_status=a.student.intervention_status,
-                        last_notified_at=a.student.last_notified_timestamp,
-                        is_generating=is_generating,
-                        active_case_id=active_case.case_id if active_case else None,
+                        sid=alert.student.sid,
+                        student_name=alert.student.student_name,
+                        email=alert.student.email,
+                        major=alert.student.major,
+                        current_risk_status=alert.student.current_risk_status,
+                        intervention_status=alert.student.intervention_status,
+                        last_notified_at=alert.student.last_notified_at,
+                        is_generating=alert.student.is_generating,
+                        active_case_id=alert.student.active_case_id,
                     ),
-                    alert_details=a.alert_details,
+                    alert_details={
+                        "latest_draft_subject": alert.latest_draft_subject,
+                        "latest_draft_body": alert.latest_draft_body,
+                    },
                 )
-            )
-        return dtos
+                for alert in domain_alerts
+            ],
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=query.limit,
+                offset=query.offset,
+                has_next=(query.offset + query.limit) < total_count,
+            ),
+        )
 
-    async def handle_get_task_list(self, query: GetTaskListQuery) -> list[TaskDTO]:
+    async def handle_get_task_list(self, query: GetTaskListQuery) -> PagedResult[TaskDTO]:
         """Execute the get task list query."""
         gamification = GamificationService()
-        raw_tasks = await self.case_repo.get_task_list(advisor_id=query.advisor_id)
+        raw_tasks, total_count = await self.case_repo.get_task_list(
+            advisor_id=query.advisor_id, limit=query.limit, offset=query.offset
+        )
         
-        dtos = []
-        for row in raw_tasks:
-            draft_status = row.draft_status
-            
-            # Determine suggested action
-            if draft_status == 'draft':
-                suggested_action = "Review & Send Email"
-                action_type = 'email_sent'
-            elif draft_status == 'generating':
-                suggested_action = "Wait for Draft"
-                action_type = 'email_sent'
-            elif draft_status == 'sent':
-                suggested_action = "Follow up"
-                action_type = 'student_resolved' # Or another action
-            else:
-                suggested_action = "Initiate Intervention"
-                action_type = 'email_sent'
-                
-            # Determine points reward based on GamificationService
-            points_reward = gamification.calculate_points(
-                action_type=action_type,
-                recorded_dt=row.created_at,
-                risk_level=row.current_risk_status
-            )
-            
-            dtos.append(
+        return PagedResult(
+            items=[
                 TaskDTO(
-                    case_id=row.case_id,
-                    created_at=row.created_at,
-                    assigned_advisor_id=row.assigned_advisor_id,
-                    student_name=row.student_name,
-                    email=row.email,
-                    major=row.major,
-                    current_risk_status=row.current_risk_status,
-                    intervention_status=row.intervention_status,
-                    draft_subject=row.draft_subject,
-                    draft_body=row.draft_body,
-                    draft_status=str(draft_status) if draft_status else None,
-                    assigned_to=row.assigned_to,
-                    suggested_action=suggested_action,
-                    points_reward=points_reward,
+                    case_id=task.case_id,
+                    created_at=task.created_at,
+                    assigned_advisor_id=task.assigned_advisor_id,
+                    student_name=task.student_name,
+                    email=task.email,
+                    major=task.major,
+                    current_risk_status=task.current_risk_status,
+                    intervention_status=task.intervention_status,
+                    draft_subject=task.draft_subject,
+                    draft_body=task.draft_body,
+                    draft_status=task.draft_status,
+                    assigned_to=task.assigned_to,
+                    suggested_action=gamification.get_suggested_action(
+                        task.current_risk_status, task.intervention_status
+                    ),
+                    points_reward=gamification.calculate_points(
+                        task.current_risk_status, task.intervention_status
+                    ),
                 )
-            )
-        return dtos
+                for task in raw_tasks
+            ],
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=query.limit,
+                offset=query.offset,
+                has_next=(query.offset + query.limit) < total_count,
+            ),
+        )
 
     async def handle_get_email_history(
         self, query: GetEmailHistoryQuery
