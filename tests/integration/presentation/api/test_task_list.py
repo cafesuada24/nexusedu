@@ -1,5 +1,4 @@
 import pytest
-from httpx import AsyncClient
 from uuid import uuid4
 from starlette.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,5 +70,44 @@ async def test_get_task_list(
     assert task['draft_body'] == 'Draft Body'
     assert task['draft_status'] == 'draft'
     
-    # Base is 100 for critical. Multiplier is 1.5, so 150 points reward
-    assert task['points_reward'] == 150
+    # GamificationService: 10 base * 1.0 risk * 1.5 SLA = 15 points
+    assert task['points_reward'] == 15
+
+
+@pytest.mark.asyncio
+async def test_get_task_list_empty(
+    client: TestClient,
+    test_db_session: AsyncSession,
+) -> None:
+    """Verify that an empty task list returns successfully."""
+    response = client.get('/api/v1/alerts/tasks')
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_assign_case_idempotency(
+    case_repository: CaseRepository,
+) -> None:
+    """Verify that a case cannot be re-assigned once an advisor is set."""
+    sid = uuid4()
+    cid = uuid4()
+    adv_1 = uuid4()
+    adv_2 = uuid4()
+    
+    # 1. Create a case
+    await case_repository.create_case(
+        Case(case_id=cid, sid=sid, status=CaseStatus.OPEN)
+    )
+    
+    # 2. First assignment should succeed
+    success_1 = await case_repository.assign_case(cid, adv_1)
+    assert success_1 is True
+    
+    # 3. Second assignment to a different advisor should fail
+    success_2 = await case_repository.assign_case(cid, adv_2)
+    assert success_2 is False
+    
+    # 4. Verify original advisor is still assigned
+    case = await case_repository.get_by_id(cid)
+    assert case.assigned_advisor_id == adv_1
