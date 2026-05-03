@@ -70,24 +70,30 @@ export function AlertCenter() {
   );
 
   // Internal state for goals and hidden alerts (not yet persisted in backend)
-  const [localAlertState, setLocalAlertState] = React.useState<Record<string, { goals: Goal[], hidden: boolean }>>({})
-
-  // Initialize from localStorage
-  React.useEffect(() => {
-    const saved = localStorage.getItem("alert-goals-state");
-    if (saved) {
+  const [localAlertState, setLocalAlertState] = React.useState<Record<string, { goals: Goal[], hidden: boolean }>>(() => {
+    if (typeof window !== "undefined") {
       try {
-        setLocalAlertState(JSON.parse(saved));
+        const saved = localStorage.getItem("alert-goals-state");
+        if (saved) return JSON.parse(saved);
       } catch (e) {
         console.error("Failed to parse goal state", e);
       }
     }
+    return {};
+  })
+
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
   }, []);
 
   // Sync to localStorage
   React.useEffect(() => {
-    localStorage.setItem("alert-goals-state", JSON.stringify(localAlertState));
-  }, [localAlertState]);
+    if (isMounted) {
+      localStorage.setItem("alert-goals-state", JSON.stringify(localAlertState));
+    }
+  }, [localAlertState, isMounted]);
 
   // Map remote alerts to local Alert interface
   const alerts = React.useMemo(() => {
@@ -309,7 +315,7 @@ export function AlertCenter() {
     [alerts, goalsTargetId],
   )
 
-  if (isLoading) {
+  if (isLoading || !isMounted) {
     return (
       <Card className="rounded-2xl border-border/60">
         <CardHeader>
