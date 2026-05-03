@@ -5,8 +5,8 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from src.application.commands.alert_commands import (
-    AlertCommandHandler,
+from src.application.commands.case_commands import (
+    CaseCommandHandler,
     TriggerDraftCommand,
 )
 from src.application.dtos.data_dtos import DataIngestionCommand
@@ -32,7 +32,7 @@ class DataCommandHandler:
         case_repo: CaseRepository,
         job_repo: JobRepository,
         anomaly_engine: AnomalyEngine,
-        alert_command_handler: AlertCommandHandler,
+        case_command_handler: CaseCommandHandler,
     ):
         self.student_repo = student_repo
         self.activity_repo = activity_repo
@@ -40,7 +40,7 @@ class DataCommandHandler:
         self.case_repo = case_repo
         self.job_repo = job_repo
         self.anomaly_engine = anomaly_engine
-        self.alert_command_handler = alert_command_handler
+        self.case_command_handler = case_command_handler
 
     async def handle_ingest_data(
         self,
@@ -75,7 +75,7 @@ class DataCommandHandler:
                     user_id=user_id,
                     update_db=False,
                 )
-                job_id = await self.alert_command_handler.handle_trigger_draft(
+                job_id = await self.case_command_handler.handle_trigger_draft(
                     trigger_command,
                 )
                 triggered_jobs.append({'sid': sid, 'job_id': job_id})
