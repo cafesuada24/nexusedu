@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from src.domain.value_objects.status import RiskStatus
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

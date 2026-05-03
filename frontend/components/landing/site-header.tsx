@@ -12,7 +12,6 @@ const links = [
     { href: "#features", label: "Tính năng" },
     { href: "#how", label: "Cách hoạt động" },
     { href: "#metrics", label: "Hiệu quả" },
-    { href: "#faq", label: "FAQ" },
 ];
 
 export function SiteHeader() {
@@ -45,20 +44,28 @@ export function SiteHeader() {
             )}
         >
             <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 md:px-6">
-                <Logo />
+                <Logo onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} />
 
                 <nav
                     className="hidden items-center gap-1 md:flex"
                     aria-label="Điều hướng chính"
                 >
                     {links.map((l) => (
-                        <Link
+                        <button
                             key={l.href}
-                            href={l.href}
-                            className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                const element = document.querySelector(l.href);
+                                if (element) {
+                                    element.scrollIntoView({
+                                        behavior: "smooth",
+                                    });
+                                }
+                            }}
+                            className="rounded-lg px-3 py-2 text-base font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         >
                             {l.label}
-                        </Link>
+                        </button>
                     ))}
                 </nav>
 
@@ -70,7 +77,7 @@ export function SiteHeader() {
                                 variant: "ghost",
                                 size: "default",
                             }),
-                            "hidden rounded-xl md:inline-flex text-primary font-semibold",
+                            "hidden rounded-xl md:inline-flex text-primary font-semibold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-shadow duration-300",
                         )}
                     >
                         Đăng nhập
@@ -100,14 +107,23 @@ export function SiteHeader() {
                         aria-label="Điều hướng di động"
                     >
                         {links.map((l) => (
-                            <Link
+                            <button
                                 key={l.href}
-                                href={l.href}
-                                onClick={() => setOpen(false)}
-                                className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                                onClick={() => {
+                                    setOpen(false);
+                                    const element = document.querySelector(
+                                        l.href,
+                                    );
+                                    if (element) {
+                                        element.scrollIntoView({
+                                            behavior: "smooth",
+                                        });
+                                    }
+                                }}
+                                className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground text-left"
                             >
                                 {l.label}
-                            </Link>
+                            </button>
                         ))}
                         <div className="mt-2 flex flex-col gap-2">
                             <Link

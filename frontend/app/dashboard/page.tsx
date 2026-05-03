@@ -22,12 +22,6 @@ export default function OverviewPage() {
 
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm" className="rounded-xl">
-            <Link href="/dashboard/analysis" aria-label="Phân tích">
-              <LineChart className="size-4" />
-              Phân tích
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="rounded-xl">
             <Link href="/dashboard/alerts" aria-label="Cảnh báo">
               <BellRing className="size-4" />
               Cảnh báo

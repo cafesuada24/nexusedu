@@ -27,7 +27,7 @@ from src.infrastructure.database.session import async_session_maker
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetadataRepository,
 )
-from src.telemetry.logger import logger
+from src.core.logger import logger
 
 
 def create_graph(

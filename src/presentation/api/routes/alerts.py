@@ -3,7 +3,6 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from arq import ArqRedis
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,30 +28,14 @@ from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
     get_alert_command_handler,
     get_alert_query_handler,
-    get_arq_pool,
     get_case_repository,
     get_email_repository,
 )
-from src.telemetry.logger import logger
+from src.presentation.schemas.request import SendEmailRequest, StatusUpdate
+from src.presentation.schemas.response import AlertStudent, CaseResponse
+from src.core.logger import logger
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
-
-
-class AlertStudent(BaseModel):
-    """Schema for a student in the Kanban alert dashboard."""
-
-    sid: str = Field(..., description='Student identifier.')
-    student_name: str = Field(..., description='Student name.')
-    email: str = Field(..., description='Student email.')
-    current_risk_status: str = Field(..., description='The type of anomaly detected.')
-    intervention_status: str = Field(..., description='The current Kanban state.')
-    is_generating: bool = Field(
-        False,
-        description='Whether a background AI draft generation is running.',
-    )
-    active_case_id: str | None = Field(
-        None, description='The ID of the currently active case.'
-    )
 
 
 class TaskItem(BaseModel):
@@ -72,35 +55,11 @@ class TaskItem(BaseModel):
     assigned_to: str | None = Field(None, description='Name of assigned advisor.')
     suggested_action: str = Field(..., description='Computed action to take.')
     points_reward: int = Field(..., description='Points for completing action.')
-
-
-class StatusUpdate(BaseModel):
-    """Schema for updating a student's intervention status."""
-
-    status: str = Field(..., description='The new Kanban state.')
-
-
-class SendEmailRequest(BaseModel):
-    """Schema for sending a personalized nudge email."""
-
-    body: str = Field(..., description='The final email body to send.')
-
-
-class CaseResponse(BaseModel):
-    """Schema for a student case."""
-
-    case_id: str
-    sid: str
-    status: str
-    created_at: str
-    resolved_at: str | None = None
-
-
 @router.get('/{sid}/cases', response_model=list[CaseResponse])
 async def get_case_history(
     sid: str,
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> list[dict[str, Any]]:
     """Retrieve historical cases for a specific student."""
     try:
@@ -124,7 +83,7 @@ async def get_case_history(
 async def get_case_details(
     case_id: str,
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
-    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> dict[str, Any]:
     """Retrieve full details of a specific case, including associated emails."""
     try:
@@ -139,7 +98,7 @@ async def get_case_details(
 @router.get('', response_model=list[AlertStudent])
 async def get_alerts(
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
-    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
     status: str | None = Query(None),
 ) -> list[dict[str, Any]]:
     """Retrieve students who have an active alert for the Kanban board."""
@@ -261,7 +220,6 @@ async def trigger_draft(
     request: TriggerDraftRequest,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
-    session: Annotated[AsyncSession, Depends(get_async_session)],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
     """Manually triggers a background AI draft generation."""
@@ -276,7 +234,7 @@ async def trigger_draft(
                 }
 
         command = TriggerDraftCommand(
-            case_id=UUID(case_id), user_id=user.id, booking_link=request.booking_link
+            case_id=UUID(case_id), user_id=user.id, booking_link=request.booking_link,
         )
         job_id = await command_handler.handle_trigger_draft(command)
 
@@ -322,7 +280,7 @@ async def review_draft(
 async def get_email_draft(
     case_id: str,
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
-    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> dict[str, Any]:
     """Retrieve the current AI draft status and content for a case."""
     try:
@@ -338,7 +296,7 @@ async def get_email_draft(
 async def get_case_email(
     case_id: str,
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
-    _user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> dict[str, Any] | None:
     """Retrieve the single intervention email associated with a specific case."""
     try:
@@ -380,7 +338,9 @@ async def send_nudge_email(
 
         # 2. Database Write: Record state and get email address
         command = SendEmailCommand(
-            case_id=UUID(case_id), body=request.body, user_id=user.id
+            case_id=UUID(case_id),
+            body=request.body,
+            user_id=user.id,
         )
         target_email = await command_handler.handle_send_email(command)
 
@@ -392,7 +352,7 @@ async def send_nudge_email(
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
         logger.info(
-            f'DISPATCHING EMAIL for case {case_id} to {target_email}: {request.body[:50]}...'
+            f'DISPATCHING EMAIL for case {case_id} to {target_email}: {request.body[:50]}...',
         )
 
         return {'status': 'success', 'message': f'Email sent to {target_email}'}

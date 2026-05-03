@@ -9,8 +9,11 @@ from uuid import UUID, uuid4
 import pytest
 
 from src.domain.entities.case import Case
-from src.domain.value_objects.status import InterventionStatus
-from src.infrastructure.database.models import AdvisorPointsLedger, IdempotencyKey, StudentStatusHistory
+from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.infrastructure.database.models import (
+    AdvisorPointsLedger,
+    StudentStatusHistory,
+)
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -32,7 +35,12 @@ async def test_draft_review_points(
     cid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G1', 'email': 'g1@ex.com', 'current_risk_status': 'Critical'},
+            {
+                'sid': sid,
+                'student_name': 'G1',
+                'email': 'g1@ex.com',
+                'current_risk_status': 'Critical',
+            },
         ]
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
@@ -44,7 +52,7 @@ async def test_draft_review_points(
             academic_year=2024,
             semester=1,
             week=1,
-        )
+        ),
     )
     await test_db_session.commit()
 
@@ -77,9 +85,9 @@ async def test_idempotency_prevents_duplicate_review_points(
     idemp_key = str(uuid4())
 
     # Arrange
-    await student_repository.ingest_students([
-        {'sid': sid, 'student_name': 'Idemp', 'email': 'i@ex.com'}
-    ])
+    await student_repository.ingest_students(
+        [{'sid': sid, 'student_name': 'Idemp', 'email': 'i@ex.com'}]
+    )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
     headers = {'Idempotency-Key': idemp_key}
@@ -91,11 +99,15 @@ async def test_idempotency_prevents_duplicate_review_points(
     # Act 2: Second request with IDENTICAL key (Should succeed but NOT award points)
     resp2 = client.post(f'/api/v1/alerts/cases/{cid}/draft/review', headers=headers)
     assert resp2.status_code == 200
-    assert "already triggered (idempotent)" in resp2.json()['message'] or "already awarded (idempotent)" in resp2.json()['message']
+    assert (
+        'already triggered (idempotent)' in resp2.json()['message']
+        or 'already awarded (idempotent)' in resp2.json()['message']
+    )
 
     # Assert
     # Check that only ONE ledger entry was created
     from sqlalchemy import select
+
     stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
     ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
     assert len(ledger_entries) == 1
@@ -111,9 +123,16 @@ async def test_duplicate_action_guard_prevents_double_points(
     """Verify that the domain-level duplicate guard prevents double points even without Idempotency-Key."""
     sid = uuid4()
     cid = uuid4()
-    await student_repository.ingest_students([
-        {'sid': sid, 'student_name': 'DupGuard', 'email': 'dg@ex.com', 'current_risk_status': 'Critical'},
-    ])
+    await student_repository.ingest_students(
+        [
+            {
+                'sid': sid,
+                'student_name': 'DupGuard',
+                'email': 'dg@ex.com',
+                'current_risk_status': 'Critical',
+            },
+        ]
+    )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
 
@@ -126,6 +145,7 @@ async def test_duplicate_action_guard_prevents_double_points(
 
     # Assert: Only ONE ledger entry should exist
     from sqlalchemy import select
+
     stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
     ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
     assert len(ledger_entries) == 1
@@ -143,7 +163,12 @@ async def test_email_sent_points(
     cid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G2', 'email': 'g2@ex.com', 'current_risk_status': 'Critical'},
+            {
+                'sid': sid,
+                'student_name': 'G2',
+                'email': 'g2@ex.com',
+                'current_risk_status': 'Critical',
+            },
         ]
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
@@ -165,7 +190,11 @@ async def test_email_sent_points(
 
     key = str(uuid4())
     headers = {'Idempotency-Key': key}
-    response = client.post(f'/api/v1/alerts/cases/{cid}/send', json={'body': 'test'}, headers=headers)
+    response = client.post(
+        f'/api/v1/alerts/cases/{cid}/send',
+        json={'body': 'test'},
+        headers=headers,
+    )
     assert response.status_code == 200
 
     # Check ledger
@@ -189,7 +218,12 @@ async def test_status_change_points(
     cid = uuid4()
     await student_repository.ingest_students(
         [
-            {'sid': sid, 'student_name': 'G3', 'email': 'g3@ex.com', 'current_risk_status': 'Critical'},
+            {
+                'sid': sid,
+                'student_name': 'G3',
+                'email': 'g3@ex.com',
+                'current_risk_status': RiskStatus.CRITICAL,
+            },
         ]
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
@@ -231,10 +265,30 @@ async def test_response_time_bonus(
 
     await student_repository.ingest_students(
         [
-            {'sid': sid_fast, 'student_name': 'Fast', 'email': 'f@ex.com', 'current_risk_status': 'Critical'},
-            {'sid': sid_mid, 'student_name': 'Mid', 'email': 'm@ex.com', 'current_risk_status': 'Critical'},
-            {'sid': sid_slow, 'student_name': 'Slow', 'email': 's@ex.com', 'current_risk_status': 'Critical'},
-            {'sid': sid_penalty, 'student_name': 'Pen', 'email': 'p@ex.com', 'current_risk_status': 'Critical'},
+            {
+                'sid': sid_fast,
+                'student_name': 'Fast',
+                'email': 'f@ex.com',
+                'current_risk_status': 'Critical',
+            },
+            {
+                'sid': sid_mid,
+                'student_name': 'Mid',
+                'email': 'm@ex.com',
+                'current_risk_status': 'Critical',
+            },
+            {
+                'sid': sid_slow,
+                'student_name': 'Slow',
+                'email': 's@ex.com',
+                'current_risk_status': 'Critical',
+            },
+            {
+                'sid': sid_penalty,
+                'student_name': 'Pen',
+                'email': 'p@ex.com',
+                'current_risk_status': 'Critical',
+            },
         ]
     )
     await case_repository.create_case(Case(case_id=cid_fast, sid=sid_fast))
@@ -251,10 +305,38 @@ async def test_response_time_bonus(
 
     test_db_session.add_all(
         [
-            StudentStatusHistory(history_id=uuid4(), sid=sid_fast, status_recorded_at=fast_time, academic_year=2025, semester=2, week=1),
-            StudentStatusHistory(history_id=uuid4(), sid=sid_mid, status_recorded_at=mid_time, academic_year=2025, semester=2, week=1),
-            StudentStatusHistory(history_id=uuid4(), sid=sid_slow, status_recorded_at=slow_time, academic_year=2025, semester=2, week=1),
-            StudentStatusHistory(history_id=uuid4(), sid=sid_penalty, status_recorded_at=penalty_time, academic_year=2025, semester=2, week=1),
+            StudentStatusHistory(
+                history_id=uuid4(),
+                sid=sid_fast,
+                status_recorded_at=fast_time,
+                academic_year=2025,
+                semester=2,
+                week=1,
+            ),
+            StudentStatusHistory(
+                history_id=uuid4(),
+                sid=sid_mid,
+                status_recorded_at=mid_time,
+                academic_year=2025,
+                semester=2,
+                week=1,
+            ),
+            StudentStatusHistory(
+                history_id=uuid4(),
+                sid=sid_slow,
+                status_recorded_at=slow_time,
+                academic_year=2025,
+                semester=2,
+                week=1,
+            ),
+            StudentStatusHistory(
+                history_id=uuid4(),
+                sid=sid_penalty,
+                status_recorded_at=penalty_time,
+                academic_year=2025,
+                semester=2,
+                week=1,
+            ),
         ]
     )
     await test_db_session.commit()
@@ -270,7 +352,9 @@ async def test_response_time_bonus(
     stmt_fast = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_fast)
     stmt_mid = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_mid)
     stmt_slow = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_slow)
-    stmt_penalty = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_penalty)
+    stmt_penalty = select(AdvisorPointsLedger).where(
+        AdvisorPointsLedger.sid == sid_penalty
+    )
 
     res_fast = (await test_db_session.execute(stmt_fast)).scalar_one()
     res_mid = (await test_db_session.execute(stmt_mid)).scalar_one()
@@ -281,6 +365,7 @@ async def test_response_time_bonus(
     assert res_mid.points == 6
     assert res_slow.points == 5
     assert res_penalty.points == 4
+
 
 @pytest.mark.asyncio
 async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) -> None:
