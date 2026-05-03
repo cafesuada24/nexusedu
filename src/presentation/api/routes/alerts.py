@@ -20,8 +20,10 @@ from src.application.queries.alert_queries import (
     GetEmailHistoryQuery,
     GetTaskListQuery,
 )
+from src.core.logger import logger
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
+from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import Scope, User, UserRole, require_scope
@@ -30,17 +32,10 @@ from src.presentation.dependencies.providers import (
     get_alert_query_handler,
     get_case_repository,
     get_email_repository,
+    get_idempotency_repository,
 )
 from src.presentation.schemas.request import SendEmailRequest, StatusUpdate
-from src.presentation.schemas.response import (
-    AlertPagedResponse,
-    AlertStudent,
-    CaseResponse,
-    PaginationMetadata,
-    TaskItem,
-    TaskPagedResponse,
-)
-from src.core.logger import logger
+from src.presentation.schemas.response import AlertStudent, CaseResponse
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
@@ -230,6 +225,7 @@ async def trigger_draft(
     case_id: str,
     request: TriggerDraftRequest,
     command_handler: Annotated[AlertCommandHandler, Depends(get_alert_command_handler)],
+    idempotency_repo: Annotated[IdempotencyRepository, Depends(get_idempotency_repository)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
@@ -237,7 +233,7 @@ async def trigger_draft(
     try:
         if idempotency_key:
             idemp_key = UUID(idempotency_key)
-            if await command_handler.check_idempotency(idemp_key):
+            if await idempotency_repo.check_key(idemp_key):
                 logger.info(f'Idempotency hit for trigger_draft: {idemp_key}')
                 return {
                     'status': 'success',
@@ -245,12 +241,14 @@ async def trigger_draft(
                 }
 
         command = TriggerDraftCommand(
-            case_id=UUID(case_id), user_id=user.id, booking_link=request.booking_link,
+            case_id=UUID(case_id),
+            user_id=user.id,
+            booking_link=request.booking_link,
         )
         job_id = await command_handler.handle_trigger_draft(command)
 
         if idempotency_key:
-            await command_handler.record_idempotency(UUID(idempotency_key))
+            await idempotency_repo.record_key(UUID(idempotency_key))
 
         return {'status': 'success', 'job_id': str(job_id)}
     except Exception as e:

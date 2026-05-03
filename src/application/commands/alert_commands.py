@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
-from src.domain.entities.alert import Alert
-from src.domain.entities.case import Case
+from src.core.logger import logger
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.case_repository import CaseRepository
@@ -21,7 +20,6 @@ from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
 )
-from src.core.logger import logger
 
 
 @dataclass
@@ -80,7 +78,6 @@ class AlertCommandHandler:
         case_repo: CaseRepository,
         alert_repo: AlertRepository,
         advisor_repo: AdvisorRepository,
-        idempotency_repo: IdempotencyRepository,
         job_repo: JobRepository,
         gamification_service: GamificationService,
         task_queue: BackgroundTaskQueue,
@@ -92,7 +89,6 @@ class AlertCommandHandler:
         self.case_repo = case_repo
         self.alert_repo = alert_repo
         self.advisor_repo = advisor_repo
-        self.idempotency_repo = idempotency_repo
         self.job_repo = job_repo
         self.gamification_service = gamification_service
         self.email_drafting_service = email_drafting_service
@@ -152,18 +148,27 @@ class AlertCommandHandler:
             # but usually, we'd check if it's already 'generating'.
             if existing_email.status.value == 'generating':
                 # Already in progress, just find the job_id
-                active_job = await self.job_repo.get_active_job(case.case_id, 'case', 'email_draft')
+                active_job = await self.job_repo.get_active_job(
+                    case.case_id,
+                    'case',
+                    'email_draft',
+                )
                 if active_job:
                     return active_job
 
         # 2. Create/Update placeholder entry in intervention_emails
         if not existing_email:
             await self.email_repo.create_placeholder(
-                case.case_id, case.sid, command.user_id,
+                case.case_id,
+                case.sid,
+                command.user_id,
             )
         else:
             await self.email_repo.update_content(
-                case.case_id, None, None, EmailStatus.GENERATING.value,
+                case.case_id,
+                '',
+                '',
+                EmailStatus.GENERATING,
             )
 
         # 3. Queue the job
@@ -178,10 +183,12 @@ class AlertCommandHandler:
 
         if command.update_db:
             await self.job_repo.create_job(
-                job_id, 'email_draft', case.case_id, 'case',
+                job_id,
+                'email_draft',
+                case.case_id,
+                'case',
             )
         return job_id
-
 
     async def handle_generate_email_draft(
         self,
@@ -225,14 +232,13 @@ class AlertCommandHandler:
                 case.case_id,
                 'Checking in on your academic progress',
                 personalized_body,
-                EmailStatus.DRAFT.value,
+                EmailStatus.DRAFT,
             )
             await self.job_repo.complete_job(command.job_id)
         except Exception as e:
             logger.error(f'Failed to generate email draft: {str(e)}')
             await self.job_repo.fail_job(command.job_id, str(e))
             raise e
-
 
     async def handle_send_email(self, command: SendEmailCommand) -> str:
         """Execute the send email command."""
@@ -286,25 +292,12 @@ class AlertCommandHandler:
         student = await self.student_repo.get_by_id(sid)
         risk_level = RiskStatus.UNKNOWN
         if student:
-            raw = student.current_risk_status
-            if isinstance(raw, RiskStatus):
-                risk_level = raw
-            elif isinstance(raw, str):
-                try:
-                    risk_level = RiskStatus(raw)
-                except ValueError:
-                    risk_level = RiskStatus.UNKNOWN
+            risk_level = student.current_risk_status
 
         points = self.gamification_service.calculate_points(
-            action_type, recorded_dt, risk_level,
+            action_type,
+            recorded_dt,
+            risk_level,
         )
         if points > 0:
             await self.advisor_repo.record_points(advisor_id, sid, action_type, points)
-
-    async def check_idempotency(self, key: UUID) -> bool:
-        """Check if an idempotency key has been used."""
-        return await self.idempotency_repo.check_key(key)
-
-    async def record_idempotency(self, key: UUID) -> None:
-        """Record a new idempotency key."""
-        await self.idempotency_repo.record_key(key)
