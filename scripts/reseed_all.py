@@ -79,6 +79,20 @@ async def reseed() -> None:
         
         # Create default admin user
         print('Creating default admin user (admin@example.com / password123)...')
+        from src.infrastructure.repositories.sqlalchemy_repositories import (
+            SqlAlchemyUserSettingsRepository,
+        )
+        user_db = SQLAlchemyUserDatabase(session, User)
+        settings_repo = SqlAlchemyUserSettingsRepository(session)
+        user_manager = UserManager(user_db, settings_repo)
+        user = await user_manager.create(
+            UserCreate(email='admin@example.com', password='password123'),
+            safe=True
+        )
+>>>>
+<<<<
+        # Create default admin user
+        print('Creating default admin user (admin@example.com / password123)...')
         user_db = SQLAlchemyUserDatabase(session, User)
         user_manager = UserManager(user_db)
         user = await user_manager.create(
