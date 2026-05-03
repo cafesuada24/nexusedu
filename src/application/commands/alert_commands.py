@@ -256,7 +256,11 @@ class AlertCommandHandler:
         await self.student_repo.update_last_notified(case.sid)
         
         # Auto-assign the case to the advisor who sent the email
-        await self.case_repo.assign_case(command.case_id, command.user_id)
+        assigned = await self.case_repo.assign_case(command.case_id, command.user_id)
+        if not assigned:
+            logger.info(
+                f"Case {command.case_id} already assigned. Skipping auto-assignment for advisor {command.user_id}."
+            )
 
         # 3. Gamification
         await self._award_points(command.user_id, case.sid, 'email_sent')
