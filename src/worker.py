@@ -142,11 +142,22 @@ async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None
             eligible_badges = gamification.check_badges(stats)
             existing_badges = await badge_repo.get_advisor_badges(UUID(advisor_id))
             
+            any_awarded = False
             for badge in eligible_badges:
                 if badge not in existing_badges:
                     await badge_repo.award_badge(UUID(advisor_id), badge)
+                    any_awarded = True
             
             await session.commit()
+            
+            # Invalidate cache if a new badge was awarded
+            if any_awarded:
+                redis = ctx.get('redis')
+                if redis:
+                    cache_key = f"advisor_badges:{advisor_id}"
+                    await redis.delete(cache_key)
+                    logger.info(f'Worker: Invalidated cache for advisor {advisor_id}')
+            
             logger.info(f'Worker: Badge evaluation completed for {advisor_id}')
         except Exception as e:
             logger.error(f'Worker: Failed to evaluate badges: {e}')

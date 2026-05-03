@@ -509,7 +509,7 @@ class SqlAlchemyBadgeRepository:
                     delta_hours = 0.0
                 total_hours += delta_hours
                 valid_pairs += 1
-                if delta_hours <= 24.0:
+                if delta_hours <= 12.0:
                     fast_action_count += 1
 
         avg_response_hours = total_hours / valid_pairs if valid_pairs > 0 else 999.0
