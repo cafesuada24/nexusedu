@@ -50,7 +50,6 @@ def handler(mock_repos, mock_engine, mock_alert_handler):
         student_repo=mock_repos['student'],
         activity_repo=mock_repos['activity'],
         history_repo=mock_repos['history'],
-        settings_repo=mock_repos['settings'],
         case_repo=mock_repos['case'],
         job_repo=mock_repos['job'],
         anomaly_engine=mock_engine,
@@ -98,7 +97,7 @@ async def test_run_anomaly_detection_orchestration(handler, mock_repos, mock_eng
     new_at_risk = await handler._run_anomaly_detection()
 
     # Verify
-    assert sid in new_at_risk
+    assert sid in (s[0] for s in new_at_risk)
     mock_repos['history'].batch_create_history.assert_called_once_with(new_records)
     mock_repos['student'].update_risk_status.assert_called_with(
         sid,
