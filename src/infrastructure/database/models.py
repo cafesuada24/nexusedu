@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import TYPE_CHECKING
+from datetime import datetime  # noqa: TC003
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
@@ -22,9 +21,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-if TYPE_CHECKING:
-    pass
-
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
@@ -37,6 +33,21 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
     role: Mapped[str] = mapped_column(String, default='viewer')
 
+    preferences: Mapped[UserSettings] = relationship('UserSettings', back_populates='user', lazy='selectin')
+
+
+class UserSettings(Base):
+    """Configuration settings for a specific user."""
+
+    __tablename__ = 'user_settings'
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey('user.id'),
+        primary_key=True,
+    )
+    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    user: Mapped[User] = relationship('User', back_populates='preferences')
 
 class Student(Base):
     """Student record from the Student Information System (SIS)."""
@@ -54,7 +65,8 @@ class Student(Base):
 
     # Relationships
     activities: Mapped[list[Activity]] = relationship(
-        'Activity', back_populates='student'
+        'Activity',
+        back_populates='student',
     )
     status_history: Mapped[list[StudentStatusHistory]] = relationship(
         'StudentStatusHistory',
@@ -119,7 +131,9 @@ class Advisor(Base):
 
     __tablename__ = 'advisors'
 
-    advisor_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    advisor_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, default=uuid.uuid4
+    )
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
 
@@ -178,7 +192,9 @@ class InterventionEmail(Base):
     sent_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
 
     # Business rule: each intervention case has exactly one email record
-    __table_args__ = (UniqueConstraint('case_id', name='uq_intervention_emails_case_id'),)
+    __table_args__ = (
+        UniqueConstraint('case_id', name='uq_intervention_emails_case_id'),
+    )
 
 
 class Case(Base):
@@ -216,19 +232,6 @@ class IdempotencyKey(Base):
         TIMESTAMP,
         server_default=func.current_timestamp(),
     )
-
-
-class UserSettings(Base):
-    """Configuration settings for a specific user."""
-
-    __tablename__ = 'user_settings'
-
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey('user.id'),
-        primary_key=True,
-    )
-    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class BackgroundJobTracker(Base):
