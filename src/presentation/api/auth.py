@@ -8,7 +8,6 @@ import uuid
 from collections.abc import AsyncGenerator, Callable
 from enum import StrEnum
 from typing import Annotated, Any, override
-from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
@@ -116,6 +115,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         print(f'User {user.id} has registered.')
         await self._user_setting_db.create_user_settings(user.id)
 
+        if user.role == UserRole.ADVISOR.value:
+            # Ensure an advisor profile exists and is linked
+            name = user.email.split('@')[0].capitalize()
+            await self._advisor_repo.upsert_advisor_for_user(user.id, user.email, name)
+
     @override
     async def on_after_update(
         self,
@@ -133,10 +137,10 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 async def get_user_manager(
     user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
     user_settings_db: Annotated[
-        SqlAlchemyUserSettingsRepository, Depends(get_user_settings_repository)
+        SqlAlchemyUserSettingsRepository, Depends(get_user_settings_repository),
     ],
     advisor_repo: Annotated[
-        SqlAlchemyAdvisorRepository, Depends(get_advisor_repository)
+        SqlAlchemyAdvisorRepository, Depends(get_advisor_repository),
     ],
 ) -> AsyncGenerator[UserManager, None]:
     """Dependency for getting the user manager instance."""
