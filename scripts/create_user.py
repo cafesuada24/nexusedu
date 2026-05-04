@@ -4,11 +4,11 @@ import argparse
 import asyncio
 
 from dotenv import load_dotenv
-from sqlalchemy import update
 
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import async_session_maker
 from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyAdvisorRepository,
     SqlAlchemyUserSettingsRepository,
 )
 from src.presentation.api.auth import (
@@ -16,7 +16,7 @@ from src.presentation.api.auth import (
     UserManager,
     UserRole,
 )
-from src.presentation.schemas.auth import UserCreate  # noqa: E402
+from src.presentation.schemas.auth import UserCreate, UserUpdate  # noqa: E402
 
 load_dotenv()
 
@@ -26,7 +26,8 @@ async def create_user(email: str, password: str, role: str) -> None:
     async with async_session_maker() as session:
         user_db = SQLAlchemyUserDatabase(session, User)
         settings_repo = SqlAlchemyUserSettingsRepository(session)
-        user_manager = UserManager(user_db, settings_repo)
+        advisor_repo = SqlAlchemyAdvisorRepository(session)
+        user_manager = UserManager(user_db, settings_repo, advisor_repo)
 
         # 1. Create user
         user_create = UserCreate(email=email, password=password)
@@ -38,12 +39,9 @@ async def create_user(email: str, password: str, role: str) -> None:
             if role != UserRole.VIEWER.value:
                 try:
                     user_role = UserRole(role)
-                    stmt = (
-                        update(User)
-                        .where(User.id == user.id)
-                        .values(role=user_role.value)
-                    )
-                    await session.execute(stmt)
+                    user_update = UserUpdate(role=user_role)
+                    # Use user_manager.update to trigger on_after_update (advisor linkage)
+                    await user_manager.update(user_update, user)
                     await session.commit()
                     print(f'User role updated to: {user_role.value}')
                 except ValueError:
