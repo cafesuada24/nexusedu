@@ -34,6 +34,9 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     role: Mapped[str] = mapped_column(String, default='viewer')
 
     preferences: Mapped[UserSettings] = relationship('UserSettings', back_populates='user', lazy='selectin')
+    advisor_profile: Mapped[Advisor | None] = relationship(
+        'Advisor', back_populates='user', uselist=False
+    )
 
 
 class UserSettings(Base):
@@ -134,8 +137,14 @@ class Advisor(Base):
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, default=uuid.uuid4
     )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey('user.id'), unique=True, nullable=True
+    )
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
+
+    # Relationships
+    user: Mapped[User | None] = relationship('User', back_populates='advisor_profile')
 
 
 class AdvisorPointsLedger(Base):
