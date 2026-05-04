@@ -13,7 +13,9 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    MetaData,
     String,
+    Table,
     Text,
     UniqueConstraint,
     Uuid,
@@ -22,10 +24,26 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
+def _all_column_names(constraint: UniqueConstraint | Index, _: Table) -> str:
+    return (
+    '_'.join(
+        [column.name for column in constraint.columns.values()],
+    )
+)
+_convention = {
+    'all_column_names': _all_column_names,
+    'ix': 'ix__%(table_name)s__%(all_column_names)s',
+    'uq': 'uq__%(table_name)s__%(all_column_names)s',
+    'ck': 'ck__%(table_name)s__%(constraint_name)s',
+    'fk': 'fk__%(table_name)s__%(all_column_names)s__%(referred_table_name)s',
+    'pk': 'pk__%(table_name)s',
+}
+
+
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
 
-    pass
+    metadata = MetaData(naming_convention=_convention)
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
@@ -33,9 +51,15 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
 
     role: Mapped[str] = mapped_column(String, default='viewer')
 
-    preferences: Mapped[UserSettings] = relationship('UserSettings', back_populates='user', lazy='selectin')
+    preferences: Mapped[UserSettings] = relationship(
+        'UserSettings',
+        back_populates='user',
+        lazy='selectin',
+    )
     advisor_profile: Mapped[Advisor | None] = relationship(
-        'Advisor', back_populates='user', uselist=False
+        'Advisor',
+        back_populates='user',
+        uselist=False,
     )
 
 
@@ -51,6 +75,7 @@ class UserSettings(Base):
     auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     user: Mapped[User] = relationship('User', back_populates='preferences')
+
 
 class Student(Base):
     """Student record from the Student Information System (SIS)."""
@@ -135,10 +160,14 @@ class Advisor(Base):
     __tablename__ = 'advisors'
 
     advisor_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey('user.id'), unique=True, nullable=True
+        ForeignKey('user.id'),
+        unique=True,
+        nullable=True,
     )
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
@@ -147,13 +176,11 @@ class Advisor(Base):
     user: Mapped[User | None] = relationship('User', back_populates='advisor_profile')
 
 
-class AdvisorPointsLedger(Base):
-    """Ledger recording points earned by advisors for intervention actions."""
+class PointLedger(Base):
+    """Ledger recording points earned by users for completed tasks."""
 
-    __tablename__ = 'advisor_points_ledger'
-    __table_args__ = (
-        Index('ix_ledger_advisor_sid_action', 'advisor_id', 'sid', 'action_type'),
-    )
+    __tablename__ = 'point_ledger'
+    __table_args__ = (Index('ix_ledger_advisor_task', 'advisor_id', 'task_id'),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -164,9 +191,11 @@ class AdvisorPointsLedger(Base):
         Uuid,
         ForeignKey('advisors.advisor_id'),
     )
-    action_type: Mapped[str | None] = mapped_column(String)
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey('tasks.task_id'),
+    )
     points: Mapped[int | None] = mapped_column(Integer)
-    sid: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey('students.sid'))
     timestamp: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
@@ -248,11 +277,52 @@ class Case(Base):
     )
     resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
     assigned_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey('advisors.advisor_id'), nullable=True
+        Uuid,
+        ForeignKey('advisors.advisor_id'),
+        nullable=True,
     )
 
     # Relationships
     student: Mapped[Student] = relationship('Student')
+    tasks: Mapped[list[Task]] = relationship(
+        'Task',
+        back_populates='case',
+        cascade='all, delete-orphan',
+        lazy='selectin',
+    )
+
+
+class Task(Base):
+    """Represents a specific task associated with an intervention case."""
+
+    __tablename__ = 'tasks'
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    case_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('cases.case_id'),
+    )
+    action_type: Mapped[str] = mapped_column(
+        String
+    )  # 'send email', 'student book', 'resolve case'
+    status: Mapped[str] = mapped_column(String, default='pending')
+    points_reward: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    completed_by_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey('advisors.advisor_id'),
+    )
+
+    # Relationships
+    case: Mapped[Case] = relationship('Case', back_populates='tasks')
 
 
 class IdempotencyKey(Base):
