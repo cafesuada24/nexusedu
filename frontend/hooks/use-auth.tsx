@@ -28,37 +28,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Use TanStack Query for profile management
   const { data: user, isLoading, refetch, isFetched, error } = useProfile()
 
-  // Explicitly handle session expiration (401)
-  React.useEffect(() => {
-    if (isFetched && !user && !isLoading) {
-       if (error) {
-         warnLog("Session invalid or fetch failed", error)
-       }
-    }
-  }, [isFetched, user, isLoading, error])
-
   const isLoggingOut = React.useRef(false);
 
   const logout = React.useCallback(async () => {
     if (isLoggingOut.current) return;
     isLoggingOut.current = true;
+    
     try {
       if (typeof window !== "undefined") {
         window.localStorage.removeItem("nexusedu:auth:token");
       }
-      await logoutAction()
       
-      // HARD BREAK: Use window.location.href instead of router.push.
-      // This forcefully unloads the React app and stops all active TanStack Query refetches.
+      // Attempt server-side logout but don't let it block redirection
+      try {
+        await logoutAction()
+      } catch (err) {
+        warnLog("Server-side logout action failed", err)
+      }
+      
       toast.success("Đã đăng xuất")
-      window.location.href = "/login"
     } catch (error: any) {
-      toast.error("Lỗi khi đăng xuất")
-      warnLog("Logout error", error)
+      warnLog("Logout logic error", error)
     } finally {
+      // Force redirect regardless of success or failure
       isLoggingOut.current = false;
+      if (typeof window !== "undefined") {
+        window.location.href = "/login"
+      }
     }
   }, [])
+
+  // Explicitly handle session expiration (401/403)
+  React.useEffect(() => {
+    // getCurrentUser returns null on 401/403 authentication failures
+    if (isFetched && !user && !isLoading) {
+      if (error) {
+        warnLog("Profile fetch encountered an error", error)
+      }
+      
+      // Auto-logout if on a protected route
+      if (typeof window !== "undefined") {
+        const path = window.location.pathname
+        if (path.startsWith("/dashboard")) {
+          warnLog("Unauthorized access to dashboard detected, logging out...")
+          logout()
+        }
+      }
+    }
+  }, [isFetched, user, isLoading, error, logout])
+
 
   // Global unauthorized listener
   React.useEffect(() => {
