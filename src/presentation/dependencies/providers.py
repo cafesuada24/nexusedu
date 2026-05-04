@@ -26,6 +26,7 @@ from src.domain.repositories.metrics_repository import MetricsRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.domain.repositories.task_repository import TaskRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
 from src.domain.services.gamification import GamificationService
@@ -45,6 +46,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetricsRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
+    SqlAlchemyTaskRepository,
     SqlAlchemyUserSettingsRepository,
 )
 
@@ -127,6 +129,13 @@ async def get_job_repository(
     return SqlAlchemyJobRepository(session)
 
 
+async def get_task_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> TaskRepository:
+    """Dependency provider for the TaskRepository."""
+    return SqlAlchemyTaskRepository(session)
+
+
 async def get_user_settings_repository(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> UserSettingsRepository:
@@ -201,6 +210,7 @@ async def get_case_command_handler(
     ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
+    task_repo: Annotated[TaskRepository, Depends(get_task_repository)],
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
     task_queue = ArqTaskQueueAdapter(arq_pool)
@@ -212,6 +222,7 @@ async def get_case_command_handler(
         job_repo,
         gamification_service,
         task_queue,
+        task_repo=task_repo,
         email_drafting_service=BamlEmailDraftingService(),
         badge_repo=badge_repo,
     )
