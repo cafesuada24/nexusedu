@@ -9,11 +9,28 @@ import pytest
 
 from src.domain.entities.case import Case
 from src.domain.value_objects.status import EmailStatus, InterventionStatus
+from src.infrastructure.database.models import Advisor
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from src.presentation.api.auth import User
 
     from src.domain.repositories.case_repository import CaseRepository
+...
+@pytest.fixture(autouse=True)
+async def seed_advisor(test_db_session: AsyncSession, mock_user: User) -> None:
+    """Seed an advisor profile for the mock user."""
+    from uuid import uuid4
+    test_db_session.add(
+        Advisor(
+            advisor_id=uuid4(),
+            user_id=mock_user.id,
+            name='Test Advisor',
+            email=mock_user.email,
+        )
+    )
+    await test_db_session.commit()
     from src.domain.repositories.email_repository import EmailRepository
     from src.domain.repositories.student_repository import StudentRepository
 

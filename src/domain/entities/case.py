@@ -4,7 +4,13 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from src.domain.value_objects.status import CaseStatus, EmailStatus, InterventionStatus, RiskStatus
+from src.domain.entities.task import Task
+from src.domain.value_objects.status import (
+    CaseStatus,
+    EmailStatus,
+    InterventionStatus,
+    RiskStatus,
+)
 
 
 @dataclass
@@ -17,6 +23,7 @@ class Case:
     created_at: datetime = field(default_factory=datetime.now)
     resolved_at: datetime | None = None
     assigned_advisor_id: UUID | None = None
+    tasks: list[Task] = field(default_factory=list[Task])
 
 
 @dataclass
@@ -37,3 +44,4 @@ class TaskItemRecord:
     draft_status: EmailStatus | str | None
     assigned_to: str | None
     suggested_action: str
+    tasks: list[Task] = field(default_factory=list[Task])

@@ -1,6 +1,7 @@
 """Command handlers for case-related operations."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
@@ -11,6 +12,7 @@ from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.domain.repositories.task_repository import TaskRepository
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.gamification import GamificationService
 from src.domain.value_objects.status import (
@@ -18,7 +20,17 @@ from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
     RiskStatus,
+    TaskStatus,
+    TaskType,
 )
+
+
+@dataclass
+class CompleteTaskCommand:
+    """Command to complete a task and award points."""
+
+    task_id: UUID
+    user_id: UUID
 
 
 @dataclass
@@ -79,6 +91,7 @@ class CaseCommandHandler:
         job_repo: JobRepository,
         gamification_service: GamificationService,
         task_queue: BackgroundTaskQueue,
+        task_repo: TaskRepository | None = None,
         email_drafting_service: EmailDraftingService | None = None,
         badge_repo: BadgeRepository | None = None,
     ) -> None:
@@ -92,6 +105,70 @@ class CaseCommandHandler:
         self.email_drafting_service = email_drafting_service
         self.task_queue = task_queue
         self.badge_repo = badge_repo
+        self.task_repo = task_repo
+
+    async def handle_complete_task(self, command: CompleteTaskCommand) -> None:
+        """Complete a task and award points if eligible."""
+        if not self.task_repo:
+            raise ValueError('TaskRepository not provided.')
+
+        task = await self.task_repo.get_by_id(command.task_id)
+        if not task:
+            raise ValueError(f'Task {command.task_id} not found.')
+
+        if task.status == TaskStatus.COMPLETED:
+            return
+
+        case = await self.case_repo.get_by_id(task.case_id)
+        if not case:
+            raise ValueError(f'Case {task.case_id} not found.')
+
+        advisor_id = await self._resolve_advisor_id(command.user_id)
+        if not advisor_id:
+            raise ValueError(f'User {command.user_id} is not an advisor.')
+
+        # Security Check: Only the assigned advisor can complete the task
+        if case.assigned_advisor_id and case.assigned_advisor_id != advisor_id:
+            raise PermissionError('Only the assigned advisor can complete this task.')
+
+        # Update task status
+        task.status = TaskStatus.COMPLETED
+        task.completed_at = datetime.now()
+        task.completed_by_advisor_id = advisor_id
+
+        # Calculate dynamic points based on student risk and SLA
+        recorded_dt = await self.student_repo.get_latest_status_timestamp(case.sid)
+        student = await self.student_repo.get_by_id(case.sid)
+        risk_level = student.current_risk_status if student else RiskStatus.UNKNOWN
+
+        points = self.gamification_service.calculate_points(
+            task.action_type.value,
+            recorded_dt,
+            risk_level,
+        )
+        task.points_reward = points
+        await self.task_repo.update_task(task)
+
+        # Award points
+        await self._award_points(advisor_id, task.task_id, points)
+
+    async def _complete_task_by_type(
+        self,
+        case_id: UUID,
+        task_type: TaskType,
+        user_id: UUID,
+    ) -> None:
+        """Helper to find and complete a task of a specific type for a case."""
+        if not self.task_repo:
+            return
+
+        tasks = await self.task_repo.get_by_case(case_id)
+        for task in tasks:
+            if task.action_type == task_type and task.status != TaskStatus.COMPLETED:
+                await self.handle_complete_task(
+                    CompleteTaskCommand(task_id=task.task_id, user_id=user_id),
+                )
+                break
 
     async def handle_update_status(self, command: UpdateStudentStatusCommand) -> None:
         """Execute the status update command."""
@@ -113,29 +190,29 @@ class CaseCommandHandler:
             await self.case_repo.update_case_status(case.case_id, CaseStatus.OPEN)
 
         # Gamification hooks for status changes
-        advisor_id = await self._resolve_advisor_id(command.user_id)
-        if advisor_id:
-            if command.status == InterventionStatus.BOOKED:
-                await self._award_points(advisor_id, case.sid, 'meeting_booked')
-            elif command.status == InterventionStatus.RESOLVED:
-                await self._award_points(advisor_id, case.sid, 'student_resolved')
+        if command.status == InterventionStatus.BOOKED:
+            await self._complete_task_by_type(
+                case.case_id,
+                TaskType.STUDENT_BOOK,
+                command.user_id,
+            )
+        elif command.status == InterventionStatus.RESOLVED:
+            await self._complete_task_by_type(
+                case.case_id,
+                TaskType.RESOLVE_CASE,
+                command.user_id,
+            )
 
     async def handle_award_review_points(
         self,
         command: AwardReviewPointsCommand,
     ) -> None:
         """Execute the award review points command."""
-        case = await self.case_repo.get_by_id(command.case_id)
-        if not case:
-            raise ValueError(f'Case {command.case_id} not found.')
-
-        advisor_id = await self._resolve_advisor_id(command.user_id)
-        if advisor_id:
-            await self._award_points(
-                advisor_id,
-                case.sid,
-                'draft_reviewed',
-            )
+        await self._complete_task_by_type(
+            command.case_id,
+            TaskType.REVIEW_DRAFT,
+            command.user_id,
+        )
 
     async def handle_trigger_draft(self, command: TriggerDraftCommand) -> UUID:
         """Execute the trigger draft command."""
@@ -264,17 +341,26 @@ class CaseCommandHandler:
         await self.email_repo.mark_as_sent(case.case_id, command.body)
         await self.student_repo.update_last_notified(case.sid)
 
-        # Auto-assign the case to the advisor who sent the email
+        # TODO: refactor this stupid logic later
         advisor_id = await self._resolve_advisor_id(command.user_id)
         if advisor_id:
+            # TODO: add explicit assign action instead of implicit assign upon sending email
             assigned = await self.case_repo.assign_case(command.case_id, advisor_id)
             if not assigned:
                 logger.info(
-                    f'Case {command.case_id} already assigned. Skipping auto-assignment for advisor {advisor_id}.'
+                    f'Case {command.case_id} already assigned. Skipping auto-assignment for advisor {advisor_id}.',
                 )
 
-            # 3. Gamification
-            await self._award_points(advisor_id, case.sid, 'email_sent')
+            # TODO: dispatch email sent event upon email sent succesfully
+            await self._complete_task_by_type(
+                case.case_id,
+                TaskType.SEND_EMAIL,
+                command.user_id,
+            )
+        else:
+            logger.warning(
+                f'Gamification: User {command.user_id} is not linked to an advisor profile. Skipping points reward for send email.',
+            )
 
         await self.task_queue.enqueue(
             'run_dispatch_email_task',
@@ -294,30 +380,18 @@ class CaseCommandHandler:
     async def _award_points(
         self,
         advisor_id: UUID,
-        sid: UUID,
-        action_type: str,
+        task_id: UUID,
+        points: int,
     ) -> None:
-        """Orchestrate awarding points for an advisor action."""
-        if await self.advisor_repo.has_existing_action(advisor_id, sid, action_type):
+        """Orchestrate awarding points for a completed task."""
+        if await self.advisor_repo.has_existing_reward(advisor_id, task_id):
             logger.info(
-                f'Gamification: Action {action_type} already recorded for advisor {advisor_id} and student {sid}. Skipping.',
+                f'Gamification: Reward already recorded for advisor {advisor_id} and task {task_id}. Skipping.',
             )
             return
 
-        recorded_dt = await self.student_repo.get_latest_status_timestamp(sid)
-
-        student = await self.student_repo.get_by_id(sid)
-        risk_level = RiskStatus.UNKNOWN
-        if student:
-            risk_level = student.current_risk_status
-
-        points = self.gamification_service.calculate_points(
-            action_type,
-            recorded_dt,
-            risk_level,
-        )
         if points > 0:
-            await self.advisor_repo.record_points(advisor_id, sid, action_type, points)
+            await self.advisor_repo.record_points(advisor_id, task_id, points)
             if self.badge_repo:
                 # Trigger background task to evaluate badges without blocking API
                 await self.task_queue.enqueue('run_evaluate_badges_task', advisor_id=str(advisor_id))

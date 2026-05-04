@@ -37,21 +37,21 @@ class AdvisorRepository(Protocol):
     async def record_points(
         self,
         advisor_id: UUID,
-        sid: UUID,
-        action_type: str,
+        task_id: UUID,
         points: int,
     ) -> None:
-        """Record gamification points for an advisor action."""
+        """Record gamification points for a completed task."""
         ...
 
-    async def has_existing_action(
-        self, advisor_id: UUID, sid: UUID, action_type: str
-    ) -> bool:
-        """Check if an action has already been recorded for this advisor/student combination."""
+    async def has_existing_reward(self, advisor_id: UUID, task_id: UUID) -> bool:
+        """Check if a reward has already been recorded for this advisor/task combination."""
         ...
 
     async def upsert_advisor_for_user(
-        self, user_id: UUID, email: str, name: str
+        self,
+        user_id: UUID,
+        email: str,
+        name: str,
     ) -> None:
         """Link a user to an advisor profile, creating one if necessary."""
         ...

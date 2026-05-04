@@ -4,9 +4,25 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.testclient import TestClient
 
-from src.domain.entities.case import Case, CaseStatus
+from src.domain.entities.case import Case
+from src.domain.value_objects.status import CaseStatus
+from src.infrastructure.database.models import Advisor
+from src.presentation.api.auth import User
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.student_repository import StudentRepository
+
+@pytest.fixture(autouse=True)
+async def seed_advisor(test_db_session: AsyncSession, mock_user: User) -> None:
+    """Seed an advisor profile for the mock user."""
+    test_db_session.add(
+        Advisor(
+            advisor_id=uuid4(),
+            user_id=mock_user.id,
+            name='Test Advisor',
+            email=mock_user.email,
+        )
+    )
+    await test_db_session.commit()
 
 
 @pytest.mark.asyncio

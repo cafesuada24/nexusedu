@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.infrastructure.database.models import AdvisorBadge, AdvisorPointsLedger, Case as OrmCase
+from src.infrastructure.database.models import AdvisorBadge, PointLedger, Case as OrmCase, Task as OrmTask
 from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyBadgeRepository
 from src.domain.value_objects.badges import BADGE_MAP
 
@@ -61,10 +61,11 @@ async def test_badge_repository_stats_calculation(
     sid = uuid4()
     
     # 1. Create a case created 10 hours ago
+    case_id = uuid4()
     created_at = datetime.now() - timedelta(hours=10)
     test_db_session.add(
         OrmCase(
-            case_id=uuid4(),
+            case_id=case_id,
             sid=sid,
             assigned_advisor_id=advisor_id,
             created_at=created_at,
@@ -72,14 +73,26 @@ async def test_badge_repository_stats_calculation(
         )
     )
     
-    # 2. Add an action (points ledger) for that sid taken NOW (response time = 10 hours)
+    # 2. Add an action (points ledger) for that case
+    task_id = uuid4()
     test_db_session.add(
-        AdvisorPointsLedger(
+        OrmTask(
+            task_id=task_id,
+            case_id=case_id,
+            action_type="send email",
+            status="completed",
+            points_reward=10,
+            created_at=created_at,
+            completed_at=datetime.now(),
+            completed_by_advisor_id=advisor_id
+        )
+    )
+    test_db_session.add(
+        PointLedger(
             id=uuid4(),
             advisor_id=advisor_id,
-            sid=sid,
+            task_id=task_id,
             points=10,
-            action_type="email_sent",
             timestamp=datetime.now()
         )
     )

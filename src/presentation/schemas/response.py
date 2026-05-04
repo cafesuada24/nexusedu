@@ -112,6 +112,17 @@ class AlertStudent(BaseModel):
     )
 
 
+class TaskDetail(BaseModel):
+    """Schema for a specific task within a case."""
+
+    task_id: str = Field(..., description='Unique task identifier.')
+    action_type: str = Field(..., description='The action required (e.g., send email).')
+    status: str = Field(..., description='Task status (pending, completed).')
+    points_reward: int = Field(..., description='Points awarded upon completion.')
+    completed_at: str | None = Field(None, description='When the task was completed.')
+    completed_by_advisor_id: str | None = Field(None, description='Who completed the task.')
+
+
 class TaskItem(BaseModel):
     """Schema for a task in the advisor task list."""
 
@@ -130,6 +141,7 @@ class TaskItem(BaseModel):
     assigned_to: str | None = Field(None, description='Name of assigned advisor.')
     suggested_action: str = Field(..., description='Computed action to take.')
     points_reward: int = Field(..., description='Points for completing action.')
+    tasks: list[TaskDetail] | None = Field(None, description='Detailed sub-tasks.')
 
 
 class TaskPagedResponse(BaseModel):

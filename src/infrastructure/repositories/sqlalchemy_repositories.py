@@ -11,6 +11,7 @@ from sqlalchemy import (
     CursorResult,
     Integer,
     String,
+    and_,
     case,
     cast,
     desc,
@@ -25,9 +26,11 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.orm import selectinload
 
 from src.core.config import config
 from src.domain.entities.case import TaskItemRecord
+from src.domain.entities.task import Task as DomainTask
 from src.domain.value_objects.status import (
     CaseStatus,
     EmailStatus,
@@ -40,10 +43,10 @@ from src.infrastructure.database.models import (
     Activity,
     Advisor,
     AdvisorBadge,
-    AdvisorPointsLedger,
     BackgroundJobTracker,
     IdempotencyKey,
     InterventionEmail,
+    PointLedger,
     Student,
     StudentStatusHistory,
     UserSettings,
@@ -52,13 +55,16 @@ from src.infrastructure.database.models import Advisor as OrmAdvisor
 from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.models import InterventionEmail as OrmEmail
 from src.infrastructure.database.models import Student as OrmStudent
+from src.infrastructure.database.models import (
+    Task as OrmTask,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm import Session
+    from sqlalchemy.orm import Session, selectinload
 
     from src.domain.entities.advisor import Advisor as DomainAdvisor
     from src.domain.entities.alert import Alert as DomainAlert
@@ -375,72 +381,73 @@ class SqlAlchemyAdvisorRepository:
             'semester': timedelta(days=120),
         }
 
-        stmt = select(
-            AdvisorPointsLedger.advisor_id,
-            func.coalesce(
-                Advisor.name,
-                AdvisorPointsLedger.advisor_id,
-            ).label('name'),
-            func.sum(AdvisorPointsLedger.points).label('total_points'),
-            func.count(AdvisorPointsLedger.id).label('actions_count'),
-            func.count(
-                case((AdvisorPointsLedger.action_type == 'email_sent', 1)),
-            ).label('sent_count'),
-            func.count(
-                case((AdvisorPointsLedger.action_type == 'student_resolved', 1)),
-            ).label('resolved_count'),
-        ).outerjoin(Advisor, AdvisorPointsLedger.advisor_id == Advisor.advisor_id)
-
+        # Calculate cutoff if needed
+        cutoff = None
         if time_window != 'all_time' and time_window in interval_map:
             cutoff = datetime.now() - interval_map[time_window]
-            stmt = stmt.where(AdvisorPointsLedger.timestamp >= cutoff)
+
+        # Base query: Select from Advisor to include everyone even with 0 points
+        # Join with PointLedger and filter by cutoff in the join condition
+        ledger_join_cond = Advisor.advisor_id == PointLedger.advisor_id
+        if cutoff:
+            ledger_join_cond = and_(ledger_join_cond, PointLedger.timestamp >= cutoff)
+
+        stmt = select(
+            Advisor.advisor_id,
+            Advisor.name,
+            func.coalesce(func.sum(PointLedger.points), 0).label('total_points'),
+            func.count(PointLedger.id).label('actions_count'),
+            func.count(
+                case((OrmTask.action_type == 'send email', 1)),
+            ).label('sent_count'),
+            func.count(
+                case((OrmTask.action_type == 'resolve case', 1)),
+            ).label('resolved_count'),
+        ).outerjoin(PointLedger, ledger_join_cond)\
+         .outerjoin(OrmTask, PointLedger.task_id == OrmTask.task_id)
 
         stmt = stmt.group_by(
-            AdvisorPointsLedger.advisor_id,
+            Advisor.advisor_id,
             Advisor.name,
         ).order_by(desc('total_points'))
 
-        # Count total items
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        # Count total items (total number of advisors)
+        count_stmt = select(func.count(Advisor.advisor_id))
         count_result = await self.session.execute(count_stmt)
         total_count = count_result.scalar() or 0
 
         # Apply paging
         stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
-        return [dict(row) for row in result.mappings().all()], total_count
+        return [row._asdict() for row in result.all()], total_count
 
     async def record_points(
         self,
         advisor_id: uuid.UUID,
-        sid: uuid.UUID,
-        action_type: str,
+        task_id: uuid.UUID,
         points: int,
     ) -> None:
-        """Record gamification points for an advisor action."""
-        entry = AdvisorPointsLedger(
+        """Record gamification points for a completed task."""
+        entry = PointLedger(
             advisor_id=advisor_id,
-            sid=sid,
-            action_type=action_type,
+            task_id=task_id,
             points=points,
         )
         self.session.add(entry)
-        # await self.session.commit() removed
 
-    async def has_existing_action(
-        self, advisor_id: uuid.UUID, sid: uuid.UUID, action_type: str
+    async def has_existing_reward(
+        self, advisor_id: uuid.UUID, task_id: uuid.UUID,
     ) -> bool:
-        """Check if an action has already been recorded for this advisor/student combination."""
-        stmt = select(AdvisorPointsLedger).where(
-            AdvisorPointsLedger.advisor_id == advisor_id,
-            AdvisorPointsLedger.sid == sid,
-            AdvisorPointsLedger.action_type == action_type,
+        """Check if a reward has already been recorded for this advisor/task combination."""
+        stmt = select(PointLedger).where(
+            PointLedger.advisor_id == advisor_id,
+            PointLedger.task_id == task_id,
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none() is not None
 
     async def upsert_advisor_for_user(
-        self, user_id: uuid.UUID, email: str, name: str
+        self, user_id: uuid.UUID, email: str, name: str,
     ) -> None:
         """Link a user to an advisor profile, creating one if necessary."""
         # 1. Check if an advisor with this user_id already exists
@@ -501,14 +508,14 @@ class SqlAlchemyBadgeRepository:
 
     async def get_advisor_badges(self, advisor_id: uuid.UUID) -> list[str]:
         stmt = select(AdvisorBadge.badge_id).where(
-            AdvisorBadge.advisor_id == advisor_id
+            AdvisorBadge.advisor_id == advisor_id,
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
     async def award_badge(self, advisor_id: uuid.UUID, badge_id: str) -> bool:
         stmt = select(AdvisorBadge).where(
-            AdvisorBadge.advisor_id == advisor_id, AdvisorBadge.badge_id == badge_id
+            AdvisorBadge.advisor_id == advisor_id, AdvisorBadge.badge_id == badge_id,
         )
         existing = (await self.session.execute(stmt)).first()
         if existing:
@@ -521,30 +528,27 @@ class SqlAlchemyBadgeRepository:
     async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
         # Get total points and action count
         stmt = select(
-            func.sum(AdvisorPointsLedger.points), func.count(AdvisorPointsLedger.id)
-        ).where(AdvisorPointsLedger.advisor_id == advisor_id)
+            func.sum(PointLedger.points), func.count(PointLedger.id),
+        ).where(PointLedger.advisor_id == advisor_id)
 
         row = (await self.session.execute(stmt)).first()
         total_points = row[0] or 0
         total_actions = row[1] or 0
 
         # Get resolves
-        stmt_resolves = select(func.count(AdvisorPointsLedger.id)).where(
-            AdvisorPointsLedger.advisor_id == advisor_id,
-            AdvisorPointsLedger.action_type == 'student_resolved',
-        )
+        stmt_resolves = select(func.count(PointLedger.id)).where(
+            PointLedger.advisor_id == advisor_id,
+            OrmTask.action_type == 'resolve case',
+        ).join(OrmTask, PointLedger.task_id == OrmTask.task_id)
         total_resolves = (await self.session.execute(stmt_resolves)).scalar() or 0
 
-        # Fast actions (Approximate: assuming >10 points per action often means fast SLA multiplier was hit,
-        # Calculate real response metrics by comparing case creation vs action time
+        # Fast actions
         stmt_times = (
-            select(OrmCase.created_at, AdvisorPointsLedger.timestamp)
-            .join(
-                AdvisorPointsLedger,
-                (OrmCase.sid == AdvisorPointsLedger.sid)
-                & (OrmCase.assigned_advisor_id == AdvisorPointsLedger.advisor_id),
-            )
+            select(OrmCase.created_at, PointLedger.timestamp)
+            .join(OrmTask, OrmCase.case_id == OrmTask.case_id)
+            .join(PointLedger, OrmTask.task_id == PointLedger.task_id)
             .where(OrmCase.assigned_advisor_id == advisor_id)
+            .where(PointLedger.advisor_id == advisor_id)
         )
         time_pairs = (await self.session.execute(stmt_times)).all()
 
@@ -567,7 +571,7 @@ class SqlAlchemyBadgeRepository:
 
         # Get total cases assigned
         stmt_cases = select(func.count(OrmCase.case_id)).where(
-            OrmCase.assigned_advisor_id == advisor_id
+            OrmCase.assigned_advisor_id == advisor_id,
         )
         total_cases = (await self.session.execute(stmt_cases)).scalar() or 0
         recovery_rate = total_resolves / total_cases if total_cases > 0 else 0.0
@@ -729,7 +733,7 @@ class SqlAlchemyCaseRepository:
         self.session = session
 
     async def create_case(self, case: DomainCase) -> None:
-        """Create a new case."""
+        """Create a new case with initial tasks."""
         orm_case = OrmCase(
             case_id=case.case_id,
             sid=case.sid,
@@ -737,6 +741,25 @@ class SqlAlchemyCaseRepository:
             created_at=case.created_at,
         )
         self.session.add(orm_case)
+
+        # Automatically generate standard tasks
+        # These points values should ideally come from a config or service
+        standard_tasks = [
+            ('send email', 10),
+            ('student book', 20),
+            ('resolve case', 50),
+            ('review draft', 5),
+        ]
+        for action_type, points in standard_tasks:
+            task = OrmTask(
+                task_id=uuid.uuid4(),
+                case_id=case.case_id,
+                action_type=action_type,
+                status='pending',
+                points_reward=points,
+                created_at=case.created_at,
+            )
+            self.session.add(task)
 
     async def get_active_case(self, sid: uuid.UUID) -> DomainCase | None:
         """Retrieve the active case for a student, if any."""
@@ -775,15 +798,22 @@ class SqlAlchemyCaseRepository:
 
     async def get_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
         """Retrieve a case by its ID."""
-        stmt = select(OrmCase).where(OrmCase.case_id == case_id)
+        stmt = (
+            select(OrmCase)
+            .where(OrmCase.case_id == case_id)
+            .options(selectinload(OrmCase.tasks))
+        )
         result = await self.session.execute(stmt)
-        orm_case = result.scalar_one_or_none()
-        return DataMapper.to_domain_case(orm_case) if orm_case else None
+        case = result.scalar_one_or_none()
+        return DataMapper.to_domain_case(case) if case else None
 
     async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
         """Retrieve all cases for a specific student."""
         stmt = (
-            select(OrmCase).where(OrmCase.sid == sid).order_by(desc(OrmCase.created_at))
+            select(OrmCase)
+            .where(OrmCase.sid == sid)
+            .options(selectinload(OrmCase.tasks))
+            .order_by(desc(OrmCase.created_at))
         )
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
@@ -822,7 +852,7 @@ class SqlAlchemyCaseRepository:
                 or_(
                     OrmCase.assigned_advisor_id == advisor_id,
                     OrmCase.assigned_advisor_id.is_(None),
-                )
+                ),
             )
 
         # Count total items before applying limit/offset
@@ -834,8 +864,23 @@ class SqlAlchemyCaseRepository:
         stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
 
+        mappings = result.mappings().all()
+        case_ids = [m['case_id'] for m in mappings]
+
+        # Fetch all tasks for these cases in one go
+        tasks_stmt = select(OrmTask).where(OrmTask.case_id.in_(case_ids))
+        tasks_result = await self.session.execute(tasks_stmt)
+        all_tasks = tasks_result.scalars().all()
+
+        # Group tasks by case_id
+        tasks_by_case = {}
+        for t in all_tasks:
+            if t.case_id not in tasks_by_case:
+                tasks_by_case[t.case_id] = []
+            tasks_by_case[t.case_id].append(DataMapper.to_domain_task(t))
+
         tasks = []
-        for row in result.mappings().all():
+        for row in mappings:
             risk_status_val = row['current_risk_status']
             if isinstance(risk_status_val, str):
                 try:
@@ -854,6 +899,8 @@ class SqlAlchemyCaseRepository:
             else:
                 intervention_status = InterventionStatus.NONE
 
+            case_tasks = tasks_by_case.get(row['case_id'], [])
+
             tasks.append(
                 TaskItemRecord(
                     case_id=row['case_id'],
@@ -870,9 +917,57 @@ class SqlAlchemyCaseRepository:
                     draft_status=row['draft_status'],
                     assigned_to=row['assigned_to'],
                     suggested_action='N/A',  # Will be populated by the application layer
-                )
+                    tasks=case_tasks,
+                ),
             )
         return tasks, total_count
+
+
+class SqlAlchemyTaskRepository:
+    """SQLAlchemy implementation of the TaskRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+
+    async def create_task(self, task: DomainTask) -> None:
+        """Create a new task."""
+        orm_task = OrmTask(
+            task_id=task.task_id,
+            case_id=task.case_id,
+            action_type=task.action_type.value,
+            status=task.status.value,
+            points_reward=task.points_reward,
+            created_at=task.created_at,
+        )
+        self.session.add(orm_task)
+
+    async def get_by_id(self, task_id: uuid.UUID) -> DomainTask | None:
+        """Retrieve a task by its ID."""
+        stmt = select(OrmTask).where(OrmTask.task_id == task_id)
+        result = await self.session.execute(stmt)
+        task = result.scalar_one_or_none()
+        return DataMapper.to_domain_task(task) if task else None
+
+    async def get_by_case(self, case_id: uuid.UUID) -> list[DomainTask]:
+        """Retrieve all tasks for a specific case."""
+        stmt = select(OrmTask).where(OrmTask.case_id == case_id)
+        result = await self.session.execute(stmt)
+        return [DataMapper.to_domain_task(t) for t in result.scalars().all()]
+
+    async def update_task(self, task: DomainTask) -> None:
+        """Update an existing task."""
+        stmt = (
+            update(OrmTask)
+            .where(OrmTask.task_id == task.task_id)
+            .values(
+                status=task.status.value,
+                points_reward=task.points_reward,
+                completed_at=task.completed_at,
+                completed_by_advisor_id=task.completed_by_advisor_id,
+            )
+        )
+        await self.session.execute(stmt)
 
 
 class SqlAlchemyAlertRepository:
@@ -981,7 +1076,7 @@ class SqlAlchemyMetricsRepository:
 
         # 3. Advisor Engagement
         active_advisors_stmt = select(
-            func.count(func.distinct(AdvisorPointsLedger.advisor_id)),
+            func.count(func.distinct(PointLedger.advisor_id)),
         )
         active_advisors_res = await self.session.execute(active_advisors_stmt)
         active_advisors = active_advisors_res.scalar() or 0

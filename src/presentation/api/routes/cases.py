@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.commands.case_commands import (
     AwardReviewPointsCommand,
     CaseCommandHandler,
+    CompleteTaskCommand,
     SendEmailCommand,
     TriggerDraftCommand,
     UpdateStudentStatusCommand,
@@ -102,6 +103,21 @@ async def get_cases_list(
                     'assigned_to': d.assigned_to,
                     'suggested_action': d.suggested_action,
                     'points_reward': d.points_reward,
+                    'tasks': [
+                        {
+                            'task_id': str(t.task_id),
+                            'action_type': t.action_type.value,
+                            'status': t.status.value,
+                            'points_reward': t.points_reward,
+                            'completed_at': t.completed_at.isoformat() if t.completed_at else None,
+                            'completed_by_advisor_id': str(t.completed_by_advisor_id)
+                            if t.completed_by_advisor_id
+                            else None,
+                        }
+                        for t in d.tasks
+                    ]
+                    if d.tasks
+                    else [],
                 }
                 for d in paged_dto.items
             ],
@@ -334,4 +350,24 @@ async def send_nudge_email(
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
         logger.error(f'Error in send_nudge_email: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/tasks/{task_id}/complete')
+async def complete_task(
+    task_id: str,
+    command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+) -> dict[str, str]:
+    """Manually completes a task and awards points."""
+    try:
+        command = CompleteTaskCommand(task_id=UUID(task_id), user_id=user.id)
+        await command_handler.handle_complete_task(command)
+        return {'status': 'success', 'task_id': task_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error in complete_task: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
