@@ -1,47 +1,35 @@
 """API routes for Advisor management and Leaderboards."""
 
+import json
 from typing import Annotated, Any
+from uuid import UUID
 
+from arq import ArqRedis
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
 
-from src.domain.repositories.interfaces import AdvisorRepository
-from src.presentation.api.auth import Scope, User, require_scope
 from src.core.logger import logger
+from src.domain.repositories.badge_repository import BadgeRepository
+from src.domain.repositories.interfaces import AdvisorRepository
+from src.domain.value_objects.badges import BADGE_MAP
+from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
     get_advisor_repository,
-    get_badge_repository,
     get_arq_pool,
+    get_badge_repository,
 )
-from src.presentation.schemas.response import PaginationMetadata
-from arq import ArqRedis
-import json
+from src.presentation.schemas.response import (
+    LeaderboardEntry,
+    LeaderboardPagedResponse,
+    PaginationMetadata,
+)
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
-
-
-class LeaderboardEntry(BaseModel):
-    """Schema for a single entry in the advisor leaderboard."""
-
-    advisor_id: str = Field(..., description='Unique advisor identifier.')
-    name: str = Field(..., description='Advisor name.')
-    total_points: int = Field(..., description='Total points earned.')
-    actions_count: int = Field(..., description='Total actions taken.')
-    sent_count: int = Field(..., description='Emails sent.')
-    resolved_count: int = Field(..., description='Students resolved.')
-
-
-class LeaderboardPagedResponse(BaseModel):
-    """Paged response for advisor leaderboard."""
-
-    items: list[LeaderboardEntry]
-    metadata: PaginationMetadata
 
 
 @router.get('/engagement')
 async def get_engagement_metrics(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
 ) -> list[dict[str, Any]]:
     """Retrieve engagement metrics aggregated by major (faculty).
 
@@ -53,21 +41,22 @@ async def get_engagement_metrics(
     except Exception as e:
         logger.error(f'Failed to fetch engagement metrics: {e}')
         raise HTTPException(
-            status_code=500, detail='Failed to retrieve engagement metrics'
+            status_code=500,
+            detail='Failed to retrieve engagement metrics',
         ) from e
 
 
 @router.get('/leaderboard', response_model=LeaderboardPagedResponse)
 async def get_leaderboard(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
     time_window: str = Query(
         'all_time',
         pattern='^(weekly|monthly|semester|all_time)$',
     ),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
-) -> dict[str, Any]:
+) -> LeaderboardPagedResponse:
     """Retrieve the advisor leaderboard based on gamification points.
 
     Args:
@@ -80,46 +69,46 @@ async def get_leaderboard(
     """
     try:
         items, total_count = await advisor_repo.get_leaderboard(
-            time_window, limit=limit, offset=offset
+            time_window,
+            limit=limit,
+            offset=offset,
         )
-        return {
-            'items': [
-                {
-                    'advisor_id': str(i['advisor_id']),
-                    'name': i['name'],
-                    'total_points': i['total_points'],
-                    'actions_count': i['actions_count'],
-                    'sent_count': i['sent_count'],
-                    'resolved_count': i['resolved_count'],
-                }
+        return LeaderboardPagedResponse(
+            items=[
+                LeaderboardEntry(
+                    advisor_id=str(i['advisor_id']),
+                    name=i['name'],
+                    total_points=i['total_points'],
+                    actions_count=i['actions_count'],
+                    sent_count=i['sent_count'],
+                    resolved_count=i['resolved_count'],
+                )
                 for i in items
             ],
-            'metadata': {
-                'total_count': total_count,
-                'limit': limit,
-                'offset': offset,
-                'has_next': (offset + limit) < total_count,
-            },
-        }
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
+                has_next=(offset + limit) < total_count,
+            ),
+        )
     except Exception as e:
         logger.error(f'Failed to fetch leaderboard: {e}')
         raise HTTPException(
-            status_code=500, detail='Failed to retrieve leaderboard'
+            status_code=500,
+            detail='Failed to retrieve leaderboard',
         ) from e
 
 
 @router.get('/{advisor_id}/badges')
 async def get_advisor_badges(
     advisor_id: str,
-    badge_repo: Annotated[Any, Depends(get_badge_repository)],
+    badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
-    _user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
 ) -> list[dict[str, Any]]:
     """Retrieve the badges earned by an advisor (with Redis caching)."""
-    from uuid import UUID
-    from src.domain.value_objects.badges import BADGE_MAP
-    
-    cache_key = f"advisor_badges:{advisor_id}"
+    cache_key = f'advisor_badges:{advisor_id}'
     try:
         # 1. Try to get from cache
         cached_data = await arq_pool.get(cache_key)
@@ -129,26 +118,28 @@ async def get_advisor_badges(
         # 2. If not in cache, fetch from DB
         adv_uuid = UUID(advisor_id)
         badge_ids = await badge_repo.get_advisor_badges(adv_uuid)
-        
-        badges = []
+
+        badges: list[dict[str, Any]] = []
         for b_id in badge_ids:
             if b_id in BADGE_MAP:
                 b = BADGE_MAP[b_id]
-                badges.append({
-                    'badge_id': b.badge_id,
-                    'name': b.name,
-                    'description': b.description,
-                    'icon': b.icon,
-                })
-        
+                badges.append(
+                    {
+                        'badge_id': b.badge_id,
+                        'name': b.name,
+                        'description': b.description,
+                        'icon': b.icon,
+                    },
+                )
+
         # 3. Store in cache for 5 minutes (300s)
         await arq_pool.setex(cache_key, 300, json.dumps(badges))
-        
+
         return badges
-    except ValueError:
-        raise HTTPException(status_code=400, detail='Invalid advisor ID format')
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail='Invalid advisor ID format') from e
     except Exception as e:
         logger.error(f'Failed to fetch badges for advisor {advisor_id}: {e}')
         raise HTTPException(
-            status_code=500, detail='Failed to retrieve advisor badges'
+            status_code=500, detail='Failed to retrieve advisor badges',
         ) from e
