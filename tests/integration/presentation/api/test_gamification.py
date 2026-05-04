@@ -11,16 +11,34 @@ import pytest
 from src.domain.entities.case import Case
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
 from src.infrastructure.database.models import (
-    AdvisorPointsLedger,
+    PointLedger,
     StudentStatusHistory,
+    Task,
+    Case as OrmCase,
+    Advisor,
 )
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
     from sqlalchemy.ext.asyncio import AsyncSession
+    from src.presentation.api.auth import User
 
     from src.domain.repositories.case_repository import CaseRepository
     from src.domain.repositories.student_repository import StudentRepository
+
+
+@pytest.fixture(autouse=True)
+async def seed_advisor(test_db_session: AsyncSession, mock_user: User) -> None:
+    """Seed an advisor profile for the mock user."""
+    test_db_session.add(
+        Advisor(
+            advisor_id=uuid4(),
+            user_id=mock_user.id,
+            name='Test Advisor',
+            email=mock_user.email,
+        )
+    )
+    await test_db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -63,13 +81,14 @@ async def test_draft_review_points(
     # Check ledger
     from sqlalchemy import select
 
-    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    stmt = select(PointLedger, Task).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
     result = await test_db_session.execute(stmt)
-    ledger_entries = result.scalars().all()
+    rows = result.all()
 
-    assert len(ledger_entries) == 1
-    assert ledger_entries[0].action_type == 'draft_reviewed'
-    assert ledger_entries[0].points == 7
+    assert len(rows) == 1
+    ledger_entry, task = rows[0]
+    assert task.action_type == 'review draft'
+    assert ledger_entry.points == 7
 
 
 @pytest.mark.asyncio
@@ -108,7 +127,7 @@ async def test_idempotency_prevents_duplicate_review_points(
     # Check that only ONE ledger entry was created
     from sqlalchemy import select
 
-    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    stmt = select(PointLedger).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
     ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
     assert len(ledger_entries) == 1
 
@@ -146,7 +165,7 @@ async def test_duplicate_action_guard_prevents_double_points(
     # Assert: Only ONE ledger entry should exist
     from sqlalchemy import select
 
-    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    stmt = select(PointLedger).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
     ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
     assert len(ledger_entries) == 1
 
@@ -200,10 +219,10 @@ async def test_email_sent_points(
     # Check ledger
     from sqlalchemy import select
 
-    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    stmt = select(PointLedger, Task).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
     result = await test_db_session.execute(stmt)
-    ledger_entries = result.scalars().all()
-    assert any(r.action_type == 'email_sent' for r in ledger_entries)
+    rows = result.all()
+    assert any(row.Task.action_type == 'send email' for row in rows)
 
 
 @pytest.mark.asyncio
@@ -222,12 +241,12 @@ async def test_status_change_points(
                 'sid': sid,
                 'student_name': 'G3',
                 'email': 'g3@ex.com',
-                'current_risk_status': RiskStatus.CRITICAL,
+                'current_risk_status': RiskStatus.CRITICAL.value,
             },
         ]
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
-    await student_repository.session.commit()
+    await test_db_session.commit()
 
     # Booked
     client.patch(f'/api/v1/cases/{cid}/status', json={'status': 'booked'})
@@ -236,13 +255,13 @@ async def test_status_change_points(
 
     from sqlalchemy import select
 
-    stmt = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid)
+    stmt = select(PointLedger, Task).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
     result = await test_db_session.execute(stmt)
-    ledger_entries = result.scalars().all()
+    rows = result.all()
 
-    actions = [r.action_type for r in ledger_entries]
-    assert 'meeting_booked' in actions
-    assert 'student_resolved' in actions
+    actions = [row.Task.action_type for row in rows]
+    assert 'student book' in actions
+    assert 'resolve case' in actions
 
 
 @pytest.mark.asyncio
@@ -349,17 +368,13 @@ async def test_response_time_bonus(
 
     from sqlalchemy import select
 
-    stmt_fast = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_fast)
-    stmt_mid = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_mid)
-    stmt_slow = select(AdvisorPointsLedger).where(AdvisorPointsLedger.sid == sid_slow)
-    stmt_penalty = select(AdvisorPointsLedger).where(
-        AdvisorPointsLedger.sid == sid_penalty
-    )
+    def get_stmt(sid: UUID):
+        return select(PointLedger).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
 
-    res_fast = (await test_db_session.execute(stmt_fast)).scalar_one()
-    res_mid = (await test_db_session.execute(stmt_mid)).scalar_one()
-    res_slow = (await test_db_session.execute(stmt_slow)).scalar_one()
-    res_penalty = (await test_db_session.execute(stmt_penalty)).scalar_one()
+    res_fast = (await test_db_session.execute(get_stmt(sid_fast))).scalar_one()
+    res_mid = (await test_db_session.execute(get_stmt(sid_mid))).scalar_one()
+    res_slow = (await test_db_session.execute(get_stmt(sid_slow))).scalar_one()
+    res_penalty = (await test_db_session.execute(get_stmt(sid_penalty))).scalar_one()
 
     assert res_fast.points == 7
     assert res_mid.points == 6
@@ -373,42 +388,51 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
     # Seed ledger with some data
     adv1_id = uuid4()
     adv2_id = uuid4()
-    s1 = uuid4()
-    s2 = uuid4()
-    s3 = uuid4()
-    s4 = uuid4()
+    s1, s2, s3, s4 = uuid4(), uuid4(), uuid4(), uuid4()
+    cid1, cid2, cid3, cid4 = uuid4(), uuid4(), uuid4(), uuid4()
+    t1, t2, t3, t4 = uuid4(), uuid4(), uuid4(), uuid4()
+
+    test_db_session.add_all([
+        OrmCase(case_id=cid1, sid=s1),
+        OrmCase(case_id=cid2, sid=s2),
+        OrmCase(case_id=cid3, sid=s3),
+        OrmCase(case_id=cid4, sid=s4),
+    ])
+    test_db_session.add_all([
+        Task(task_id=t1, case_id=cid1, action_type='send email'),
+        Task(task_id=t2, case_id=cid2, action_type='send email'),
+        Task(task_id=t3, case_id=cid3, action_type='send email'),
+        Task(task_id=t4, case_id=cid4, action_type='send email'),
+    ])
+
     test_db_session.add_all(
         [
-            AdvisorPointsLedger(
+            PointLedger(
                 id=uuid4(),
                 advisor_id=adv1_id,
-                action_type='action',
+                task_id=t1,
                 points=100,
-                sid=s1,
                 timestamp=datetime.now(),
             ),
-            AdvisorPointsLedger(
+            PointLedger(
                 id=uuid4(),
                 advisor_id=adv1_id,
-                action_type='action',
+                task_id=t2,
                 points=50,
-                sid=s2,
                 timestamp=datetime.now(),
             ),
-            AdvisorPointsLedger(
+            PointLedger(
                 id=uuid4(),
                 advisor_id=adv2_id,
-                action_type='action',
+                task_id=t3,
                 points=80,
-                sid=s3,
                 timestamp=datetime.now(),
             ),
-            AdvisorPointsLedger(
+            PointLedger(
                 id=uuid4(),
                 advisor_id=adv2_id,
-                action_type='action',
+                task_id=t4,
                 points=10,
-                sid=s4,
                 timestamp=datetime.now() - timedelta(days=10),
             ),
         ]
