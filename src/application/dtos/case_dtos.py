@@ -2,7 +2,24 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.domain.value_objects.status import (
+    InterventionStatus,
+    RiskStatus,
+    TaskStatus,
+    TaskType,
+)
+
+
+@dataclass
+class TaskDTO:
+    """DTO for a task associated with a case."""
+
+    task_id: UUID
+    action_type: TaskType
+    status: TaskStatus
+    points_reward: int
+    completed_at: datetime | None
+    completed_by_advisor_id: UUID | None
 
 
 @dataclass
@@ -24,3 +41,4 @@ class CaseDTO:
     assigned_to: str | None
     suggested_action: str
     points_reward: int
+    tasks: list[TaskDTO] | None = None
