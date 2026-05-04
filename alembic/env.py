@@ -22,9 +22,11 @@ config = context.config
 
 # Override sqlalchemy.url from the same env var used by the app
 
+from src.core.config import config as cfg  # noqa: E402
+
 config.set_main_option(
     'sqlalchemy.url',
-    os.getenv('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db'),
+    cfg.database_url,
 )
 
 # Setup Python logging from the ini file
@@ -32,6 +34,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all models so Base.metadata knows about every table
+
 from src.infrastructure.database.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
