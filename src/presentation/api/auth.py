@@ -7,7 +7,8 @@ backend, and role-based access control (RBAC).
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from enum import StrEnum
-from typing import Annotated, override
+from typing import Annotated, Any, override
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
@@ -20,13 +21,18 @@ from fastapi_users.db import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import config
+from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyAdvisorRepository,
     SqlAlchemyUserSettingsRepository,
 )
-from src.presentation.dependencies.providers import get_user_settings_repository
+from src.presentation.dependencies.providers import (
+    get_advisor_repository,
+    get_user_settings_repository,
+)
 
 # Configuration
 if config.jwt_secret is None:
@@ -94,9 +100,11 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         self,
         user_db: BaseUserDatabase[User, uuid.UUID],
         user_settings_db: UserSettingsRepository,
+        advisor_repo: AdvisorRepository,
     ):
         super().__init__(user_db)
         self._user_setting_db = user_settings_db
+        self._advisor_repo = advisor_repo
 
     @override
     async def on_after_register(
@@ -108,13 +116,31 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         print(f'User {user.id} has registered.')
         await self._user_setting_db.create_user_settings(user.id)
 
+    @override
+    async def on_after_update(
+        self,
+        user: User,
+        _update_dict: dict[str, Any],
+        _request: Request | None = None,
+    ) -> None:
+        """Callback triggered after a user is updated."""
+        if user.role == UserRole.ADVISOR.value:
+            # Ensure an advisor profile exists and is linked
+            name = user.email.split('@')[0].capitalize()
+            await self._advisor_repo.upsert_advisor_for_user(user.id, user.email, name)
+
 
 async def get_user_manager(
     user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
-    user_settings_db: Annotated[SqlAlchemyUserSettingsRepository, Depends(get_user_settings_repository)],
+    user_settings_db: Annotated[
+        SqlAlchemyUserSettingsRepository, Depends(get_user_settings_repository)
+    ],
+    advisor_repo: Annotated[
+        SqlAlchemyAdvisorRepository, Depends(get_advisor_repository)
+    ],
 ) -> AsyncGenerator[UserManager, None]:
     """Dependency for getting the user manager instance."""
-    yield UserManager(user_db, user_settings_db)
+    yield UserManager(user_db, user_settings_db, advisor_repo)
 
 
 # Authentication Backend

@@ -13,6 +13,10 @@ class AdvisorRepository(Protocol):
         """Retrieve an advisor by their unique ID."""
         ...
 
+    async def get_by_user_id(self, user_id: UUID) -> Advisor | None:
+        """Retrieve an advisor by their associated user ID."""
+        ...
+
     async def get_engagement_metrics(self) -> list[dict[str, Any]]:
         """Retrieve aggregated engagement metrics by major."""
         ...
@@ -24,7 +28,7 @@ class AdvisorRepository(Protocol):
         offset: int = 0,
     ) -> tuple[list[dict[str, Any]], int]:
         """Retrieve the advisor leaderboard for a specific time window with pagination.
-        
+
         Returns:
             Tuple of (list of leaderboard entries, total count)
         """
@@ -44,4 +48,10 @@ class AdvisorRepository(Protocol):
         self, advisor_id: UUID, sid: UUID, action_type: str
     ) -> bool:
         """Check if an action has already been recorded for this advisor/student combination."""
+        ...
+
+    async def upsert_advisor_for_user(
+        self, user_id: UUID, email: str, name: str
+    ) -> None:
+        """Link a user to an advisor profile, creating one if necessary."""
         ...

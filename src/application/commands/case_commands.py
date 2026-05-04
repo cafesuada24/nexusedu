@@ -113,10 +113,12 @@ class CaseCommandHandler:
             await self.case_repo.update_case_status(case.case_id, CaseStatus.OPEN)
 
         # Gamification hooks for status changes
-        if command.status == InterventionStatus.BOOKED:
-            await self._award_points(command.user_id, case.sid, 'meeting_booked')
-        elif command.status == InterventionStatus.RESOLVED:
-            await self._award_points(command.user_id, case.sid, 'student_resolved')
+        advisor_id = await self._resolve_advisor_id(command.user_id)
+        if advisor_id:
+            if command.status == InterventionStatus.BOOKED:
+                await self._award_points(advisor_id, case.sid, 'meeting_booked')
+            elif command.status == InterventionStatus.RESOLVED:
+                await self._award_points(advisor_id, case.sid, 'student_resolved')
 
     async def handle_award_review_points(
         self,
@@ -127,17 +129,21 @@ class CaseCommandHandler:
         if not case:
             raise ValueError(f'Case {command.case_id} not found.')
 
-        await self._award_points(
-            command.user_id,
-            case.sid,
-            'draft_reviewed',
-        )
+        advisor_id = await self._resolve_advisor_id(command.user_id)
+        if advisor_id:
+            await self._award_points(
+                advisor_id,
+                case.sid,
+                'draft_reviewed',
+            )
 
     async def handle_trigger_draft(self, command: TriggerDraftCommand) -> UUID:
         """Execute the trigger draft command."""
         case = await self.case_repo.get_by_id(command.case_id)
         if not case:
             raise ValueError(f'Case {command.case_id} not found.')
+
+        advisor_id = await self._resolve_advisor_id(command.user_id)
 
         # 1. Check for existing email record for this case
         existing_email = await self.email_repo.get_by_case(case.case_id)
@@ -158,7 +164,7 @@ class CaseCommandHandler:
             await self.email_repo.create_placeholder(
                 case.case_id,
                 case.sid,
-                command.user_id,
+                advisor_id,
             )
         else:
             await self.email_repo.update_content(
@@ -259,14 +265,16 @@ class CaseCommandHandler:
         await self.student_repo.update_last_notified(case.sid)
 
         # Auto-assign the case to the advisor who sent the email
-        assigned = await self.case_repo.assign_case(command.case_id, command.user_id)
-        if not assigned:
-            logger.info(
-                f'Case {command.case_id} already assigned. Skipping auto-assignment for advisor {command.user_id}.'
-            )
+        advisor_id = await self._resolve_advisor_id(command.user_id)
+        if advisor_id:
+            assigned = await self.case_repo.assign_case(command.case_id, advisor_id)
+            if not assigned:
+                logger.info(
+                    f'Case {command.case_id} already assigned. Skipping auto-assignment for advisor {advisor_id}.'
+                )
 
-        # 3. Gamification
-        await self._award_points(command.user_id, case.sid, 'email_sent')
+            # 3. Gamification
+            await self._award_points(advisor_id, case.sid, 'email_sent')
 
         await self.task_queue.enqueue(
             'run_dispatch_email_task',
@@ -277,6 +285,11 @@ class CaseCommandHandler:
 
         # 4. Return recipient email for dispatching
         return recipient_email
+
+    async def _resolve_advisor_id(self, user_id: UUID) -> UUID | None:
+        """Resolve an advisor_id from a user_id."""
+        advisor = await self.advisor_repo.get_by_user_id(user_id)
+        return advisor.advisor_id if advisor else None
 
     async def _award_points(
         self,
