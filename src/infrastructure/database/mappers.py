@@ -54,6 +54,7 @@ class DataMapper:
             advisor_id=orm_advisor.advisor_id,
             name=orm_advisor.name,
             email=orm_advisor.email,
+            user_id=orm_advisor.user_id,
         )
 
     @staticmethod
