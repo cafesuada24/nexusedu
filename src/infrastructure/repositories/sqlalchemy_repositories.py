@@ -329,6 +329,13 @@ class SqlAlchemyAdvisorRepository:
         advisor = result.scalar_one_or_none()
         return DataMapper.to_domain_advisor(advisor) if advisor else None
 
+    async def get_by_user_id(self, user_id: uuid.UUID) -> DomainAdvisor | None:
+        """Retrieve an advisor by their associated user ID."""
+        stmt = select(Advisor).where(Advisor.user_id == user_id)
+        result = await self.session.execute(stmt)
+        advisor = result.scalar_one_or_none()
+        return DataMapper.to_domain_advisor(advisor) if advisor else None
+
     async def get_engagement_metrics(self) -> list[dict[str, Any]]:
         """Retrieve aggregated engagement metrics by major."""
         stmt = (
@@ -430,7 +437,40 @@ class SqlAlchemyAdvisorRepository:
             AdvisorPointsLedger.action_type == action_type,
         )
         result = await self.session.execute(stmt)
-        return result.first() is not None
+        return result.scalar_one_or_none() is not None
+
+    async def upsert_advisor_for_user(
+        self, user_id: uuid.UUID, email: str, name: str
+    ) -> None:
+        """Link a user to an advisor profile, creating one if necessary."""
+        # 1. Check if an advisor with this user_id already exists
+        stmt = select(Advisor).where(Advisor.user_id == user_id)
+        result = await self.session.execute(stmt)
+        advisor = result.scalar_one_or_none()
+
+        if advisor:
+            advisor.email = email
+            advisor.name = name
+            return
+
+        # 2. Check if an advisor with this email already exists but is not linked
+        stmt = select(Advisor).where(Advisor.email == email, Advisor.user_id.is_(None))
+        result = await self.session.execute(stmt)
+        advisor = result.scalar_one_or_none()
+
+        if advisor:
+            advisor.user_id = user_id
+            advisor.name = name
+            return
+
+        # 3. Create new advisor profile
+        new_advisor = Advisor(
+            advisor_id=uuid.uuid4(),
+            user_id=user_id,
+            email=email,
+            name=name,
+        )
+        self.session.add(new_advisor)
 
 
 class SqlAlchemyIdempotencyRepository:
