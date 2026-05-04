@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import UUID4
 
-from src.application.dtos.case_dtos import CaseDTO
+from src.application.dtos.case_dtos import CaseDTO, TaskDTO
 from src.application.dtos.pagination_dtos import PagedResult, PaginationMetadata
 from src.application.dtos.student_dtos import EmailDTO
 from src.domain.repositories.case_repository import CaseRepository
@@ -13,7 +13,11 @@ from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.gamification import GamificationService
-from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.domain.value_objects.status import (
+    InterventionStatus,
+    RiskStatus,
+    TaskStatus,
+)
 
 
 @dataclass
@@ -80,10 +84,23 @@ class CaseQueryHandler:
                         case.intervention_status,
                     ),
                     points_reward=gamification.calculate_points(
-                        'email_sent',
+                        'send email',
                         case.created_at,
                         case.current_risk_status,
                     ),
+                    tasks=[
+                        TaskDTO(
+                            task_id=t.task_id,
+                            action_type=t.action_type,
+                            status=t.status,
+                            points_reward=t.points_reward,
+                            completed_at=t.completed_at,
+                            completed_by_advisor_id=t.completed_by_advisor_id,
+                        )
+                        for t in case.tasks
+                    ]
+                    if case.tasks
+                    else [],
                 )
                 for case in raw_cases
             ],
