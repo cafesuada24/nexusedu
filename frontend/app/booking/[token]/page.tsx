@@ -5,8 +5,6 @@ import { PublicBookingHeader } from "@/components/booking/public-header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
-// Demo-only "token → advisor" lookup. In production this would be a signed,
-// one-time link that resolves to the student + advisor on the server.
 const advisors: Record<
   string,
   { advisor: string; role: string; student?: string }
@@ -15,14 +13,6 @@ const advisors: Record<
     advisor: "TS. Lê Hà",
     role: "Cố vấn học tập · Khoa CNTT",
   },
-}
-
-// Mock student lookup for demo purposes.
-// In a real app, this would be an API call: fetchStudent(sid)
-const mockStudents: Record<string, string> = {
-  "51883": "Nguyễn Văn An",
-  "51884": "Trần Thị Bình",
-  "51885": "Lê Hoàng Nam",
 }
 
 export default async function PublicBookingPage({

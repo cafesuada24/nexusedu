@@ -322,8 +322,8 @@ export async function authFetch(
 
     const res = await fetch(url, merged);
 
-    if (res.status === 401 && !suppressUnauthorizedEvent) {
-        warnLog("authFetch: 401 Unauthorized", url);
+    if ((res.status === 401 || res.status === 403) && !suppressUnauthorizedEvent) {
+        warnLog(`authFetch: ${res.status} Unauthorized/Forbidden`, url);
         if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("nexusedu:unauthorized"));
         }
@@ -403,7 +403,7 @@ export async function getCurrentUser(): Promise<UserRead | null> {
     );
 
     if (!res.ok) {
-        if (res.status === 401) return null;
+        if (res.status === 401 || res.status === 403) return null;
         const errorBody = await res.json().catch(() => ({}));
         throw new Error(
             errorBody.detail || `Failed to fetch user: ${res.status}`,
