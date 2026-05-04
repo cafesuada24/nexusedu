@@ -9,10 +9,10 @@ class GamificationService:
     """Service for managing advisor points and SLAs."""
 
     DEFAULT_MATRIX = {
-        'draft_reviewed': 5,
-        'email_sent': 10,
-        'meeting_booked': 50,
-        'student_resolved': 100,
+        'review draft': 5,
+        'send email': 10,
+        'student book': 50,
+        'resolve case': 100,
     }
 
     RISK_MULTIPLIERS: dict[RiskStatus, float] = {
