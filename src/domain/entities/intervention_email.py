@@ -19,3 +19,4 @@ class InterventionEmail:
     sent_at: datetime | None
     status: EmailStatus
     sid: UUID
+    case_id: UUID | None = None

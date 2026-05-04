@@ -10,12 +10,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.infrastructure.database.models import Base
+from src.infrastructure.database.models import Base, UserSettings
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
+    SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyMetadataRepository,
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from src.domain.repositories.activity_repository import ActivityRepository
     from src.domain.repositories.advisor_repository import AdvisorRepository
     from src.domain.repositories.alert_repository import AlertRepository
+    from src.domain.repositories.case_repository import CaseRepository
     from src.domain.repositories.email_repository import EmailRepository
     from src.domain.repositories.idempotency_repository import IdempotencyRepository
     from src.domain.repositories.metadata_repository import MetadataRepository
@@ -83,6 +85,8 @@ def mock_arq_pool(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Mock ARQ Redis pool creation."""
     mock_pool = AsyncMock()
     mock_pool.enqueue_job = AsyncMock(return_value=MagicMock(job_id='test_job_id'))
+    mock_pool.get = AsyncMock(return_value=None)
+    mock_pool.setex = AsyncMock(return_value=True)
 
     monkeypatch.setattr(
         'src.presentation.api.lifecycle.create_pool',
@@ -111,7 +115,7 @@ def mock_agent() -> MagicMock:
 @pytest.fixture
 def mock_user() -> User:
     """Provides a mock authenticated User with admin role."""
-    return User(
+    user = User(
         id=uuid.uuid4(),
         email='test@example.com',
         hashed_password='hashed_password',
@@ -120,6 +124,8 @@ def mock_user() -> User:
         is_superuser=False,
         is_verified=True,
     )
+    user.preferences = UserSettings(auto_draft_enabled=True)
+    return user
 
 
 @pytest.fixture
@@ -152,6 +158,12 @@ def advisor_repository(test_db_session: AsyncSession) -> AdvisorRepository:
 def alert_repository(test_db_session: AsyncSession) -> AlertRepository:
     """Provides a SqlAlchemyAlertRepository."""
     return SqlAlchemyAlertRepository(test_db_session)
+
+
+@pytest.fixture
+def case_repository(test_db_session: AsyncSession) -> CaseRepository:
+    """Provides a SqlAlchemyCaseRepository."""
+    return SqlAlchemyCaseRepository(test_db_session)
 
 
 @pytest.fixture

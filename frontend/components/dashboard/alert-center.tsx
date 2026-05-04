@@ -13,13 +13,13 @@ import { EmailEditorSheet } from "@/components/dashboard/email-editor-sheet"
 import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog"
 import { type Problem } from "@/lib/csv"
 import { sendNudge } from "@/lib/api"
-import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts"
+import { useTasks, useUpdateAlertStatus } from "@/hooks/use-alerts"
 import { useSocketEvent } from "@/hooks/use-socket"
 import { useQueryClient } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/query-keys"
 import {
   type Alert,
-  type AlertStatus,
+  type CaseStatus,
   problemMeta,
   COLUMNS,
   pickRandomAppointment,
@@ -38,7 +38,7 @@ export function AlertCenter() {
   const [goalsTargetId, setGoalsTargetId] = React.useState<string | null>(null)
 
   // Use TanStack Query hooks
-  const { data: remoteAlerts = [], isLoading } = useAlerts()
+  const { data: taskPaged, isLoading } = useTasks()
   const { mutate: updateStatus } = useUpdateAlertStatus()
   const queryClient = useQueryClient()
 
@@ -48,14 +48,17 @@ export function AlertCenter() {
     (data) => {
       // Move student from 'Contacted' (sent) to 'Scheduled' (booked) in the UI
       queryClient.setQueryData(
-        queryKeys.alerts.list(),
-        (old: any[] | undefined) => {
-          if (!old) return [];
-          return old.map((alert) =>
-            alert.sid === data.sid
-              ? { ...alert, intervention_status: "booked" }
-              : alert,
-          );
+        [...queryKeys.cases.all, "tasks", 20, 0],
+        (old: any | undefined) => {
+          if (!old || !old.items) return old;
+          return {
+            ...old,
+            items: old.items.map((task: any) =>
+              task.sid === data.sid
+                ? { ...task, intervention_status: "booked" }
+                : task,
+            ),
+          };
         },
       );
 
@@ -67,24 +70,30 @@ export function AlertCenter() {
   );
 
   // Internal state for goals and hidden alerts (not yet persisted in backend)
-  const [localAlertState, setLocalAlertState] = React.useState<Record<string, { goals: Goal[], hidden: boolean }>>({})
-
-  // Initialize from localStorage
-  React.useEffect(() => {
-    const saved = localStorage.getItem("alert-goals-state");
-    if (saved) {
+  const [localAlertState, setLocalAlertState] = React.useState<Record<string, { goals: Goal[], hidden: boolean }>>(() => {
+    if (typeof window !== "undefined") {
       try {
-        setLocalAlertState(JSON.parse(saved));
+        const saved = localStorage.getItem("alert-goals-state");
+        if (saved) return JSON.parse(saved);
       } catch (e) {
         console.error("Failed to parse goal state", e);
       }
     }
+    return {};
+  })
+
+  const [isMounted, setIsMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
   }, []);
 
   // Sync to localStorage
   React.useEffect(() => {
-    localStorage.setItem("alert-goals-state", JSON.stringify(localAlertState));
-  }, [localAlertState]);
+    if (isMounted) {
+      localStorage.setItem("alert-goals-state", JSON.stringify(localAlertState));
+    }
+  }, [localAlertState, isMounted]);
 
   // Map remote alerts to local Alert interface
   const alerts = React.useMemo(() => {
@@ -97,31 +106,35 @@ export function AlertCenter() {
       return "low_average"
     }
 
-    return remoteAlerts
+    return (taskPaged?.items || [])
       .filter(r => !localAlertState[r.sid]?.hidden)
-      .map((r) => ({
-        id: r.sid,
-        name: r.student_name,
-        mssv: r.sid.slice(0, 8).toUpperCase(),
-        email: r.email,
-        problem: getProblemFromStatus(r.current_risk_status),
-        summary: r.current_risk_status,
-        severity: "high" as const,
-        subject: r.draft_subject || "",
-        body: r.draft_body || "",
-        lastContactedAt: null,
-        status: fromBackendStatus(r.intervention_status),
-        movedAt: now,
-        draftJobId: r.draft_job_id,
-        draftSubject: r.draft_subject,
-        draftBody: r.draft_body,
-        appointmentAt: r.intervention_status === "booked" ? pickRandomAppointment() : null,
-        goals: localAlertState[r.sid]?.goals || [],
-      }))
-  }, [remoteAlerts, localAlertState])
+      .map((r) => {
+        const sid = r.sid || "unknown";
+        const status = fromBackendStatus(r.intervention_status);
+        
+        return {
+          id: sid,
+          name: r.student_name || "Unknown Student",
+          mssv: sid.length >= 8 ? sid.slice(0, 8).toUpperCase() : "STUDENT",
+          email: r.email || "",
+          problem: getProblemFromStatus(r.current_risk_status || ""),
+          summary: r.current_risk_status || "Unknown Risk",
+          severity: "high" as const,
+          subject: r.draft_subject || "",
+          body: r.draft_body || "",
+          lastContactedAt: null,
+          status: status,
+          movedAt: now,
+          isGenerating: r.draft_status === "generating",
+          activeCaseId: r.case_id,
+          appointmentAt: r.intervention_status === "booked" ? pickRandomAppointment() : null,
+          goals: localAlertState[sid]?.goals || [],
+        };
+      })
+  }, [taskPaged, localAlertState])
 
   const [collapsedCols, setCollapsedCols] = React.useState<
-    Record<AlertStatus, boolean>
+    Record<CaseStatus, boolean>
   >({
     new: false,
     contacted: false,
@@ -130,11 +143,11 @@ export function AlertCenter() {
     resolved: false,
   })
 
-  const toggleCollapse = (id: AlertStatus) =>
+  const toggleCollapse = (id: CaseStatus) =>
     setCollapsedCols((prev) => ({ ...prev, [id]: !prev[id] }))
 
   const [expandedCols, setExpandedCols] = React.useState<
-    Record<AlertStatus, boolean>
+    Record<CaseStatus, boolean>
   >({
     new: false,
     contacted: false,
@@ -143,7 +156,7 @@ export function AlertCenter() {
     resolved: false,
   })
 
-  const toggleExpand = (id: AlertStatus) =>
+  const toggleExpand = (id: CaseStatus) =>
     setExpandedCols((prev) => ({ ...prev, [id]: !prev[id] }))
 
   const filteredAlerts = React.useMemo(() => {
@@ -162,7 +175,7 @@ export function AlertCenter() {
   }, [alerts, problemFilter, query])
 
   const grouped = React.useMemo(() => {
-    const map: Record<AlertStatus, Alert[]> = {
+    const map: Record<CaseStatus, Alert[]> = {
       new: [],
       contacted: [],
       scheduled: [],
@@ -179,7 +192,7 @@ export function AlertCenter() {
   }, [filteredAlerts])
 
   const totalCounts = React.useMemo(() => {
-    const map: Record<AlertStatus, number> = {
+    const map: Record<CaseStatus, number> = {
       new: 0,
       contacted: 0,
       scheduled: 0,
@@ -202,9 +215,13 @@ export function AlertCenter() {
     return counts
   }, [alerts])
 
-  const moveTo = (id: string, status: AlertStatus, message?: string) => {
+  const moveTo = (alert: Alert, status: CaseStatus, message?: string) => {
+    if (!alert.activeCaseId) {
+      toast.error("Không tìm thấy Case ID cho sinh viên này.");
+      return;
+    }
     updateStatus(
-      { sid: id, status: toBackendStatus(status) },
+      { case_id: alert.activeCaseId, status: toBackendStatus(status) },
       {
         onSuccess: () => {
           if (message) toast.success(message)
@@ -218,11 +235,15 @@ export function AlertCenter() {
       toast.error("Chưa có nội dung email. Hãy nhấn Sửa để tạo bản nháp.")
       return
     }
+    if (!a.activeCaseId) {
+      toast.error("Không tìm thấy Case ID.")
+      return;
+    }
     const toastId = toast.loading("Đang gửi email...")
     try {
-      await sendNudge(a.id, { body: a.body })
+      await sendNudge(a.activeCaseId, { body: a.body })
       moveTo(
-        a.id,
+        a,
         "contacted",
         `Đã gửi email tới ${a.name}`,
       )
@@ -294,7 +315,7 @@ export function AlertCenter() {
     [alerts, goalsTargetId],
   )
 
-  if (isLoading) {
+  if (isLoading || !isMounted) {
     return (
       <Card className="rounded-2xl border-border/60">
         <CardHeader>

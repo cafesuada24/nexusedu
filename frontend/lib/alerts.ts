@@ -13,7 +13,7 @@ import { problemLabels, type Problem } from "@/lib/csv";
 import { type BackendInterventionStatus } from "@/lib/api";
 import { type Goal } from "@/components/dashboard/goals-dialog";
 
-export type AlertStatus =
+export type CaseStatus =
     | "new"
     | "contacted"
     | "scheduled"
@@ -32,12 +32,14 @@ export type Alert = {
     body: string;
     /** 0 = chưa từng liên hệ, >0 = đã liên hệ (Unix seconds). */
     lastContactedAt: number | null;
-    status: AlertStatus;
+    status: CaseStatus;
     /** Khi thẻ chuyển cột gần nhất — dùng để hiển thị thời gian. */
     movedAt: number;
     draftJobId?: string | null;
     draftSubject?: string | null;
     draftBody?: string | null;
+    isGenerating?: boolean;
+    activeCaseId?: string | null;
     /** Thời gian cuộc hẹn (Unix seconds) — chỉ có khi đã đặt hẹn. */
     appointmentAt: number | null;
     /** Danh sách mục tiêu can thiệp. */
@@ -66,7 +68,7 @@ export const problemMeta: Record<
 };
 
 export type ColumnDef = {
-    id: AlertStatus;
+    id: CaseStatus;
     title: string;
     icon: React.ElementType;
     /** Tailwind classes cho dot và viền nhẹ ở header column. */
@@ -171,9 +173,9 @@ export function getEmailPreview(body: string): string {
 
 /**
  * Translate the local Kanban column to the backend `intervention_status`
- * enum. This is the value persisted by `PATCH /alerts/{sid}/status`.
+ * enum. This is the value persisted by `PATCH /cases/{case_id}/status`.
  */
-export function toBackendStatus(s: AlertStatus): BackendInterventionStatus {
+export function toBackendStatus(s: CaseStatus): BackendInterventionStatus {
     switch (s) {
         case "new":
             return "notified";
@@ -193,7 +195,7 @@ export function toBackendStatus(s: AlertStatus): BackendInterventionStatus {
  * column id. `none` and `expired` both fold into "new" — the PD should
  * see them together at the top of the funnel for re-engagement.
  */
-export function fromBackendStatus(s: BackendInterventionStatus): AlertStatus {
+export function fromBackendStatus(s: BackendInterventionStatus): CaseStatus {
     switch (s) {
         case "sent":
             return "contacted";
@@ -203,8 +205,8 @@ export function fromBackendStatus(s: BackendInterventionStatus): AlertStatus {
             return "in_progress";
         case "resolved":
             return "resolved";
-        case "none":
         case "notified":
+        case "none":
         case "expired":
         default:
             return "new";

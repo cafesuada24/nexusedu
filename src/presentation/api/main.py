@@ -11,12 +11,15 @@ from fastapi import APIRouter, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.core.config import config
+from src.core.logger import logger
 from src.presentation.api.auth import auth_backend, fastapi_users
 from src.presentation.api.lifecycle import lifespan
 from src.presentation.api.middleware.rate_limit import rate_limit_middleware
 from src.presentation.api.routes import (
     advisors,
     alerts,
+    cases,
     data,
     health,
     jobs,
@@ -25,8 +28,6 @@ from src.presentation.api.routes import (
     users,
 )
 from src.presentation.schemas.auth import UserCreate, UserRead
-from src.telemetry.logger import logger
-from src.utils.env import getenv
 
 app = FastAPI(
     title='Agent Assistant API',
@@ -36,7 +37,7 @@ app = FastAPI(
 )
 
 # CORS Configuration
-allowed_origins_str = getenv('ALLOWED_ORIGINS', 'http://localhost:3000')
+allowed_origins_str = config.allowed_origins
 allowed_origins = [
     origin.strip() for origin in allowed_origins_str.split(',') if origin.strip()
 ]
@@ -148,6 +149,7 @@ api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(alerts.router)
+api_v1_router.include_router(cases.router)
 api_v1_router.include_router(advisors.router)
 api_v1_router.include_router(metrics.router)
 

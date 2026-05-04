@@ -5,10 +5,10 @@ from typing import Any
 
 from pydantic import UUID4
 
+from src.application.dtos.pagination_dtos import PagedResult, PaginationMetadata
 from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.email_repository import EmailRepository
-from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 
 
@@ -17,13 +17,8 @@ class GetActiveAlertsQuery:
     """Query to retrieve active alerts."""
 
     status_filter: str | None = None
-
-
-@dataclass
-class GetEmailHistoryQuery:
-    """Query to retrieve communication history for a student."""
-
-    sid: UUID4
+    limit: int = 20
+    offset: int = 0
 
 
 class AlertQueryHandler:
@@ -34,71 +29,44 @@ class AlertQueryHandler:
         alert_repo: AlertRepository,
         email_repo: EmailRepository,
         student_repo: StudentRepository,
-        job_repo: JobRepository,
     ):
         self.alert_repo = alert_repo
         self.email_repo = email_repo
         self.student_repo = student_repo
-        self.job_repo = job_repo
 
     async def handle_get_active_alerts(
         self, query: GetActiveAlertsQuery
-    ) -> list[AlertDTO]:
+    ) -> PagedResult[AlertDTO]:
         """Execute the get active alerts query."""
-        domain_alerts = await self.alert_repo.get_active_alerts(query.status_filter)
+        domain_alerts, total_count = await self.alert_repo.get_active_alerts(
+            query.status_filter, limit=query.limit, offset=query.offset
+        )
 
-        dtos = []
-        for a in domain_alerts:
-            active_job = await self.job_repo.get_active_job(a.student.sid, 'email_draft')
-            dtos.append(
+        return PagedResult(
+            items=[
                 AlertDTO(
                     student=StudentDTO(
-                        sid=a.student.sid,
-                        student_name=a.student.student_name,
-                        email=a.student.email,
-                        major=a.student.major,
-                        current_risk_status=a.student.current_risk_status,
-                        intervention_status=a.student.intervention_status,
-                        last_notified_at=a.student.last_notified_timestamp,
-                        is_generating=active_job is not None,
+                        sid=alert.student.sid,
+                        student_name=alert.student.student_name,
+                        email=alert.student.email,
+                        major=alert.student.major,
+                        current_risk_status=alert.student.current_risk_status,
+                        intervention_status=alert.student.intervention_status,
+                        last_notified_at=alert.student.last_notified_timestamp,
+                        is_generating=False,
+                        active_case_id=None,
                     ),
-                    alert_details=a.alert_details,
+                    alert_details={
+                        "latest_draft_subject": alert.alert_details.get("draft_subject"),
+                        "latest_draft_body": alert.alert_details.get("draft_body"),
+                    },
                 )
-            )
-        return dtos
-
-    async def handle_get_email_history(
-        self, query: GetEmailHistoryQuery
-    ) -> list[EmailDTO]:
-        """Execute the get email history query."""
-        history = await self.email_repo.get_history(query.sid)
-        return [
-            EmailDTO(
-                email_id=e.email_id,
-                sid=e.sid,
-                subject=e.subject,
-                body=e.body,
-                status=e.status.value,
-                created_at=e.created_at.isoformat(),
-                sent_at=e.sent_at.isoformat() if e.sent_at else None,
-            )
-            for e in history
-        ]
-
-    async def handle_get_draft_status(self, sid: UUID4) -> dict[str, Any]:
-        """Retrieve the current AI draft status and content for a student."""
-        student = await self.student_repo.get_by_id(sid)
-        if not student:
-            raise ValueError(f'Student {sid} not found.')
-
-        history = await self.email_repo.get_history(sid)
-        latest_draft = next((d for d in history if d.status.value == 'draft'), None)
-
-        active_job = await self.job_repo.get_active_job(sid, 'email_draft')
-
-        return {
-            'sid': sid,
-            'is_generating': active_job is not None,
-            'subject': latest_draft.subject if latest_draft else None,
-            'body': latest_draft.body if latest_draft else None,
-        }
+                for alert in domain_alerts
+            ],
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=query.limit,
+                offset=query.offset,
+                has_next=(query.offset + query.limit) < total_count,
+            ),
+        )

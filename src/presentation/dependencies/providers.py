@@ -8,14 +8,16 @@ from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.commands.agent_commands import AgentCommandHandler
-from src.application.commands.alert_commands import AlertCommandHandler
+from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.queries.alert_queries import AlertQueryHandler
+from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
+from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
@@ -24,6 +26,7 @@ from src.domain.repositories.metrics_repository import MetricsRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.domain.repositories.task_repository import TaskRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
 from src.domain.services.gamification import GamificationService
@@ -35,6 +38,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
+    SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyJobRepository,
@@ -42,9 +46,9 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetricsRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
+    SqlAlchemyTaskRepository,
     SqlAlchemyUserSettingsRepository,
 )
-from src.telemetry.logger import logger
 
 
 # Repository Providers
@@ -74,6 +78,13 @@ async def get_email_repository(
 ) -> EmailRepository:
     """Dependency provider for the EmailRepository."""
     return SqlAlchemyEmailRepository(session)
+
+
+async def get_case_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> CaseRepository:
+    """Dependency provider for the CaseRepository."""
+    return SqlAlchemyCaseRepository(session)
 
 
 async def get_alert_repository(
@@ -118,6 +129,13 @@ async def get_job_repository(
     return SqlAlchemyJobRepository(session)
 
 
+async def get_task_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> TaskRepository:
+    """Dependency provider for the TaskRepository."""
+    return SqlAlchemyTaskRepository(session)
+
+
 async def get_user_settings_repository(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> UserSettingsRepository:
@@ -142,32 +160,71 @@ async def get_anomaly_engine() -> AnomalyEngine:
     return ZScore()
 
 
-async def get_alert_command_handler(
+from src.domain.repositories.badge_repository import BadgeRepository
+
+async def get_badge_repository(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> BadgeRepository:
+    """Dependency provider for the BadgeRepository."""
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyBadgeRepository
+    return SqlAlchemyBadgeRepository(session)
+
+
+# async def get_alert_command_handler(
+#     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
+#     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+#     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
+#     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
+#     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+#     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
+#     gamification_service: Annotated[
+#         GamificationService, Depends(get_gamification_service),
+#     ],
+#     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+#     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
+# ) -> AlertCommandHandler:
+#     """Dependency provider for the AlertCommandHandler."""
+#     task_queue = ArqTaskQueueAdapter(arq_pool)
+#     return AlertCommandHandler(
+#         student_repo,
+#         email_repo,
+#         case_repo,
+#         alert_repo,
+#         advisor_repo,
+#         job_repo,
+#         gamification_service,
+#         task_queue,
+#         email_drafting_service=BamlEmailDraftingService(),
+#         badge_repo=badge_repo,
+#     )
+
+
+async def get_case_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
-    alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
-    ],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     gamification_service: Annotated[
-        GamificationService, Depends(get_gamification_service)
+        GamificationService, Depends(get_gamification_service),
     ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
-) -> AlertCommandHandler:
-    """Dependency provider for the AlertCommandHandler."""
+    badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
+    task_repo: Annotated[TaskRepository, Depends(get_task_repository)],
+) -> CaseCommandHandler:
+    """Dependency provider for the CaseCommandHandler."""
     task_queue = ArqTaskQueueAdapter(arq_pool)
-    return AlertCommandHandler(
+    return CaseCommandHandler(
         student_repo,
         email_repo,
-        alert_repo,
+        case_repo,
         advisor_repo,
-        idempotency_repo,
         job_repo,
         gamification_service,
         task_queue,
+        task_repo=task_repo,
         email_drafting_service=BamlEmailDraftingService(),
+        badge_repo=badge_repo,
     )
 
 
@@ -175,10 +232,19 @@ async def get_alert_query_handler(
     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
 ) -> AlertQueryHandler:
     """Dependency provider for the AlertQueryHandler."""
-    return AlertQueryHandler(alert_repo, email_repo, student_repo, job_repo)
+    return AlertQueryHandler(alert_repo, email_repo, student_repo)
+
+
+async def get_case_query_handler(
+    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
+    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
+) -> CaseQueryHandler:
+    """Dependency provider for the CaseQueryHandler."""
+    return CaseQueryHandler(email_repo, student_repo, job_repo, case_repo)
 
 
 async def get_data_command_handler(
@@ -187,16 +253,11 @@ async def get_data_command_handler(
     history_repo: Annotated[
         StatusHistoryRepository, Depends(get_status_history_repository),
     ],
-    idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
-    ],
-    settings_repo: Annotated[
-        UserSettingsRepository, Depends(get_user_settings_repository)
-    ],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
-    alert_command_handler: Annotated[
-        AlertCommandHandler, Depends(get_alert_command_handler),
+    case_command_handler: Annotated[
+        CaseCommandHandler, Depends(get_case_command_handler),
     ],
 ) -> DataCommandHandler:
     """Dependency provider for the DataCommandHandler."""
@@ -204,11 +265,10 @@ async def get_data_command_handler(
         student_repo,
         activity_repo,
         history_repo,
-        idempotency_repo,
-        settings_repo,
+        case_repo,
         job_repo,
         anomaly_engine,
-        alert_command_handler,
+        case_command_handler,
     )
 
 
@@ -240,7 +300,7 @@ async def get_agent_command_handler(
         AgentMetadataService, Depends(get_agent_metadata_service),
     ],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
+        IdempotencyRepository, Depends(get_idempotency_repository),
     ],
 ) -> AgentCommandHandler:
     """Dependency provider for the AgentCommandHandler."""

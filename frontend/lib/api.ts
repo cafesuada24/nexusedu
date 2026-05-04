@@ -8,10 +8,11 @@ import { z } from "zod";
  * Endpoints (per src/DEMO_UIXx8/ENDPOINTS.md / frontend/ENDPOINTS_concise.md):
  *   POST   /data/ingest                — push raw test rows (wrapped).
  *   GET    /alerts                     — pull current at-risk students + status.
- *   PATCH  /alerts/{sid}/status        — update a student's intervention status.
- *   POST   /alerts/{sid}/draft         — trigger async draft generation (returns job_id).
+ *   GET    /cases                      — pull unified advisor task list.
+ *   PATCH  /cases/{case_id}/status     — update a case status.
+ *   POST   /cases/{case_id}/draft      — trigger async draft generation (returns job_id).
  *   GET    /jobs/{job_id}              — poll status/result for background jobs.
- *   POST   /alerts/{sid}/send          — send email for student.
+ *   POST   /cases/{case_id}/send       — send email for case.
  *   POST   /query                      — async agent query (returns job_id).
  *   GET    /advisors/leaderboard       — leaderboard by time window.
  *   POST   /auth/register              — register (public)
@@ -44,18 +45,6 @@ export const BackendRiskStatusSchema = z.string();
 export type BackendRiskStatus = string;
 
 export const BackendAlertSchema = z.object({
-<<<<<<< Updated upstream
-    sid: z.string(),
-    student_name: z.string(),
-    email: z.string(),
-    current_risk_status: BackendRiskStatusSchema,
-    intervention_status: BackendInterventionStatusSchema,
-    draft_job_id: z.string().nullable().optional(),
-    draft_subject: z.string().nullable().optional(),
-    draft_body: z.string().nullable().optional(),
-});
-export type BackendAlert = z.infer<typeof BackendAlertSchema>;
-=======
   sid: z.string(),
   student_name: z.string(),
   email: z.string(),
@@ -95,7 +84,6 @@ export const TaskPagedResponseSchema = z.object({
   }),
 });
 export type TaskPagedResponse = z.infer<typeof TaskPagedResponseSchema>;
->>>>>>> Stashed changes
 
 export const BackendIngestRowSchema = z.object({
   sid: z.string(),
@@ -114,15 +102,6 @@ export const BackendIngestRowSchema = z.object({
 export type BackendIngestRow = z.infer<typeof BackendIngestRowSchema>;
 
 export const JobResultSchema = z.object({
-<<<<<<< Updated upstream
-    job_id: z.string(),
-    status: z.string(),
-    result: z.any().optional(),
-    error: z.string().nullable().optional(),
-});
-export type JobResult = z.infer<typeof JobResultSchema>;
-
-=======
   job_id: z.string(),
   status: z.string(),
   progress: z.number().optional(),
@@ -158,7 +137,6 @@ export const CaseDetailsResponseSchema = CaseResponseSchema.extend({
 });
 export type CaseDetailsResponse = z.infer<typeof CaseDetailsResponseSchema>;
 
->>>>>>> Stashed changes
 export const DraftJobResponseSchema = z.object({
   job_id: z.string(),
   status: z.string(),
@@ -219,30 +197,14 @@ export const RetentionTrendItemSchema = z.object({
 });
 export type RetentionTrendItem = z.infer<typeof RetentionTrendItemSchema>;
 
-export const EmailHistoryItemSchema = z.object({
-    email_id: z.string(),
-    subject: z.string(),
-    body: z.string(),
-    status: z.enum(["draft", "sent"]),
-    created_at: z.string(),
-    sent_at: z.string().nullable(),
-});
-export type EmailHistoryItem = z.infer<typeof EmailHistoryItemSchema>;
 
 export const DraftStatusResponseSchema = z.object({
-<<<<<<< Updated upstream
-    sid: z.string(),
-    is_generating: z.boolean(),
-    subject: z.string().nullable(),
-    body: z.string().nullable(),
-=======
   sid: z.string(),
   is_generating: z.boolean(),
   progress: z.number().optional(),
   subject: z.string().nullable(),
   body: z.string().nullable(),
   active_case_id: z.string().nullable().optional(),
->>>>>>> Stashed changes
 });
 export type DraftStatusResponse = z.infer<typeof DraftStatusResponseSchema>;
 
@@ -260,22 +222,6 @@ const INGEST_TIMEOUT_MS = 60_000;
 const TOKEN_STORAGE_KEY = "nexusedu:auth:token";
 
 function getApiBase(): string {
-<<<<<<< Updated upstream
-    const env =
-        typeof process !== "undefined"
-            ? (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined)
-            : undefined;
-
-    if (env && env.trim()) {
-        const base = env.trim().replace(/\/+$/, "");
-        // If we're on the server and the base is relative, we need to make it absolute.
-        // However, it's better to use a dedicated server-only env var or a known backend URL.
-        if (typeof window === "undefined" && base.startsWith("/")) {
-            // Fallback to localhost if we're in a relative proxy mode but on the server
-            return `http://localhost:8000${base}`;
-        }
-        return base;
-=======
   // On the client, we MUST use the relative proxy path so that proxy.ts can
   // intercept the request, extract the httpOnly cookie, and inject the Bearer token.
   if (typeof window !== "undefined") {
@@ -288,22 +234,11 @@ function getApiBase(): string {
     const base = env.trim().replace(/\/+$/, "");
     if (base.startsWith("/")) {
       return `http://localhost:8000${base}`;
->>>>>>> Stashed changes
     }
     return base;
   }
 
-<<<<<<< Updated upstream
-    // Default to the documented base path.
-    // On the server, we must use an absolute URL.
-    if (typeof window === "undefined") {
-        return "http://localhost:8000/api/v1";
-    }
-
-    return "/api/v1";
-=======
   return "http://localhost:8000/api/v1";
->>>>>>> Stashed changes
 }
 
 export function endpoint(path: string): string {
@@ -374,14 +309,6 @@ export async function logout() {
  * token is available. It merges headers and accepts all the same fetch options.
  */
 export async function authFetch(
-<<<<<<< Updated upstream
-    url: string,
-    opts: RequestInit = {},
-    signal?: AbortSignal,
-): Promise<Response> {
-    const headers = new Headers(opts.headers || undefined);
-    headers.set("Accept", headers.get("Accept") || "application/json");
-=======
   url: string,
   opts: RequestInit & { suppressUnauthorizedEvent?: boolean } = {},
   signal?: AbortSignal,
@@ -389,7 +316,6 @@ export async function authFetch(
   const { suppressUnauthorizedEvent, ...fetchOpts } = opts;
   const headers = new Headers(fetchOpts.headers || undefined);
   headers.set("Accept", headers.get("Accept") || "application/json");
->>>>>>> Stashed changes
 
   // On the server, we must manually inject the token from cookies
   if (typeof window === "undefined") {
@@ -401,31 +327,18 @@ export async function authFetch(
   // On the client, we rely on middleware to inject the token from the httpOnly cookie
   // for all requests to /api/v1/*
 
-<<<<<<< Updated upstream
-    const merged: RequestInit = {
-        ...opts,
-        headers,
-        signal: opts.signal ?? signal,
-    };
-=======
   const merged: RequestInit = {
     ...fetchOpts,
     headers,
     signal: fetchOpts.signal ?? signal,
   };
->>>>>>> Stashed changes
 
   const res = await fetch(url, merged);
 
-<<<<<<< Updated upstream
-    if (res.status === 401) {
-        warnLog("authFetch: 401 Unauthorized", url);
-=======
   if ((res.status === 401 || res.status === 403) && !suppressUnauthorizedEvent) {
     warnLog(`authFetch: ${res.status} Unauthorized/Forbidden`, url);
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("nexusedu:unauthorized"));
->>>>>>> Stashed changes
     }
   }
 
@@ -437,12 +350,7 @@ export async function authFetch(
 /* ----------------------------------------------------------------------- */
 
 function warnLog(...args: any[]) {
-<<<<<<< Updated upstream
-    // eslint-disable-next-line no-console
-    console.warn("[lib/api]", ...args);
-=======
   console.warn("[lib/api]", ...args);
->>>>>>> Stashed changes
 }
 
 /* ----------------------------------------------------------------------- */
@@ -502,11 +410,6 @@ export async function register(email: string, password: string): Promise<any> {
  * Requires a valid token; authFetch will attach Authorization header.
  */
 export async function getCurrentUser(): Promise<UserRead | null> {
-<<<<<<< Updated upstream
-    const res = await withTimeout(
-        (signal) => authFetch(endpoint("/users/me"), { method: "GET" }, signal),
-        DEFAULT_TIMEOUT_MS,
-=======
   const res = await withTimeout(
     (signal) => authFetch(endpoint("/users/me"), { method: "GET", suppressUnauthorizedEvent: true }, signal),
     DEFAULT_TIMEOUT_MS,
@@ -517,25 +420,11 @@ export async function getCurrentUser(): Promise<UserRead | null> {
     const errorBody = await res.json().catch(() => ({}));
     throw new Error(
       errorBody.detail || `Failed to fetch user: ${res.status}`,
->>>>>>> Stashed changes
     );
   }
 
-<<<<<<< Updated upstream
-    if (!res.ok) {
-        if (res.status === 401) return null;
-        const errorBody = await res.json().catch(() => ({}));
-        throw new Error(
-            errorBody.detail || `Failed to fetch user: ${res.status}`,
-        );
-    }
-
-    const data = await res.json();
-    return UserReadSchema.parse(data);
-=======
   const data = await res.json();
   return UserReadSchema.parse(data);
->>>>>>> Stashed changes
 }
 
 /* ----------------------------------------------------------------------- */
@@ -612,32 +501,6 @@ export async function fetchAlerts(): Promise<BackendAlert[]> {
 }
 
 /**
-<<<<<<< Updated upstream
- * Pushes a status transition for a single student.
- */
-export async function updateAlertStatus(
-    sid: string,
-    status: BackendInterventionStatus,
-): Promise<void> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/status`),
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status }),
-                },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Cập nhật trạng thái thất bại: ${message}`);
-    }
-=======
  * Pulls the unified list of tasks for the advisor dashboard.
  */
 export async function fetchTasks(
@@ -687,7 +550,6 @@ export async function updateAlertStatus(
     const message = errorBody.detail || res.statusText;
     throw new Error(`Cập nhật trạng thái thất bại: ${message}`);
   }
->>>>>>> Stashed changes
 }
 
 /* ----------------------------------------------------------------------- */
@@ -720,29 +582,6 @@ export async function getJobStatus(job_id: string): Promise<JobResult> {
  * Send finalized email body to student.
  */
 export async function sendNudge(
-<<<<<<< Updated upstream
-    sid: string,
-    body: { body: string },
-): Promise<void> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/send`),
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body),
-                },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Gửi email thất bại: ${message}`);
-    }
-=======
   case_id: string,
   payload: { body: string },
 ): Promise<void> {
@@ -765,7 +604,6 @@ export async function sendNudge(
     const message = errorBody.detail || res.statusText;
     throw new Error(`Gửi email thất bại: ${message}`);
   }
->>>>>>> Stashed changes
 }
 
 /**
@@ -893,29 +731,8 @@ export async function fetchRetentionTrend(): Promise<RetentionTrendItem[]> {
 }
 
 /**
- * GET /alerts/{sid}/history — returns communication history for a student.
+ * GET /cases/{case_id}/email — returns the intervention email for a case.
  */
-<<<<<<< Updated upstream
-export async function fetchAlertHistory(
-    sid: string,
-): Promise<EmailHistoryItem[]> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/history`),
-                { method: "GET" },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể lấy lịch sử email: ${message}`);
-    }
-    const data = await res.json();
-    return z.array(EmailHistoryItemSchema).parse(data);
-=======
 export async function fetchCaseEmail(
   case_id: string,
 ): Promise<EmailHistoryItem | null> {
@@ -937,62 +754,12 @@ export async function fetchCaseEmail(
   const data = await res.json();
   if (!data) return null;
   return EmailHistoryItemSchema.parse(data);
->>>>>>> Stashed changes
 }
 
 /**
- * GET /alerts/{sid}/draft — returns current draft status and content.
+ * GET /cases/{case_id}/email/draft — returns current draft status and content.
  */
 export async function fetchDraftStatus(
-<<<<<<< Updated upstream
-    sid: string,
-): Promise<DraftStatusResponse> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
-                { method: "GET" },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể lấy trạng thái bản nháp: ${message}`);
-    }
-    const data = await res.json();
-    return DraftStatusResponseSchema.parse(data);
-}
-
-/**
- * POST /alerts/{sid}/draft — trigger async draft generation.
- */
-export async function generateAiDraft(
-    sid: string,
-    booking_link?: string,
-): Promise<DraftJobResponse> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/alerts/${encodeURIComponent(sid)}/draft`),
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ booking_link }),
-                },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể tạo bản nháp AI: ${message}`);
-    }
-    const data = await res.json();
-    return DraftJobResponseSchema.parse(data);
-=======
   case_id: string,
 ): Promise<DraftStatusResponse> {
   const res = await withTimeout(
@@ -1076,7 +843,6 @@ export async function generateAiDraft(
   }
   const data = await res.json();
   return DraftJobResponseSchema.parse(data);
->>>>>>> Stashed changes
 }
 
 /** True when an `NEXT_PUBLIC_API_BASE_URL` was configured at build time or we're in the browser. */

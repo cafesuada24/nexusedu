@@ -15,19 +15,21 @@ sys.path.append(str(project_root))
 from src.infrastructure.database.models import (
     Activity,
     Advisor,
-    AdvisorPointsLedger,
     Base,
+    Case,
+    PointLedger,
     Student,
+    Task,
     User,
 )
 from src.infrastructure.database.session import async_session_maker, engine
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
+    SqlAlchemyAdvisorRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
+    SqlAlchemyUserSettingsRepository,
 )
-
-
 from src.presentation.api.auth import SQLAlchemyUserDatabase, UserManager, UserRole
 from src.presentation.schemas.auth import UserCreate
 
@@ -76,17 +78,19 @@ async def reseed() -> None:
         session.add_all(advisors)
         session.add_all(students)
         session.add_all(activities)
-        
+
         # Create default admin user
         print('Creating default admin user (admin@example.com / password123)...')
         user_db = SQLAlchemyUserDatabase(session, User)
-        user_manager = UserManager(user_db)
+        user_settings_repo = SqlAlchemyUserSettingsRepository(session)
+        advisor_repo = SqlAlchemyAdvisorRepository(session)
+        user_manager = UserManager(user_db, user_settings_repo, advisor_repo)
         user = await user_manager.create(
-            UserCreate(email='admin@example.com', password='password123'),
-            safe=True
+            UserCreate(email='admin@example.com', password='password123'), safe=True
         )
         # Update role to admin
         from sqlalchemy import update
+
         await session.execute(
             update(User).where(User.id == user.id).values(role=UserRole.ADMIN.value)
         )
@@ -149,33 +153,70 @@ async def reseed() -> None:
             else:
                 await student_repo.update_risk_status(sid, risk_status=latest_risk)
 
-        print(f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk.")
+        print(
+            f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk."
+        )
 
-        print('Seeding advisor points ledger...')
-        actions = [
-            ('email_sent', 10),
-            ('student_resolved', 50),
-            ('meeting_booked', 30),
-            ('draft_reviewed', 5),
-        ]
+        print('Seeding cases and tasks...')
+        # Create cases for at-risk students
+        from src.domain.value_objects.status import CaseStatus, TaskStatus, TaskType
 
-        ledger_entries = []
-        for adv in advisors:
-            aid = adv.advisor_id
-            for _ in range(random.randint(5, 15)):
-                student = random.choice(students)
-                action, points = random.choice(actions)
-                ts = datetime.now() - timedelta(days=random.randint(0, 14))
-                ledger_entries.append(
-                    AdvisorPointsLedger(
-                        id=uuid.uuid4(),
-                        advisor_id=aid,
-                        action_type=action,
-                        points=points,
-                        sid=student.sid,
-                        timestamp=ts,
+        cases = []
+        tasks = []
+        for sid in new_at_risk_sids:
+            case_id = uuid.uuid4()
+            advisor = random.choice(advisors)
+            cases.append(
+                Case(
+                    case_id=case_id,
+                    sid=sid,
+                    status=CaseStatus.OPEN.value,
+                    assigned_advisor_id=advisor.advisor_id,
+                )
+            )
+
+            # Standard tasks
+            standard_tasks = [
+                (TaskType.SEND_EMAIL.value, 10),
+                (TaskType.STUDENT_BOOK.value, 20),
+                (TaskType.RESOLVE_CASE.value, 50),
+                (TaskType.REVIEW_DRAFT.value, 5),
+            ]
+            for action_type, points in standard_tasks:
+                tasks.append(
+                    Task(
+                        task_id=uuid.uuid4(),
+                        case_id=case_id,
+                        action_type=action_type,
+                        status=TaskStatus.PENDING.value,
+                        points_reward=points,
                     )
                 )
+
+        session.add_all(cases)
+        session.add_all(tasks)
+        await session.flush()  # To get task IDs if needed
+
+        print('Seeding point ledger...')
+        ledger_entries = []
+        # Complete some random tasks
+        completed_tasks = random.sample(tasks, min(len(tasks), 50))
+        for t in completed_tasks:
+            case_obj = next(c for c in cases if c.case_id == t.case_id)
+            aid = case_obj.assigned_advisor_id
+            t.status = TaskStatus.COMPLETED.value
+            t.completed_at = datetime.now() - timedelta(days=random.randint(0, 7))
+            t.completed_by_advisor_id = aid
+
+            ledger_entries.append(
+                PointLedger(
+                    id=uuid.uuid4(),
+                    advisor_id=aid,
+                    task_id=t.task_id,
+                    points=t.points_reward,
+                    timestamp=t.completed_at,
+                )
+            )
 
         session.add_all(ledger_entries)
         await session.commit()

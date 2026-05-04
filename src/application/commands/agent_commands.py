@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
 from src.application.services.agent_metadata import AgentMetadataService
+from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
-from src.telemetry.logger import logger
 
 if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph

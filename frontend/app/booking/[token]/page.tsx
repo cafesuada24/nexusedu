@@ -5,8 +5,6 @@ import { PublicBookingHeader } from "@/components/booking/public-header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
-// Demo-only "token → advisor" lookup. In production this would be a signed,
-// one-time link that resolves to the student + advisor on the server.
 const advisors: Record<
   string,
   { advisor: string; role: string; student?: string }
@@ -17,14 +15,6 @@ const advisors: Record<
   },
 }
 
-// Mock student lookup for demo purposes.
-// In a real app, this would be an API call: fetchStudent(sid)
-const mockStudents: Record<string, string> = {
-  "51883": "Nguyễn Văn An",
-  "51884": "Trần Thị Bình",
-  "51885": "Lê Hoàng Nam",
-}
-
 export default async function PublicBookingPage({
   params,
   searchParams,
@@ -33,17 +23,18 @@ export default async function PublicBookingPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const { token } = await params
-  const { sid } = await searchParams
+  const { cid } = await searchParams
 
   const meta = advisors[token] ?? {
     advisor: "Cố vấn học tập",
     role: "NexusEdu",
   }
 
-  const studentId = typeof sid === "string" ? sid : undefined
-  const studentName = studentId ? mockStudents[studentId] : undefined
+  const caseId = typeof cid === "string" ? cid : undefined
+  const studentName = undefined // Mock student lookup by SID is deprecated here
 
-  if (!studentId) {
+
+  if (!caseId) {
     return (
       <div className="flex min-h-screen flex-col bg-muted/30">
         <PublicBookingHeader />
@@ -93,7 +84,7 @@ export default async function PublicBookingPage({
             </p>
           </div>
 
-          <BookingView studentId={studentId} studentName={studentName} />
+          <BookingView studentId={caseId} studentName={studentName} />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người được mời qua email này, bạn có thể bỏ

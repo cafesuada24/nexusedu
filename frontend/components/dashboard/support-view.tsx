@@ -295,7 +295,8 @@ export function SupportView() {
             toast.success("AI đã trả lời", { id: toastId })
             setIsAsking(false)
           } else if (job.status === "failed") {
-            toast.error("AI gặp lỗi khi xử lý", { id: toastId })
+            const errorMsg = job.error || "AI gặp lỗi khi xử lý"
+            toast.error(errorMsg, { id: toastId })
             setIsAsking(false)
           } else {
             setTimeout(poll, 2000)

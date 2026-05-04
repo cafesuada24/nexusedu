@@ -11,3 +11,4 @@ class Advisor:
     advisor_id: UUID
     name: str
     email: str
+    user_id: UUID | None = None

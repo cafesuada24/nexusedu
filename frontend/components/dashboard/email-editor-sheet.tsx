@@ -39,13 +39,12 @@ type Props = {
 };
 
 export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
-    // Only poll for draft status while there's an active draft job. If there's no
-    // job, rely on the alert's stored draft fields to avoid excess requests.
+    // Only poll for draft status while there's an active case.
     const {
         data: draft,
         isFetching,
         isError,
-    } = useDraftStatus(alert?.draftJobId ? alert.id : null);
+    } = useDraftStatus(alert?.activeCaseId);
     const [subject, setSubject] = React.useState("");
     const [body, setBody] = React.useState("");
 
@@ -78,14 +77,15 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
     };
 
     const isGenerating =
-        draft?.is_generating ??
+        alert?.isGenerating ||
+        draft?.is_generating ||
         (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
     const bookingUrl = alert
-        ? `/booking/le-ha?sid=${alert.id}`
+        ? `/booking/le-ha?cid=${alert.activeCaseId}`
         : "/booking/le-ha";
     const displayUrl = alert
-        ? `nexusedu.app/booking/le-ha?sid=${alert.id}`
+        ? `nexusedu.app/booking/le-ha?cid=${alert.activeCaseId}`
         : "nexusedu.app/booking/le-ha";
 
     return (

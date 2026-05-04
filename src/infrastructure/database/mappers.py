@@ -5,19 +5,34 @@ from uuid import UUID
 
 from src.domain.entities.advisor import Advisor as DomainAdvisor
 from src.domain.entities.alert import Alert as DomainAlert
+from src.domain.entities.case import Case as DomainCase
 from src.domain.entities.intervention_email import (
     InterventionEmail as DomainInterventionEmail,
 )
 from src.domain.entities.student import Student as DomainStudent
-from src.domain.value_objects.status import EmailStatus, InterventionStatus, RiskStatus
+from src.domain.entities.task import Task as DomainTask
+from src.domain.value_objects.status import (
+    CaseStatus,
+    EmailStatus,
+    InterventionStatus,
+    RiskStatus,
+    TaskStatus,
+    TaskType,
+)
 from src.infrastructure.database.models import (
     Advisor as OrmAdvisor,
+)
+from src.infrastructure.database.models import (
+    Case as OrmCase,
 )
 from src.infrastructure.database.models import (
     InterventionEmail as OrmInterventionEmail,
 )
 from src.infrastructure.database.models import (
     Student as OrmStudent,
+)
+from src.infrastructure.database.models import (
+    Task as OrmTask,
 )
 
 
@@ -45,6 +60,7 @@ class DataMapper:
             advisor_id=orm_advisor.advisor_id,
             name=orm_advisor.name,
             email=orm_advisor.email,
+            user_id=orm_advisor.user_id,
         )
 
     @staticmethod
@@ -53,12 +69,42 @@ class DataMapper:
         return DomainInterventionEmail(
             email_id=orm_email.email_id,
             sid=orm_email.sid,
+            case_id=orm_email.case_id,
             advisor_id=orm_email.advisor_id,
             subject=orm_email.subject,
             body=orm_email.body,
             status=EmailStatus(orm_email.status),
             created_at=orm_email.created_at,
             sent_at=orm_email.sent_at,
+        )
+
+    @staticmethod
+    def to_domain_case(orm_case: OrmCase) -> DomainCase:
+        """Map ORM Case to Domain Case."""
+        domain_case = DomainCase(
+            case_id=orm_case.case_id,
+            sid=orm_case.sid,
+            status=CaseStatus(orm_case.status),
+            created_at=orm_case.created_at,
+            resolved_at=orm_case.resolved_at,
+            assigned_advisor_id=orm_case.assigned_advisor_id,
+        )
+        if hasattr(orm_case, 'tasks') and orm_case.tasks:
+            domain_case.tasks = [DataMapper.to_domain_task(t) for t in orm_case.tasks]
+        return domain_case
+
+    @staticmethod
+    def to_domain_task(orm_task: OrmTask) -> DomainTask:
+        """Map ORM Task to Domain Task."""
+        return DomainTask(
+            task_id=orm_task.task_id,
+            case_id=orm_task.case_id,
+            action_type=TaskType(orm_task.action_type),
+            status=TaskStatus(orm_task.status),
+            points_reward=orm_task.points_reward,
+            created_at=orm_task.created_at,
+            completed_at=orm_task.completed_at,
+            completed_by_advisor_id=orm_task.completed_by_advisor_id,
         )
 
     @staticmethod

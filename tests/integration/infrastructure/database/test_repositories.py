@@ -68,32 +68,39 @@ async def test_email_repository(session: AsyncSession) -> None:
     student_repo = SqlAlchemyStudentRepository(session)
 
     s1 = uuid4()
+    c1 = uuid4()
     await student_repo.ingest_students([{'sid': s1, 'major': 'CS'}])
     await session.commit()
 
-    # 1. Create Draft
-    eid = await repo.create_draft(s1, uuid4(), 'Sub', 'Body')
+    # 1. Create Placeholder
+    eid = await repo.create_placeholder(c1, s1, uuid4())
     await session.commit()
     assert eid is not None
 
-    # 2. Get Latest Draft
-    draft = await repo.get_latest_draft(s1)
-    assert draft is not None
-    assert draft.subject == 'Sub'
-    assert draft.body == 'Body'
-
-    # 3. Mark as Sent
-    await repo.mark_as_sent(s1, 'Updated Body')
+    # 2. Update Content (Draft)
+    await repo.update_content(c1, 'Sub', 'Body', EmailStatus.DRAFT)
     await session.commit()
 
-    # Latest draft should now be None
-    assert await repo.get_latest_draft(s1) is None
+    # 3. Get By Case
+    email = await repo.get_by_case(c1)
+    assert email is not None
+    assert email.subject == 'Sub'
+    assert email.body == 'Body'
+    assert email.status == EmailStatus.DRAFT
 
-    # 4. History
+    # 4. Mark as Sent
+    await repo.mark_as_sent(c1, 'Updated Body')
+    await session.commit()
+
+    # Verify Sent
+    email_sent = await repo.get_by_case(c1)
+    assert email_sent.status == EmailStatus.SENT
+    assert email_sent.body == 'Updated Body'
+
+    # 5. History
     history = await repo.get_history(s1)
     assert len(history) == 1
     assert history[0].status == EmailStatus.SENT
-    assert history[0].body == 'Updated Body'
 
 
 @pytest.mark.asyncio

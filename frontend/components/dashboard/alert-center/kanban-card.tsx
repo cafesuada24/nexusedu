@@ -15,6 +15,7 @@ import {
     ArrowRight,
     RotateCcw,
     Loader2,
+    History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,9 +30,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useDraftStatus } from "@/hooks/use-alerts";
+import { Progress } from "@/components/ui/progress";
 import {
     type Alert,
-    type AlertStatus,
+    type CaseStatus,
     problemMeta,
     COLUMNS,
     getInitials,
@@ -44,7 +46,7 @@ type KanbanCardProps = {
     onSend: (updated: Alert) => void;
     onEdit: () => void;
     onRemove: () => void;
-    onMove: (status: AlertStatus, message?: string) => void;
+    onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
 };
 
@@ -56,13 +58,12 @@ function KanbanCardInner({
     onMove,
     onOpenGoals,
 }: KanbanCardProps) {
-    // Only poll the backend for draft updates if there's an active draft job.
-    // This prevents a request-per-card thundering herd when many cards are rendered.
+    // Only poll the backend for draft updates if there's an active case.
     const {
         data: draft,
         isFetching,
         isError,
-    } = useDraftStatus(a.draftJobId ? a.id : null);
+    } = useDraftStatus(a.activeCaseId);
 
     const meta = problemMeta[a.problem];
     const ProblemIcon = meta.icon;
@@ -77,12 +78,11 @@ function KanbanCardInner({
             new Date(g.deadline).getTime() < new Date().setHours(0, 0, 0, 0),
     );
 
-    // Consider an alert as "generating" only when the backend
-    // explicitly reports it (`draft?.is_generating`) or when we're actively
-    // fetching the draft for a known job. Do not assume generation on fetch
-    // errors to avoid false positives (which cause extra renders).
+    // Consider an alert as "generating" if the backend reports it,
+    // or if we're actively polling a known job.
     const isGenerating =
-        draft?.is_generating ??
+        a.isGenerating ||
+        draft?.is_generating ||
         (isFetching && !!a.draftJobId && !a.draftBody && !isError);
     const draftBody = isGenerating
         ? ""
@@ -161,6 +161,12 @@ function KanbanCardInner({
                             <Pencil className="size-4" />
                             Chỉnh sửa email
                         </DropdownMenuItem>
+                        {a.activeCaseId && (
+                            <DropdownMenuItem className="gap-2">
+                                <History className="size-4" />
+                                Lịch sử can thiệp
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                             onClick={onRemove}
                             className="gap-2 text-destructive focus:text-destructive"
@@ -239,13 +245,25 @@ function KanbanCardInner({
             {a.status === "new" ? (
                 <div className="mt-3 flex flex-col gap-2">
                     {isGenerating ? (
-                        <Badge
-                            variant="outline"
-                            className="w-fit gap-1.5 rounded-md border-transparent bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border"
-                        >
-                            <Loader2 className="size-3.5 animate-spin" />
-                            Đang soạn thảo AI...
-                        </Badge>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Badge
+                                    variant="outline"
+                                    className="w-fit gap-1.5 rounded-md border-transparent bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border"
+                                >
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                    Đang soạn thảo AI...
+                                </Badge>
+                                {draft?.progress !== undefined && (
+                                    <span className="font-mono text-[11px] text-muted-foreground">
+                                        {draft.progress}%
+                                    </span>
+                                )}
+                            </div>
+                            {draft?.progress !== undefined && (
+                                <Progress value={draft.progress} className="h-1" />
+                            )}
+                        </div>
                     ) : draftBody ? (
                         <div className="flex items-center justify-between">
                             <Badge
@@ -318,7 +336,7 @@ function CardActions({
     alert: Alert;
     onSend: (updated: Alert) => void;
     onEdit: () => void;
-    onMove: (status: AlertStatus, message?: string) => void;
+    onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     isGenerating?: boolean;
 }) {

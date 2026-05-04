@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
   type Alert,
-  type AlertStatus,
+  type CaseStatus,
   type ColumnDef,
   PAGE_SIZE,
 } from "@/lib/alerts"
@@ -19,12 +19,12 @@ type KanbanColumnProps = {
   totalInColumn: number
   isCollapsed: boolean
   isExpanded: boolean
-  onToggleCollapse: (id: AlertStatus) => void
-  onToggleExpand: (id: AlertStatus) => void
+  onToggleCollapse: (id: CaseStatus) => void
+  onToggleExpand: (id: CaseStatus) => void
   onSend: (a: Alert) => void
   onEdit: (a: Alert) => void
   onRemove: (a: Alert) => void
-  onMove: (id: string, status: AlertStatus, message?: string) => void
+  onMove: (id: string, status: CaseStatus, message?: string) => void
   onOpenGoals: (id: string) => void
 }
 

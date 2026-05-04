@@ -3,22 +3,22 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
+from uuid import UUID
 
-from pydantic import UUID4
-
-from src.application.commands.alert_commands import (
-    AlertCommandHandler,
+from src.application.commands.case_commands import (
+    CaseCommandHandler,
     TriggerDraftCommand,
 )
 from src.application.dtos.data_dtos import DataIngestionCommand
+from src.core.logger import logger
+from src.domain.entities.case import Case
 from src.domain.repositories.activity_repository import ActivityRepository
-from src.domain.repositories.idempotency_repository import IdempotencyRepository
+from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.job_repository import JobRepository
-from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
-from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.domain.value_objects.status import CaseStatus, InterventionStatus, RiskStatus
 
 
 class DataCommandHandler:
@@ -29,25 +29,23 @@ class DataCommandHandler:
         student_repo: StudentRepository,
         activity_repo: ActivityRepository,
         history_repo: StatusHistoryRepository,
-        idempotency_repo: IdempotencyRepository,
-        settings_repo: UserSettingsRepository,
+        case_repo: CaseRepository,
         job_repo: JobRepository,
         anomaly_engine: AnomalyEngine,
-        alert_command_handler: AlertCommandHandler,
+        case_command_handler: CaseCommandHandler,
     ):
         self.student_repo = student_repo
         self.activity_repo = activity_repo
         self.history_repo = history_repo
-        self.idempotency_repo = idempotency_repo
-        self.settings_repo = settings_repo
+        self.case_repo = case_repo
         self.job_repo = job_repo
         self.anomaly_engine = anomaly_engine
-        self.alert_command_handler = alert_command_handler
+        self.case_command_handler = case_command_handler
 
     async def handle_ingest_data(
         self,
         command: DataIngestionCommand,
-        user_id: UUID4,
+        user_id: UUID,
     ) -> Mapping[str, Any]:
         """Execute the data ingestion command with orchestration."""
         results: list[str] = []
@@ -68,23 +66,20 @@ class DataCommandHandler:
 
         # Trigger automatic draft generation for new at-risk students
         triggered_jobs: list[dict[str, Any]] = []
-        db_updates: list[tuple[UUID4, UUID4]] = []
+        db_updates: list[tuple[UUID, str, UUID | None, str | None]] = []
 
-        # Check user policy for automatic drafts
-        auto_draft_enabled = await self.settings_repo.get_auto_draft_enabled(user_id)
-
-        if auto_draft_enabled:
-            for sid in new_sids:
+        if command.auto_generate_draft_email:
+            for sid, case_id in new_sids:
                 trigger_command = TriggerDraftCommand(
-                    sid=sid,
+                    case_id=case_id,
                     user_id=user_id,
                     update_db=False,
                 )
-                job_id = await self.alert_command_handler.handle_trigger_draft(
-                    trigger_command
+                job_id = await self.case_command_handler.handle_trigger_draft(
+                    trigger_command,
                 )
                 triggered_jobs.append({'sid': sid, 'job_id': job_id})
-                db_updates.append((job_id, sid, 'email_draft'))
+                db_updates.append((job_id, 'email_draft', case_id, 'case'))
 
         # Batch create job tracking records
         if db_updates:
@@ -96,7 +91,7 @@ class DataCommandHandler:
             'triggered_jobs': triggered_jobs,
         }
 
-    async def _run_anomaly_detection(self) -> list[UUID4]:
+    async def _run_anomaly_detection(self) -> list[tuple[UUID, UUID]]:
         """Orchestrate the anomaly detection process."""
         # 1. Fetch data
         weekly_avgs = await self.activity_repo.get_weekly_averages()
@@ -108,13 +103,14 @@ class DataCommandHandler:
             for h in existing_history
         }
 
-        student_data: dict[UUID4, list[dict[str, Any]]] = defaultdict(list)
+        student_data: dict[UUID, list[dict[str, Any]]] = defaultdict(list)
         for avg in weekly_avgs:
             student_data[avg['sid']].append(avg)
 
         # 3. Call the pure domain service
         new_history_records, risk_statuses = self.anomaly_engine.run(
-            student_data, history_set
+            student_data,
+            history_set,
         )
 
         # 4. Persist new history records
@@ -122,7 +118,7 @@ class DataCommandHandler:
             await self.history_repo.batch_create_history(new_history_records)
 
         # 5. Transition student statuses and identify new at-risk students
-        new_at_risk_sids: list[UUID4] = []
+        new_at_risk_sids: list[tuple[UUID, UUID]] = []
         for sid, latest_risk in risk_statuses.items():
             if latest_risk == RiskStatus.NORMAL:
                 continue
@@ -140,16 +136,22 @@ class DataCommandHandler:
                     risk_status=latest_risk,
                     intervention_status=InterventionStatus.NOTIFIED,
                 )
-                new_at_risk_sids.append(sid)
+
+                # Create a new Case for this student
+                new_case = Case(sid=sid, status=CaseStatus.OPEN)
+                await self.case_repo.create_case(new_case)
+                case_id = new_case.case_id
             else:
                 await self.student_repo.update_risk_status(sid, risk_status=latest_risk)
+                case = await self.case_repo.get_active_case(sid)
+                if case is None:
+                    logger.warning(
+                        f'Student id {sid} having risk status outside'
+                        ' (NONE, RESOLVED) has no active case, ignoring...',
+                    )
+                    continue
+                case_id = case.case_id
+
+            new_at_risk_sids.append((sid, case_id))
 
         return new_at_risk_sids
-
-    async def check_idempotency(self, key: UUID4) -> bool:
-        """Check if an idempotency key has been used."""
-        return await self.idempotency_repo.check_key(key)
-
-    async def record_idempotency(self, key: UUID4) -> None:
-        """Record a new idempotency key."""
-        await self.idempotency_repo.record_key(key)

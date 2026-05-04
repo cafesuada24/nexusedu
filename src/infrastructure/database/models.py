@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import TYPE_CHECKING
+from datetime import datetime  # noqa: TC003
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
@@ -12,28 +11,70 @@ from sqlalchemy import (
     Boolean,
     Double,
     ForeignKey,
+    Index,
     Integer,
+    MetaData,
     String,
+    Table,
     Text,
+    UniqueConstraint,
     Uuid,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-if TYPE_CHECKING:
-    pass
+
+def _all_column_names(constraint: UniqueConstraint | Index, _: Table) -> str:
+    return (
+    '_'.join(
+        [column.name for column in constraint.columns.values()],
+    )
+)
+_convention = {
+    'all_column_names': _all_column_names,
+    'ix': 'ix__%(table_name)s__%(all_column_names)s',
+    'uq': 'uq__%(table_name)s__%(all_column_names)s',
+    'ck': 'ck__%(table_name)s__%(constraint_name)s',
+    'fk': 'fk__%(table_name)s__%(all_column_names)s__%(referred_table_name)s',
+    'pk': 'pk__%(table_name)s',
+}
 
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
 
-    pass
+    metadata = MetaData(naming_convention=_convention)
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table, integrating with FastAPI-Users."""
 
     role: Mapped[str] = mapped_column(String, default='viewer')
+
+    preferences: Mapped[UserSettings] = relationship(
+        'UserSettings',
+        back_populates='user',
+        lazy='selectin',
+    )
+    advisor_profile: Mapped[Advisor | None] = relationship(
+        'Advisor',
+        back_populates='user',
+        uselist=False,
+    )
+
+
+class UserSettings(Base):
+    """Configuration settings for a specific user."""
+
+    __tablename__ = 'user_settings'
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey('user.id'),
+        primary_key=True,
+    )
+    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    user: Mapped[User] = relationship('User', back_populates='preferences')
 
 
 class Student(Base):
@@ -52,7 +93,8 @@ class Student(Base):
 
     # Relationships
     activities: Mapped[list[Activity]] = relationship(
-        'Activity', back_populates='student'
+        'Activity',
+        back_populates='student',
     )
     status_history: Mapped[list[StudentStatusHistory]] = relationship(
         'StudentStatusHistory',
@@ -117,15 +159,28 @@ class Advisor(Base):
 
     __tablename__ = 'advisors'
 
-    advisor_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    advisor_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey('user.id'),
+        unique=True,
+        nullable=True,
+    )
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
 
+    # Relationships
+    user: Mapped[User | None] = relationship('User', back_populates='advisor_profile')
 
-class AdvisorPointsLedger(Base):
-    """Ledger recording points earned by advisors for intervention actions."""
 
-    __tablename__ = 'advisor_points_ledger'
+class PointLedger(Base):
+    """Ledger recording points earned by users for completed tasks."""
+
+    __tablename__ = 'point_ledger'
+    __table_args__ = (Index('ix_ledger_advisor_task', 'advisor_id', 'task_id'),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -136,10 +191,36 @@ class AdvisorPointsLedger(Base):
         Uuid,
         ForeignKey('advisors.advisor_id'),
     )
-    action_type: Mapped[str | None] = mapped_column(String)
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey('tasks.task_id'),
+    )
     points: Mapped[int | None] = mapped_column(Integer)
-    sid: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey('students.sid'))
     timestamp: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+
+
+class AdvisorBadge(Base):
+    """Registry of achievement badges earned by advisors."""
+
+    __tablename__ = 'advisor_badges'
+    __table_args__ = (
+        UniqueConstraint('advisor_id', 'badge_id', name='uq_advisor_badge'),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    advisor_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('advisors.advisor_id'),
+    )
+    badge_id: Mapped[str] = mapped_column(String)
+    awarded_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
     )
@@ -156,6 +237,9 @@ class InterventionEmail(Base):
         default=uuid.uuid4,
     )
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    case_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey('cases.case_id'), nullable=True
+    )
     advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey('advisors.advisor_id'),
@@ -168,6 +252,77 @@ class InterventionEmail(Base):
         server_default=func.current_timestamp(),
     )
     sent_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+
+    # Business rule: each intervention case has exactly one email record
+    __table_args__ = (
+        UniqueConstraint('case_id', name='uq_intervention_emails_case_id'),
+    )
+
+
+class Case(Base):
+    """Represents an intervention case for a student."""
+
+    __tablename__ = 'cases'
+
+    case_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    status: Mapped[str] = mapped_column(String, default='open')
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    assigned_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey('advisors.advisor_id'),
+        nullable=True,
+    )
+
+    # Relationships
+    student: Mapped[Student] = relationship('Student')
+    tasks: Mapped[list[Task]] = relationship(
+        'Task',
+        back_populates='case',
+        cascade='all, delete-orphan',
+        lazy='selectin',
+    )
+
+
+class Task(Base):
+    """Represents a specific task associated with an intervention case."""
+
+    __tablename__ = 'tasks'
+
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    case_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('cases.case_id'),
+    )
+    action_type: Mapped[str] = mapped_column(
+        String
+    )  # 'send email', 'student book', 'resolve case'
+    status: Mapped[str] = mapped_column(String, default='pending')
+    points_reward: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    completed_by_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey('advisors.advisor_id'),
+    )
+
+    # Relationships
+    case: Mapped[Case] = relationship('Case', back_populates='tasks')
 
 
 class IdempotencyKey(Base):
@@ -182,21 +337,8 @@ class IdempotencyKey(Base):
     )
 
 
-class UserSettings(Base):
-    """Configuration settings for a specific user."""
-
-    __tablename__ = 'user_settings'
-
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey('user.id'),
-        primary_key=True,
-    )
-    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-
-
 class BackgroundJobTracker(Base):
-    """Tracker for ephemeral background jobs tied to a student."""
+    """Tracker for background jobs with observability and correlation."""
 
     __tablename__ = 'background_job_tracker'
 
@@ -205,6 +347,19 @@ class BackgroundJobTracker(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
     job_type: Mapped[str] = mapped_column(String, default='email_draft')
     status: Mapped[str] = mapped_column(String, default='running')
+
+    # Observability
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP,
+        server_default=func.current_timestamp(),
+    )
+    started_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Correlation to connect jobs with other entities (e.g., cases, students)
+    correlation_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    correlation_type: Mapped[str | None] = mapped_column(String)

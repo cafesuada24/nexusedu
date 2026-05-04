@@ -7,7 +7,7 @@ backend, and role-based access control (RBAC).
 import uuid
 from collections.abc import AsyncGenerator, Callable
 from enum import StrEnum
-from typing import Annotated, override
+from typing import Annotated, Any, override
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
@@ -16,18 +16,30 @@ from fastapi_users.authentication import (
     BearerTransport,
     JWTStrategy,
 )
-from fastapi_users.db import SQLAlchemyUserDatabase
+from fastapi_users.db import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import config
+from src.domain.repositories.advisor_repository import AdvisorRepository
+from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import get_async_session
-from src.utils.env import getenv
+from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyAdvisorRepository,
+    SqlAlchemyUserSettingsRepository,
+)
+from src.presentation.dependencies.providers import (
+    get_advisor_repository,
+    get_user_settings_repository,
+)
 
 # Configuration
-JWT_SECRET: str = getenv(
-    'JWT_SECRET',
-    'SET_ME_IN_PRODUCTION_HEHEHE',
-)
+if config.jwt_secret is None:
+    if config.environment == 'production':
+        raise ValueError(
+            'config.jwt_secret variable is required in production environment.',
+        )
+    config.jwt_secret = 'SET_ME_IN_PRODUCTION_HAHAH'
 
 
 class Scope(StrEnum):
@@ -69,10 +81,9 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
 }
 
 
-
 async def get_user_db(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> AsyncGenerator[SQLAlchemyUserDatabase[User, uuid.UUID], None]:
+) -> AsyncGenerator[BaseUserDatabase[User, uuid.UUID], None]:
     """Dependency for getting the user database adapter."""
     yield SQLAlchemyUserDatabase(session, User)
 
@@ -81,8 +92,18 @@ async def get_user_db(
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     """User manager for handling user registration, login, and security tokens."""
 
-    reset_password_token_secret = JWT_SECRET
-    verification_token_secret = JWT_SECRET
+    reset_password_token_secret = config.jwt_secret
+    verification_token_secret = config.jwt_secret
+
+    def __init__(
+        self,
+        user_db: BaseUserDatabase[User, uuid.UUID],
+        user_settings_db: UserSettingsRepository,
+        advisor_repo: AdvisorRepository,
+    ):
+        super().__init__(user_db)
+        self._user_setting_db = user_settings_db
+        self._advisor_repo = advisor_repo
 
     @override
     async def on_after_register(
@@ -92,13 +113,38 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ) -> None:
         """Callback triggered after a user successfully registers."""
         print(f'User {user.id} has registered.')
+        await self._user_setting_db.create_user_settings(user.id)
+
+        if user.role == UserRole.ADVISOR.value:
+            # Ensure an advisor profile exists and is linked
+            name = user.email.split('@')[0].capitalize()
+            await self._advisor_repo.upsert_advisor_for_user(user.id, user.email, name)
+
+    @override
+    async def on_after_update(
+        self,
+        user: User,
+        _update_dict: dict[str, Any],
+        _request: Request | None = None,
+    ) -> None:
+        """Callback triggered after a user is updated."""
+        if user.role == UserRole.ADVISOR.value:
+            # Ensure an advisor profile exists and is linked
+            name = user.email.split('@')[0].capitalize()
+            await self._advisor_repo.upsert_advisor_for_user(user.id, user.email, name)
 
 
 async def get_user_manager(
     user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
+    user_settings_db: Annotated[
+        SqlAlchemyUserSettingsRepository, Depends(get_user_settings_repository),
+    ],
+    advisor_repo: Annotated[
+        SqlAlchemyAdvisorRepository, Depends(get_advisor_repository),
+    ],
 ) -> AsyncGenerator[UserManager, None]:
     """Dependency for getting the user manager instance."""
-    yield UserManager(user_db)
+    yield UserManager(user_db, user_settings_db, advisor_repo)
 
 
 # Authentication Backend
@@ -107,7 +153,7 @@ bearer_transport = BearerTransport(tokenUrl='api/v1/auth/jwt/login')
 
 def get_jwt_strategy() -> JWTStrategy:
     """Strategy for generating and validating JWT tokens."""
-    return JWTStrategy(secret=JWT_SECRET, lifetime_seconds=3600)
+    return JWTStrategy(secret=config.jwt_secret, lifetime_seconds=3600)
 
 
 auth_backend = AuthenticationBackend(
