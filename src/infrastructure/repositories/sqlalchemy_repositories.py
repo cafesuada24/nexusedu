@@ -443,6 +443,14 @@ class SqlAlchemyAdvisorRepository:
         result = await self.session.execute(stmt)
         return [row._asdict() for row in result.all()], total_count
 
+    async def get_advisor_points(self, advisor_id: uuid.UUID) -> int:
+        """Get total points for an advisor."""
+        stmt = select(func.coalesce(func.sum(PointLedger.points), 0)).where(
+            PointLedger.advisor_id == advisor_id
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
+
     async def record_points(
         self,
         advisor_id: uuid.UUID,
