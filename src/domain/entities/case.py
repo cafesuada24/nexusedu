@@ -19,7 +19,6 @@ from src.domain.value_objects.status import (
 class Case:
     """Represents an intervention case for a student."""
 
-    risk_status: RiskStatus
     sid: UUID
     case_id: UUID = field(default_factory=uuid4)
     status: CaseStatus = CaseStatus.OPEN
