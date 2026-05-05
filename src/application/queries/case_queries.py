@@ -16,7 +16,6 @@ from src.domain.services.gamification import GamificationService
 from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
-    TaskStatus,
 )
 
 
@@ -84,7 +83,7 @@ class CaseQueryHandler:
                         case.intervention_status,
                     ),
                     points_reward=gamification.calculate_points(
-                        'send email',
+                        GamificationService.Action.SEND_EMAIL,
                         case.created_at,
                         case.current_risk_status,
                     ),
@@ -153,7 +152,7 @@ class CaseQueryHandler:
             'sid': str(case.sid),
             'status': case.status.value,
             'created_at': case.created_at.isoformat(),
-            'resolved_at': case.resolved_at.isoformat() if case.resolved_at else None,
+            'resolved_at': case.closed_at.isoformat() if case.closed_at else None,
             'email': {
                 'email_id': str(email.email_id),
                 'subject': email.subject,
