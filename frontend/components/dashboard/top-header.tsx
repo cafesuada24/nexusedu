@@ -25,6 +25,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Kbd } from "@/components/ui/kbd"
 import { NotificationsDropdown } from "@/components/dashboard/notifications-dropdown"
 import { UserDropdown } from "@/components/dashboard/sidebar/user-dropdown"
+import { AdvisorScore } from "@/components/dashboard/advisor-score"
 
 const labels: Record<string, string> = {
   dashboard: "Tổng quan",
@@ -98,7 +99,7 @@ export function TopHeader() {
         </div>
 
         <NotificationsDropdown />
-        <ThemeToggle />
+        <AdvisorScore />
         <UserDropdown />
       </div>
     </header>
