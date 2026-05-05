@@ -1,8 +1,9 @@
 """Request models for the Agent Assistant API."""
 
+from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class QueryRequest(BaseModel):
@@ -45,8 +46,7 @@ class SISRecord(BaseModel):
         'Normal', description='Current risk status.'
     )
     intervention_status: str | None = Field('none', description='Intervention status.')
-    last_notified_timestamp: float | None = Field(
-        0,
+    last_notified_timestamp: AwareDatetime | None = Field(
         description='Timestamp of last nudge.',
     )
     last_notified_satisfaction: int | None = Field(
@@ -66,7 +66,7 @@ class LMSRecord(BaseModel):
     course_name: str = Field(..., description='Full course name.')
     test_type: str = Field(..., description='Type of assessment.')
     score: float = Field(..., description='Numeric score achieved.')
-    timestamp: float = Field(..., description='UNIX timestamp of activity.')
+    timestamp: AwareDatetime = Field(..., description='UNIX timestamp of activity.')
     academic_year: int = Field(..., description='Academic year (1-4).')
     semester: int = Field(..., description='Semester (1-2).')
     week: int | None = Field(None, description='Week number (1-16).')
