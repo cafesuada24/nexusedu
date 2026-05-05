@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
-    CursorResult,
     Integer,
     String,
     and_,
@@ -28,9 +27,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import selectinload
 
+from src.application.exceptions import ConcurrencyError
 from src.core.config import config
-from src.domain.entities.case import TaskItemRecord
-from src.domain.entities.task import Task as DomainTask
+from src.domain.entities.case import Case, TaskItemRecord
 from src.domain.value_objects.status import (
     CaseStatus,
     EmailStatus,
@@ -64,7 +63,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm import Session, selectinload
+    from sqlalchemy.orm import Session
 
     from src.domain.entities.advisor import Advisor as DomainAdvisor
     from src.domain.entities.alert import Alert as DomainAlert
@@ -73,8 +72,8 @@ if TYPE_CHECKING:
         InterventionEmail as DomainInterventionEmail,
     )
     from src.domain.entities.student import Student as DomainStudent
+    from src.domain.entities.task import Task as DomainTask
     from src.domain.repositories.metadata_repository import DBDescription
-    from src.domain.value_objects.status import InterventionStatus
 
 
 class SqlAlchemyStudentRepository:
@@ -392,19 +391,22 @@ class SqlAlchemyAdvisorRepository:
         if cutoff:
             ledger_join_cond = and_(ledger_join_cond, PointLedger.timestamp >= cutoff)
 
-        stmt = select(
-            Advisor.advisor_id,
-            Advisor.name,
-            func.coalesce(func.sum(PointLedger.points), 0).label('total_points'),
-            func.count(PointLedger.id).label('actions_count'),
-            func.count(
-                case((OrmTask.action_type == 'send email', 1)),
-            ).label('sent_count'),
-            func.count(
-                case((OrmTask.action_type == 'resolve case', 1)),
-            ).label('resolved_count'),
-        ).outerjoin(PointLedger, ledger_join_cond)\
-         .outerjoin(OrmTask, PointLedger.task_id == OrmTask.task_id)
+        stmt = (
+            select(
+                Advisor.advisor_id,
+                Advisor.name,
+                func.coalesce(func.sum(PointLedger.points), 0).label('total_points'),
+                func.count(PointLedger.id).label('actions_count'),
+                func.count(
+                    case((OrmTask.action_type == 'send email', 1)),
+                ).label('sent_count'),
+                func.count(
+                    case((OrmTask.action_type == 'resolve case', 1)),
+                ).label('resolved_count'),
+            )
+            .outerjoin(PointLedger, ledger_join_cond)
+            .outerjoin(OrmTask, PointLedger.task_id == OrmTask.task_id)
+        )
 
         stmt = stmt.group_by(
             Advisor.advisor_id,
@@ -436,7 +438,9 @@ class SqlAlchemyAdvisorRepository:
         self.session.add(entry)
 
     async def has_existing_reward(
-        self, advisor_id: uuid.UUID, task_id: uuid.UUID,
+        self,
+        advisor_id: uuid.UUID,
+        task_id: uuid.UUID,
     ) -> bool:
         """Check if a reward has already been recorded for this advisor/task combination."""
         stmt = select(PointLedger).where(
@@ -447,7 +451,10 @@ class SqlAlchemyAdvisorRepository:
         return result.scalar_one_or_none() is not None
 
     async def upsert_advisor_for_user(
-        self, user_id: uuid.UUID, email: str, name: str,
+        self,
+        user_id: uuid.UUID,
+        email: str,
+        name: str,
     ) -> None:
         """Link a user to an advisor profile, creating one if necessary."""
         # 1. Check if an advisor with this user_id already exists
@@ -515,7 +522,8 @@ class SqlAlchemyBadgeRepository:
 
     async def award_badge(self, advisor_id: uuid.UUID, badge_id: str) -> bool:
         stmt = select(AdvisorBadge).where(
-            AdvisorBadge.advisor_id == advisor_id, AdvisorBadge.badge_id == badge_id,
+            AdvisorBadge.advisor_id == advisor_id,
+            AdvisorBadge.badge_id == badge_id,
         )
         existing = (await self.session.execute(stmt)).first()
         if existing:
@@ -528,7 +536,8 @@ class SqlAlchemyBadgeRepository:
     async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
         # Get total points and action count
         stmt = select(
-            func.sum(PointLedger.points), func.count(PointLedger.id),
+            func.sum(PointLedger.points),
+            func.count(PointLedger.id),
         ).where(PointLedger.advisor_id == advisor_id)
 
         row = (await self.session.execute(stmt)).first()
@@ -536,10 +545,14 @@ class SqlAlchemyBadgeRepository:
         total_actions = row[1] or 0
 
         # Get resolves
-        stmt_resolves = select(func.count(PointLedger.id)).where(
-            PointLedger.advisor_id == advisor_id,
-            OrmTask.action_type == 'resolve case',
-        ).join(OrmTask, PointLedger.task_id == OrmTask.task_id)
+        stmt_resolves = (
+            select(func.count(PointLedger.id))
+            .where(
+                PointLedger.advisor_id == advisor_id,
+                OrmTask.action_type == 'resolve case',
+            )
+            .join(OrmTask, PointLedger.task_id == OrmTask.task_id)
+        )
         total_resolves = (await self.session.execute(stmt_resolves)).scalar() or 0
 
         # Fast actions
@@ -770,6 +783,25 @@ class SqlAlchemyCaseRepository:
         orm_case = result.scalar_one_or_none()
         return DataMapper.to_domain_case(orm_case) if orm_case else None
 
+    async def save(self, case: Case) -> None:
+        stmt = (
+            update(OrmCase)
+            .where(
+                OrmCase.case_id == case.case_id,
+                OrmCase.version == case.version,
+            )
+            .values(
+                assigned_advisor_id=case.assigned_advisor_id,
+                status=case.status,
+                version=case.version + 1,
+                updated_at=datetime.now(UTC),
+            )
+        )
+        result = await self.session.execute(stmt)
+
+        if result.rowcount == 0: # type: ignore
+            raise ConcurrencyError('Data was modified by another process.')
+
     async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> bool:
         """Assign an advisor to a case."""
         stmt = (
@@ -783,7 +815,7 @@ class SqlAlchemyCaseRepository:
             )
         )
         result = await self.session.execute(stmt)
-        return result.rowcount > 0 # type: ignore
+        return result.rowcount > 0  # type: ignore
 
     async def update_case_status(self, case_id: uuid.UUID, status: CaseStatus) -> None:
         """Update the status of a case."""
@@ -792,8 +824,8 @@ class SqlAlchemyCaseRepository:
             .where(OrmCase.case_id == case_id)
             .values(status=status.value)
         )
-        if status in (CaseStatus.RESOLVED, CaseStatus.CLOSED):
-            stmt = stmt.values(resolved_at=func.current_timestamp())
+        if status in (CaseStatus.RESOLVED, CaseStatus.FAILED):
+            stmt = stmt.values(closed_at=func.current_timestamp())
         await self.session.execute(stmt)
 
     async def get_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
