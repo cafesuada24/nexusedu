@@ -16,9 +16,11 @@ from src.application.commands.case_commands import (
     TriggerDraftCommand,
     UpdateStudentStatusCommand,
 )
+from src.application.dtos.case_dtos import CaseDTO
 from src.application.queries.case_queries import (
     CaseQueryHandler,
-    GetTaskListQuery,
+    GetAssignedQuery,
+    GetUnassignedQuery,
 )
 from src.core.logger import logger
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -27,7 +29,7 @@ from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.session import get_async_session
-from src.presentation.api.auth import Scope, User, UserRole, require_scope
+from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
     get_case_command_handler,
     get_case_query_handler,
@@ -35,16 +37,13 @@ from src.presentation.dependencies.providers import (
     get_email_repository,
     get_idempotency_repository,
 )
+from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 from src.presentation.schemas.request import SendEmailRequest, StatusUpdate
-from src.presentation.schemas.response import (
-    CaseResponse,
-    TaskPagedResponse,
-)
 
 router = APIRouter(prefix='/cases', tags=['cases'])
 
 
-@router.get('/student/{sid}', response_model=list[CaseResponse])
+@router.get('/student/{sid}', response_model=list[CaseDTO])
 async def get_case_history(
     sid: str,
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
@@ -68,70 +67,60 @@ async def get_case_history(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get('', response_model=TaskPagedResponse)
-async def get_cases_list(
+@router.get('/open')
+async def get_open_cases_list(
     query_handler: Annotated[CaseQueryHandler, Depends(get_case_query_handler)],
-    user: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
+    _: Annotated[User, Depends(require_scope(Scope.CASE_READ))],
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-) -> dict[str, Any]:
+) -> PagedResponse[CaseDTO]:
     """Retrieve the unified list of cases for the advisor dashboard.
 
     Administrators see all open cases. Advisors see new cases (unassigned)
     and cases specifically assigned to them.
     """
     try:
-        advisor_id = None if user.role == UserRole.ADMIN.value else user.id
-        query = GetTaskListQuery(advisor_id=advisor_id, limit=limit, offset=offset)
-        paged_dto = await query_handler.handle_get_cases_list(query)
+        query = GetUnassignedQuery(limit=limit, offset=offset)
+        cases, total_count = await query_handler.handle_get_open_cases(query)
 
-        return {
-            'items': [
-                {
-                    'case_id': str(d.case_id),
-                    'sid': str(d.sid),
-                    'created_at': d.created_at.isoformat() + 'Z',
-                    'assigned_advisor_id': str(d.assigned_advisor_id)
-                    if d.assigned_advisor_id
-                    else None,
-                    'student_name': d.student_name,
-                    'email': d.email,
-                    'major': d.major,
-                    'current_risk_status': d.current_risk_status.value,
-                    'intervention_status': d.intervention_status.value,
-                    'draft_subject': d.draft_subject,
-                    'draft_body': d.draft_body,
-                    'draft_status': d.draft_status,
-                    'assigned_to': d.assigned_to,
-                    'suggested_action': d.suggested_action,
-                    'points_reward': d.points_reward,
-                    'tasks': [
-                        {
-                            'task_id': str(t.task_id),
-                            'action_type': t.action_type.value,
-                            'status': t.status.value,
-                            'points_reward': t.points_reward,
-                            'completed_at': t.completed_at.isoformat()
-                            if t.completed_at
-                            else None,
-                            'completed_by_advisor_id': str(t.completed_by_advisor_id)
-                            if t.completed_by_advisor_id
-                            else None,
-                        }
-                        for t in d.tasks
-                    ]
-                    if d.tasks
-                    else [],
-                }
-                for d in paged_dto.items
-            ],
-            'metadata': {
-                'total_count': paged_dto.metadata.total_count,
-                'limit': paged_dto.metadata.limit,
-                'offset': paged_dto.metadata.offset,
-                'has_next': paged_dto.metadata.has_next,
-            },
-        }
+        return PagedResponse[CaseDTO](
+            items=cases,
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
+                has_next=offset + len(cases) < total_count,
+            ),
+        )
+    except Exception as e:
+        logger.error(f'Error in get_case_list: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.get('/assigned')
+async def get_assigned_cases_list(
+    query_handler: Annotated[CaseQueryHandler, Depends(get_case_query_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.CASE_READ))],
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> PagedResponse[CaseDTO]:
+    """Retrieve the unified list of cases for the advisor dashboard.
+
+    Administrators see all open cases. Advisors see new cases (unassigned)
+    and cases specifically assigned to them.
+    """
+    try:
+        query = GetAssignedQuery(user_id=user.id, limit=limit, offset=offset)
+        cases, total_count = await query_handler.handle_get_assigned_cases(query)
+
+        return PagedResponse[CaseDTO](
+            items=cases,
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
+                has_next=offset + len(cases) < total_count,
+            ),
+        )
     except Exception as e:
         logger.error(f'Error in get_case_list: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -361,7 +350,8 @@ async def send_nudge_email(
         logger.error(f'Error in send_nudge_email: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-@router.post('/cases/{case_id}/accept')
+
+@router.post('/{case_id}/accept')
 async def accept_task(
     case_id: str,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
@@ -369,7 +359,6 @@ async def accept_task(
 ) -> dict[str, str]:
     """An advisor accept to solve a case."""
     try:
-
         command = AcceptCaseCommand(
             case_id=UUID(case_id),
             user_id=user.id,
