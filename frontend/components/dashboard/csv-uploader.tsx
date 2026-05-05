@@ -19,7 +19,7 @@ import {
   type UploadItem,
 } from "@/hooks/use-uploads";
 import { analyzeCsv, csvToLMSRecords, csvToSISRecords, mergeCsv, SAMPLE_CSV } from "@/lib/csv";
-import { ingestData } from "@/lib/api";
+import { ingestData, updateUserSettings } from "@/lib/api";
 import { type SourceKey } from "@/lib/constants";
 import { Dropzone, HintLine, type StagedMap } from "./csv-uploader/dropzone";
 import { UploadHistoryRow } from "./csv-uploader/upload-history";
@@ -134,6 +134,7 @@ export function CsvUploader() {
 
       if (dataSources.length > 0) {
         try {
+          await updateUserSettings({ auto_draft_enabled: false });
           await ingestData(dataSources);
           updateUpload(id, {
             status: "ready",
