@@ -56,6 +56,7 @@ class Scope(StrEnum):
     USERS_WRITE = 'users:write'
 
     CASE_ACCEPT = 'case:accept'
+    CASE_READ = 'case:read'
 
 
 class UserRole(StrEnum):
@@ -76,11 +77,11 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
         Scope.JOBS_READ,
         Scope.QUERY_EXECUTE,
         Scope.CASE_ACCEPT,
+        Scope.CASE_READ,
     },
     UserRole.VIEWER: {
         Scope.ALERTS_READ,
         Scope.ADVISORS_READ,
-        Scope.JOBS_READ,
     },
 }
 
