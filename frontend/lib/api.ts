@@ -200,6 +200,11 @@ export const AdvisorEngagementItemSchema = z.object({
 });
 export type AdvisorEngagementItem = z.infer<typeof AdvisorEngagementItemSchema>;
 
+export const AdvisorPointsSchema = z.object({
+    points: z.number().int(),
+});
+export type AdvisorPoints = z.infer<typeof AdvisorPointsSchema>;
+
 export const AdvisorProfileReadSchema = z.object({
   advisor_id: z.string(),
   name: z.string().nullable().optional(),
@@ -932,6 +937,24 @@ export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
   }
   const data = await res.json();
   return AdvisorProfileReadSchema.parse(data);
+}
+
+/**
+ * GET /advisors/me/points — returns current user's advisor points.
+ */
+export async function fetchAdvisorPoints(): Promise<AdvisorPoints> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(endpoint("/advisors/me/points"), { method: "GET" }, signal),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        const message = errorBody.detail || res.statusText;
+        throw new Error(`Không thể lấy điểm thưởng: ${message}`);
+    }
+    const data = await res.json();
+    return AdvisorPointsSchema.parse(data);
 }
 
 /**
