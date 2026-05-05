@@ -10,6 +10,7 @@ from sqlalchemy import (
     TIMESTAMP,
     Boolean,
     Double,
+    Enum,
     ForeignKey,
     Index,
     Integer,
@@ -23,13 +24,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from src.domain.value_objects.status import CaseStatus, RiskStatus
+
 
 def _all_column_names(constraint: UniqueConstraint | Index, _: Table) -> str:
-    return (
-    '_'.join(
+    return '_'.join(
         [column.name for column in constraint.columns.values()],
     )
-)
+
+
 _convention = {
     'all_column_names': _all_column_names,
     'ix': 'ix__%(table_name)s__%(all_column_names)s',
@@ -270,12 +273,14 @@ class Case(Base):
         default=uuid.uuid4,
     )
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
-    status: Mapped[str] = mapped_column(String, default='open')
+    status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         server_default=func.current_timestamp(),
     )
-    resolved_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    assigned_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    closed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    version: Mapped[int] = mapped_column(Integer, default=0)
     assigned_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey('advisors.advisor_id'),
