@@ -84,9 +84,9 @@ class DataMapper:
         domain_case = DomainCase(
             case_id=orm_case.case_id,
             sid=orm_case.sid,
-            status=CaseStatus(orm_case.status),
+            status=orm_case.status,
             created_at=orm_case.created_at,
-            resolved_at=orm_case.resolved_at,
+            closed_at=orm_case.closed_at,
             assigned_advisor_id=orm_case.assigned_advisor_id,
         )
         if hasattr(orm_case, 'tasks') and orm_case.tasks:
