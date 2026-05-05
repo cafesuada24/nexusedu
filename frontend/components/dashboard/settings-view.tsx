@@ -64,22 +64,10 @@ const integrations = [
         logo: "/logos/google-calendar.png",
     },
     {
-        name: "Microsoft Teams",
-        description: "Link meeting tự động",
-        connected: true,
-        logo: "/logos/ms-teams.png",
-    },
-    {
         name: "Zalo OA",
         description: "Nhắc qua Zalo",
         connected: false,
         logo: "/logos/zalo.png",
-    },
-    {
-        name: "LMS Moodle",
-        description: "Đồng bộ điểm 30p",
-        connected: true,
-        logo: "/logos/moodle.png",
     },
 ];
 
