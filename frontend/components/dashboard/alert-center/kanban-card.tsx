@@ -45,6 +45,7 @@ type KanbanCardProps = {
     studentProfile?: StudentRow;
     isAiDrafting?: boolean;
     aiDraftError?: string;
+    isAiDraftReady?: boolean;
 };
 
 function KanbanCardInner({
@@ -55,6 +56,7 @@ function KanbanCardInner({
     studentProfile,
     isAiDrafting,
     aiDraftError,
+    isAiDraftReady,
 }: KanbanCardProps) {
     const meta = problemMeta[a.problem];
     const ProblemIcon = meta.icon;
@@ -231,11 +233,15 @@ function KanbanCardInner({
             ) : a.status === "accepted" && isAiDrafting ? (
                 <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted-foreground">
                     <Loader2 className="size-3.5 animate-spin" />
-                    AI is drafting...
+                    AI đang soạn thảo bản thảo...
                 </p>
             ) : a.status === "accepted" && aiDraftError ? (
                 <p className="mt-3 text-[13px] text-destructive">
                     {aiDraftError}
+                </p>
+            ) : a.status === "accepted" && isAiDraftReady ? (
+                <p className="mt-3 text-[13px] text-success">
+                    Bản nháp AI đã sẵn sàng.
                 </p>
             ) : (
                 <p className="mt-3 text-[13px] text-muted-foreground">
@@ -250,6 +256,8 @@ function KanbanCardInner({
                 onMove={onMove}
                 onOpenGoals={onOpenGoals}
                 studentProfile={studentProfile}
+                isAiDrafting={isAiDrafting}
+                isAiDraftReady={isAiDraftReady}
             />
         </article>
     );
@@ -263,12 +271,16 @@ function CardActions({
     onMove,
     onOpenGoals,
     studentProfile,
+    isAiDrafting,
+    isAiDraftReady,
 }: {
     alert: Alert;
     onViewDetails: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     studentProfile?: StudentRow;
+    isAiDrafting?: boolean;
+    isAiDraftReady?: boolean;
 }) {
     const hasGoals = a.goals.length > 0;
     if (a.status === "new") {
@@ -330,6 +342,42 @@ function CardActions({
     }
 
     if (a.status === "accepted") {
+        if (isAiDrafting) {
+            return (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 h-10 w-full rounded-lg text-sm font-medium"
+                    disabled
+                >
+                    <Loader2 className="size-4 animate-spin" />
+                    AI đang soạn thảo bản thảo...
+                </Button>
+            );
+        }
+
+        if (isAiDraftReady) {
+            return (
+                <div className="mt-3 flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 flex-1 rounded-lg text-sm font-medium"
+                        onClick={onViewDetails}
+                    >
+                        View Draft
+                    </Button>
+                    <Button
+                        size="sm"
+                        className="h-10 flex-1 rounded-lg text-sm font-medium"
+                        onClick={onViewDetails}
+                    >
+                        Edit Email
+                    </Button>
+                </div>
+            );
+        }
+
         return (
             <div className="mt-3 flex items-center gap-2">
                 <Button

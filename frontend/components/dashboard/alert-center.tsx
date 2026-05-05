@@ -18,7 +18,7 @@ import { useDataset } from "@/hooks/use-dataset";
 import { cn } from "@/lib/utils";
 import {
     type Alert,
-    type AlertStatus,
+    type CaseStatus,
     problemMeta,
     COLUMNS,
     pickRandomAppointment,
@@ -50,7 +50,7 @@ export function AlertCenter() {
     const [aiDraftErrorById, setAiDraftErrorById] = React.useState<
         Record<string, string>
     >({});
-    const [acceptedOverrides, setAcceptedOverrides] = React.useState<
+    const [aiDraftReadyById, setAiDraftReadyById] = React.useState<
         Record<string, boolean>
     >({});
     const [canScrollLeft, setCanScrollLeft] = React.useState(false);
@@ -133,9 +133,7 @@ export function AlertCenter() {
                 subject: "",
                 body: "",
                 lastContactedAt: null,
-                status: acceptedOverrides[r.sid]
-                    ? "accepted"
-                    : fromBackendStatus(r.intervention_status),
+                status: fromBackendStatus(r.intervention_status),
                 movedAt: now,
                 draftJobId: null,
                 draftSubject: null,
@@ -146,10 +144,10 @@ export function AlertCenter() {
                         : null,
                 goals: localAlertState[r.sid]?.goals || [],
             }));
-    }, [remoteAlerts, localAlertState, acceptedOverrides]);
+    }, [remoteAlerts, localAlertState]);
 
     const [collapsedCols, setCollapsedCols] = React.useState<
-        Record<AlertStatus, boolean>
+        Record<CaseStatus, boolean>
     >({
         new: false,
         accepted: false,
@@ -159,11 +157,11 @@ export function AlertCenter() {
         resolved: false,
     });
 
-    const toggleCollapse = (id: AlertStatus) =>
+    const toggleCollapse = (id: CaseStatus) =>
         setCollapsedCols((prev) => ({ ...prev, [id]: !prev[id] }));
 
     const [expandedCols, setExpandedCols] = React.useState<
-        Record<AlertStatus, boolean>
+        Record<CaseStatus, boolean>
     >({
         new: false,
         accepted: false,
@@ -173,7 +171,7 @@ export function AlertCenter() {
         resolved: false,
     });
 
-    const toggleExpand = (id: AlertStatus) =>
+    const toggleExpand = (id: CaseStatus) =>
         setExpandedCols((prev) => ({ ...prev, [id]: !prev[id] }));
 
     const filteredAlerts = React.useMemo(() => {
@@ -192,7 +190,7 @@ export function AlertCenter() {
     }, [alerts, problemFilter, query]);
 
     const grouped = React.useMemo(() => {
-        const map: Record<AlertStatus, Alert[]> = {
+        const map: Record<CaseStatus, Alert[]> = {
             new: [],
             accepted: [],
             contacted: [],
@@ -210,7 +208,7 @@ export function AlertCenter() {
     }, [filteredAlerts]);
 
     const totalCounts = React.useMemo(() => {
-        const map: Record<AlertStatus, number> = {
+        const map: Record<CaseStatus, number> = {
             new: 0,
             accepted: 0,
             contacted: 0,
@@ -221,6 +219,7 @@ export function AlertCenter() {
         for (const a of alerts) map[a.status]++;
         return map;
     }, [alerts]);
+
 
     const problemCounts = React.useMemo(() => {
         const counts: Record<Problem, number> = {
@@ -239,87 +238,88 @@ export function AlertCenter() {
         [grouped, aiDraftingById],
     );
 
-    const moveTo = (a: Alert, status: AlertStatus, message?: string) => {
+    const moveTo = (a: Alert, status: CaseStatus, message?: string) => {
+        const sid = a.id;
+        const entityId = a.caseId ?? sid;
+
         if (status === "accepted") {
-            setAcceptedOverrides((prev) => ({ ...prev, [a.id]: true }));
-            setAiDraftErrorById((prev) => {
-                if (!prev[a.id]) return prev;
-                const next = { ...prev };
-                delete next[a.id];
-                return next;
-            });
-            if (message) toast.success(message);
-            if (!requestedDraftById[a.id]) {
-                setAiDraftingById((prev) => ({ ...prev, [a.id]: true }));
-                void generateAiDraftForAlert(a.id)
-                    .then(() => {
-                        setRequestedDraftById((prev) => ({
-                            ...prev,
-                            [a.id]: true,
-                        }));
+            if (!sid) {
+                // Debug aid for local environment diagnostics.
+                console.error("[Debug] Missing sid for student:", a);
+                return;
+            }
+
+            updateStatus(
+                { case_id: sid, status: toBackendStatus(status) },
+                {
+                    onSuccess: () => {
                         setAiDraftErrorById((prev) => {
                             if (!prev[a.id]) return prev;
                             const next = { ...prev };
                             delete next[a.id];
                             return next;
                         });
-                    })
-                    .catch((err: any) => {
-                        const message = String(err?.message || "");
-                        const aiUnavailable =
-                            message.includes("[404]") ||
-                            message.toLowerCase().includes("not found");
-                        const errorMessage = aiUnavailable
-                            ? "Không tìm thấy dịch vụ AI. Vui lòng kiểm tra lại kết nối."
-                            : message || "Vui lòng thử lại sau.";
-                        setAiDraftErrorById((prev) => ({
-                            ...prev,
-                            [a.id]: errorMessage,
-                        }));
-                        toast.error("Không thể tạo nội dung email", {
-                            description: errorMessage,
-                        });
-                    })
-                    .finally(() => {
-                        setAiDraftingById((prev) => ({
-                            ...prev,
-                            [a.id]: false,
-                        }));
-                    });
-            }
-            return;
-        }
-
-        updateStatus(
-            { sid: a.id, status: toBackendStatus(status) },
-            {
-                onSuccess: () => {
-                    if (acceptedOverrides[a.id]) {
-                        setAcceptedOverrides((prev) => {
+                        setAiDraftReadyById((prev) => {
+                            if (!prev[a.id]) return prev;
                             const next = { ...prev };
                             delete next[a.id];
                             return next;
                         });
-                    }
-                    if (message) toast.success(message);
-                },
-            },
-        );
-    };
+                        if (message) toast.success(message);
 
-    const archive = (a: Alert) => {
-        if (acceptedOverrides[a.id]) {
-            setAcceptedOverrides((prev) => {
-                const next = { ...prev };
-                delete next[a.id];
-                return next;
-            });
+                        if (!requestedDraftById[a.id]) {
+                            setAiDraftingById((prev) => ({ ...prev, [a.id]: true }));
+                            void generateAiDraftForAlert(a.id, a.caseId)
+                                .then(() => {
+                                    setRequestedDraftById((prev) => ({
+                                        ...prev,
+                                        [a.id]: true,
+                                    }));
+                                    setAiDraftReadyById((prev) => ({
+                                        ...prev,
+                                        [a.id]: true,
+                                    }));
+                                    setAiDraftErrorById((prev) => {
+                                        if (!prev[a.id]) return prev;
+                                        const next = { ...prev };
+                                        delete next[a.id];
+                                        return next;
+                                    });
+                                })
+                                .catch((err: any) => {
+                                    const message = String(err?.message || "");
+                                    const aiUnavailable =
+                                        message.includes("[404]") ||
+                                        message.toLowerCase().includes("not found");
+                                    const errorMessage = aiUnavailable
+                                        ? "Không tìm thấy dịch vụ AI. Vui lòng kiểm tra lại kết nối."
+                                        : message || "Vui lòng thử lại sau.";
+                                    setAiDraftErrorById((prev) => ({
+                                        ...prev,
+                                        [a.id]: errorMessage,
+                                    }));
+                                    toast.error("Không thể tạo nội dung email", {
+                                        description: errorMessage,
+                                    });
+                                })
+                                .finally(() => {
+                                    setAiDraftingById((prev) => ({
+                                        ...prev,
+                                        [a.id]: false,
+                                    }));
+                                });
+                        }
+                    },
+                },
+            );
+            return;
         }
+
         updateStatus(
-            { sid: a.id, status: "dismissed" },
+            { case_id: entityId, status: toBackendStatus(status) },
             {
                 onSuccess: () => {
-                    toast.message(`Đã bỏ qua cảnh báo của ${a.name}`);
+                    if (message) toast.success(message);
                 },
             },
         );
@@ -489,13 +489,13 @@ export function AlertCenter() {
                                     isExpanded={expandedCols[col.id]}
                                     onToggleCollapse={toggleCollapse}
                                     onToggleExpand={toggleExpand}
-                                    onArchive={archive}
                                     onViewDetails={handleGetProfile}
                                     onMove={moveTo}
                                     onOpenGoals={(id) => setGoalsTargetId(id)}
                                     studentProfilesById={studentProfilesById}
                                     aiDraftingById={aiDraftingById}
                                     aiDraftErrorById={aiDraftErrorById}
+                                    aiDraftReadyById={aiDraftReadyById}
                                 />
                             ))}
                         </div>

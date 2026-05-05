@@ -29,6 +29,7 @@ type KanbanColumnProps = {
   studentProfilesById: Record<string, StudentRow | undefined>
   aiDraftingById: Record<string, boolean>
   aiDraftErrorById: Record<string, string>
+  aiDraftReadyById: Record<string, boolean>
 }
 
 export function KanbanColumn({
@@ -45,6 +46,7 @@ export function KanbanColumn({
   studentProfilesById,
   aiDraftingById,
   aiDraftErrorById,
+  aiDraftReadyById,
 }: KanbanColumnProps) {
   const ColIcon = col.icon
 
@@ -142,6 +144,7 @@ export function KanbanColumn({
                       studentProfile={studentProfilesById[a.id]}
                       isAiDrafting={Boolean(aiDraftingById[a.id])}
                       aiDraftError={aiDraftErrorById[a.id]}
+                      isAiDraftReady={Boolean(aiDraftReadyById[a.id])}
                     />
                   </motion.div>
                 ))}
