@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from pydantic import AwareDatetime, BaseModel, EmailStr
+
 from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
@@ -10,7 +12,7 @@ from src.domain.value_objects.status import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class TaskDTO:
     """DTO for a task associated with a case."""
 
@@ -22,23 +24,26 @@ class TaskDTO:
     completed_by_advisor_id: UUID | None
 
 
-@dataclass
-class CaseDTO:
-    """DTO for a case in the advisor case list."""
+class CaseDTO(BaseModel):
+    """Schema for a student case."""
 
     case_id: UUID
     sid: UUID
-    created_at: datetime
+    created_at: AwareDatetime
+
     assigned_advisor_id: UUID | None
-    student_name: str | None
-    email: str | None
+    assigned_to: str | None
+
+    student_name: str
     major: str
+
     current_risk_status: RiskStatus
     intervention_status: InterventionStatus
+
+    email: EmailStr
     draft_subject: str | None
     draft_body: str | None
-    draft_status: str | None
-    assigned_to: str | None
-    suggested_action: str
+    draft_status: str
+
     points_reward: int
-    tasks: list[TaskDTO] | None = None
+

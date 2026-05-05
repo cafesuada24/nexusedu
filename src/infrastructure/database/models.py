@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime  # noqa: TC003
+from datetime import UTC, datetime  # noqa: TC003
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
-    TIMESTAMP,
     Boolean,
+    DateTime,
+    Dialect,
     Double,
     Enum,
     ForeignKey,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    TypeDecorator,
     UniqueConstraint,
     Uuid,
     func,
@@ -41,6 +43,38 @@ _convention = {
     'fk': 'fk__%(table_name)s__%(all_column_names)s__%(referred_table_name)s',
     'pk': 'pk__%(table_name)s',
 }
+
+
+class UTCDateTime(TypeDecorator[datetime]):
+    """Safely coerce SQLite datetimes to be timezone-aware UTC.
+
+    TypeDecorator[datetime.datetime] tells static analyzers that this
+    decorator works with Python datetime objects.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(
+        self,
+        value: datetime | None,
+        _: Dialect,
+    ) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError('Datetime must be timezone-aware')
+        return value.astimezone(UTC)
+
+    def process_result_value(
+        self,
+        value: datetime | None,
+        _: Dialect,
+    ) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            # SQLite returned a naive datetime, so we "attach" UTC
+            return value.replace(tzinfo=UTC)
+        return value
 
 
 class Base(DeclarativeBase):
@@ -91,7 +125,7 @@ class Student(Base):
     major: Mapped[str] = mapped_column(String, default='Unknown')
     current_risk_status: Mapped[str] = mapped_column(String, default='Normal')
     intervention_status: Mapped[str] = mapped_column(String, default='none')
-    last_notified_timestamp: Mapped[float] = mapped_column(Double, default=0)
+    last_notified_timestamp: Mapped[datetime | None] = mapped_column(UTCDateTime)
     last_notified_satisfaction: Mapped[int] = mapped_column(Integer, default=0)
 
     # Relationships
@@ -120,7 +154,7 @@ class Activity(Base):
     course_name: Mapped[str | None] = mapped_column(String)
     test_type: Mapped[str | None] = mapped_column(String)
     score: Mapped[float | None] = mapped_column(Double)
-    timestamp: Mapped[float | None] = mapped_column(Double)
+    timestamp: Mapped[float | None] = mapped_column(UTCDateTime)
     academic_year: Mapped[int | None] = mapped_column(Integer)
     semester: Mapped[int | None] = mapped_column(Integer)
     week: Mapped[int | None] = mapped_column(Integer)
@@ -149,7 +183,6 @@ class StudentStatusHistory(Base):
     z_score: Mapped[float | None] = mapped_column(Double)
     anomaly_flag: Mapped[str | None] = mapped_column(String)
     status_recorded_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
         server_default=func.current_timestamp(),
     )
 
@@ -204,8 +237,8 @@ class PointLedger(Base):
         ForeignKey('tasks.task_id'),
     )
     points: Mapped[int | None] = mapped_column(Integer)
-    timestamp: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
+    earned_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
         server_default=func.current_timestamp(),
     )
 
@@ -229,7 +262,7 @@ class AdvisorBadge(Base):
     )
     badge_id: Mapped[str] = mapped_column(String)
     awarded_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
+        UTCDateTime,
         server_default=func.current_timestamp(),
     )
 
@@ -246,7 +279,9 @@ class InterventionEmail(Base):
     )
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
     case_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey('cases.case_id'), nullable=True
+        Uuid,
+        ForeignKey('cases.case_id'),
+        nullable=True,
     )
     advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
@@ -256,10 +291,10 @@ class InterventionEmail(Base):
     body: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(String)  # 'draft', 'sent'
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
-        server_default=func.current_timestamp(),
+        UTCDateTime,
+        server_default=func.now(),
     )
-    sent_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     # Business rule: each intervention case has exactly one email record
     __table_args__ = (
@@ -278,19 +313,23 @@ class Case(Base):
         default=uuid.uuid4,
     )
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
-    status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
-        server_default=func.current_timestamp(),
+    status: Mapped[CaseStatus] = mapped_column(
+        Enum(CaseStatus),
+        default=CaseStatus.OPEN,
     )
-    assigned_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
-    closed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
+        server_default=func.now(),
+    )
+    assigned_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     version: Mapped[int] = mapped_column(Integer, default=0)
     assigned_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey('advisors.advisor_id'),
         nullable=True,
     )
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
     student: Mapped[Student] = relationship('Student')
@@ -317,15 +356,16 @@ class Task(Base):
         ForeignKey('cases.case_id'),
     )
     action_type: Mapped[str] = mapped_column(
-        String
+        String,
     )  # 'send email', 'student book', 'resolve case'
     status: Mapped[str] = mapped_column(String, default='pending')
     points_reward: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
-        server_default=func.current_timestamp(),
+        UTCDateTime,
+        server_default=func.now(),
     )
-    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+
     completed_by_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey('advisors.advisor_id'),
@@ -342,8 +382,8 @@ class IdempotencyKey(Base):
 
     key: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
-        server_default=func.current_timestamp(),
+        UTCDateTime,
+        server_default=func.now(),
     )
 
 
@@ -362,11 +402,11 @@ class BackgroundJobTracker(Base):
 
     # Observability
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP,
-        server_default=func.current_timestamp(),
+        UTCDateTime,
+        server_default=func.now(),
     )
-    started_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
-    completed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     error_message: Mapped[str | None] = mapped_column(Text)
     progress: Mapped[int] = mapped_column(Integer, default=0)
 
