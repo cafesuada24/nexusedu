@@ -17,10 +17,9 @@ from src.presentation.dependencies.providers import (
     get_arq_pool,
     get_badge_repository,
 )
+from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 from src.presentation.schemas.response import (
     LeaderboardEntry,
-    LeaderboardPagedResponse,
-    PaginationMetadata,
 )
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
@@ -46,7 +45,7 @@ async def get_engagement_metrics(
         ) from e
 
 
-@router.get('/leaderboard', response_model=LeaderboardPagedResponse)
+@router.get('/leaderboard')
 async def get_leaderboard(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
@@ -56,7 +55,7 @@ async def get_leaderboard(
     ),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
-) -> LeaderboardPagedResponse:
+) -> PagedResponse[LeaderboardEntry]:
     """Retrieve the advisor leaderboard based on gamification points.
 
     Args:
@@ -73,7 +72,7 @@ async def get_leaderboard(
             limit=limit,
             offset=offset,
         )
-        return LeaderboardPagedResponse(
+        return PagedResponse(
             items=[
                 LeaderboardEntry(
                     advisor_id=str(i['advisor_id']),

@@ -48,11 +48,15 @@ class Scope(StrEnum):
     ALERTS_READ = 'alerts:read'
     ALERTS_WRITE = 'alerts:write'
     ADVISORS_READ = 'advisors:read'
+
     DATA_INGEST = 'data:ingest'
     JOBS_READ = 'jobs:read'
     QUERY_EXECUTE = 'query:execute'
     USERS_READ = 'users:read'
     USERS_WRITE = 'users:write'
+
+    CASE_ACCEPT = 'case:accept'
+    CASE_READ = 'case:read'
 
 
 class UserRole(StrEnum):
@@ -65,18 +69,19 @@ class UserRole(StrEnum):
 
 # Map roles to their specific capabilities
 ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
-    UserRole.ADMIN: set(Scope),  # Full access
+    UserRole.ADMIN: set(Scope) - set({Scope.CASE_ACCEPT}),  # Full access
     UserRole.ADVISOR: {
         Scope.ALERTS_READ,
         Scope.ALERTS_WRITE,
         Scope.ADVISORS_READ,
         Scope.JOBS_READ,
         Scope.QUERY_EXECUTE,
+        Scope.CASE_ACCEPT,
+        Scope.CASE_READ,
     },
     UserRole.VIEWER: {
         Scope.ALERTS_READ,
         Scope.ADVISORS_READ,
-        Scope.JOBS_READ,
     },
 }
 
@@ -137,10 +142,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
 async def get_user_manager(
     user_db: Annotated[SQLAlchemyUserDatabase[User, uuid.UUID], Depends(get_user_db)],
     user_settings_db: Annotated[
-        SqlAlchemyUserSettingsRepository, Depends(get_user_settings_repository),
+        SqlAlchemyUserSettingsRepository,
+        Depends(get_user_settings_repository),
     ],
     advisor_repo: Annotated[
-        SqlAlchemyAdvisorRepository, Depends(get_advisor_repository),
+        SqlAlchemyAdvisorRepository,
+        Depends(get_advisor_repository),
     ],
 ) -> AsyncGenerator[UserManager, None]:
     """Dependency for getting the user manager instance."""

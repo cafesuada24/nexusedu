@@ -1,6 +1,7 @@
 """Domain service for handling gamification and advisor rewards."""
 
 import datetime
+from enum import StrEnum
 
 from src.domain.value_objects.status import RiskStatus
 
@@ -8,11 +9,18 @@ from src.domain.value_objects.status import RiskStatus
 class GamificationService:
     """Service for managing advisor points and SLAs."""
 
+    class Action(StrEnum):
+        ACCEPT_TASK = 'accept_task'
+        SEND_EMAIL = 'send_email'
+        STUDENT_BOOK = 'student_book'
+        RESOLVE_CASE = 'resolve_case'
+
     DEFAULT_MATRIX = {
-        'review draft': 5,
-        'send email': 10,
-        'student book': 50,
-        'resolve case': 100,
+        Action.ACCEPT_TASK: 5,
+        # 'review draft': 5,
+        Action.SEND_EMAIL: 10,
+        Action.STUDENT_BOOK: 50,
+        Action.RESOLVE_CASE: 100,
     }
 
     RISK_MULTIPLIERS: dict[RiskStatus, float] = {
@@ -28,7 +36,7 @@ class GamificationService:
 
     def calculate_points(
         self,
-        action_type: str,
+        action_type: Action,
         recorded_dt: datetime.datetime | None,
         risk_level: RiskStatus = RiskStatus.UNKNOWN,
     ) -> int:

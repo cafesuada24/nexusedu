@@ -2,7 +2,7 @@ import os
 import random
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -59,7 +59,7 @@ def generate_mock_data():
                 'major': random.choice(MAJORS),
                 'current_risk_status': 'Normal',
                 'intervention_status': 'none',
-                'last_notified_timestamp': 0.0,
+                'last_notified_timestamp': datetime(1970, 1, 1, tzinfo=timezone.utc),
                 'last_notified_satisfaction': 0,
                 'profile': profile,  # Temporary for score generation
             }
@@ -129,11 +129,12 @@ def generate_mock_data():
                                     'course_name': course['name'],
                                     'test_type': activity_type,
                                     'score': round(final_score, 2),
-                                    'timestamp': float(
+                                    'timestamp': datetime.fromtimestamp(
                                         base_timestamp
                                         + semester_offset
                                         + (week * 7 * 24 * 3600)
-                                        + random.randint(0, 86400)
+                                        + random.randint(0, 86400),
+                                        tz=timezone.utc,
                                     ),
                                     'academic_year': year,
                                     'semester': semester,

@@ -1,5 +1,6 @@
 """API routes for Student Case management."""
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -8,9 +9,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.commands.case_commands import (
+    AcceptCaseCommand,
     AwardReviewPointsCommand,
     CaseCommandHandler,
-    CompleteTaskCommand,
     SendEmailCommand,
     TriggerDraftCommand,
     UpdateStudentStatusCommand,
@@ -20,6 +21,7 @@ from src.application.queries.case_queries import (
     GetTaskListQuery,
 )
 from src.core.logger import logger
+from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
@@ -57,7 +59,7 @@ async def get_case_history(
                 'sid': str(c.sid),
                 'status': c.status.value,
                 'created_at': c.created_at.isoformat(),
-                'resolved_at': c.resolved_at.isoformat() if c.resolved_at else None,
+                'resolved_at': c.closed_at.isoformat() if c.closed_at else None,
             }
             for c in cases
         ]
@@ -109,7 +111,9 @@ async def get_cases_list(
                             'action_type': t.action_type.value,
                             'status': t.status.value,
                             'points_reward': t.points_reward,
-                            'completed_at': t.completed_at.isoformat() if t.completed_at else None,
+                            'completed_at': t.completed_at.isoformat()
+                            if t.completed_at
+                            else None,
                             'completed_by_advisor_id': str(t.completed_by_advisor_id)
                             if t.completed_by_advisor_id
                             else None,
@@ -156,7 +160,8 @@ async def update_case_status(
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository),
+        IdempotencyRepository,
+        Depends(get_idempotency_repository),
     ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
@@ -200,7 +205,9 @@ async def trigger_draft(
     case_id: str,
     request: TriggerDraftRequest,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
-    idempotency_repo: Annotated[IdempotencyRepository, Depends(get_idempotency_repository)],
+    idempotency_repo: Annotated[
+        IdempotencyRepository, Depends(get_idempotency_repository)
+    ],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
@@ -236,7 +243,8 @@ async def review_draft(
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository),
+        IdempotencyRepository,
+        Depends(get_idempotency_repository),
     ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
@@ -311,7 +319,8 @@ async def send_nudge_email(
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     session: Annotated[AsyncSession, Depends(get_async_session)],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository),
+        IdempotencyRepository,
+        Depends(get_idempotency_repository),
     ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, str]:
@@ -352,18 +361,22 @@ async def send_nudge_email(
         logger.error(f'Error in send_nudge_email: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-
-@router.post('/tasks/{task_id}/complete')
-async def complete_task(
-    task_id: str,
+@router.post('/cases/{case_id}/accept')
+async def accept_task(
+    case_id: str,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
-    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+    user: Annotated[User, Depends(require_scope(Scope.CASE_ACCEPT))],
 ) -> dict[str, str]:
-    """Manually completes a task and awards points."""
+    """An advisor accept to solve a case."""
     try:
-        command = CompleteTaskCommand(task_id=UUID(task_id), user_id=user.id)
-        await command_handler.handle_complete_task(command)
-        return {'status': 'success', 'task_id': task_id}
+
+        command = AcceptCaseCommand(
+            case_id=UUID(case_id),
+            user_id=user.id,
+            accepted_at=datetime.now(UTC),
+        )
+        await command_handler.handle_accept_case(command)
+        return {'status': 'success', 'task_id': case_id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:

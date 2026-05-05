@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from src.application.exceptions import CaseNotFoundError, MissingAdvisorProfileError
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.core.logger import logger
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -19,18 +20,17 @@ from src.domain.value_objects.status import (
     CaseStatus,
     EmailStatus,
     InterventionStatus,
-    RiskStatus,
-    TaskStatus,
     TaskType,
 )
 
 
 @dataclass
-class CompleteTaskCommand:
+class AcceptCaseCommand:
     """Command to complete a task and award points."""
 
-    task_id: UUID
+    case_id: UUID
     user_id: UUID
+    accepted_at: datetime
 
 
 @dataclass
@@ -107,50 +107,27 @@ class CaseCommandHandler:
         self.badge_repo = badge_repo
         self.task_repo = task_repo
 
-    async def handle_complete_task(self, command: CompleteTaskCommand) -> None:
-        """Complete a task and award points if eligible."""
-        if not self.task_repo:
-            raise ValueError('TaskRepository not provided.')
+    async def handle_accept_case(self, command: AcceptCaseCommand) -> None:
+        """Try assign a case to an advisor."""
+        case = await self.case_repo.get_by_id(command.case_id)
+        if case is None:
+            raise CaseNotFoundError(command.case_id)
 
-        task = await self.task_repo.get_by_id(command.task_id)
-        if not task:
-            raise ValueError(f'Task {command.task_id} not found.')
+        advisor = await self.advisor_repo.get_by_user_id(command.user_id)
+        if advisor is None:
+            raise MissingAdvisorProfileError(command.user_id)
 
-        if task.status == TaskStatus.COMPLETED:
-            return
+        case.assign_advisor(advisor.advisor_id, command.accepted_at)
 
-        case = await self.case_repo.get_by_id(task.case_id)
-        if not case:
-            raise ValueError(f'Case {task.case_id} not found.')
+        await self.case_repo.save(case)
 
-        advisor_id = await self._resolve_advisor_id(command.user_id)
-        if not advisor_id:
-            raise ValueError(f'User {command.user_id} is not an advisor.')
-
-        # Security Check: Only the assigned advisor can complete the task
-        if case.assigned_advisor_id and case.assigned_advisor_id != advisor_id:
-            raise PermissionError('Only the assigned advisor can complete this task.')
-
-        # Update task status
-        task.status = TaskStatus.COMPLETED
-        task.completed_at = datetime.now()
-        task.completed_by_advisor_id = advisor_id
-
-        # Calculate dynamic points based on student risk and SLA
-        recorded_dt = await self.student_repo.get_latest_status_timestamp(case.sid)
         student = await self.student_repo.get_by_id(case.sid)
-        risk_level = student.current_risk_status if student else RiskStatus.UNKNOWN
 
-        points = self.gamification_service.calculate_points(
-            task.action_type.value,
-            recorded_dt,
-            risk_level,
+        self.gamification_service.calculate_points(
+            GamificationService.Action.ACCEPT_TASK,
+            case.assigned_at,
+            student.current_risk_status,
         )
-        task.points_reward = points
-        await self.task_repo.update_task(task)
-
-        # Award points
-        await self._award_points(advisor_id, task.task_id, points)
 
     async def _complete_task_by_type(
         self,
@@ -159,16 +136,16 @@ class CaseCommandHandler:
         user_id: UUID,
     ) -> None:
         """Helper to find and complete a task of a specific type for a case."""
-        if not self.task_repo:
-            return
-
-        tasks = await self.task_repo.get_by_case(case_id)
-        for task in tasks:
-            if task.action_type == task_type and task.status != TaskStatus.COMPLETED:
-                await self.handle_complete_task(
-                    CompleteTaskCommand(task_id=task.task_id, user_id=user_id),
-                )
-                break
+        # if not self.task_repo:
+        #     return
+        #
+        # tasks = await self.task_repo.get_by_case(case_id)
+        # for task in tasks:
+        #     if task.action_type == task_type and task.status != TaskStatus.COMPLETED:
+        #         await self.handle_complete_task(
+        #             CompleteTaskCommand(task_id=task.task_id, user_id=user_id),
+        #         )
+        #         break
 
     async def handle_update_status(self, command: UpdateStudentStatusCommand) -> None:
         """Execute the status update command."""
@@ -183,7 +160,7 @@ class CaseCommandHandler:
             InterventionStatus.RESOLVED,
             InterventionStatus.DISMISSED,
         ):
-            await self.case_repo.update_case_status(case.case_id, CaseStatus.CLOSED)
+            await self.case_repo.update_case_status(case.case_id, CaseStatus.FAILED)
         elif (
             command.status != InterventionStatus.NONE and case.status != CaseStatus.OPEN
         ):
@@ -344,13 +321,6 @@ class CaseCommandHandler:
         # TODO: refactor this stupid logic later
         advisor_id = await self._resolve_advisor_id(command.user_id)
         if advisor_id:
-            # TODO: add explicit assign action instead of implicit assign upon sending email
-            assigned = await self.case_repo.assign_case(command.case_id, advisor_id)
-            if not assigned:
-                logger.info(
-                    f'Case {command.case_id} already assigned. Skipping auto-assignment for advisor {advisor_id}.',
-                )
-
             # TODO: dispatch email sent event upon email sent succesfully
             await self._complete_task_by_type(
                 case.case_id,
@@ -394,4 +364,6 @@ class CaseCommandHandler:
             await self.advisor_repo.record_points(advisor_id, task_id, points)
             if self.badge_repo:
                 # Trigger background task to evaluate badges without blocking API
-                await self.task_queue.enqueue('run_evaluate_badges_task', advisor_id=str(advisor_id))
+                await self.task_queue.enqueue(
+                    'run_evaluate_badges_task', advisor_id=str(advisor_id)
+                )
