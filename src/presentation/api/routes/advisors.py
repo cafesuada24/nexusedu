@@ -11,7 +11,7 @@ from src.core.logger import logger
 from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.domain.value_objects.badges import BADGE_MAP
-from src.presentation.api.auth import Scope, User, require_scope
+from src.presentation.api.auth import Scope, User, current_active_user, require_scope
 from src.presentation.dependencies.providers import (
     get_advisor_repository,
     get_arq_pool,
