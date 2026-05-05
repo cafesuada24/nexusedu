@@ -1,7 +1,7 @@
 """Task domain entity."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from src.domain.value_objects.status import TaskStatus, TaskType
@@ -16,6 +16,6 @@ class Task:
     action_type: TaskType = TaskType.SEND_EMAIL
     status: TaskStatus = TaskStatus.PENDING
     points_reward: int = 0
-    created_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     completed_by_advisor_id: UUID | None = None

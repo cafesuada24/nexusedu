@@ -22,7 +22,7 @@ class Case:
     sid: UUID
     case_id: UUID = field(default_factory=uuid4)
     status: CaseStatus = CaseStatus.OPEN
-    created_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     assigned_at: datetime | None = None
     closed_at: datetime | None = None
     assigned_advisor_id: UUID | None = None

@@ -5,11 +5,11 @@ from typing import Any
 
 from pydantic import UUID4
 
-from src.application.dtos.pagination_dtos import PagedResult, PaginationMetadata
 from src.application.dtos.student_dtos import AlertDTO, EmailDTO, StudentDTO
 from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 
 
 @dataclass
@@ -36,13 +36,13 @@ class AlertQueryHandler:
 
     async def handle_get_active_alerts(
         self, query: GetActiveAlertsQuery
-    ) -> PagedResult[AlertDTO]:
+    ) -> PagedResponse[AlertDTO]:
         """Execute the get active alerts query."""
         domain_alerts, total_count = await self.alert_repo.get_active_alerts(
             query.status_filter, limit=query.limit, offset=query.offset
         )
 
-        return PagedResult(
+        return PagedResponse[AlertDTO](
             items=[
                 AlertDTO(
                     student=StudentDTO(
