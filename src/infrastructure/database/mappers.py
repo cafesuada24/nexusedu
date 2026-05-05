@@ -61,6 +61,11 @@ class DataMapper:
             name=orm_advisor.name,
             email=orm_advisor.email,
             user_id=orm_advisor.user_id,
+            title=orm_advisor.title,
+            phone=orm_advisor.phone,
+            faculty=orm_advisor.faculty,
+            office=orm_advisor.office,
+            bio=orm_advisor.bio,
         )
 
     @staticmethod

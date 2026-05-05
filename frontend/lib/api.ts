@@ -181,6 +181,28 @@ export const AdvisorEngagementItemSchema = z.object({
 });
 export type AdvisorEngagementItem = z.infer<typeof AdvisorEngagementItemSchema>;
 
+export const AdvisorProfileReadSchema = z.object({
+  advisor_id: z.string(),
+  name: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  faculty: z.string().nullable().optional(),
+  office: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
+});
+export type AdvisorProfileRead = z.infer<typeof AdvisorProfileReadSchema>;
+
+export const AdvisorProfileUpdateSchema = z.object({
+  name: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  faculty: z.string().nullable().optional(),
+  office: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
+});
+export type AdvisorProfileUpdate = z.infer<typeof AdvisorProfileUpdateSchema>;
+
 export const KpiStatsSchema = z.object({
   retention_rate: z.number(),
   total_interventions: z.number(),
@@ -688,6 +710,56 @@ export async function fetchAdvisorsEngagement(): Promise<
   }
   const data = await res.json();
   return z.array(AdvisorEngagementItemSchema).parse(data);
+}
+
+/**
+ * GET /advisors/me/profile — returns current user's advisor profile.
+ */
+export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/advisors/me/profile"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy thông tin hồ sơ: ${message}`);
+  }
+  const data = await res.json();
+  return AdvisorProfileReadSchema.parse(data);
+}
+
+/**
+ * PATCH /advisors/me/profile — updates current user's advisor profile.
+ */
+export async function updateAdvisorProfile(
+  payload: AdvisorProfileUpdate,
+): Promise<AdvisorProfileRead> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/advisors/me/profile"),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Cập nhật hồ sơ thất bại: ${message}`);
+  }
+  const data = await res.json();
+  return AdvisorProfileReadSchema.parse(data);
 }
 
 /**

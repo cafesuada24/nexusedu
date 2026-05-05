@@ -14,7 +14,7 @@ export default function SettingsPage() {
             Cài đặt
           </h1>
         </div>
-        <Button size="sm" className="rounded-lg">
+        <Button size="sm" className="rounded-lg" type="submit" form="settings-profile-form">
           <Save className="size-4" />
           Lưu
         </Button>

@@ -12,3 +12,8 @@ class Advisor:
     name: str
     email: str
     user_id: UUID | None = None
+    title: str | None = None
+    phone: str | None = None
+    faculty: str | None = None
+    office: str | None = None
+    bio: str | None = None
