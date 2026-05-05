@@ -29,7 +29,6 @@ from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import Scope, User, UserRole, require_scope
 from src.presentation.dependencies.providers import (
-    get_advisor_repository,
     get_case_command_handler,
     get_case_query_handler,
     get_case_repository,
@@ -362,30 +361,22 @@ async def send_nudge_email(
         logger.error(f'Error in send_nudge_email: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-
-@router.post('/tasks/{task_id}/accept')
+@router.post('/cases/{case_id}/accept')
 async def accept_task(
-    task_id: str,
+    case_id: str,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.CASE_ACCEPT))],
 ) -> dict[str, str]:
-    """Manually completes a task and awards points."""
+    """An advisor accept to solve a case."""
     try:
-            # logger.warning(
-            #     f'Gamification: User {user.id} is not linked to an advisor profile. Skipping points reward for send email.',
-            # )
-            # raise HTTPException(
-            #     status_code=403,
-            #     detail='This account does not link to an advisor profile.',
-            # )
 
         command = AcceptCaseCommand(
-            case_id=UUID(task_id),
+            case_id=UUID(case_id),
             user_id=user.id,
             accepted_at=datetime.now(UTC),
         )
         await command_handler.handle_accept_case(command)
-        return {'status': 'success', 'task_id': task_id}
+        return {'status': 'success', 'task_id': case_id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:
