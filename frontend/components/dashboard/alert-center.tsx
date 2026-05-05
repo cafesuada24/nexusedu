@@ -1,419 +1,599 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Mail, Inbox } from "lucide-react"
-import { toast } from "sonner"
+import * as React from "react";
+import { ChevronLeft, ChevronRight, Mail, Inbox } from "lucide-react";
+import { LayoutGroup } from "framer-motion";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog";
+import { type Problem, type StudentRow } from "@/lib/csv";
+import { generateAiDraftForAlert } from "@/lib/api";
+import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
+import { useSocketEvent } from "@/hooks/use-socket";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { useDataset } from "@/hooks/use-dataset";
+import { cn } from "@/lib/utils";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { EmailEditorSheet } from "@/components/dashboard/email-editor-sheet"
-import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog"
-import { type Problem } from "@/lib/csv"
-import { sendNudge } from "@/lib/api"
-import { useTasks, useUpdateAlertStatus } from "@/hooks/use-alerts"
-import { useSocketEvent } from "@/hooks/use-socket"
-import { useQueryClient } from "@tanstack/react-query"
-import { queryKeys } from "@/lib/query-keys"
-import {
-  type Alert,
-  type CaseStatus,
-  problemMeta,
-  COLUMNS,
-  pickRandomAppointment,
-  fromBackendStatus,
-  toBackendStatus,
-} from "@/lib/alerts"
-import { AlertSearch } from "./alert-center/alert-search"
-import { KanbanColumn } from "./alert-center/kanban-column"
+    type Alert,
+    type AlertStatus,
+    problemMeta,
+    COLUMNS,
+    pickRandomAppointment,
+    fromBackendStatus,
+    toBackendStatus,
+} from "@/lib/alerts";
+import { AlertSearch } from "./alert-center/alert-search";
+import { KanbanColumn } from "./alert-center/kanban-column";
+import { StudentDetailDrawer } from "./alert-center/student-detail-drawer";
 
 export function AlertCenter() {
-  const [problemFilter, setProblemFilter] = React.useState<"all" | Problem>(
-    "all",
-  )
-  const [query, setQuery] = React.useState("")
-  const [editing, setEditing] = React.useState<Alert | null>(null)
-  const [goalsTargetId, setGoalsTargetId] = React.useState<string | null>(null)
+    const boardScrollRef = React.useRef<HTMLDivElement | null>(null);
+    const [problemFilter, setProblemFilter] = React.useState<"all" | Problem>(
+        "all",
+    );
+    const [query, setQuery] = React.useState("");
+    const [goalsTargetId, setGoalsTargetId] = React.useState<string | null>(
+        null,
+    );
+    const [detailsTargetId, setDetailsTargetId] = React.useState<string | null>(
+        null,
+    );
+    const [requestedDraftById, setRequestedDraftById] = React.useState<
+        Record<string, boolean>
+    >({});
+    const [aiDraftingById, setAiDraftingById] = React.useState<
+        Record<string, boolean>
+    >({});
+    const [aiDraftErrorById, setAiDraftErrorById] = React.useState<
+        Record<string, string>
+    >({});
+    const [acceptedOverrides, setAcceptedOverrides] = React.useState<
+        Record<string, boolean>
+    >({});
+    const [canScrollLeft, setCanScrollLeft] = React.useState(false);
+    const [canScrollRight, setCanScrollRight] = React.useState(false);
+    const { dataset } = useDataset();
 
-  // Use TanStack Query hooks
-  const { data: taskPaged, isLoading } = useTasks()
-  const { mutate: updateStatus } = useUpdateAlertStatus()
-  const queryClient = useQueryClient()
+    const { data: remoteAlerts = [], isLoading } = useAlerts();
+    const { mutate: updateStatus } = useUpdateAlertStatus();
+    const queryClient = useQueryClient();
 
-  // Real-time listener for new appointments
-  useSocketEvent<{ sid: string; date: string; slot: string }>(
-    "new_appointment",
-    (data) => {
-      // Move student from 'Contacted' (sent) to 'Scheduled' (booked) in the UI
-      queryClient.setQueryData(
-        [...queryKeys.cases.all, "tasks", 20, 0],
-        (old: any | undefined) => {
-          if (!old || !old.items) return old;
-          return {
-            ...old,
-            items: old.items.map((task: any) =>
-              task.sid === data.sid
-                ? { ...task, intervention_status: "booked" }
-                : task,
-            ),
-          };
+    useSocketEvent<{ sid: string; date: string; slot: string }>(
+        "new_appointment",
+        (data) => {
+            queryClient.setQueryData(
+                queryKeys.alerts.list(),
+                (old: any[] | undefined) => {
+                    if (!old) return [];
+                    return old.map((alert) =>
+                        alert.sid === data.sid
+                            ? { ...alert, intervention_status: "booked" }
+                            : alert,
+                    );
+                },
+            );
+
+            toast.success(`Sinh viên ${data.sid} vừa đặt lịch hẹn!`, {
+                description: `Thời gian: ${data.date} lúc ${data.slot}`,
+            });
         },
-      );
+    );
 
-      // Notify the advisor
-      toast.success(`Sinh viên ${data.sid} vừa đặt lịch hẹn!`, {
-        description: `Thời gian: ${data.date} lúc ${data.slot}`,
-      });
-    },
-  );
+    const [localAlertState, setLocalAlertState] = React.useState<
+        Record<string, { goals: Goal[] }>
+    >({});
 
-  // Internal state for goals and hidden alerts (not yet persisted in backend)
-  const [localAlertState, setLocalAlertState] = React.useState<Record<string, { goals: Goal[], hidden: boolean }>>(() => {
-    if (typeof window !== "undefined") {
-      try {
+    React.useEffect(() => {
         const saved = localStorage.getItem("alert-goals-state");
-        if (saved) return JSON.parse(saved);
-      } catch (e) {
-        console.error("Failed to parse goal state", e);
-      }
-    }
-    return {};
-  })
-
-  const [isMounted, setIsMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // Sync to localStorage
-  React.useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem("alert-goals-state", JSON.stringify(localAlertState));
-    }
-  }, [localAlertState, isMounted]);
-
-  // Map remote alerts to local Alert interface
-  const alerts = React.useMemo(() => {
-    const now = Math.floor(Date.now() / 1000)
-
-    const getProblemFromStatus = (status: string): Problem => {
-      const s = status.toLowerCase()
-      if (s.includes("final")) return "failed_final"
-      if (s.includes("midterm") || s.includes("critical")) return "failed_midterm"
-      return "low_average"
-    }
-
-    return (taskPaged?.items || [])
-      .filter(r => !localAlertState[r.sid]?.hidden)
-      .map((r) => {
-        const sid = r.sid || "unknown";
-        const status = fromBackendStatus(r.intervention_status);
-        
-        return {
-          id: sid,
-          name: r.student_name || "Unknown Student",
-          mssv: sid.length >= 8 ? sid.slice(0, 8).toUpperCase() : "STUDENT",
-          email: r.email || "",
-          problem: getProblemFromStatus(r.current_risk_status || ""),
-          summary: r.current_risk_status || "Unknown Risk",
-          severity: "high" as const,
-          subject: r.draft_subject || "",
-          body: r.draft_body || "",
-          lastContactedAt: null,
-          status: status,
-          movedAt: now,
-          isGenerating: r.draft_status === "generating",
-          activeCaseId: r.case_id,
-          appointmentAt: r.intervention_status === "booked" ? pickRandomAppointment() : null,
-          goals: localAlertState[sid]?.goals || [],
-        };
-      })
-  }, [taskPaged, localAlertState])
-
-  const [collapsedCols, setCollapsedCols] = React.useState<
-    Record<CaseStatus, boolean>
-  >({
-    new: false,
-    contacted: false,
-    scheduled: false,
-    in_progress: false,
-    resolved: false,
-  })
-
-  const toggleCollapse = (id: CaseStatus) =>
-    setCollapsedCols((prev) => ({ ...prev, [id]: !prev[id] }))
-
-  const [expandedCols, setExpandedCols] = React.useState<
-    Record<CaseStatus, boolean>
-  >({
-    new: false,
-    contacted: false,
-    scheduled: false,
-    in_progress: false,
-    resolved: false,
-  })
-
-  const toggleExpand = (id: CaseStatus) =>
-    setExpandedCols((prev) => ({ ...prev, [id]: !prev[id] }))
-
-  const filteredAlerts = React.useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return alerts.filter((a) => {
-      const matchesProblem =
-        problemFilter === "all" || a.problem === problemFilter
-      const matchesQuery =
-        !q ||
-        a.name.toLowerCase().includes(q) ||
-        a.mssv.toLowerCase().includes(q) ||
-        a.email.toLowerCase().includes(q) ||
-        a.summary.toLowerCase().includes(q)
-      return matchesProblem && matchesQuery
-    })
-  }, [alerts, problemFilter, query])
-
-  const grouped = React.useMemo(() => {
-    const map: Record<CaseStatus, Alert[]> = {
-      new: [],
-      contacted: [],
-      scheduled: [],
-      in_progress: [],
-      resolved: [],
-    }
-    for (const a of filteredAlerts) map[a.status].push(a)
-    map.scheduled.sort((a, b) => {
-      const ta = a.appointmentAt ?? Number.POSITIVE_INFINITY
-      const tb = b.appointmentAt ?? Number.POSITIVE_INFINITY
-      return ta - tb
-    })
-    return map
-  }, [filteredAlerts])
-
-  const totalCounts = React.useMemo(() => {
-    const map: Record<CaseStatus, number> = {
-      new: 0,
-      contacted: 0,
-      scheduled: 0,
-      in_progress: 0,
-      resolved: 0,
-    }
-    for (const a of alerts) map[a.status]++
-    return map
-  }, [alerts])
-
-  const problemCounts = React.useMemo(() => {
-    const counts: Record<Problem, number> = {
-      failed_final: 0,
-      failed_midterm: 0,
-      low_average: 0,
-    }
-    for (const a of alerts) {
-      counts[a.problem]++
-    }
-    return counts
-  }, [alerts])
-
-  const moveTo = (alert: Alert, status: CaseStatus, message?: string) => {
-    if (!alert.activeCaseId) {
-      toast.error("Không tìm thấy Case ID cho sinh viên này.");
-      return;
-    }
-    updateStatus(
-      { case_id: alert.activeCaseId, status: toBackendStatus(status) },
-      {
-        onSuccess: () => {
-          if (message) toast.success(message)
-        },
-      },
-    )
-  }
-
-  const send = async (a: Alert) => {
-    if (!a.body) {
-      toast.error("Chưa có nội dung email. Hãy nhấn Sửa để tạo bản nháp.")
-      return
-    }
-    if (!a.activeCaseId) {
-      toast.error("Không tìm thấy Case ID.")
-      return;
-    }
-    const toastId = toast.loading("Đang gửi email...")
-    try {
-      await sendNudge(a.activeCaseId, { body: a.body })
-      moveTo(
-        a,
-        "contacted",
-        `Đã gửi email tới ${a.name}`,
-      )
-      toast.dismiss(toastId)
-    } catch (err) {
-      toast.error("Không thể gửi email", { id: toastId })
-    }
-  }
-
-  const remove = (a: Alert) => {
-    setLocalAlertState(prev => ({
-      ...prev,
-      [a.id]: { ...prev[a.id], hidden: true }
-    }))
-    toast.message(`Đã ẩn cảnh báo của ${a.name}`)
-  }
-
-  const saveEdit = (updated: Alert) => {
-    setEditing(null)
-    send(updated)
-  }
-
-  const addGoal = (
-    alertId: string,
-    title: string,
-    deadline: string | null,
-  ) => {
-    const newGoal: Goal = {
-      id: `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
-      title,
-      deadline,
-      done: false,
-      createdAt: Math.floor(Date.now() / 1000),
-    }
-    setLocalAlertState(prev => ({
-      ...prev,
-      [alertId]: {
-        ...prev[alertId],
-        goals: [...(prev[alertId]?.goals || []), newGoal]
-      }
-    }))
-    toast.success("Đã thêm mục tiêu mới")
-  }
-
-  const toggleGoal = (alertId: string, goalId: string) => {
-    setLocalAlertState(prev => ({
-      ...prev,
-      [alertId]: {
-        ...prev[alertId],
-        goals: (prev[alertId]?.goals || []).map((g) =>
-          g.id === goalId ? { ...g, done: !g.done } : g
-        ),
-      }
-    }))
-  }
-
-  const removeGoal = (alertId: string, goalId: string) => {
-    setLocalAlertState(prev => ({
-      ...prev,
-      [alertId]: {
-        ...prev[alertId],
-        goals: (prev[alertId]?.goals || []).filter((g) => g.id !== goalId),
-      }
-    }))
-  }
-
-  const goalsTarget = React.useMemo(
-    () => (goalsTargetId ? alerts.find((a) => a.id === goalsTargetId) : null),
-    [alerts, goalsTargetId],
-  )
-
-  if (isLoading || !isMounted) {
-    return (
-      <Card className="rounded-2xl border-border/60">
-        <CardHeader>
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-72" />
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-72 rounded-2xl" />
-          ))}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <>
-      <div className="flex flex-col gap-3">
-        <AlertSearch 
-          query={query}
-          onQueryChange={setQuery}
-          problemFilter={problemFilter}
-          onProblemFilterChange={setProblemFilter}
-          totalAlerts={alerts.length}
-          problemCounts={problemCounts}
-        />
-
-        <div
-          className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-          role="list"
-        >
-          {COLUMNS.map((col) => (
-            <KanbanColumn 
-              key={col.id}
-              column={col}
-              items={grouped[col.id]}
-              totalInColumn={totalCounts[col.id]}
-              isCollapsed={collapsedCols[col.id]}
-              isExpanded={expandedCols[col.id]}
-              onToggleCollapse={toggleCollapse}
-              onToggleExpand={toggleExpand}
-              onSend={send}
-              onEdit={(a) => setEditing(a)}
-              onRemove={remove}
-              onMove={moveTo}
-              onOpenGoals={(id) => setGoalsTargetId(id)}
-            />
-          ))}
-        </div>
-
-        {alerts.length === 0 && (
-          <Card className="rounded-2xl border-dashed border-border/60">
-            <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
-              <Inbox className="size-10 text-muted-foreground" />
-              <p className="font-serif text-lg font-semibold">
-                Không có cảnh báo
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {alerts.length > 0 && filteredAlerts.length === 0 && (
-          <Card className="rounded-2xl border-dashed border-border/60">
-            <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
-              <Mail className="size-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Không có kết quả phù hợp.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <EmailEditorSheet
-        alert={editing}
-        onClose={() => setEditing(null)}
-        onSave={saveEdit}
-      />
-
-      <GoalsDialog
-        alert={
-          goalsTarget
-            ? {
-                id: goalsTarget.id,
-                name: goalsTarget.name,
-                problem: goalsTarget.problem,
-                problemLabel: problemMeta[goalsTarget.problem].label,
-                problemTone: problemMeta[goalsTarget.problem].tone,
-                problemIcon: problemMeta[goalsTarget.problem].icon,
-                goals: goalsTarget.goals,
-              }
-            : null
+        if (saved) {
+            try {
+                setLocalAlertState(JSON.parse(saved));
+            } catch (e) {
+                console.error("Failed to parse goal state", e);
+            }
         }
-        onClose={() => setGoalsTargetId(null)}
-        onAdd={addGoal}
-        onToggle={toggleGoal}
-        onRemove={removeGoal}
-      />
-    </>
-  )
+    }, []);
+
+    React.useEffect(() => {
+        localStorage.setItem(
+            "alert-goals-state",
+            JSON.stringify(localAlertState),
+        );
+    }, [localAlertState]);
+
+    const alerts = React.useMemo(() => {
+        const now = Math.floor(Date.now() / 1000);
+
+        const getProblemFromStatus = (status: string): Problem => {
+            const s = status.toLowerCase();
+            if (s.includes("final")) return "failed_final";
+            if (s.includes("midterm") || s.includes("critical"))
+                return "failed_midterm";
+            return "low_average";
+        };
+
+        return remoteAlerts
+            .filter((r) => r.intervention_status !== "dismissed")
+            .map((r) => ({
+                id: r.sid,
+                caseId: r.active_case_id ?? null,
+                name: r.student_name,
+                mssv: r.sid.slice(0, 8).toUpperCase(),
+                email: r.email,
+                problem: getProblemFromStatus(r.current_risk_status),
+                summary: r.current_risk_status,
+                severity: r.current_risk_status
+                    .toLowerCase()
+                    .includes("elevated")
+                    ? ("medium" as const)
+                    : ("high" as const),
+                subject: "",
+                body: "",
+                lastContactedAt: null,
+                status: acceptedOverrides[r.sid]
+                    ? "accepted"
+                    : fromBackendStatus(r.intervention_status),
+                movedAt: now,
+                draftJobId: null,
+                draftSubject: null,
+                draftBody: null,
+                appointmentAt:
+                    r.intervention_status === "booked"
+                        ? pickRandomAppointment()
+                        : null,
+                goals: localAlertState[r.sid]?.goals || [],
+            }));
+    }, [remoteAlerts, localAlertState, acceptedOverrides]);
+
+    const [collapsedCols, setCollapsedCols] = React.useState<
+        Record<AlertStatus, boolean>
+    >({
+        new: false,
+        accepted: false,
+        contacted: false,
+        scheduled: false,
+        in_progress: false,
+        resolved: false,
+    });
+
+    const toggleCollapse = (id: AlertStatus) =>
+        setCollapsedCols((prev) => ({ ...prev, [id]: !prev[id] }));
+
+    const [expandedCols, setExpandedCols] = React.useState<
+        Record<AlertStatus, boolean>
+    >({
+        new: false,
+        accepted: false,
+        contacted: false,
+        scheduled: false,
+        in_progress: false,
+        resolved: false,
+    });
+
+    const toggleExpand = (id: AlertStatus) =>
+        setExpandedCols((prev) => ({ ...prev, [id]: !prev[id] }));
+
+    const filteredAlerts = React.useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return alerts.filter((a) => {
+            const matchesProblem =
+                problemFilter === "all" || a.problem === problemFilter;
+            const matchesQuery =
+                !q ||
+                a.name.toLowerCase().includes(q) ||
+                a.mssv.toLowerCase().includes(q) ||
+                a.email.toLowerCase().includes(q) ||
+                a.summary.toLowerCase().includes(q);
+            return matchesProblem && matchesQuery;
+        });
+    }, [alerts, problemFilter, query]);
+
+    const grouped = React.useMemo(() => {
+        const map: Record<AlertStatus, Alert[]> = {
+            new: [],
+            accepted: [],
+            contacted: [],
+            scheduled: [],
+            in_progress: [],
+            resolved: [],
+        };
+        for (const a of filteredAlerts) map[a.status].push(a);
+        map.scheduled.sort((a, b) => {
+            const ta = a.appointmentAt ?? Number.POSITIVE_INFINITY;
+            const tb = b.appointmentAt ?? Number.POSITIVE_INFINITY;
+            return ta - tb;
+        });
+        return map;
+    }, [filteredAlerts]);
+
+    const totalCounts = React.useMemo(() => {
+        const map: Record<AlertStatus, number> = {
+            new: 0,
+            accepted: 0,
+            contacted: 0,
+            scheduled: 0,
+            in_progress: 0,
+            resolved: 0,
+        };
+        for (const a of alerts) map[a.status]++;
+        return map;
+    }, [alerts]);
+
+    const problemCounts = React.useMemo(() => {
+        const counts: Record<Problem, number> = {
+            failed_final: 0,
+            failed_midterm: 0,
+            low_average: 0,
+        };
+        for (const a of alerts) {
+            counts[a.problem]++;
+        }
+        return counts;
+    }, [alerts]);
+
+    const isAcceptedAiProcessing = React.useMemo(
+        () => grouped.accepted.some((a) => Boolean(aiDraftingById[a.id])),
+        [grouped, aiDraftingById],
+    );
+
+    const moveTo = (a: Alert, status: AlertStatus, message?: string) => {
+        if (status === "accepted") {
+            setAcceptedOverrides((prev) => ({ ...prev, [a.id]: true }));
+            setAiDraftErrorById((prev) => {
+                if (!prev[a.id]) return prev;
+                const next = { ...prev };
+                delete next[a.id];
+                return next;
+            });
+            if (message) toast.success(message);
+            if (!requestedDraftById[a.id]) {
+                setAiDraftingById((prev) => ({ ...prev, [a.id]: true }));
+                void generateAiDraftForAlert(a.id)
+                    .then(() => {
+                        setRequestedDraftById((prev) => ({
+                            ...prev,
+                            [a.id]: true,
+                        }));
+                        setAiDraftErrorById((prev) => {
+                            if (!prev[a.id]) return prev;
+                            const next = { ...prev };
+                            delete next[a.id];
+                            return next;
+                        });
+                    })
+                    .catch((err: any) => {
+                        const message = String(err?.message || "");
+                        const aiUnavailable =
+                            message.includes("[404]") ||
+                            message.toLowerCase().includes("not found");
+                        const errorMessage = aiUnavailable
+                            ? "Không tìm thấy dịch vụ AI. Vui lòng kiểm tra lại kết nối."
+                            : message || "Vui lòng thử lại sau.";
+                        setAiDraftErrorById((prev) => ({
+                            ...prev,
+                            [a.id]: errorMessage,
+                        }));
+                        toast.error("Không thể tạo nội dung email", {
+                            description: errorMessage,
+                        });
+                    })
+                    .finally(() => {
+                        setAiDraftingById((prev) => ({
+                            ...prev,
+                            [a.id]: false,
+                        }));
+                    });
+            }
+            return;
+        }
+
+        updateStatus(
+            { sid: a.id, status: toBackendStatus(status) },
+            {
+                onSuccess: () => {
+                    if (acceptedOverrides[a.id]) {
+                        setAcceptedOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[a.id];
+                            return next;
+                        });
+                    }
+                    if (message) toast.success(message);
+                },
+            },
+        );
+    };
+
+    const archive = (a: Alert) => {
+        if (acceptedOverrides[a.id]) {
+            setAcceptedOverrides((prev) => {
+                const next = { ...prev };
+                delete next[a.id];
+                return next;
+            });
+        }
+        updateStatus(
+            { sid: a.id, status: "dismissed" },
+            {
+                onSuccess: () => {
+                    toast.message(`Đã bỏ qua cảnh báo của ${a.name}`);
+                },
+            },
+        );
+    };
+
+    const handleGetProfile = React.useCallback((a: Alert) => {
+        setDetailsTargetId(a.id);
+    }, []);
+
+    const addGoal = (
+        alertId: string,
+        title: string,
+        deadline: string | null,
+    ) => {
+        const newGoal: Goal = {
+            id: `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+            title,
+            deadline,
+            done: false,
+            createdAt: Math.floor(Date.now() / 1000),
+        };
+        setLocalAlertState((prev) => ({
+            ...prev,
+            [alertId]: {
+                ...prev[alertId],
+                goals: [...(prev[alertId]?.goals || []), newGoal],
+            },
+        }));
+        toast.success("Đã thêm mục tiêu mới");
+    };
+
+    const toggleGoal = (alertId: string, goalId: string) => {
+        setLocalAlertState((prev) => ({
+            ...prev,
+            [alertId]: {
+                ...prev[alertId],
+                goals: (prev[alertId]?.goals || []).map((g) =>
+                    g.id === goalId ? { ...g, done: !g.done } : g,
+                ),
+            },
+        }));
+    };
+
+    const removeGoal = (alertId: string, goalId: string) => {
+        setLocalAlertState((prev) => ({
+            ...prev,
+            [alertId]: {
+                ...prev[alertId],
+                goals: (prev[alertId]?.goals || []).filter(
+                    (g) => g.id !== goalId,
+                ),
+            },
+        }));
+    };
+
+    const goalsTarget = React.useMemo(
+        () =>
+            goalsTargetId ? alerts.find((a) => a.id === goalsTargetId) : null,
+        [alerts, goalsTargetId],
+    );
+    const detailsTarget = React.useMemo(
+        () =>
+            detailsTargetId
+                ? alerts.find((a) => a.id === detailsTargetId)
+                : null,
+        [alerts, detailsTargetId],
+    );
+    const studentProfilesById = React.useMemo(() => {
+        const map: Record<string, StudentRow | undefined> = {};
+        for (const student of dataset?.students ?? []) {
+            map[student.id] = student;
+        }
+        return map;
+    }, [dataset?.students]);
+
+    const updateScrollButtons = React.useCallback(() => {
+        const el = boardScrollRef.current;
+        if (!el) return;
+        const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+        setCanScrollLeft(el.scrollLeft > 4);
+        setCanScrollRight(maxLeft - el.scrollLeft > 4);
+    }, []);
+
+    React.useEffect(() => {
+        const el = boardScrollRef.current;
+        if (!el) return;
+
+        const handleScroll = () => updateScrollButtons();
+        const handleResize = () => updateScrollButtons();
+
+        updateScrollButtons();
+        el.addEventListener("scroll", handleScroll, { passive: true });
+        window.addEventListener("resize", handleResize);
+
+        const resizeObserver = new ResizeObserver(() => updateScrollButtons());
+        resizeObserver.observe(el);
+
+        return () => {
+            el.removeEventListener("scroll", handleScroll);
+            window.removeEventListener("resize", handleResize);
+            resizeObserver.disconnect();
+        };
+    }, [updateScrollButtons, grouped, collapsedCols, expandedCols]);
+
+    const getScrollStep = React.useCallback(() => {
+        const el = boardScrollRef.current;
+        if (!el) return 400;
+        const firstColumn = el.firstElementChild as HTMLElement | null;
+        const firstColumnWidth =
+            firstColumn?.getBoundingClientRect().width ?? 380;
+        const styles = window.getComputedStyle(el);
+        const gap =
+            Number.parseFloat(styles.columnGap || styles.gap || "0") || 0;
+        return Math.round(firstColumnWidth + gap);
+    }, []);
+
+    const scrollBoardBy = (direction: "left" | "right") => {
+        const el = boardScrollRef.current;
+        if (!el) return;
+        const step = getScrollStep();
+        const left = direction === "left" ? -step : step;
+        el.scrollBy({ left, behavior: "smooth" });
+    };
+
+    if (isLoading) {
+        return (
+            <Card className="rounded-2xl border-border/60">
+                <CardHeader>
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-72" />
+                </CardHeader>
+                <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                        <Skeleton key={i} className="h-72 rounded-2xl" />
+                    ))}
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <>
+            <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col gap-3 overflow-hidden">
+                <AlertSearch
+                    query={query}
+                    onQueryChange={setQuery}
+                    problemFilter={problemFilter}
+                    onProblemFilterChange={setProblemFilter}
+                    totalAlerts={alerts.length}
+                    problemCounts={problemCounts}
+                />
+
+                <LayoutGroup id="alert-board">
+                    <div className="relative min-h-0 w-full max-w-full flex-1 overflow-hidden">
+                        <div
+                            ref={boardScrollRef}
+                            className="hide-scrollbar flex h-full min-w-0 w-full max-w-full items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-1 [-webkit-overflow-scrolling:touch]"
+                            role="list"
+                        >
+                            {COLUMNS.map((col) => (
+                                <KanbanColumn
+                                    key={col.id}
+                                    column={col}
+                                    items={grouped[col.id]}
+                                    totalInColumn={totalCounts[col.id]}
+                                    isCollapsed={collapsedCols[col.id]}
+                                    isExpanded={expandedCols[col.id]}
+                                    onToggleCollapse={toggleCollapse}
+                                    onToggleExpand={toggleExpand}
+                                    onArchive={archive}
+                                    onViewDetails={handleGetProfile}
+                                    onMove={moveTo}
+                                    onOpenGoals={(id) => setGoalsTargetId(id)}
+                                    studentProfilesById={studentProfilesById}
+                                    aiDraftingById={aiDraftingById}
+                                    aiDraftErrorById={aiDraftErrorById}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                </LayoutGroup>
+
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => scrollBoardBy("left")}
+                    className={cn(
+                        "fixed left-2 top-1/2 z-[100] h-12 w-12 -translate-y-1/2 rounded-full border border-white/20 bg-blue-600/90 text-white shadow-xl shadow-blue-500/40 backdrop-blur-md transition-all duration-200 hover:scale-110 hover:bg-blue-700 hover:opacity-100 hover:shadow-[0_0_18px_rgba(37,99,235,0.45)] dark:bg-blue-500/90 dark:hover:bg-blue-600 md:left-[260px]",
+                        canScrollLeft
+                            ? "opacity-95"
+                            : "pointer-events-none opacity-0",
+                        isAcceptedAiProcessing &&
+                            "animate-pulse ring-2 ring-blue-300/70 shadow-[0_0_24px_rgba(59,130,246,0.35)] dark:ring-cyan-400/55 dark:shadow-[0_0_24px_rgba(56,189,248,0.35)]",
+                    )}
+                    aria-label="Cuộn sang trái"
+                >
+                    <ChevronLeft className="size-6 text-white" />
+                </Button>
+
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => scrollBoardBy("right")}
+                    className={cn(
+                        "fixed right-5 top-1/2 z-[100] h-12 w-12 -translate-y-1/2 rounded-full border border-white/20 bg-blue-600/90 text-white shadow-xl shadow-blue-500/40 backdrop-blur-md transition-all duration-200 hover:scale-110 hover:bg-blue-700 hover:opacity-100 hover:shadow-[0_0_18px_rgba(37,99,235,0.45)] dark:bg-blue-500/90 dark:hover:bg-blue-600",
+                        canScrollRight
+                            ? "opacity-95"
+                            : "pointer-events-none opacity-0",
+                        isAcceptedAiProcessing &&
+                            "animate-pulse ring-2 ring-blue-300/70 shadow-[0_0_24px_rgba(59,130,246,0.35)] dark:ring-cyan-400/55 dark:shadow-[0_0_24px_rgba(56,189,248,0.35)]",
+                    )}
+                    aria-label="Cuộn sang phải"
+                >
+                    <ChevronRight className="size-6 text-white" />
+                </Button>
+
+                {alerts.length === 0 && (
+                    <Card className="rounded-2xl border-dashed border-border/60">
+                        <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+                            <Inbox className="size-10 text-muted-foreground" />
+                            <p className="font-serif text-lg font-semibold">
+                                Không có cảnh báo
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {alerts.length > 0 && filteredAlerts.length === 0 && (
+                    <Card className="rounded-2xl border-dashed border-border/60">
+                        <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+                            <Mail className="size-8 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">
+                                Không có kết quả phù hợp.
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+
+            <StudentDetailDrawer
+                open={detailsTargetId !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDetailsTargetId(null);
+                }}
+                alert={detailsTarget ?? null}
+                studentProfile={
+                    detailsTarget
+                        ? studentProfilesById[detailsTarget.id]
+                        : undefined
+                }
+            />
+
+            <GoalsDialog
+                alert={
+                    goalsTarget
+                        ? {
+                              id: goalsTarget.id,
+                              name: goalsTarget.name,
+                              problem: goalsTarget.problem,
+                              problemLabel:
+                                  problemMeta[goalsTarget.problem].label,
+                              problemTone:
+                                  problemMeta[goalsTarget.problem].tone,
+                              problemIcon:
+                                  problemMeta[goalsTarget.problem].icon,
+                              goals: goalsTarget.goals,
+                          }
+                        : null
+                }
+                onClose={() => setGoalsTargetId(null)}
+                onAdd={addGoal}
+                onToggle={toggleGoal}
+                onRemove={removeGoal}
+            />
+        </>
+    );
 }

@@ -44,7 +44,11 @@ export function SiteHeader() {
             )}
         >
             <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 md:px-6">
-                <Logo onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} />
+                <Logo
+                    onClick={() =>
+                        window.scrollTo({ top: 0, behavior: "smooth" })
+                    }
+                />
 
                 <nav
                     className="hidden items-center gap-1 md:flex"
