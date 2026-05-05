@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.commands.agent_commands import AgentCommandHandler
 from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
+from src.application.interfaces.case_query_service import CaseQueryService
 from src.application.queries.alert_queries import AlertQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
@@ -17,6 +18,7 @@ from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.alert_repository import AlertRepository
+from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
@@ -33,11 +35,15 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
+from src.infrastructure.persistance.query_services.case_query_service import (
+    SqlAlchemyCaseQueryService,
+)
 from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyAlertRepository,
+    SqlAlchemyBadgeRepository,
     SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
@@ -160,13 +166,10 @@ async def get_anomaly_engine() -> AnomalyEngine:
     return ZScore()
 
 
-from src.domain.repositories.badge_repository import BadgeRepository
-
 async def get_badge_repository(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> BadgeRepository:
     """Dependency provider for the BadgeRepository."""
-    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyBadgeRepository
     return SqlAlchemyBadgeRepository(session)
 
 
@@ -199,6 +202,20 @@ async def get_badge_repository(
 #     )
 
 
+async def get_case_query_service(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    gamification_service: Annotated[
+        GamificationService,
+        Depends(get_gamification_service),
+    ],
+) -> CaseQueryService:
+    """Dependency provider for the CaseQueryService."""
+    return SqlAlchemyCaseQueryService(
+        session=session,
+        gamification_service=gamification_service,
+    )
+
+
 async def get_case_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
@@ -206,7 +223,8 @@ async def get_case_command_handler(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     gamification_service: Annotated[
-        GamificationService, Depends(get_gamification_service),
+        GamificationService,
+        Depends(get_gamification_service),
     ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
@@ -238,26 +256,29 @@ async def get_alert_query_handler(
 
 
 async def get_case_query_handler(
-    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
-    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
-    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
+    case_query_service: Annotated[CaseQueryService, Depends(get_case_query_service)],
+    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
 ) -> CaseQueryHandler:
     """Dependency provider for the CaseQueryHandler."""
-    return CaseQueryHandler(email_repo, student_repo, job_repo, case_repo)
+    return CaseQueryHandler(
+        case_query_service=case_query_service,
+        advisor_repo=advisor_repo,
+    )
 
 
 async def get_data_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     activity_repo: Annotated[ActivityRepository, Depends(get_activity_repository)],
     history_repo: Annotated[
-        StatusHistoryRepository, Depends(get_status_history_repository),
+        StatusHistoryRepository,
+        Depends(get_status_history_repository),
     ],
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
     case_command_handler: Annotated[
-        CaseCommandHandler, Depends(get_case_command_handler),
+        CaseCommandHandler,
+        Depends(get_case_command_handler),
     ],
 ) -> DataCommandHandler:
     """Dependency provider for the DataCommandHandler."""
@@ -294,13 +315,16 @@ def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentStat
 
 async def get_agent_command_handler(
     agent: Annotated[
-        CompiledStateGraph[AgentState, Any, AgentState], Depends(get_agent),
+        CompiledStateGraph[AgentState, Any, AgentState],
+        Depends(get_agent),
     ],
     metadata_service: Annotated[
-        AgentMetadataService, Depends(get_agent_metadata_service),
+        AgentMetadataService,
+        Depends(get_agent_metadata_service),
     ],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository),
+        IdempotencyRepository,
+        Depends(get_idempotency_repository),
     ],
 ) -> AgentCommandHandler:
     """Dependency provider for the AgentCommandHandler."""
