@@ -14,21 +14,19 @@ from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
     get_alert_query_handler,
 )
-from src.presentation.schemas.response import (
-    AlertPagedResponse,
-)
+from src.presentation.dtos.pagination import PagedResponse
 
 router = APIRouter(prefix='/alerts', tags=['alerts'])
 
 
-@router.get('', response_model=AlertPagedResponse)
+@router.get('')
 async def get_alerts(
     query_handler: Annotated[AlertQueryHandler, Depends(get_alert_query_handler)],
     _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
     status: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-) -> dict[str, Any]:
+):
     """Retrieve students who have an active alert for the Kanban board."""
     if status:
         try:
