@@ -34,6 +34,10 @@ class CaseRepository(Protocol):
         """Assign an advisor to a case. Returns True if successful, False if already assigned."""
         ...
 
+    async def save(self, case: Case) -> None:
+        """Update a case."""
+        ...
+
     async def get_cases_list(
         self,
         advisor_id: UUID | None = None,
