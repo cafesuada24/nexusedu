@@ -90,9 +90,12 @@ export function Hero() {
                             variant="outline"
                             className="h-12 rounded-xl px-6 text-base transition-transform transition-shadow duration-200 ease-out hover:-translate-y-1 hover:shadow-md hover:shadow-gray-200/50 dark:hover:bg-white/5"
                             onClick={() => {
-                                const element = document.querySelector("#features");
+                                const element =
+                                    document.querySelector("#features");
                                 if (element) {
-                                    element.scrollIntoView({ behavior: "smooth" });
+                                    element.scrollIntoView({
+                                        behavior: "smooth",
+                                    });
                                 }
                             }}
                         >

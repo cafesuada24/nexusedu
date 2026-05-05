@@ -15,6 +15,7 @@ import { type Goal } from "@/components/dashboard/goals-dialog";
 
 export type CaseStatus =
     | "new"
+    | "accepted"
     | "contacted"
     | "scheduled"
     | "in_progress"
@@ -22,6 +23,7 @@ export type CaseStatus =
 
 export type Alert = {
     id: string;
+    caseId: string | null;
     name: string;
     mssv: string;
     email: string;
@@ -83,6 +85,13 @@ export const COLUMNS: ColumnDef[] = [
         icon: Sparkles,
         accent: "text-destructive",
         dotClass: "bg-destructive",
+    },
+    {
+        id: "accepted",
+        title: "Accepted",
+        icon: Sparkles,
+        accent: "text-primary",
+        dotClass: "bg-primary",
     },
     {
         id: "contacted",
@@ -179,6 +188,8 @@ export function toBackendStatus(s: CaseStatus): BackendInterventionStatus {
     switch (s) {
         case "new":
             return "notified";
+        case "accepted":
+            return "accepted";
         case "contacted":
             return "sent";
         case "scheduled":
@@ -197,6 +208,8 @@ export function toBackendStatus(s: CaseStatus): BackendInterventionStatus {
  */
 export function fromBackendStatus(s: BackendInterventionStatus): CaseStatus {
     switch (s) {
+        case "accepted":
+            return "accepted";
         case "sent":
             return "contacted";
         case "booked":
