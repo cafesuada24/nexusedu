@@ -30,6 +30,7 @@ import { z } from "zod";
 export const BackendInterventionStatusSchema = z.enum([
     "none",
     "notified",
+    "accepted",
     "sent",
     "booked",
     "supporting",
@@ -596,13 +597,13 @@ export async function fetchTasks(
  * Pushes a status transition for a single student.
  */
 export async function updateAlertStatus(
-    case_id: string,
+    alert_id: string,
     status: BackendInterventionStatus,
 ): Promise<void> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/cases/${encodeURIComponent(case_id)}/status`),
+                endpoint(`/alerts/${encodeURIComponent(alert_id)}/status`),
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -617,6 +618,94 @@ export async function updateAlertStatus(
         const message = errorBody.detail || res.statusText;
         throw new Error(`Cập nhật trạng thái thất bại: ${message}`);
     }
+}
+
+/**
+ * POST /alerts/{sid}/draft/trigger — trigger AI draft generation for one alert.
+ */
+export async function generateAiDraftForAlert(
+    alert_id: string,
+): Promise<{ job_id?: string; status?: string }> {
+    const requestBody = JSON.stringify({ alert_id });
+    const primaryUrl = endpoint("/ai/generate-draft");
+    const triggerUrl = endpoint(
+        `/alerts/${encodeURIComponent(alert_id)}/draft/trigger`,
+    );
+    const alternatePrimaryUrl = primaryUrl.includes("/api/v1/")
+        ? primaryUrl.replace("/api/v1/ai/generate-draft", "/ai/generate-draft")
+        : primaryUrl.replace("/ai/generate-draft", "/api/v1/ai/generate-draft");
+    const candidateUrls = Array.from(
+        new Set([primaryUrl, alternatePrimaryUrl, triggerUrl]),
+    );
+
+    const executeDraftRequest = async (
+        url: string,
+    ): Promise<{ response: Response; raw: string; detail: string }> => {
+        const response = await withTimeout(
+            (signal) =>
+                authFetch(
+                    url,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: requestBody,
+                    },
+                    signal,
+                ),
+            DEFAULT_TIMEOUT_MS,
+        );
+
+        const raw = await response.text().catch(() => "");
+        let detail: string = response.statusText;
+        try {
+            const parsed = raw ? JSON.parse(raw) : {};
+            detail =
+                (typeof parsed?.detail === "string" ? parsed.detail : "") ||
+                (typeof parsed?.message === "string" ? parsed.message : "") ||
+                detail;
+        } catch {
+            if (raw) detail = raw;
+        }
+        return { response, raw, detail };
+    };
+
+    let lastFailure:
+        | { response: Response; raw: string; detail: string; url: string }
+        | undefined;
+
+    for (let i = 0; i < candidateUrls.length; i++) {
+        const url = candidateUrls[i];
+        const result = await executeDraftRequest(url);
+        if (result.response.ok) {
+            return (result.raw
+                ? JSON.parse(result.raw)
+                : {}) as { job_id?: string; status?: string };
+        }
+
+        console.error("[api] generateAiDraftForAlert failed", {
+            status: result.response.status,
+            url,
+            detail: result.detail,
+            response: result.raw,
+            requestBody,
+            contentType:
+                result.response.headers.get("content-type") ?? "(unknown)",
+        });
+        lastFailure = { ...result, url };
+
+        // Retry one more route variant on 404 to handle /api/v1 prefix mismatch.
+        if (result.response.status !== 404) {
+            break;
+        }
+    }
+
+    if (!lastFailure) {
+        throw new Error("Không thể tạo nội dung email: không có phản hồi từ dịch vụ AI.");
+    }
+
+    throw new Error(
+        `Không thể tạo nội dung email [${lastFailure.response.status}] (${lastFailure.url}): ${lastFailure.detail}`,
+    );
 }
 
 /* ----------------------------------------------------------------------- */
