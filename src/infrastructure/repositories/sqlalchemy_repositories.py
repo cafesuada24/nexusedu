@@ -116,7 +116,7 @@ class SqlAlchemyStudentRepository:
         stmt = (
             update(Student)
             .where(Student.sid == sid)
-            .values(last_notified_timestamp=time.time())
+            .values(last_notified_timestamp=datetime.now(UTC))
         )
         await self.session.execute(stmt)
 
@@ -403,13 +403,13 @@ class SqlAlchemyAdvisorRepository:
         # Calculate cutoff if needed
         cutoff = None
         if time_window != 'all_time' and time_window in interval_map:
-            cutoff = datetime.now() - interval_map[time_window]
+            cutoff = datetime.now(UTC) - interval_map[time_window]
 
         # Base query: Select from Advisor to include everyone even with 0 points
         # Join with PointLedger and filter by cutoff in the join condition
         ledger_join_cond = Advisor.advisor_id == PointLedger.advisor_id
         if cutoff:
-            ledger_join_cond = and_(ledger_join_cond, PointLedger.timestamp >= cutoff)
+            ledger_join_cond = and_(ledger_join_cond, PointLedger.earned_at >= cutoff)
 
         stmt = (
             select(
@@ -585,7 +585,7 @@ class SqlAlchemyBadgeRepository:
 
         # Fast actions
         stmt_times = (
-            select(OrmCase.created_at, PointLedger.timestamp)
+            select(OrmCase.created_at, PointLedger.earned_at)
             .join(OrmTask, OrmCase.case_id == OrmTask.case_id)
             .join(PointLedger, OrmTask.task_id == PointLedger.task_id)
             .where(OrmCase.assigned_advisor_id == advisor_id)

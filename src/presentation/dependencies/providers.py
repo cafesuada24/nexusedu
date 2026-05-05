@@ -12,6 +12,7 @@ from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.application.queries.alert_queries import AlertQueryHandler
+from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
@@ -253,6 +254,15 @@ async def get_alert_query_handler(
 ) -> AlertQueryHandler:
     """Dependency provider for the AlertQueryHandler."""
     return AlertQueryHandler(alert_repo, email_repo, student_repo)
+
+
+async def get_advisor_query_handler(
+    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+    badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
+    arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+) -> AdvisorQueryHandler:
+    """Dependency provider for the AdvisorQueryHandler."""
+    return AdvisorQueryHandler(advisor_repo, badge_repo, arq_pool)
 
 
 async def get_case_query_handler(

@@ -127,14 +127,3 @@ class TaskItem(BaseModel):
     suggested_action: str = Field(..., description='Computed action to take.')
     points_reward: int = Field(..., description='Points for completing action.')
     tasks: list[TaskDetail] | None = Field(None, description='Detailed sub-tasks.')
-
-
-class LeaderboardEntry(BaseModel):
-    """Schema for a single entry in the advisor leaderboard."""
-
-    advisor_id: str = Field(..., description='Unique advisor identifier.')
-    name: str = Field(..., description='Advisor name.')
-    total_points: int = Field(..., description='Total points earned.')
-    actions_count: int = Field(..., description='Total actions taken.')
-    sent_count: int = Field(..., description='Emails sent.')
-    resolved_count: int = Field(..., description='Students resolved.')
