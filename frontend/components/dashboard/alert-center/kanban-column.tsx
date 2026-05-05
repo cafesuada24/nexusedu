@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ChevronDown, ChevronsDown, ChevronsUp } from "lucide-react"
+import { AnimatePresence, motion } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -11,6 +12,7 @@ import {
   type ColumnDef,
   PAGE_SIZE,
 } from "@/lib/alerts"
+import { type StudentRow } from "@/lib/csv"
 import { KanbanCard } from "./kanban-card"
 
 type KanbanColumnProps = {
@@ -21,11 +23,13 @@ type KanbanColumnProps = {
   isExpanded: boolean
   onToggleCollapse: (id: CaseStatus) => void
   onToggleExpand: (id: CaseStatus) => void
-  onSend: (a: Alert) => void
-  onEdit: (a: Alert) => void
-  onRemove: (a: Alert) => void
-  onMove: (id: string, status: CaseStatus, message?: string) => void
+  onViewDetails: (a: Alert) => void
+  onMove: (a: Alert, status: CaseStatus, message?: string) => void
   onOpenGoals: (id: string) => void
+  studentProfilesById: Record<string, StudentRow | undefined>
+  aiDraftingById: Record<string, boolean>
+  aiDraftErrorById: Record<string, string>
+  aiDraftReadyById: Record<string, boolean>
 }
 
 export function KanbanColumn({
@@ -36,11 +40,13 @@ export function KanbanColumn({
   isExpanded,
   onToggleCollapse,
   onToggleExpand,
-  onSend,
-  onEdit,
-  onRemove,
+  onViewDetails,
   onMove,
   onOpenGoals,
+  studentProfilesById,
+  aiDraftingById,
+  aiDraftErrorById,
+  aiDraftReadyById,
 }: KanbanColumnProps) {
   const ColIcon = col.icon
 
@@ -48,7 +54,8 @@ export function KanbanColumn({
     <section
       role="listitem"
       className={cn(
-        "flex min-w-0 flex-col rounded-2xl border border-border/60 bg-muted/30 transition-colors",
+        "flex min-w-[380px] w-[380px] shrink-0 basis-[380px] flex-col rounded-2xl border border-border/60 bg-muted/30 transition-colors",
+        isCollapsed ? "h-auto" : "h-full",
         isCollapsed && "bg-muted/20",
       )}
       aria-label={col.title}
@@ -103,7 +110,7 @@ export function KanbanColumn({
       </header>
 
       {isCollapsed ? null : (
-        <div className="flex min-h-[140px] flex-col gap-2.5 p-2.5">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
           {items.length === 0 ? (
             <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border/60 bg-card/40 p-6 text-center">
               <span
@@ -118,17 +125,30 @@ export function KanbanColumn({
             </div>
           ) : (
             <>
-              {(isExpanded ? items : items.slice(0, PAGE_SIZE)).map((a) => (
-                <KanbanCard
-                  key={a.id}
-                  alert={a}
-                  onSend={onSend}
-                  onEdit={() => onEdit(a)}
-                  onRemove={() => onRemove(a)}
-                  onMove={(s, msg) => onMove(a.id, s, msg)}
-                  onOpenGoals={() => onOpenGoals(a.id)}
-                />
-              ))}
+              <AnimatePresence initial={false}>
+                {(isExpanded ? items : items.slice(0, PAGE_SIZE)).map((a) => (
+                  <motion.div
+                    key={a.id}
+                    layout
+                    layoutId={`alert-card-${a.id}`}
+                    initial={{ opacity: 0.7, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                  >
+                    <KanbanCard
+                      alert={a}
+                      onViewDetails={() => onViewDetails(a)}
+                      onMove={(s, msg) => onMove(a, s, msg)}
+                      onOpenGoals={() => onOpenGoals(a.id)}
+                      studentProfile={studentProfilesById[a.id]}
+                      isAiDrafting={Boolean(aiDraftingById[a.id])}
+                      aiDraftError={aiDraftErrorById[a.id]}
+                      isAiDraftReady={Boolean(aiDraftReadyById[a.id])}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
               {items.length > PAGE_SIZE ? (
                 <Button
                   variant="ghost"

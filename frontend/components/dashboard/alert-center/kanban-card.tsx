@@ -3,17 +3,14 @@
 import * as React from "react";
 import {
     MoreHorizontal,
-    Pencil,
-    Trash2,
     Target,
-    Sparkles,
     Clock,
-    Send,
     CalendarCheck,
     Handshake,
     CheckCircle2,
     ArrowRight,
     RotateCcw,
+    Info,
     Loader2,
     History,
 } from "lucide-react";
@@ -29,8 +26,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useDraftStatus } from "@/hooks/use-alerts";
-import { Progress } from "@/components/ui/progress";
+import { type StudentRow } from "@/lib/csv";
 import {
     type Alert,
     type CaseStatus,
@@ -43,28 +39,25 @@ import {
 
 type KanbanCardProps = {
     alert: Alert;
-    onSend: (updated: Alert) => void;
-    onEdit: () => void;
-    onRemove: () => void;
+    onViewDetails: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
+    studentProfile?: StudentRow;
+    isAiDrafting?: boolean;
+    aiDraftError?: string;
+    isAiDraftReady?: boolean;
 };
 
 function KanbanCardInner({
     alert: a,
-    onSend,
-    onEdit,
-    onRemove,
+    onViewDetails,
     onMove,
     onOpenGoals,
+    studentProfile,
+    isAiDrafting,
+    aiDraftError,
+    isAiDraftReady,
 }: KanbanCardProps) {
-    // Only poll the backend for draft updates if there's an active case.
-    const {
-        data: draft,
-        isFetching,
-        isError,
-    } = useDraftStatus(a.activeCaseId);
-
     const meta = problemMeta[a.problem];
     const ProblemIcon = meta.icon;
     const goalsTotal = a.goals.length;
@@ -77,16 +70,12 @@ function KanbanCardInner({
             g.deadline !== null &&
             new Date(g.deadline).getTime() < new Date().setHours(0, 0, 0, 0),
     );
+    const severityLabel = a.severity === "high" ? "Critical" : "Elevated";
+    const severityTone =
+        a.severity === "high"
+            ? "bg-destructive/10 text-destructive ring-destructive/20"
+            : "bg-warning/15 text-warning ring-warning/25";
 
-    // Consider an alert as "generating" if the backend reports it,
-    // or if we're actively polling a known job.
-    const isGenerating =
-        a.isGenerating ||
-        draft?.is_generating ||
-        (isFetching && !!a.draftJobId && !a.draftBody && !isError);
-    const draftBody = isGenerating
-        ? ""
-        : (draft?.body ?? a.draftBody ?? a.body ?? "");
 
     return (
         <article className="group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-shadow duration-200 hover:border-primary/30 hover:shadow-md">
@@ -157,37 +146,31 @@ function KanbanCardInner({
                                 "Đặt mục tiêu"
                             )}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={onEdit} className="gap-2">
-                            <Pencil className="size-4" />
-                            Chỉnh sửa email
-                        </DropdownMenuItem>
-                        {a.activeCaseId && (
-                            <DropdownMenuItem className="gap-2">
-                                <History className="size-4" />
-                                Lịch sử can thiệp
-                            </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                            onClick={onRemove}
-                            className="gap-2 text-destructive focus:text-destructive"
-                        >
-                            <Trash2 className="size-4" />
-                            Xoá thẻ
-                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
 
-            <Badge
-                variant="outline"
-                className={cn(
-                    "mt-3 max-w-full gap-1.5 rounded-md border-transparent px-2 py-1 text-[13px] ring-1",
-                    meta.tone,
-                )}
-            >
-                <ProblemIcon className="size-3.5" />
-                <span className="truncate">{a.summary}</span>
-            </Badge>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Badge
+                    variant="outline"
+                    className={cn(
+                        "gap-1.5 rounded-md border-transparent px-2 py-1 text-[13px] ring-1",
+                        severityTone,
+                    )}
+                >
+                    {severityLabel}
+                </Badge>
+                <Badge
+                    variant="outline"
+                    className={cn(
+                        "max-w-full gap-1.5 rounded-md border-transparent px-2 py-1 text-[13px] ring-1",
+                        meta.tone,
+                    )}
+                >
+                    <ProblemIcon className="size-3.5" />
+                    <span className="truncate">{a.summary}</span>
+                </Badge>
+            </div>
 
             {goalsTotal > 0 ? (
                 <button
@@ -242,68 +225,23 @@ function KanbanCardInner({
                 </button>
             ) : null}
 
-            {a.status === "new" ? (
-                <div className="mt-3 flex flex-col gap-2">
-                    {isGenerating ? (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Badge
-                                    variant="outline"
-                                    className="w-fit gap-1.5 rounded-md border-transparent bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border"
-                                >
-                                    <Loader2 className="size-3.5 animate-spin" />
-                                    Đang soạn thảo AI...
-                                </Badge>
-                                {draft?.progress !== undefined && (
-                                    <span className="font-mono text-[11px] text-muted-foreground">
-                                        {draft.progress}%
-                                    </span>
-                                )}
-                            </div>
-                            {draft?.progress !== undefined && (
-                                <Progress value={draft.progress} className="h-1" />
-                            )}
-                        </div>
-                    ) : draftBody ? (
-                        <div className="flex items-center justify-between">
-                            <Badge
-                                variant="outline"
-                                className="w-fit gap-1.5 rounded-md border-transparent bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-primary/20"
-                            >
-                                <Sparkles className="size-3.5" />
-                                Bản nháp AI sẵn sàng
-                            </Badge>
-                        </div>
-                    ) : null}
-
-                    <div
-                        className={cn(
-                            "rounded-lg border border-border/40 bg-muted/20 p-2.5 transition-colors duration-200",
-                            !isGenerating &&
-                                draftBody &&
-                                "cursor-pointer hover:bg-muted/40",
-                        )}
-                        onClick={
-                            !isGenerating && draftBody ? onEdit : undefined
-                        }
-                    >
-                        <p
-                            className={cn(
-                                "text-[13px] leading-relaxed text-muted-foreground",
-                                isGenerating ? "italic" : "line-clamp-3",
-                            )}
-                        >
-                            {isGenerating
-                                ? "Hệ thống đang phân tích kết quả học tập để soạn thư hỗ trợ phù hợp..."
-                                : draftBody ||
-                                  "Chưa có bản nháp email. Nhấn Sửa để soạn thảo."}
-                        </p>
-                    </div>
-                </div>
-            ) : a.status === "scheduled" && a.appointmentAt ? (
+            {a.status === "scheduled" && a.appointmentAt ? (
                 <p className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-warning">
                     <Clock className="size-3.5" />
                     Hẹn {formatAppointment(a.appointmentAt)}
+                </p>
+            ) : a.status === "accepted" && isAiDrafting ? (
+                <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    AI đang soạn thảo bản thảo...
+                </p>
+            ) : a.status === "accepted" && aiDraftError ? (
+                <p className="mt-3 text-[13px] text-destructive">
+                    {aiDraftError}
+                </p>
+            ) : a.status === "accepted" && isAiDraftReady ? (
+                <p className="mt-3 text-[13px] text-success">
+                    Bản nháp AI đã sẵn sàng.
                 </p>
             ) : (
                 <p className="mt-3 text-[13px] text-muted-foreground">
@@ -311,13 +249,15 @@ function KanbanCardInner({
                 </p>
             )}
 
+
             <CardActions
-                alert={{ ...a, body: draftBody }}
-                onSend={(updated: Alert) => onSend(updated)}
-                onEdit={onEdit}
+                alert={a}
+                onViewDetails={onViewDetails}
                 onMove={onMove}
                 onOpenGoals={onOpenGoals}
-                isGenerating={isGenerating}
+                studentProfile={studentProfile}
+                isAiDrafting={isAiDrafting}
+                isAiDraftReady={isAiDraftReady}
             />
         </article>
     );
@@ -327,47 +267,47 @@ export const KanbanCard = React.memo(KanbanCardInner);
 
 function CardActions({
     alert: a,
-    onSend,
-    onEdit,
+    onViewDetails,
     onMove,
     onOpenGoals,
-    isGenerating,
+    studentProfile,
+    isAiDrafting,
+    isAiDraftReady,
 }: {
     alert: Alert;
-    onSend: (updated: Alert) => void;
-    onEdit: () => void;
+    onViewDetails: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
-    isGenerating?: boolean;
+    studentProfile?: StudentRow;
+    isAiDrafting?: boolean;
+    isAiDraftReady?: boolean;
 }) {
     const hasGoals = a.goals.length > 0;
     if (a.status === "new") {
         return (
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex flex-col gap-2">
                 <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={onEdit}
-                    disabled={isGenerating}
+                    className="h-10 w-full justify-start rounded-lg border border-border/60 text-sm font-medium"
+                    onClick={onViewDetails}
                 >
-                    <Pencil className="size-4" />
-                    Sửa
+                    <Info className="size-4" />
+                    Get Profile
                 </Button>
                 <Button
                     size="sm"
-                    className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() => onSend(a)}
-                    disabled={!a.email || isGenerating}
-                    title={
-                        !a.email
-                            ? "Sinh viên chưa có email trong CSV"
-                            : undefined
-                    }
+                    className="h-10 w-full rounded-lg text-sm font-medium"
+                    onClick={() => onMove("accepted", `Đã nhận case của ${a.name}`)}
                 >
-                    <Send className="size-4" />
-                    Gửi ngay
+                    <Handshake className="size-4" />
+                    Accept Case
                 </Button>
+                {!studentProfile ? (
+                    <p className="text-[12px] text-muted-foreground">
+                        Chưa có dữ liệu LMS/SIS chi tiết cho sinh viên này.
+                    </p>
+                ) : null}
             </div>
         );
     }
@@ -396,6 +336,69 @@ function CardActions({
                     aria-label="Chuyển sang Đang hỗ trợ"
                 >
                     <ArrowRight className="size-4" />
+                </Button>
+            </div>
+        );
+    }
+
+    if (a.status === "accepted") {
+        if (isAiDrafting) {
+            return (
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 h-10 w-full rounded-lg text-sm font-medium"
+                    disabled
+                >
+                    <Loader2 className="size-4 animate-spin" />
+                    AI đang soạn thảo bản thảo...
+                </Button>
+            );
+        }
+
+        if (isAiDraftReady) {
+            return (
+                <div className="mt-3 flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-10 flex-1 rounded-lg text-sm font-medium"
+                        onClick={onViewDetails}
+                    >
+                        View Draft
+                    </Button>
+                    <Button
+                        size="sm"
+                        className="h-10 flex-1 rounded-lg text-sm font-medium"
+                        onClick={onViewDetails}
+                    >
+                        Edit Email
+                    </Button>
+                </div>
+            );
+        }
+
+        return (
+            <div className="mt-3 flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 flex-1 rounded-lg text-sm font-medium"
+                    onClick={() =>
+                        onMove("contacted", `${a.name} đã được liên hệ`)
+                    }
+                >
+                    <ArrowRight className="size-4" />
+                    Chuyển Đã liên hệ
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 w-10 shrink-0 rounded-lg"
+                    onClick={onViewDetails}
+                    aria-label="Get Profile"
+                >
+                    <Info className="size-4" />
                 </Button>
             </div>
         );

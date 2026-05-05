@@ -207,6 +207,11 @@ class Advisor(Base):
     )
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
+    title: Mapped[str | None] = mapped_column(String)
+    phone: Mapped[str | None] = mapped_column(String)
+    faculty: Mapped[str | None] = mapped_column(String)
+    office: Mapped[str | None] = mapped_column(String)
+    bio: Mapped[str | None] = mapped_column(Text)
 
     # Relationships
     user: Mapped[User | None] = relationship('User', back_populates='advisor_profile')

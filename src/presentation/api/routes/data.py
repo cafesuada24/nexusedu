@@ -55,7 +55,8 @@ async def ingest_data(
                 )
 
 
-        command = DataIngestionCommand(data_sources=data_sources, auto_generate_draft_email=user.preferences.auto_draft_enabled)
+        auto_draft = getattr(user.preferences, 'auto_draft_enabled', True)
+        command = DataIngestionCommand(data_sources=data_sources, auto_generate_draft_email=auto_draft)
 
         results = await command_handler.handle_ingest_data(command, user.id)
 

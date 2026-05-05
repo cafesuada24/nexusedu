@@ -4,6 +4,18 @@ import type { NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("nexusedu_auth_token")?.value;
+  const debugApiLog =
+    process.env.NODE_ENV !== "production" ||
+    process.env.DEBUG_API_PROXY_LOGS === "1";
+
+  if (pathname.startsWith("/api/v1") && debugApiLog) {
+    console.info("[proxy/api-v1]", {
+      method: request.method,
+      pathname,
+      query: request.nextUrl.search,
+      hasAuthCookie: Boolean(token),
+    });
+  }
 
   // 1. Route Protection: /dashboard/*
   if (pathname.startsWith("/dashboard")) {

@@ -55,3 +55,7 @@ class AdvisorRepository(Protocol):
     ) -> None:
         """Link a user to an advisor profile, creating one if necessary."""
         ...
+
+    async def get_advisor_points(self, advisor_id: UUID) -> int:
+        """Get total points for an advisor."""
+        ...

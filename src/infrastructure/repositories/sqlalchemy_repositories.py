@@ -341,6 +341,26 @@ class SqlAlchemyAdvisorRepository:
         advisor = result.scalar_one_or_none()
         return DataMapper.to_domain_advisor(advisor) if advisor else None
 
+    async def update_profile(
+        self,
+        advisor_id: uuid.UUID,
+        update_data: dict[str, Any],
+    ) -> DomainAdvisor:
+        """Update an advisor's profile fields."""
+        stmt = (
+            update(Advisor)
+            .where(Advisor.advisor_id == advisor_id)
+            .values(**update_data)
+            .returning(Advisor)
+        )
+        result = await self.session.execute(stmt)
+        updated_advisor = result.scalar_one_or_none()
+        
+        if not updated_advisor:
+            raise ValueError(f"Advisor with id {advisor_id} not found")
+            
+        return DataMapper.to_domain_advisor(updated_advisor)
+
     async def get_engagement_metrics(self) -> list[dict[str, Any]]:
         """Retrieve aggregated engagement metrics by major."""
         stmt = (
@@ -422,6 +442,14 @@ class SqlAlchemyAdvisorRepository:
         stmt = stmt.limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         return [row._asdict() for row in result.all()], total_count
+
+    async def get_advisor_points(self, advisor_id: uuid.UUID) -> int:
+        """Get total points for an advisor."""
+        stmt = select(func.coalesce(func.sum(PointLedger.points), 0)).where(
+            PointLedger.advisor_id == advisor_id
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0
 
     async def record_points(
         self,

@@ -31,7 +31,7 @@ export function AdvisorLeaderboard() {
     )
   }
 
-  if (!advisors || advisors.length === 0) {
+  if (!advisors || advisors.metadata.total_count === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
         Chưa có dữ liệu hoạt động.
@@ -40,7 +40,7 @@ export function AdvisorLeaderboard() {
   }
 
   // Calculate rate and initials for each advisor, and sort by points
-  const processedAdvisors = [...advisors]
+  const processedAdvisors = [...advisors.items]
     .sort((a, b) => b.total_points - a.total_points)
     .map((l, index) => {
       const initials = l.name

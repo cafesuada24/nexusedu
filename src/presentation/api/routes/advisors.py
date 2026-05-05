@@ -11,7 +11,10 @@ from src.application.queries.advisor_queries import (
     GetLeaderboardQuery,
 )
 from src.core.logger import logger
-from src.presentation.api.auth import Scope, User, require_scope
+from src.domain.repositories.badge_repository import BadgeRepository
+from src.domain.repositories.interfaces import AdvisorRepository
+from src.domain.value_objects.badges import BADGE_MAP
+from src.presentation.api.auth import Scope, User, current_active_user, require_scope
 from src.presentation.dependencies.providers import (
     get_advisor_query_handler,
 )
@@ -19,6 +22,58 @@ from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 
+
+@router.get('/me/profile')
+async def get_my_profile(
+    user: Annotated[User, Depends(current_active_user)],
+    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+) -> Any:
+    """Get the current user's advisor profile."""
+    from src.presentation.schemas.advisor import AdvisorProfileRead
+    advisor = await advisor_repo.get_by_user_id(user.id)
+    if not advisor:
+        raise HTTPException(status_code=404, detail="Advisor profile not found")
+    return AdvisorProfileRead.model_validate(advisor)
+
+
+@router.get('/me/points')
+async def get_my_points(
+    user: Annotated[User, Depends(current_active_user)],
+    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+) -> dict[str, int]:
+    """Get the current user's advisor points."""
+    advisor = await advisor_repo.get_by_user_id(user.id)
+    if not advisor:
+        raise HTTPException(status_code=404, detail="Advisor profile not found")
+    
+    points = await advisor_repo.get_advisor_points(advisor.advisor_id)
+    return {"points": points}
+
+
+@router.patch('/me/profile')
+async def update_my_profile(
+    update_data: dict[str, Any],
+    user: Annotated[User, Depends(current_active_user)],
+    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+) -> Any:
+    """Update the current user's advisor profile."""
+    from src.presentation.schemas.advisor import AdvisorProfileUpdate, AdvisorProfileRead
+    # Validate payload
+    try:
+        validated_data = AdvisorProfileUpdate(**update_data)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    advisor = await advisor_repo.get_by_user_id(user.id)
+    if not advisor:
+        raise HTTPException(status_code=404, detail="Advisor profile not found")
+
+    update_dict = {k: v for k, v in validated_data.model_dump().items() if v is not None}
+    if not update_dict:
+        return AdvisorProfileRead.model_validate(advisor)
+
+    updated_advisor = await advisor_repo.update_profile(advisor.advisor_id, update_dict)
+    return AdvisorProfileRead.model_validate(updated_advisor)
 
 @router.get('/engagement')
 async def get_engagement_metrics(

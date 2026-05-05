@@ -1,3 +1,4 @@
+import { AdvisorLeaderboard } from "@/components/dashboard/advisor-leaderboard";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -29,6 +30,7 @@ import { z } from "zod";
 export const BackendInterventionStatusSchema = z.enum([
     "none",
     "notified",
+    "accepted",
     "sent",
     "booked",
     "supporting",
@@ -53,6 +55,21 @@ export const BackendAlertSchema = z.object({
     active_case_id: z.string().nullable().optional(),
 });
 export type BackendAlert = z.infer<typeof BackendAlertSchema>;
+
+export const BackendAlertPagedResponseSchema = z.object({
+    items: z.array(BackendAlertSchema),
+    metadata: z
+        .object({
+            total_count: z.number(),
+            limit: z.number(),
+            offset: z.number(),
+            has_next: z.boolean(),
+        })
+        .optional(),
+});
+export type BackendAlertPagedResponse = z.infer<
+    typeof BackendAlertPagedResponseSchema
+>;
 
 export const TaskItemSchema = z.object({
     case_id: z.string(),
@@ -154,6 +171,17 @@ export type AdvisorLeaderboardItem = z.infer<
     typeof AdvisorLeaderboardItemSchema
 >;
 
+export const AdvisorLeaderboardSchema = z.object({
+    items: z.array(AdvisorLeaderboardItemSchema),
+    metadata: z.object({
+        total_count: z.number().int().gte(0),
+        limit: z.number().int().gte(0),
+        offset: z.number().int().gte(0),
+        has_next: z.boolean(),
+    }),
+});
+export type AdvisorLeaderboard = z.infer<typeof AdvisorLeaderboardSchema>;
+
 export const UserReadSchema = z.object({
     id: z.string(),
     email: z.string(),
@@ -161,12 +189,44 @@ export const UserReadSchema = z.object({
 });
 export type UserRead = z.infer<typeof UserReadSchema>;
 
+export const UserSettingsSchema = z.object({
+    auto_draft_enabled: z.boolean(),
+});
+export type UserSettings = z.infer<typeof UserSettingsSchema>;
+
 export const AdvisorEngagementItemSchema = z.object({
     faculty: z.string(),
     sent: z.number(),
     drafted: z.number(),
 });
 export type AdvisorEngagementItem = z.infer<typeof AdvisorEngagementItemSchema>;
+
+export const AdvisorPointsSchema = z.object({
+    points: z.number().int(),
+});
+export type AdvisorPoints = z.infer<typeof AdvisorPointsSchema>;
+
+export const AdvisorProfileReadSchema = z.object({
+  advisor_id: z.string(),
+  name: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  faculty: z.string().nullable().optional(),
+  office: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
+});
+export type AdvisorProfileRead = z.infer<typeof AdvisorProfileReadSchema>;
+
+export const AdvisorProfileUpdateSchema = z.object({
+  name: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  faculty: z.string().nullable().optional(),
+  office: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
+});
+export type AdvisorProfileUpdate = z.infer<typeof AdvisorProfileUpdateSchema>;
 
 export const KpiStatsSchema = z.object({
     retention_rate: z.number(),
@@ -183,7 +243,6 @@ export const RetentionTrendItemSchema = z.object({
     current: z.number(),
 });
 export type RetentionTrendItem = z.infer<typeof RetentionTrendItemSchema>;
-
 
 export const DraftStatusResponseSchema = z.object({
     sid: z.string(),
@@ -322,7 +381,10 @@ export async function authFetch(
 
     const res = await fetch(url, merged);
 
-    if ((res.status === 401 || res.status === 403) && !suppressUnauthorizedEvent) {
+    if (
+        (res.status === 401 || res.status === 403) &&
+        !suppressUnauthorizedEvent
+    ) {
         warnLog(`authFetch: ${res.status} Unauthorized/Forbidden`, url);
         if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("nexusedu:unauthorized"));
@@ -398,7 +460,12 @@ export async function register(email: string, password: string): Promise<any> {
  */
 export async function getCurrentUser(): Promise<UserRead | null> {
     const res = await withTimeout(
-        (signal) => authFetch(endpoint("/users/me"), { method: "GET", suppressUnauthorizedEvent: true }, signal),
+        (signal) =>
+            authFetch(
+                endpoint("/users/me"),
+                { method: "GET", suppressUnauthorizedEvent: true },
+                signal,
+            ),
         DEFAULT_TIMEOUT_MS,
     );
 
@@ -412,6 +479,62 @@ export async function getCurrentUser(): Promise<UserRead | null> {
 
     const data = await res.json();
     return UserReadSchema.parse(data);
+}
+
+/**
+ * GET /users/me/settings — returns current user settings.
+ */
+export async function getUserSettings(): Promise<UserSettings> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                endpoint("/users/me/settings"),
+                { method: "GET" },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        throw new Error(
+            errorBody.detail || `Failed to fetch user settings: ${res.status}`,
+        );
+    }
+
+    const data = await res.json();
+    return UserSettingsSchema.parse(data);
+}
+
+/**
+ * PATCH /users/me/settings — updates current user settings.
+ */
+export async function updateUserSettings(
+    settings: Pick<UserSettings, "auto_draft_enabled">,
+): Promise<UserSettings> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                endpoint("/users/me/settings"),
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(settings),
+                },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        throw new Error(
+            errorBody.detail || `Failed to update user settings: ${res.status}`,
+        );
+    }
+
+    const data = await res.json();
+    return UserSettingsSchema.parse(data);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -484,7 +607,11 @@ export async function fetchAlerts(): Promise<BackendAlert[]> {
         throw new Error(`Không thể lấy danh sách cảnh báo: ${message}`);
     }
     const data = await res.json();
-    return z.array(BackendAlertSchema).parse(data);
+    if (Array.isArray(data)) {
+        return z.array(BackendAlertSchema).parse(data);
+    }
+    const parsed = BackendAlertPagedResponseSchema.parse(data);
+    return parsed.items;
 }
 
 /**
@@ -516,27 +643,156 @@ export async function fetchTasks(
  * Pushes a status transition for a single student.
  */
 export async function updateAlertStatus(
-    case_id: string,
+    case_or_alert_id: string,
     status: BackendInterventionStatus,
 ): Promise<void> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/cases/${encodeURIComponent(case_id)}/status`),
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status }),
-                },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Cập nhật trạng thái thất bại: ${message}`);
+    const requestBody = JSON.stringify({ status });
+    const candidateUrls = [
+        endpoint(`/alerts/${encodeURIComponent(case_or_alert_id)}`),
+        endpoint(`/alerts/${encodeURIComponent(case_or_alert_id)}/status`),
+        endpoint(`/cases/${encodeURIComponent(case_or_alert_id)}/status`),
+    ];
+
+    let lastFailure:
+        | { response: Response; detail: string; url: string }
+        | undefined;
+
+    for (const url of candidateUrls) {
+        const response = await withTimeout(
+            (signal) =>
+                authFetch(
+                    url,
+                    {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: requestBody,
+                    },
+                    signal,
+                ),
+            DEFAULT_TIMEOUT_MS,
+        );
+
+        if (response.ok) return;
+
+        const errorBody = await response.json().catch(() => ({}));
+        const detail = errorBody.detail || response.statusText;
+        lastFailure = { response, detail, url };
+
+        // Retry with the alternate endpoint if one route is not available.
+        if (response.status !== 404) {
+            break;
+        }
     }
+
+    if (!lastFailure) {
+        throw new Error("Cập nhật trạng thái thất bại: không có phản hồi từ máy chủ.");
+    }
+
+    throw new Error(
+        `Cập nhật trạng thái thất bại [${lastFailure.response.status}] (${lastFailure.url}): ${lastFailure.detail}`,
+    );
+}
+
+/**
+ * POST /alerts/{sid}/draft/trigger — trigger AI draft generation for one alert.
+ */
+export async function generateAiDraftForAlert(
+    alert_id: string,
+    case_id?: string | null,
+): Promise<{ job_id?: string; status?: string }> {
+    const requestBody = JSON.stringify({
+        alert_id,
+        case_id: case_id ?? undefined,
+    });
+    const primaryUrl = endpoint("/ai/generate-draft");
+    const alertTriggerUrl = endpoint(
+        `/alerts/${encodeURIComponent(alert_id)}/draft/trigger`,
+    );
+    const caseTriggerUrl = case_id
+        ? endpoint(`/cases/${encodeURIComponent(case_id)}/email/draft`)
+        : null;
+    const alternatePrimaryUrl = primaryUrl.includes("/api/v1/")
+        ? primaryUrl.replace("/api/v1/ai/generate-draft", "/ai/generate-draft")
+        : primaryUrl.replace("/ai/generate-draft", "/api/v1/ai/generate-draft");
+    const candidateUrls = Array.from(
+        new Set(
+            [
+                primaryUrl,
+                alternatePrimaryUrl,
+                caseTriggerUrl,
+                alertTriggerUrl,
+            ].filter(Boolean) as string[],
+        ),
+    );
+
+    const executeDraftRequest = async (
+        url: string,
+    ): Promise<{ response: Response; raw: string; detail: string }> => {
+        const response = await withTimeout(
+            (signal) =>
+                authFetch(
+                    url,
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: requestBody,
+                    },
+                    signal,
+                ),
+            DEFAULT_TIMEOUT_MS,
+        );
+
+        const raw = await response.text().catch(() => "");
+        let detail: string = response.statusText;
+        try {
+            const parsed = raw ? JSON.parse(raw) : {};
+            detail =
+                (typeof parsed?.detail === "string" ? parsed.detail : "") ||
+                (typeof parsed?.message === "string" ? parsed.message : "") ||
+                detail;
+        } catch {
+            if (raw) detail = raw;
+        }
+        return { response, raw, detail };
+    };
+
+    let lastFailure:
+        | { response: Response; raw: string; detail: string; url: string }
+        | undefined;
+
+    for (let i = 0; i < candidateUrls.length; i++) {
+        const url = candidateUrls[i];
+        const result = await executeDraftRequest(url);
+        if (result.response.ok) {
+            return (result.raw
+                ? JSON.parse(result.raw)
+                : {}) as { job_id?: string; status?: string };
+        }
+
+        console.error("[api] generateAiDraftForAlert failed", {
+            status: result.response.status,
+            url,
+            detail: result.detail,
+            response: result.raw,
+            requestBody,
+            contentType:
+                result.response.headers.get("content-type") ?? "(unknown)",
+        });
+        lastFailure = { ...result, url };
+
+        // Retry one more route variant on 404 to handle /api/v1 prefix mismatch.
+        if (result.response.status !== 404) {
+            break;
+        }
+    }
+
+    if (!lastFailure) {
+        throw new Error("Không thể tạo nội dung email: không có phản hồi từ dịch vụ AI.");
+    }
+
+    throw new Error(
+        `Không thể tạo nội dung email [${lastFailure.response.status}] (${lastFailure.url}): ${lastFailure.detail}`,
+    );
 }
 
 /* ----------------------------------------------------------------------- */
@@ -631,7 +887,7 @@ export async function queryAgent(
  */
 export async function fetchAdvisorsLeaderboard(
     time_window?: "weekly" | "monthly" | "semester" | "all_time",
-): Promise<AdvisorLeaderboardItem[]> {
+): Promise<AdvisorLeaderboard> {
     const qp = time_window
         ? `?time_window=${encodeURIComponent(time_window)}`
         : "";
@@ -650,7 +906,7 @@ export async function fetchAdvisorsLeaderboard(
         throw new Error(`Không thể lấy bảng xếp hạng: ${message}`);
     }
     const data = await res.json();
-    return z.array(AdvisorLeaderboardItemSchema).parse(data);
+    return AdvisorLeaderboardSchema.parse(data);
 }
 
 /**
@@ -675,6 +931,74 @@ export async function fetchAdvisorsEngagement(): Promise<
     }
     const data = await res.json();
     return z.array(AdvisorEngagementItemSchema).parse(data);
+}
+
+/**
+ * GET /advisors/me/profile — returns current user's advisor profile.
+ */
+export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/advisors/me/profile"),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy thông tin hồ sơ: ${message}`);
+  }
+  const data = await res.json();
+  return AdvisorProfileReadSchema.parse(data);
+}
+
+/**
+ * GET /advisors/me/points — returns current user's advisor points.
+ */
+export async function fetchAdvisorPoints(): Promise<AdvisorPoints> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(endpoint("/advisors/me/points"), { method: "GET" }, signal),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        const message = errorBody.detail || res.statusText;
+        throw new Error(`Không thể lấy điểm thưởng: ${message}`);
+    }
+    const data = await res.json();
+    return AdvisorPointsSchema.parse(data);
+}
+
+/**
+ * PATCH /advisors/me/profile — updates current user's advisor profile.
+ */
+export async function updateAdvisorProfile(
+  payload: AdvisorProfileUpdate,
+): Promise<AdvisorProfileRead> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/advisors/me/profile"),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Cập nhật hồ sơ thất bại: ${message}`);
+  }
+  const data = await res.json();
+  return AdvisorProfileReadSchema.parse(data);
 }
 
 /**
@@ -773,9 +1097,13 @@ export async function fetchDraftStatus(
 export async function fetchStudentCases(sid: string): Promise<CaseResponse[]> {
     const res = await withTimeout(
         (signal) =>
-            authFetch(endpoint(`/cases/student/${encodeURIComponent(sid)}`), {
-                method: "GET",
-            }, signal),
+            authFetch(
+                endpoint(`/cases/student/${encodeURIComponent(sid)}`),
+                {
+                    method: "GET",
+                },
+                signal,
+            ),
         DEFAULT_TIMEOUT_MS,
     );
     if (!res.ok) {
@@ -788,12 +1116,18 @@ export async function fetchStudentCases(sid: string): Promise<CaseResponse[]> {
 /**
  * GET /cases/{case_id} — returns full details for a case.
  */
-export async function fetchCaseDetails(case_id: string): Promise<CaseDetailsResponse> {
+export async function fetchCaseDetails(
+    case_id: string,
+): Promise<CaseDetailsResponse> {
     const res = await withTimeout(
         (signal) =>
-            authFetch(endpoint(`/cases/${encodeURIComponent(case_id)}`), {
-                method: "GET",
-            }, signal),
+            authFetch(
+                endpoint(`/cases/${encodeURIComponent(case_id)}`),
+                {
+                    method: "GET",
+                },
+                signal,
+            ),
         DEFAULT_TIMEOUT_MS,
     );
     if (!res.ok) {

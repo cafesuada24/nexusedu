@@ -16,7 +16,7 @@ import {
     Sun,
     Moon,
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,25 @@ import {
 import { useDataset } from "@/hooks/use-dataset";
 import { reclassifyStudentsAndStats } from "@/lib/csv";
 import { useTheme } from "next-themes";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+    AdvisorProfileUpdateSchema,
+    type AdvisorProfileUpdate,
+    fetchAdvisorProfile,
+    updateAdvisorProfile,
+} from "@/lib/api";
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from "@/components/ui/form";
+import { Skeleton } from "@/components/ui/skeleton";
+
 const integrations = [
     {
         name: "Google Calendar",
@@ -45,22 +64,10 @@ const integrations = [
         logo: "/logos/google-calendar.png",
     },
     {
-        name: "Microsoft Teams",
-        description: "Link meeting tự động",
-        connected: true,
-        logo: "/logos/ms-teams.png",
-    },
-    {
         name: "Zalo OA",
         description: "Nhắc qua Zalo",
         connected: false,
         logo: "/logos/zalo.png",
-    },
-    {
-        name: "LMS Moodle",
-        description: "Đồng bộ điểm 30p",
-        connected: true,
-        logo: "/logos/moodle.png",
     },
 ];
 
@@ -134,6 +141,56 @@ export function SettingsView() {
 
     // Reclassify existing dataset when the risk threshold changes so Alert Center updates.
     const { dataset, setDataset } = useDataset();
+    
+    const queryClient = useQueryClient();
+    const { data: profile, isLoading: isProfileLoading } = useQuery({
+        queryKey: ["advisor-profile"],
+        queryFn: fetchAdvisorProfile,
+    });
+
+    const updateProfileMutation = useMutation({
+        mutationFn: updateAdvisorProfile,
+        onSuccess: () => {
+            toast.success("Thành công", {
+                description: "Đã cập nhật hồ sơ cố vấn.",
+            });
+            queryClient.invalidateQueries({ queryKey: ["advisor-profile"] });
+        },
+        onError: (err: any) => {
+            toast.error("Lỗi", {
+                description: err.message || "Không thể cập nhật hồ sơ.",
+            });
+        },
+    });
+
+    const form = useForm<AdvisorProfileUpdate>({
+        resolver: zodResolver(AdvisorProfileUpdateSchema),
+        defaultValues: {
+            name: "",
+            title: "",
+            phone: "",
+            faculty: "cntt",
+            office: "",
+            bio: "",
+        },
+    });
+
+    React.useEffect(() => {
+        if (profile) {
+            form.reset({
+                name: profile.name || "",
+                title: profile.title || "",
+                phone: profile.phone || "",
+                faculty: profile.faculty || "cntt",
+                office: profile.office || "",
+                bio: profile.bio || "",
+            });
+        }
+    }, [profile, form]);
+
+    const onSubmit = (values: AdvisorProfileUpdate) => {
+        updateProfileMutation.mutate(values);
+    };
 
     React.useEffect(() => {
         if (!dataset) return;
@@ -228,107 +285,145 @@ export function SettingsView() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-5">
-                        <div className="flex items-center gap-4">
-                            <div className="grid size-20 place-items-center rounded-2xl bg-primary/10 text-primary text-2xl font-semibold ring-2 ring-primary/20">
-                                LH
+                        {isProfileLoading ? (
+                            <div className="space-y-4">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
                             </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg"
-                                >
-                                    <Upload className="size-4" />
-                                    Tải ảnh
-                                </Button>
-                                <p className="font-mono text-[11px] text-muted-foreground">
-                                    PNG · JPG · 2MB
-                                </p>
-                            </div>
-                        </div>
+                        ) : (
+                        <Form {...form}>
+                            <form id="settings-profile-form" onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
+                                <div className="flex items-center gap-4">
+                                    <div className="grid size-20 place-items-center rounded-2xl bg-primary/10 text-primary text-2xl font-semibold ring-2 ring-primary/20">
+                                        {profile?.name ? profile.name.slice(0,2).toUpperCase() : "AD"}
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="rounded-lg"
+                                            onClick={() => toast.info("Đang phát triển", { description: "Tính năng tải ảnh đang được cập nhật." })}
+                                        >
+                                            <Upload className="size-4" />
+                                            Tải ảnh
+                                        </Button>
+                                        <p className="font-mono text-[11px] text-muted-foreground">
+                                            PNG · JPG · 2MB
+                                        </p>
+                                    </div>
+                                </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="full-name">Họ và tên</Label>
-                                <Input
-                                    id="full-name"
-                                    defaultValue="TS. Lê Thị Hà"
-                                    className="rounded-lg"
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="title">Chức danh</Label>
-                                <Input
-                                    id="title"
-                                    defaultValue="Giảng viên chính · Cố vấn học tập"
-                                    className="rounded-lg"
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="email">Email trường</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    defaultValue="ha.le@nexusedu.edu.vn"
-                                    className="rounded-lg"
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="phone">Số điện thoại</Label>
-                                <Input
-                                    id="phone"
-                                    defaultValue="+84 912 345 678"
-                                    className="rounded-lg"
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="faculty">Khoa</Label>
-                                <Select defaultValue="cntt">
-                                    <SelectTrigger
-                                        id="faculty"
-                                        className="rounded-lg"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="cntt">
-                                            Công nghệ thông tin
-                                        </SelectItem>
-                                        <SelectItem value="ktpm">
-                                            Kỹ thuật phần mềm
-                                        </SelectItem>
-                                        <SelectItem value="httt">
-                                            Hệ thống thông tin
-                                        </SelectItem>
-                                        <SelectItem value="attt">
-                                            An toàn thông tin
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="office">Phòng làm việc</Label>
-                                <Input
-                                    id="office"
-                                    defaultValue="A2-312 · Toà A2"
-                                    className="rounded-lg"
-                                />
-                            </div>
-                        </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <FormField
+                                        control={form.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem className="grid gap-1.5">
+                                                <FormLabel>Họ và tên</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="title"
+                                        render={({ field }) => (
+                                            <FormItem className="grid gap-1.5">
+                                                <FormLabel>Chức danh</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="email">Email trường</Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={profile?.email || ""}
+                                            disabled
+                                            className="rounded-lg bg-muted/50"
+                                        />
+                                    </div>
+                                    <FormField
+                                        control={form.control}
+                                        name="phone"
+                                        render={({ field }) => (
+                                            <FormItem className="grid gap-1.5">
+                                                <FormLabel>Số điện thoại</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="faculty"
+                                        render={({ field }) => (
+                                            <FormItem className="grid gap-1.5">
+                                                <FormLabel>Khoa</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value || "cntt"}>
+                                                    <FormControl>
+                                                        <SelectTrigger className="rounded-lg">
+                                                            <SelectValue placeholder="Chọn khoa" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="cntt">Công nghệ thông tin</SelectItem>
+                                                        <SelectItem value="ktpm">Kỹ thuật phần mềm</SelectItem>
+                                                        <SelectItem value="httt">Hệ thống thông tin</SelectItem>
+                                                        <SelectItem value="attt">An toàn thông tin</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="office"
+                                        render={({ field }) => (
+                                            <FormItem className="grid gap-1.5">
+                                                <FormLabel>Phòng làm việc</FormLabel>
+                                                <FormControl>
+                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
 
-                        <div className="grid gap-1.5">
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="bio">Giới thiệu</Label>
-                                <span className="font-mono text-[11px] text-muted-foreground">
-                                    ≤ 280
-                                </span>
-                            </div>
-                            <Textarea
-                                id="bio"
-                                className="min-h-24 rounded-lg"
-                                defaultValue="Quan tâm đến AI ứng dụng trong giáo dục. Sẵn sàng hỗ trợ sinh viên về định hướng nghề nghiệp, kỹ năng lập trình và nghiên cứu khoa học."
-                            />
-                        </div>
+                                <FormField
+                                    control={form.control}
+                                    name="bio"
+                                    render={({ field }) => (
+                                        <FormItem className="grid gap-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <FormLabel>Giới thiệu</FormLabel>
+                                                <span className="font-mono text-[11px] text-muted-foreground">
+                                                    ≤ 280
+                                                </span>
+                                            </div>
+                                            <FormControl>
+                                                <Textarea {...field} value={field.value || ""} className="min-h-24 rounded-lg" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </form>
+                        </Form>
+                        )}
                     </CardContent>
                 </Card>
             </TabsContent>
