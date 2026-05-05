@@ -16,7 +16,7 @@ import {
     Sun,
     Moon,
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -163,17 +163,14 @@ export function SettingsView() {
     const updateProfileMutation = useMutation({
         mutationFn: updateAdvisorProfile,
         onSuccess: () => {
-            toast({
-                title: "Thành công",
+            toast.success("Thành công", {
                 description: "Đã cập nhật hồ sơ cố vấn.",
             });
             queryClient.invalidateQueries({ queryKey: ["advisor-profile"] });
         },
         onError: (err: any) => {
-            toast({
-                title: "Lỗi",
+            toast.error("Lỗi", {
                 description: err.message || "Không thể cập nhật hồ sơ.",
-                variant: "destructive",
             });
         },
     });
@@ -319,6 +316,7 @@ export function SettingsView() {
                                             variant="outline"
                                             size="sm"
                                             className="rounded-lg"
+                                            onClick={() => toast.info("Đang phát triển", { description: "Tính năng tải ảnh đang được cập nhật." })}
                                         >
                                             <Upload className="size-4" />
                                             Tải ảnh
