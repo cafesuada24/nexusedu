@@ -15,10 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUploads, type UploadItem } from "@/hooks/use-uploads";
-import {
-  useUploads,
-  type UploadItem,
-} from "@/hooks/use-uploads";
 import { analyzeCsv, csvToLMSRecords, csvToSISRecords, mergeCsv, SAMPLE_CSV } from "@/lib/csv";
 import { ingestData, updateUserSettings } from "@/lib/api";
 import { type SourceKey } from "@/lib/constants";
@@ -31,190 +27,9 @@ export function CsvUploader() {
     const { user } = useAuth();
     const { uploads, addUpload, updateUpload, removeUpload } = useUploads();
 
-  const [staged, setStaged] = React.useState<StagedMap>({});
-  const [draggingOver, setDraggingOver] = React.useState<SourceKey | null>(
-    null,
-  );
-  const [confirming, setConfirming] = React.useState(false);
-
-  const isAdmin = user?.role === "admin";
-
-  const stageFile = React.useCallback((file: File, source: SourceKey) => {
-    if (!isAdmin) {
-      toast.error("Bạn không có quyền thực hiện thao tác này");
-      return;
-    }
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast.error("Vui lòng tải file .CSV");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onerror = () => {
-      toast.error("Không đọc được file");
-    };
-    reader.onload = () => {
-      const text = typeof reader.result === "string" ? reader.result : "";
-      setStaged((prev) => ({
-        ...prev,
-        [source]: {
-          file,
-          text,
-          sizeKB: Number((file.size / 1024).toFixed(1)),
-        },
-      }));
-      toast.success(`Đã nạp file ${source}`, {
-        description: file.name,
-      });
-    };
-    reader.readAsText(file);
-  }, []);
-
-  const removeStaged = (source: SourceKey) => {
-    setStaged((prev) => {
-      const next = { ...prev };
-      delete next[source];
-      return next;
-    });
-  };
-
-  const lmsStaged = staged.LMS;
-  const sisStaged = staged.SIS;
-  const bothReady = Boolean(lmsStaged && sisStaged);
-
-  const handleConfirm = async () => {
-    if (!isAdmin) {
-      toast.error("Chỉ Quản trị viên mới có quyền nhập dữ liệu");
-      return;
-    }
-    if (!lmsStaged || !sisStaged || confirming) return;
-    setConfirming(true);
-
-    const id = `up_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const item: UploadItem = {
-      id,
-      status: "processing",
-      uploadedAt: new Date().toISOString(),
-      files: {
-        LMS: { fileName: lmsStaged.file.name, sizeKB: lmsStaged.sizeKB },
-        SIS: { fileName: sisStaged.file.name, sizeKB: sisStaged.sizeKB },
-      },
-    };
-    addUpload(item);
-
-    // Reset zones immediately so the user can stage the next pair.
-    setStaged({});
-
-    // Small delay so the "Đang xử lý" pill is briefly visible.
-    await new Promise((r) => setTimeout(r, 800));
-
-    try {
-      const merged = mergeCsv(lmsStaged.text, sisStaged.text);
-      const result = analyzeCsv(merged);
-      if (result.totalStudents === 0) {
-        updateUpload(id, {
-          status: "error",
-          errorMessage:
-            "Bộ dữ liệu không có dòng hợp lệ (thiếu cột sid hoặc score).",
-        });
-        toast.error("Bộ dữ liệu không có dữ liệu hợp lệ");
-        setConfirming(false);
-        return;
-      }
-
-      // Push the raw rows to the backend as structured sources.
-      const lmsRecords = csvToLMSRecords(lmsStaged.text);
-      const sisRecords = csvToSISRecords(sisStaged.text);
-
-      const dataSources: any[] = [];
-      if (sisRecords.length > 0) {
-        dataSources.push({ source_type: "sis", records: sisRecords });
-      }
-      if (lmsRecords.length > 0) {
-        dataSources.push({ source_type: "lms", records: lmsRecords });
-      }
-
-      if (dataSources.length > 0) {
-        try {
-          await updateUserSettings({ auto_draft_enabled: false });
-          await ingestData(dataSources);
-          updateUpload(id, {
-            status: "ready",
-            totalStudents: result.totalStudents,
-            totalTests: result.totalTests,
-            highRisk: result.highRisk,
-          });
-          toast.success("Đã đồng bộ với máy chủ", {
-            description: `${result.totalStudents.toLocaleString(
-              "vi-VN",
-            )} sinh viên đã được cập nhật hệ thống.`,
-          });
-        } catch (err: any) {
-          console.warn("[v0] /data/ingest failed", err);
-
-          let errorMessage = err.message || "Không thể đồng bộ với máy chủ.";
-          if (err.detail) {
-            if (Array.isArray(err.detail)) {
-              errorMessage = err.detail.map((d: any) => d.msg || d.message).join(", ");
-            } else {
-              errorMessage = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
-            }
-          }
-
-          updateUpload(id, {
-            status: "error",
-            errorMessage,
-          });
-          toast.error("Đồng bộ thất bại", {
-            description: errorMessage,
-          });
-        }
-      }
-    } catch (err: any) {
-      console.error("[v0] CSV analyze failed", err);
-      updateUpload(id, {
-        status: "error",
-        errorMessage: err.message || "Không thể phân tích bộ hồ sơ. Hãy kiểm tra định dạng.",
-      });
-      toast.error("Phân tích thất bại");
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  const handleDelete = (item: UploadItem) => {
-    removeUpload(item.id);
-    toast.message("Đã xóa khỏi danh sách", {
-      description: `${item.files.LMS.fileName} + ${item.files.SIS.fileName}`,
-    });
-  };
-
-  const useSampleForBoth = () => {
-    const lmsFile = new File([SAMPLE_CSV], "nexusedu-lms-sample.csv", {
-      type: "text/csv",
-    });
-    const sisFile = new File([SAMPLE_CSV], "nexusedu-sis-sample.csv", {
-      type: "text/csv",
-    });
-    stageFile(lmsFile, "LMS");
-    stageFile(sisFile, "SIS");
-  };
-
-  const ordered = React.useMemo(() => [...uploads].reverse(), [uploads]);
-
-  if (!isAdmin) {
-    return (
-      <Card className="border-dashed border-red-200 bg-red-50/30">
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="mb-4 rounded-full bg-red-100 p-3">
-            <CheckCircle2 className="size-6 text-red-600" />
-          </div>
-          <h3 className="text-lg font-medium text-red-900">Quyền truy cập bị từ chối</h3>
-          <p className="max-w-xs text-sm text-red-600/80">
-            Bạn đang đăng nhập với vai trò <strong>{user?.role || "viewer"}</strong>.
-            Chỉ Quản trị viên mới có quyền nhập dữ liệu CSV vào hệ thống.
-          </p>
-        </CardContent>
-      </Card>
+    const [staged, setStaged] = React.useState<StagedMap>({});
+    const [draggingOver, setDraggingOver] = React.useState<SourceKey | null>(
+        null,
     );
     const [confirming, setConfirming] = React.useState(false);
 
@@ -248,7 +63,7 @@ export function CsvUploader() {
             });
         };
         reader.readAsText(file);
-    }, []);
+    }, [isAdmin]);
 
     const removeStaged = (source: SourceKey) => {
         setStaged((prev) => {
@@ -322,6 +137,7 @@ export function CsvUploader() {
 
             if (dataSources.length > 0) {
                 try {
+                    await updateUserSettings({ auto_draft_enabled: false });
                     await ingestData(dataSources);
                     updateUpload(id, {
                         status: "ready",
