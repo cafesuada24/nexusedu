@@ -794,7 +794,6 @@ class SqlAlchemyCaseRepository:
                 assigned_advisor_id=case.assigned_advisor_id,
                 status=case.status,
                 version=case.version + 1,
-                updated_at=datetime.now(UTC),
             )
         )
         result = await self.session.execute(stmt)
