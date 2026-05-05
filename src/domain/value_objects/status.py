@@ -29,8 +29,9 @@ class CaseStatus(StrEnum):
     """Status of a student case."""
 
     OPEN = "open"
+    ASSIGNED = "assigned"
     RESOLVED = "resolved"
-    CLOSED = "closed"
+    FAILED = "failed"
 
 
 class TaskStatus(StrEnum):
