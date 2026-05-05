@@ -5,15 +5,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class PaginationMetadata(BaseModel):
-    """Metadata for paged results."""
-
-    total_count: int = Field(..., description='Total number of items available.')
-    limit: int = Field(..., description='Number of items per page.')
-    offset: int = Field(..., description='Number of items skipped.')
-    has_next: bool = Field(..., description='True if there are more pages.')
-
-
 class EmailDraft(BaseModel):
     """Schema for a personalized email draft."""
 
@@ -85,16 +76,6 @@ class JobStatusResponse(BaseModel):
     completed_at: str | None = Field(None, description='Job completion timestamp.')
 
 
-class CaseResponse(BaseModel):
-    """Schema for a student case."""
-
-    case_id: str
-    sid: str
-    status: str
-    created_at: str
-    resolved_at: str | None = None
-
-
 class AlertStudent(BaseModel):
     """Schema for a student in the Kanban alert dashboard."""
 
@@ -120,7 +101,9 @@ class TaskDetail(BaseModel):
     status: str = Field(..., description='Task status (pending, completed).')
     points_reward: int = Field(..., description='Points awarded upon completion.')
     completed_at: str | None = Field(None, description='When the task was completed.')
-    completed_by_advisor_id: str | None = Field(None, description='Who completed the task.')
+    completed_by_advisor_id: str | None = Field(
+        None, description='Who completed the task.'
+    )
 
 
 class TaskItem(BaseModel):
@@ -129,7 +112,9 @@ class TaskItem(BaseModel):
     case_id: str = Field(..., description='Case identifier.')
     sid: str = Field(..., description='Student id')
     created_at: str = Field(..., description='When the case was created.')
-    assigned_advisor_id: str | None = Field(None, description='Advisor assigned to the case.')
+    assigned_advisor_id: str | None = Field(
+        None, description='Advisor assigned to the case.'
+    )
     student_name: str | None = Field(None, description='Student name.')
     email: str | None = Field(None, description='Student email.')
     major: str = Field(..., description='Student major.')
@@ -144,20 +129,6 @@ class TaskItem(BaseModel):
     tasks: list[TaskDetail] | None = Field(None, description='Detailed sub-tasks.')
 
 
-class TaskPagedResponse(BaseModel):
-    """Paged response for task list."""
-
-    items: list[TaskItem]
-    metadata: PaginationMetadata
-
-
-class AlertPagedResponse(BaseModel):
-    """Paged response for active alerts."""
-
-    items: list[AlertStudent]
-    metadata: PaginationMetadata
-
-
 class LeaderboardEntry(BaseModel):
     """Schema for a single entry in the advisor leaderboard."""
 
@@ -167,10 +138,3 @@ class LeaderboardEntry(BaseModel):
     actions_count: int = Field(..., description='Total actions taken.')
     sent_count: int = Field(..., description='Emails sent.')
     resolved_count: int = Field(..., description='Students resolved.')
-
-class LeaderboardPagedResponse(BaseModel):
-    """Paged response for advisor leaderboard."""
-
-    items: list[LeaderboardEntry]
-    metadata: PaginationMetadata
-
