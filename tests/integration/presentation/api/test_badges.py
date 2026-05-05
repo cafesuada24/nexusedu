@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -62,7 +62,7 @@ async def test_badge_repository_stats_calculation(
     
     # 1. Create a case created 10 hours ago
     case_id = uuid4()
-    created_at = datetime.now() - timedelta(hours=10)
+    created_at = datetime.now(UTC) - timedelta(hours=10)
     test_db_session.add(
         OrmCase(
             case_id=case_id,
@@ -72,7 +72,7 @@ async def test_badge_repository_stats_calculation(
             status="open"
         )
     )
-    
+
     # 2. Add an action (points ledger) for that case
     task_id = uuid4()
     test_db_session.add(
@@ -83,7 +83,7 @@ async def test_badge_repository_stats_calculation(
             status="completed",
             points_reward=10,
             created_at=created_at,
-            completed_at=datetime.now(),
+            completed_at=datetime.now(UTC),
             completed_by_advisor_id=advisor_id
         )
     )
@@ -93,7 +93,7 @@ async def test_badge_repository_stats_calculation(
             advisor_id=advisor_id,
             task_id=task_id,
             points=10,
-            timestamp=datetime.now()
+            earned_at=datetime.now(UTC)
         )
     )
     await test_db_session.commit()

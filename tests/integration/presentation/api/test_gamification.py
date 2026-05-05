@@ -11,12 +11,13 @@ import pytest
 from src.domain.entities.case import Case
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
 from src.infrastructure.database.models import (
+    Advisor,
     PointLedger,
     StudentStatusHistory,
     Task,
     Case as OrmCase,
-    Advisor,
 )
+from src.presentation.api.auth import Scope, User
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -47,10 +48,18 @@ async def test_draft_review_points(
     student_repository: StudentRepository,
     case_repository: CaseRepository,
     test_db_session: AsyncSession,
+    mock_user: User,
 ) -> None:
     """Verify that /cases/{cid}/draft/review awards 7 points for a Critical student (<12h)."""
     sid = uuid4()
     cid = uuid4()
+
+    # Seed Advisor profile safely
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
+        mock_user.id, mock_user.email, "Mock Advisor"
+    )
+
     await student_repository.ingest_students(
         [
             {
@@ -97,14 +106,21 @@ async def test_idempotency_prevents_duplicate_review_points(
     student_repository: StudentRepository,
     case_repository: CaseRepository,
     test_db_session: AsyncSession,
+    mock_user: User,
 ) -> None:
     """Verify that submitting the same Idempotency-Key twice does not double-award points."""
     sid = uuid4()
     cid = uuid4()
     idemp_key = str(uuid4())
 
+    # Seed Advisor profile safely
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
+        mock_user.id, mock_user.email, "Mock Advisor"
+    )
     # Arrange
     await student_repository.ingest_students(
+
         [{'sid': sid, 'student_name': 'Idemp', 'email': 'i@ex.com'}]
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
@@ -138,11 +154,19 @@ async def test_duplicate_action_guard_prevents_double_points(
     student_repository: StudentRepository,
     case_repository: CaseRepository,
     test_db_session: AsyncSession,
+    mock_user: User,
 ) -> None:
     """Verify that the domain-level duplicate guard prevents double points even without Idempotency-Key."""
     sid = uuid4()
     cid = uuid4()
+
+    # Seed Advisor profile safely
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
+        mock_user.id, mock_user.email, "Mock Advisor"
+    )
     await student_repository.ingest_students(
+
         [
             {
                 'sid': sid,
@@ -176,11 +200,19 @@ async def test_email_sent_points(
     student_repository: StudentRepository,
     case_repository: CaseRepository,
     test_db_session: AsyncSession,
+    mock_user: User,
 ) -> None:
     """Verify that sending an email awards points."""
     sid = uuid4()
     cid = uuid4()
+
+    # Seed Advisor profile safely
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
+        mock_user.id, mock_user.email, "Mock Advisor"
+    )
     await student_repository.ingest_students(
+
         [
             {
                 'sid': sid,
@@ -231,11 +263,19 @@ async def test_status_change_points(
     student_repository: StudentRepository,
     case_repository: CaseRepository,
     test_db_session: AsyncSession,
+    mock_user: User,
 ) -> None:
     """Verify that changing status to booked/resolved awards points."""
     sid = uuid4()
     cid = uuid4()
+
+    # Seed Advisor profile safely
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
+        mock_user.id, mock_user.email, "Mock Advisor"
+    )
     await student_repository.ingest_students(
+
         [
             {
                 'sid': sid,
@@ -270,6 +310,7 @@ async def test_response_time_bonus(
     student_repository: StudentRepository,
     case_repository: CaseRepository,
     test_db_session: AsyncSession,
+    mock_user: User,
 ) -> None:
     """Verify tiered SLA multipliers (1.5x <12h, 1.2x <24h, 1.0x <72h, 0.8x >72h)."""
     sid_fast = uuid4()
@@ -277,7 +318,13 @@ async def test_response_time_bonus(
     sid_slow = uuid4()
     sid_penalty = uuid4()
 
+    # Seed Advisor profile safely
+    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
+        mock_user.id, mock_user.email, "Mock Advisor"
+    )
     cid_fast = uuid4()
+
     cid_mid = uuid4()
     cid_slow = uuid4()
     cid_penalty = uuid4()
@@ -393,11 +440,17 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
     t1, t2, t3, t4 = uuid4(), uuid4(), uuid4(), uuid4()
 
     test_db_session.add_all([
+        Advisor(advisor_id=adv1_id, name="Adv 1", email="a1@ex.com"),
+        Advisor(advisor_id=adv2_id, name="Adv 2", email="a2@ex.com"),
+    ])
+
+    test_db_session.add_all([
         OrmCase(case_id=cid1, sid=s1),
         OrmCase(case_id=cid2, sid=s2),
         OrmCase(case_id=cid3, sid=s3),
         OrmCase(case_id=cid4, sid=s4),
     ])
+
     test_db_session.add_all([
         Task(task_id=t1, case_id=cid1, action_type='send email'),
         Task(task_id=t2, case_id=cid2, action_type='send email'),
@@ -412,28 +465,28 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
                 advisor_id=adv1_id,
                 task_id=t1,
                 points=100,
-                timestamp=datetime.now(),
+                earned_at=datetime.now(UTC),
             ),
             PointLedger(
                 id=uuid4(),
                 advisor_id=adv1_id,
                 task_id=t2,
                 points=50,
-                timestamp=datetime.now(),
+                earned_at=datetime.now(UTC),
             ),
             PointLedger(
                 id=uuid4(),
                 advisor_id=adv2_id,
                 task_id=t3,
                 points=80,
-                timestamp=datetime.now(),
+                earned_at=datetime.now(UTC),
             ),
             PointLedger(
                 id=uuid4(),
                 advisor_id=adv2_id,
                 task_id=t4,
                 points=10,
-                timestamp=datetime.now() - timedelta(days=10),
+                earned_at=datetime.now(UTC) - timedelta(days=10),
             ),
         ]
     )
@@ -510,12 +563,13 @@ async def test_engagement_metrics(
     data = resp.json()
 
     # Sort by faculty to be predictable
-    data.sort(key=lambda x: x['faculty'])
+    data.sort(key=lambda x: x['major'])
 
-    assert data[0]['faculty'] == 'CS'
-    assert data[0]['sent'] == 1
-    assert data[0]['drafted'] == 1
+    assert data[0]['major'] == 'CS'
+    assert data[0]['sent_count'] == 1
+    assert data[0]['drafted_count'] == 1
 
-    assert data[1]['faculty'] == 'Math'
-    assert data[1]['sent'] == 1
-    assert data[1]['drafted'] == 1
+    assert data[1]['major'] == 'Math'
+    assert data[1]['sent_count'] == 1
+    assert data[1]['drafted_count'] == 1
+
