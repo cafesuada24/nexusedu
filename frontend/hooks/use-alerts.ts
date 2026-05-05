@@ -73,7 +73,7 @@ export function useUpdateAlertStatus() {
                 (old: any[] | undefined) => {
                     if (!old) return [];
                     return old.map((alert) =>
-                        alert.active_case_id === case_id
+                        alert.active_case_id === case_id || alert.sid === case_id
                             ? { ...alert, intervention_status: status }
                             : alert,
                     );

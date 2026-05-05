@@ -56,6 +56,21 @@ export const BackendAlertSchema = z.object({
 });
 export type BackendAlert = z.infer<typeof BackendAlertSchema>;
 
+export const BackendAlertPagedResponseSchema = z.object({
+    items: z.array(BackendAlertSchema),
+    metadata: z
+        .object({
+            total_count: z.number(),
+            limit: z.number(),
+            offset: z.number(),
+            has_next: z.boolean(),
+        })
+        .optional(),
+});
+export type BackendAlertPagedResponse = z.infer<
+    typeof BackendAlertPagedResponseSchema
+>;
+
 export const TaskItemSchema = z.object({
     case_id: z.string(),
     created_at: z.string(),
@@ -565,7 +580,11 @@ export async function fetchAlerts(): Promise<BackendAlert[]> {
         throw new Error(`Không thể lấy danh sách cảnh báo: ${message}`);
     }
     const data = await res.json();
-    return z.array(BackendAlertSchema).parse(data);
+    if (Array.isArray(data)) {
+        return z.array(BackendAlertSchema).parse(data);
+    }
+    const parsed = BackendAlertPagedResponseSchema.parse(data);
+    return parsed.items;
 }
 
 /**
@@ -597,27 +616,54 @@ export async function fetchTasks(
  * Pushes a status transition for a single student.
  */
 export async function updateAlertStatus(
-    alert_id: string,
+    case_or_alert_id: string,
     status: BackendInterventionStatus,
 ): Promise<void> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/alerts/${encodeURIComponent(alert_id)}/status`),
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status }),
-                },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Cập nhật trạng thái thất bại: ${message}`);
+    const requestBody = JSON.stringify({ status });
+    const candidateUrls = [
+        endpoint(`/alerts/${encodeURIComponent(case_or_alert_id)}`),
+        endpoint(`/alerts/${encodeURIComponent(case_or_alert_id)}/status`),
+        endpoint(`/cases/${encodeURIComponent(case_or_alert_id)}/status`),
+    ];
+
+    let lastFailure:
+        | { response: Response; detail: string; url: string }
+        | undefined;
+
+    for (const url of candidateUrls) {
+        const response = await withTimeout(
+            (signal) =>
+                authFetch(
+                    url,
+                    {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: requestBody,
+                    },
+                    signal,
+                ),
+            DEFAULT_TIMEOUT_MS,
+        );
+
+        if (response.ok) return;
+
+        const errorBody = await response.json().catch(() => ({}));
+        const detail = errorBody.detail || response.statusText;
+        lastFailure = { response, detail, url };
+
+        // Retry with the alternate endpoint if one route is not available.
+        if (response.status !== 404) {
+            break;
+        }
     }
+
+    if (!lastFailure) {
+        throw new Error("Cập nhật trạng thái thất bại: không có phản hồi từ máy chủ.");
+    }
+
+    throw new Error(
+        `Cập nhật trạng thái thất bại [${lastFailure.response.status}] (${lastFailure.url}): ${lastFailure.detail}`,
+    );
 }
 
 /**
@@ -625,17 +671,31 @@ export async function updateAlertStatus(
  */
 export async function generateAiDraftForAlert(
     alert_id: string,
+    case_id?: string | null,
 ): Promise<{ job_id?: string; status?: string }> {
-    const requestBody = JSON.stringify({ alert_id });
+    const requestBody = JSON.stringify({
+        alert_id,
+        case_id: case_id ?? undefined,
+    });
     const primaryUrl = endpoint("/ai/generate-draft");
-    const triggerUrl = endpoint(
+    const alertTriggerUrl = endpoint(
         `/alerts/${encodeURIComponent(alert_id)}/draft/trigger`,
     );
+    const caseTriggerUrl = case_id
+        ? endpoint(`/cases/${encodeURIComponent(case_id)}/email/draft`)
+        : null;
     const alternatePrimaryUrl = primaryUrl.includes("/api/v1/")
         ? primaryUrl.replace("/api/v1/ai/generate-draft", "/ai/generate-draft")
         : primaryUrl.replace("/ai/generate-draft", "/api/v1/ai/generate-draft");
     const candidateUrls = Array.from(
-        new Set([primaryUrl, alternatePrimaryUrl, triggerUrl]),
+        new Set(
+            [
+                primaryUrl,
+                alternatePrimaryUrl,
+                caseTriggerUrl,
+                alertTriggerUrl,
+            ].filter(Boolean) as string[],
+        ),
     );
 
     const executeDraftRequest = async (
