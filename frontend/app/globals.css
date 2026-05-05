@@ -184,10 +184,19 @@
     }
     body {
         @apply bg-background text-foreground antialiased;
+        overflow-x: hidden;
     }
 }
 
 @layer utilities {
+    .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
     /* Lightweight animated background blobs (CSS-only, performant)
        - replaces previous framer-motion blobs
        - transform-only animations, reduced blur, respects prefers-reduced-motion
