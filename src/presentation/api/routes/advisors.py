@@ -37,6 +37,20 @@ async def get_my_profile(
     return AdvisorProfileRead.model_validate(advisor)
 
 
+@router.get('/me/points')
+async def get_my_points(
+    user: Annotated[User, Depends(current_active_user)],
+    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+) -> dict[str, int]:
+    """Get the current user's advisor points."""
+    advisor = await advisor_repo.get_by_user_id(user.id)
+    if not advisor:
+        raise HTTPException(status_code=404, detail="Advisor profile not found")
+    
+    points = await advisor_repo.get_advisor_points(advisor.advisor_id)
+    return {"points": points}
+
+
 @router.patch('/me/profile')
 async def update_my_profile(
     update_data: dict[str, Any],
