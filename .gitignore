@@ -240,3 +240,4 @@ alembic/__pycache__/
 node_modules/
 .ai-log/session.jsonl
 >>>>>>> Stashed changes
+.gitnexus
