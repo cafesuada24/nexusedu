@@ -166,7 +166,7 @@ export default function LoginPage() {
             <p className="mt-6 text-center text-sm text-muted-foreground dark:text-slate-300">
               Chưa có tài khoản?{" "}
               <Link
-                href="#"
+                href="/contact-admin"
                 className="font-medium text-primary hover:underline dark:text-blue-400 dark:hover:text-blue-300"
               >
                 Liên hệ quản trị viên
