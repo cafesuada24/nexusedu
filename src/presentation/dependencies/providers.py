@@ -10,9 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.commands.agent_commands import AgentCommandHandler
 from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
+from src.application.interfaces.advisor_query_service import AdvisorQueryService
 from src.application.interfaces.case_query_service import CaseQueryService
-from src.application.queries.alert_queries import AlertQueryHandler
 from src.application.queries.advisor_queries import AdvisorQueryHandler
+from src.application.queries.alert_queries import AlertQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
@@ -36,6 +37,9 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
+from src.infrastructure.persistance.query_services.advisor_query_service import (
+    SqlAlchemyAdvisorQueryService,
+)
 from src.infrastructure.persistance.query_services.case_query_service import (
     SqlAlchemyCaseQueryService,
 )
@@ -216,6 +220,12 @@ async def get_case_query_service(
         gamification_service=gamification_service,
     )
 
+async def get_advisor_query_service(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> AdvisorQueryService:
+    return SqlAlchemyAdvisorQueryService(session=session)
+
+
 
 async def get_case_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
@@ -259,10 +269,12 @@ async def get_alert_query_handler(
 async def get_advisor_query_handler(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
-    arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+    advisor_query_service: Annotated[AdvisorQueryService, Depends(get_advisor_query_service)],
 ) -> AdvisorQueryHandler:
     """Dependency provider for the AdvisorQueryHandler."""
-    return AdvisorQueryHandler(advisor_repo, badge_repo, arq_pool)
+    return AdvisorQueryHandler(
+        advisor_repo, badge_repo, advisor_query_service=advisor_query_service
+    )
 
 
 async def get_case_query_handler(

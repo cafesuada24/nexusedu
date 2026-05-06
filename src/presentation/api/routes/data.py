@@ -24,7 +24,7 @@ async def ingest_data(
     request: DataIngestionRequest,
     command_handler: Annotated[DataCommandHandler, Depends(get_data_command_handler)],
     idempotency_repo: Annotated[IdempotencyRepository, Depends(get_idempotency_repository)],
-    user: Annotated[User, Depends(require_scope(Scope.DATA_INGEST))],
+    _: Annotated[User, Depends(require_scope(Scope.DATA_INGEST))],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> dict[str, Any]:
     """Ingest multi-source data from JSON payload.
@@ -55,10 +55,9 @@ async def ingest_data(
                 )
 
 
-        auto_draft = getattr(user.preferences, 'auto_draft_enabled', True)
-        command = DataIngestionCommand(data_sources=data_sources, auto_generate_draft_email=auto_draft)
+        command = DataIngestionCommand(data_sources=data_sources)
 
-        results = await command_handler.handle_ingest_data(command, user.id)
+        results = await command_handler.handle_ingest_data(command)
 
         if idempotency_key:
             await idempotency_repo.record_key(UUID(idempotency_key))

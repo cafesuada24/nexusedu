@@ -4,35 +4,15 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from src.application.dtos.case_dtos import CaseDTO
+from src.application.dtos.case_dtos import (
+    CaseDTO,
+    GetAssignedQuery,
+    GetUnassignedQuery,
+)
 from src.application.dtos.student_dtos import EmailDTO
-from src.application.exceptions import AdvisorProfileNotLinkedError
 from src.application.interfaces.case_query_service import CaseQueryService
+from src.domain.exceptions import UserIsNotAnAdvisorError
 from src.domain.repositories.advisor_repository import AdvisorRepository
-
-
-@dataclass
-class GetEmailHistoryQuery:
-    """Query to retrieve communication history for a student."""
-
-    sid: UUID
-
-
-@dataclass(frozen=True)
-class GetAssignedQuery:
-    """Query to retrieve advisor task list."""
-
-    user_id: UUID
-    limit: int = 20
-    offset: int = 0
-
-
-@dataclass(frozen=True)
-class GetUnassignedQuery:
-    """Query to retrieve advisor task list."""
-
-    limit: int = 20
-    offset: int = 0
 
 
 class CaseQueryHandler:
@@ -51,9 +31,9 @@ class CaseQueryHandler:
         query: GetAssignedQuery,
     ) -> tuple[list[CaseDTO], int]:
         """Execute the get task list query."""
-        advisor = await self._advisor_repo.get_by_user_id(query.user_id)
+        advisor = await self._advisor_repo.find_by_user_id(query.user_id)
         if advisor is None:
-            raise AdvisorProfileNotLinkedError(user_id=query.user_id)
+            raise UserIsNotAnAdvisorError(user_id=query.user_id)
 
         return await self._case_query_service.find_assigned_to(
             advisor_id=advisor.advisor_id,
@@ -74,7 +54,7 @@ class CaseQueryHandler:
 
     async def handle_get_email_history(
         self,
-        query: GetEmailHistoryQuery,
+        sid: UUID,
     ) -> list[EmailDTO]:
         """Execute the get email history query."""
         return []
@@ -94,7 +74,7 @@ class CaseQueryHandler:
 
     async def handle_get_case_details(self, case_id: UUID) -> dict[str, Any]:
         """Retrieve full details of a specific case, including its associated email."""
-        return []
+        return {}
         # case = await self.case_repo.get_by_id(case_id)
         # if not case:
         #     raise ValueError(f'Case {case_id} not found.')

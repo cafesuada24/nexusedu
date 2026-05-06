@@ -5,10 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from src.application.commands.case_commands import (
-    CaseCommandHandler,
-    TriggerDraftCommand,
-)
+from src.application.commands.case_commands import CaseCommandHandler
 from src.application.dtos.data_dtos import DataIngestionCommand
 from src.core.logger import logger
 from src.domain.entities.case import Case
@@ -42,11 +39,7 @@ class DataCommandHandler:
         self.anomaly_engine = anomaly_engine
         self.case_command_handler = case_command_handler
 
-    async def handle_ingest_data(
-        self,
-        command: DataIngestionCommand,
-        user_id: UUID,
-    ) -> Mapping[str, Any]:
+    async def handle_ingest_data(self, command: DataIngestionCommand) -> Mapping[str, Any]:
         """Execute the data ingestion command with orchestration."""
         results: list[str] = []
 
@@ -68,20 +61,6 @@ class DataCommandHandler:
         triggered_jobs: list[dict[str, Any]] = []
         db_updates: list[tuple[UUID, str, UUID | None, str | None]] = []
 
-        if command.auto_generate_draft_email:
-            for sid, case_id in new_sids:
-                trigger_command = TriggerDraftCommand(
-                    case_id=case_id,
-                    user_id=user_id,
-                    update_db=False,
-                )
-                job_id = await self.case_command_handler.handle_trigger_draft(
-                    trigger_command,
-                )
-                triggered_jobs.append({'sid': sid, 'job_id': job_id})
-                db_updates.append((job_id, 'email_draft', case_id, 'case'))
-
-        # Batch create job tracking records
         if db_updates:
             await self.job_repo.batch_create_jobs(db_updates)
 

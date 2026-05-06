@@ -43,29 +43,6 @@ from src.presentation.schemas.request import SendEmailRequest, StatusUpdate
 router = APIRouter(prefix='/cases', tags=['cases'])
 
 
-@router.get('/student/{sid}', response_model=list[CaseDTO])
-async def get_case_history(
-    sid: str,
-    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-    _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
-) -> list[dict[str, Any]]:
-    """Retrieve historical cases for a specific student."""
-    try:
-        cases = await case_repo.get_student_cases(UUID(sid))
-        return [
-            {
-                'case_id': str(c.case_id),
-                'sid': str(c.sid),
-                'status': c.status.value,
-                'created_at': c.created_at.isoformat(),
-                'resolved_at': c.closed_at.isoformat() if c.closed_at else None,
-            }
-            for c in cases
-        ]
-    except Exception as e:
-        logger.error(f'Error in get_case_history: {str(e)}', exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
 
 @router.get('/open')
 async def get_open_cases_list(

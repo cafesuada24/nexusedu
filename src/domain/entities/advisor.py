@@ -9,9 +9,9 @@ class Advisor:
     """Represents an academic advisor."""
 
     advisor_id: UUID
+    user_id: UUID | None
     name: str
     email: str
-    user_id: UUID | None = None
     title: str | None = None
     phone: str | None = None
     faculty: str | None = None
