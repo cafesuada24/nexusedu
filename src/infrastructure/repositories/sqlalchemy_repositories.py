@@ -929,7 +929,7 @@ class SqlAlchemyMetricsRepository:
         active_advisors_res = await self.session.execute(active_advisors_stmt)
         active_advisors = active_advisors_res.scalar() or 0
 
-        total_advisors_stmt = select(func.count(Advisor.advisor_id))
+        total_advisors_stmt = select(func.count(OrmAdvisor.advisor_id))
         total_advisors_res = await self.session.execute(total_advisors_stmt)
         total_advisors = total_advisors_res.scalar() or 1
 

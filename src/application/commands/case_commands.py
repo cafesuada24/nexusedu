@@ -13,6 +13,7 @@ from src.application.dtos.case_dtos import (
     UpdateStudentStatusCommand,
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
+from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.core.logger import logger
 from src.domain.exceptions import UserIsNotAnAdvisorError
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -43,6 +44,7 @@ class CaseCommandHandler:
         job_repo: JobRepository,
         gamification_service: GamificationService,
         task_queue: BackgroundTaskQueue,
+        point_ledger_query_service: PointLedgerQueryService,
         task_repo: TaskRepository | None = None,
         email_drafting_service: EmailDraftingService | None = None,
         badge_repo: BadgeRepository | None = None,
@@ -53,6 +55,7 @@ class CaseCommandHandler:
         self.case_repo = case_repo
         self.advisor_repo = advisor_repo
         self.job_repo = job_repo
+        self.__point_ledger_query_service = point_ledger_query_service
         self.gamification_service = gamification_service
         self.email_drafting_service = email_drafting_service
         self.task_queue = task_queue
@@ -73,10 +76,17 @@ class CaseCommandHandler:
 
         student = await self.student_repo.get_by_id(case.sid)
 
-        self.gamification_service.calculate_points(
+        points = self.gamification_service.calculate_points(
             GamificationService.Action.ACCEPT_TASK,
             case.assigned_at,
             student.current_risk_status,
+        )
+
+        await self.__point_ledger_query_service.award_points(
+            advisor_id=advisor.advisor_id,
+            task_id=uuid4(),
+            points=points,
+            earned_at=datetime.now(UTC),
         )
 
         # if command.auto_generate_draft_email:
@@ -131,7 +141,6 @@ class CaseCommandHandler:
         ):
             case.fail(now)
 
-
         await self.case_repo.save(case)
         # Gamification hooks for status changes
         if command.status == InterventionStatus.BOOKED:
@@ -161,16 +170,14 @@ class CaseCommandHandler:
     async def handle_trigger_draft(self, command: TriggerDraftCommand) -> UUID:
         """Execute the trigger draft command."""
         case = await self.case_repo.get_by_id(command.case_id)
-        if not case:
-            raise ValueError(f'Case {command.case_id} not found.')
+        advisor = await self.advisor_repo.find_by_user_id(command.user_id)
+        if advisor is None:
+            raise UserIsNotAnAdvisorError(command.user_id)
 
-        advisor_id = await self._resolve_advisor_id(command.user_id)
 
         # 1. Check for existing email record for this case
         existing_email = await self.email_repo.get_by_case(case.case_id)
-        if existing_email:
-            # If already generating or drafted, we might want to skip or just return current job
-            if existing_email.status.value == 'generating':
+        if existing_email and existing_email.status.value == 'generating':
                 # Already in progress, just find the job_id
                 active_job = await self.job_repo.get_active_job(
                     case.case_id,
@@ -185,7 +192,7 @@ class CaseCommandHandler:
             await self.email_repo.create_placeholder(
                 case.case_id,
                 case.sid,
-                advisor_id,
+                advisor.advisor_id,
             )
         else:
             await self.email_repo.update_content(
@@ -313,25 +320,3 @@ class CaseCommandHandler:
         """Resolve an advisor_id from a user_id."""
         advisor = await self.advisor_repo.find_by_user_id(user_id)
         return advisor.advisor_id if advisor else None
-
-    async def _award_points(
-        self,
-        advisor_id: UUID,
-        task_id: UUID,
-        points: int,
-    ) -> None:
-        """Orchestrate awarding points for a completed task."""
-
-        # if await self.advisor_repo.has_existing_reward(advisor_id, task_id):
-        #     logger.info(
-        #         f'Gamification: Reward already recorded for advisor {advisor_id} and task {task_id}. Skipping.',
-        #     )
-        #     return
-        #
-        # if points > 0:
-        #     await self.advisor_repo.record_points(advisor_id, task_id, points)
-        #     if self.badge_repo:
-        #         # Trigger background task to evaluate badges without blocking API
-        #         await self.task_queue.enqueue(
-        #             'run_evaluate_badges_task', advisor_id=str(advisor_id)
-        #         )

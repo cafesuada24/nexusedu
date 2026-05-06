@@ -12,6 +12,7 @@ from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.interfaces.advisor_query_service import AdvisorQueryService
 from src.application.interfaces.case_query_service import CaseQueryService
+from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.alert_queries import AlertQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
@@ -42,6 +43,9 @@ from src.infrastructure.persistance.query_services.advisor_query_service import 
 )
 from src.infrastructure.persistance.query_services.case_query_service import (
     SqlAlchemyCaseQueryService,
+)
+from src.infrastructure.persistance.query_services.point_ledger_query_service import (
+    SqlAlchemyPointLedgerQueryService,
 )
 from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.repositories.sqlalchemy_repositories import (
@@ -207,6 +211,12 @@ async def get_badge_repository(
 #     )
 
 
+async def get_point_ledger_query_service(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> PointLedgerQueryService:
+    return SqlAlchemyPointLedgerQueryService(session=session)
+
+
 async def get_case_query_service(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     gamification_service: Annotated[
@@ -220,11 +230,11 @@ async def get_case_query_service(
         gamification_service=gamification_service,
     )
 
+
 async def get_advisor_query_service(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> AdvisorQueryService:
     return SqlAlchemyAdvisorQueryService(session=session)
-
 
 
 async def get_case_command_handler(
@@ -240,6 +250,9 @@ async def get_case_command_handler(
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
     task_repo: Annotated[TaskRepository, Depends(get_task_repository)],
+    point_ledger_query_service: Annotated[
+        PointLedgerQueryService, Depends(get_point_ledger_query_service),
+    ],
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
     task_queue = ArqTaskQueueAdapter(arq_pool)
@@ -254,6 +267,7 @@ async def get_case_command_handler(
         task_repo=task_repo,
         email_drafting_service=BamlEmailDraftingService(),
         badge_repo=badge_repo,
+        point_ledger_query_service=point_ledger_query_service,
     )
 
 
@@ -269,7 +283,9 @@ async def get_alert_query_handler(
 async def get_advisor_query_handler(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
-    advisor_query_service: Annotated[AdvisorQueryService, Depends(get_advisor_query_service)],
+    advisor_query_service: Annotated[
+        AdvisorQueryService, Depends(get_advisor_query_service)
+    ],
 ) -> AdvisorQueryHandler:
     """Dependency provider for the AdvisorQueryHandler."""
     return AdvisorQueryHandler(
@@ -280,11 +296,17 @@ async def get_advisor_query_handler(
 async def get_case_query_handler(
     case_query_service: Annotated[CaseQueryService, Depends(get_case_query_service)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
+    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
+    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
+    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
 ) -> CaseQueryHandler:
     """Dependency provider for the CaseQueryHandler."""
     return CaseQueryHandler(
         case_query_service=case_query_service,
         advisor_repo=advisor_repo,
+        case_repo=case_repo,
+        job_repo=job_repo,
+        email_repo=email_repo,
     )
 
 
