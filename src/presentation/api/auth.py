@@ -20,6 +20,7 @@ from fastapi_users.db import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import config
+from src.core.logger import logger
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.infrastructure.database.models import User
@@ -117,7 +118,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         _request: Request | None = None,
     ) -> None:
         """Callback triggered after a user successfully registers."""
-        print(f'User {user.id} has registered.')
+        logger.info(f'User {user.id} has registered.')
         await self._user_setting_db.create_user_settings(user.id)
 
         if user.role == UserRole.ADVISOR.value:
