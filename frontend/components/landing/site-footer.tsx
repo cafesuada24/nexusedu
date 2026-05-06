@@ -21,8 +21,8 @@ const cols = [
   {
     title: "Công ty",
     links: [
-      { href: "#", label: "Về NexusEdu" },
-      { href: "#", label: "Liên hệ" },
+      { href: "/about", label: "Về NexusEdu" },
+      { href: "/contact", label: "Liên hệ" },
     ],
   },
 ]
