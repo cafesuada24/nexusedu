@@ -114,6 +114,6 @@ class CaseDTO(BaseModel):
     email: EmailStr
     draft_subject: str | None
     draft_body: str | None
-    draft_status: str
+    draft_status: str | None
 
     points_reward: int
