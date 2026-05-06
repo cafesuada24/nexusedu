@@ -14,15 +14,15 @@ const cols = [
     title: "Tài liệu",
     links: [
       { href: "/docs/csv-import", label: "Hướng dẫn CSV" },
-      { href: "#", label: "Bảo mật dữ liệu" },
-      { href: "#", label: "Trung tâm hỗ trợ" },
+      { href: "/docs/privacy", label: "Bảo mật dữ liệu" },
+      { href: "/docs/help", label: "Trung tâm hỗ trợ" },
     ],
   },
   {
     title: "Công ty",
     links: [
-      { href: "#", label: "Về NexusEdu" },
-      { href: "#", label: "Liên hệ" },
+      { href: "/about", label: "Về NexusEdu" },
+      { href: "/contact", label: "Liên hệ" },
     ],
   },
 ]
