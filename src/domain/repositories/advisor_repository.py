@@ -27,6 +27,10 @@ class AdvisorRepository(Protocol):
         ...
 
     async def find_by_user_id(self, user_id: UUID) -> Advisor | None:
+        """Find an advisor by their associated user ID."""
+        ...
+
+    async def get_by_user_id(self, user_id: UUID) -> Advisor:
         """Retrieve an advisor by their associated user ID."""
         ...
 
