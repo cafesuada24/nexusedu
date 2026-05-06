@@ -19,6 +19,7 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker, get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
+from src.infrastructure.persistance.query_services.point_ledger_query_service import SqlAlchemyPointLedgerQueryService
 from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
@@ -49,6 +50,7 @@ async def run_email_draft_task(
         case_repo = SqlAlchemyCaseRepository(session)
         email_repo = SqlAlchemyEmailRepository(session)
         job_repo = SqlAlchemyJobRepository(session)
+        point_ledger_query_service = SqlAlchemyPointLedgerQueryService(session)
 
         # Domain Service
         gamification_service = GamificationService()
@@ -67,6 +69,7 @@ async def run_email_draft_task(
             gamification_service=gamification_service,
             task_queue=task_queue,
             email_drafting_service=BamlEmailDraftingService(),
+            point_ledger_query_service=point_ledger_query_service,
         )
 
         command = GenerateEmailDraftCommand(
