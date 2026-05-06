@@ -8,14 +8,12 @@ const cols = [
       { href: "#features", label: "Tính năng" },
       { href: "#how", label: "Cách hoạt động" },
       { href: "#metrics", label: "Hiệu quả" },
-      { href: "/dashboard", label: "Dashboard" },
     ],
   },
   {
     title: "Tài liệu",
     links: [
-      { href: "#", label: "Hướng dẫn CSV" },
-      { href: "#", label: "API cho trường học" },
+      { href: "/docs/csv-import", label: "Hướng dẫn CSV" },
       { href: "#", label: "Bảo mật dữ liệu" },
       { href: "#", label: "Trung tâm hỗ trợ" },
     ],
@@ -24,8 +22,6 @@ const cols = [
     title: "Công ty",
     links: [
       { href: "#", label: "Về NexusEdu" },
-      { href: "#", label: "Đối tác giáo dục" },
-      { href: "#", label: "Tuyển dụng" },
       { href: "#", label: "Liên hệ" },
     ],
   },
