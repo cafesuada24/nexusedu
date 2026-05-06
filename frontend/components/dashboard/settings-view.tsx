@@ -193,8 +193,8 @@ export function SettingsView() {
     };
 
     const profileInputClass =
-        "h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-900 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0";
-    const profileLabelClass = "text-slate-700 font-semibold";
+        "h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-900 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-none dark:focus-visible:border-blue-500 dark:focus-visible:ring-blue-500/40";
+    const profileLabelClass = "text-slate-700 font-semibold dark:text-slate-300";
 
     React.useEffect(() => {
         if (!dataset) return;
@@ -281,7 +281,7 @@ export function SettingsView() {
 
             {/* Profile */}
             <TabsContent value="profile" className="grid gap-6">
-                <Card className="stripe-sky rounded-2xl border-accent-sky/15 bg-gradient-to-br from-accent-sky/22 via-accent-sky/10 to-card">
+                <Card className="stripe-sky rounded-2xl border-accent-sky/15 bg-gradient-to-br from-accent-sky/22 via-accent-sky/10 to-card dark:border-slate-800 dark:bg-slate-950/50 dark:from-slate-950/90 dark:via-slate-950/70 dark:to-slate-900/50">
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2">
                             <User className="size-4 text-primary" />
@@ -298,7 +298,7 @@ export function SettingsView() {
                         ) : (
                         <Form {...form}>
                             <form id="settings-profile-form" onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
-                                <div className="flex items-center gap-4 rounded-xl border border-slate-200/80 bg-white/70 p-3">
+                                <div className="flex items-center gap-4 rounded-xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-900/80">
                                     <div className="grid size-20 place-items-center rounded-2xl bg-primary/10 text-primary text-2xl font-semibold ring-2 ring-primary/20">
                                         {profile?.name ? profile.name.slice(0,2).toUpperCase() : "AD"}
                                     </div>
@@ -307,7 +307,7 @@ export function SettingsView() {
                                             type="button"
                                             variant="outline"
                                             size="sm"
-                                            className="h-10 rounded-lg border-slate-300 bg-white px-4 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                                            className="h-10 rounded-lg border-slate-300 bg-white px-4 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-slate-100"
                                             onClick={() => toast.info("Đang phát triển", { description: "Tính năng tải ảnh đang được cập nhật." })}
                                         >
                                             <Upload className="size-4" />
@@ -363,7 +363,7 @@ export function SettingsView() {
                                             type="email"
                                             value={profile?.email || ""}
                                             disabled
-                                            className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-600 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 disabled:cursor-not-allowed disabled:opacity-100"
+                                            className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-600 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 disabled:cursor-not-allowed disabled:opacity-100 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300 dark:placeholder:text-slate-500 dark:shadow-none"
                                         />
                                     </div>
                                     <FormField
@@ -395,7 +395,7 @@ export function SettingsView() {
                                                 <FormLabel className={profileLabelClass}>Khoa</FormLabel>
                                                 <Select onValueChange={field.onChange} value={field.value || "cntt"}>
                                                     <FormControl>
-                                                        <SelectTrigger className={profileInputClass}>
+                                                        <SelectTrigger className={`${profileInputClass} [&_svg]:text-slate-500 dark:[&_svg]:text-slate-400`}>
                                                             <SelectValue placeholder="Chọn khoa" />
                                                         </SelectTrigger>
                                                     </FormControl>
@@ -443,9 +443,9 @@ export function SettingsView() {
                                                         value={field.value || ""}
                                                         maxLength={280}
                                                         placeholder="Viết ngắn gọn về chuyên môn, lĩnh vực hỗ trợ và cách sinh viên nên liên hệ..."
-                                                        className="min-h-36 rounded-xl border border-slate-300 bg-white px-4 py-3 pr-16 text-slate-900 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0"
+                                                        className="min-h-36 rounded-xl border border-slate-300 bg-white px-4 py-3 pr-16 text-slate-900 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-none dark:focus-visible:border-blue-500 dark:focus-visible:ring-blue-500/40"
                                                     />
-                                                    <span className="pointer-events-none absolute bottom-2 right-3 font-mono text-[11px] text-slate-500">
+                                                    <span className="pointer-events-none absolute bottom-2 right-3 font-mono text-[11px] text-slate-500 dark:text-slate-500">
                                                         {(field.value || "").length}/280
                                                     </span>
                                                 </div>
