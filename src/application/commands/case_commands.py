@@ -235,8 +235,6 @@ class CaseCommandHandler:
         try:
             # 1. Fetch case and student info
             case = await self.case_repo.get_by_id(command.case_id)
-            if not case:
-                raise ValueError(f'Case {command.case_id} not found.')
 
             student_data = await self.student_repo.get_pii(case.sid)
             if not student_data:
