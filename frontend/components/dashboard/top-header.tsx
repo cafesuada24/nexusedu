@@ -98,7 +98,6 @@ export function TopHeader() {
         </div>
 
         <NotificationsDropdown />
-        <ThemeToggle />
         <AdvisorScore />
         <UserDropdown />
       </div>
