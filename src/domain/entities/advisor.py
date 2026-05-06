@@ -11,7 +11,6 @@ class Advisor:
     advisor_id: UUID
     name: str
     email: str
-    user_id: UUID | None = None
     title: str | None = None
     phone: str | None = None
     faculty: str | None = None
