@@ -13,7 +13,7 @@ const cols = [
   {
     title: "Tài liệu",
     links: [
-      { href: "#", label: "Hướng dẫn CSV" },
+      { href: "/docs/csv-import", label: "Hướng dẫn CSV" },
       { href: "#", label: "Bảo mật dữ liệu" },
       { href: "#", label: "Trung tâm hỗ trợ" },
     ],
