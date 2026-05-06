@@ -30,7 +30,6 @@ import { z } from "zod";
 export const BackendInterventionStatusSchema = z.enum([
     "none",
     "notified",
-    "accepted",
     "sent",
     "booked",
     "supporting",
@@ -616,53 +615,38 @@ export async function fetchTasks(
  * Pushes a status transition for a single student.
  */
 export async function updateAlertStatus(
-    case_or_alert_id: string,
+    case_id: string,
     status: BackendInterventionStatus,
 ): Promise<void> {
     const requestBody = JSON.stringify({ status });
-    const candidateUrls = [
-        endpoint(`/alerts/${encodeURIComponent(case_or_alert_id)}`),
-        endpoint(`/alerts/${encodeURIComponent(case_or_alert_id)}/status`),
-        endpoint(`/cases/${encodeURIComponent(case_or_alert_id)}/status`),
-    ];
+    const url = endpoint(`/cases/${encodeURIComponent(case_id)}/status`);
+    const response = await withTimeout(
+        (signal) =>
+            authFetch(
+                url,
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: requestBody,
+                },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
 
-    let lastFailure:
-        | { response: Response; detail: string; url: string }
-        | undefined;
+    if (response.ok) return;
 
-    for (const url of candidateUrls) {
-        const response = await withTimeout(
-            (signal) =>
-                authFetch(
-                    url,
-                    {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: requestBody,
-                    },
-                    signal,
-                ),
-            DEFAULT_TIMEOUT_MS,
-        );
-
-        if (response.ok) return;
-
-        const errorBody = await response.json().catch(() => ({}));
-        const detail = errorBody.detail || response.statusText;
-        lastFailure = { response, detail, url };
-
-        // Retry with the alternate endpoint if one route is not available.
-        if (response.status !== 404) {
-            break;
-        }
+    const errorText = await response.text().catch(() => "");
+    let errorBody = {};
+    try {
+        errorBody = JSON.parse(errorText);
+    } catch {
+        // It might be a plain text error
     }
 
-    if (!lastFailure) {
-        throw new Error("Cập nhật trạng thái thất bại: không có phản hồi từ máy chủ.");
-    }
-
+    const detail = errorBody.detail || errorText || response.statusText;
     throw new Error(
-        `Cập nhật trạng thái thất bại [${lastFailure.response.status}] (${lastFailure.url}): ${lastFailure.detail}`,
+        `Cập nhật trạng thái thất bại [${response.status}] (${url}): ${detail}`,
     );
 }
 

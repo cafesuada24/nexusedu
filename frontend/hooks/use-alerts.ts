@@ -53,10 +53,15 @@ export function useUpdateAlertStatus() {
         }: {
             case_id: string;
             status: BackendInterventionStatus;
+            sid?: string;
         }) => updateAlertStatus(case_id, status),
 
         // Optimistic Update logic
-        onMutate: async ({ case_id, status }) => {
+        onMutate: async ({ case_id, status, sid }: {
+            case_id: string;
+            status: BackendInterventionStatus;
+            sid?: string;
+        }) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
             await queryClient.cancelQueries({
                 queryKey: queryKeys.alerts.list(),
@@ -73,7 +78,7 @@ export function useUpdateAlertStatus() {
                 (old: any[] | undefined) => {
                     if (!old) return [];
                     return old.map((alert) =>
-                        alert.active_case_id === case_id || alert.sid === case_id
+                        alert.active_case_id === case_id || alert.sid === sid
                             ? { ...alert, intervention_status: status }
                             : alert,
                     );
@@ -92,8 +97,15 @@ export function useUpdateAlertStatus() {
                     context.previousAlerts,
                 );
             }
+            const message =
+                err instanceof Error && err.message
+                    ? err.message
+                    : "Vui lòng thử lại sau.";
+            const notFound = message.includes("[404]") || /not found/i.test(message);
             toast.error("Không thể cập nhật trạng thái", {
-                description: "Vui lòng thử lại sau.",
+                description: notFound
+                    ? "Không tìm thấy case hợp lệ cho sinh viên này. Vui lòng tải lại danh sách."
+                    : message,
             });
         },
 

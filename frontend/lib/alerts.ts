@@ -189,7 +189,7 @@ export function toBackendStatus(s: CaseStatus): BackendInterventionStatus {
         case "new":
             return "notified";
         case "accepted":
-            return "accepted";
+            return "notified";
         case "contacted":
             return "sent";
         case "scheduled":
