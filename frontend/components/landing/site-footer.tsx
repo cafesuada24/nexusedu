@@ -15,7 +15,7 @@ const cols = [
     links: [
       { href: "/docs/csv-import", label: "Hướng dẫn CSV" },
       { href: "/docs/privacy", label: "Bảo mật dữ liệu" },
-      { href: "#", label: "Trung tâm hỗ trợ" },
+      { href: "/docs/help", label: "Trung tâm hỗ trợ" },
     ],
   },
   {
