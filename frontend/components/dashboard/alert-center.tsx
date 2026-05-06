@@ -53,6 +53,10 @@ export function AlertCenter() {
     const [aiDraftReadyById, setAiDraftReadyById] = React.useState<
         Record<string, boolean>
     >({});
+    const [recentlyMoved, setRecentlyMoved] = React.useState<{
+        alertId: string;
+        status: CaseStatus;
+    } | null>(null);
     const [canScrollLeft, setCanScrollLeft] = React.useState(false);
     const [canScrollRight, setCanScrollRight] = React.useState(false);
     const { dataset } = useDataset();
@@ -238,6 +242,21 @@ export function AlertCenter() {
         [grouped, aiDraftingById],
     );
 
+    const markRecentlyMoved = React.useCallback(
+        (alertId: string, status: CaseStatus) => {
+            setRecentlyMoved({ alertId, status });
+        },
+        [],
+    );
+
+    React.useEffect(() => {
+        if (!recentlyMoved) return;
+        const timeoutId = window.setTimeout(() => {
+            setRecentlyMoved(null);
+        }, 3200);
+        return () => window.clearTimeout(timeoutId);
+    }, [recentlyMoved]);
+
     const resolveCaseIdForAlert = async (a: Alert): Promise<string | null> => {
         if (a.caseId) return a.caseId;
         try {
@@ -276,6 +295,7 @@ export function AlertCenter() {
                 { case_id: caseId, status: toBackendStatus(status), sid },
                 {
                     onSuccess: () => {
+                        markRecentlyMoved(a.id, status);
                         setAiDraftErrorById((prev) => {
                             if (!prev[a.id]) return prev;
                             const next = { ...prev };
@@ -342,6 +362,7 @@ export function AlertCenter() {
             { case_id: caseId, status: toBackendStatus(status), sid },
             {
                 onSuccess: () => {
+                    markRecentlyMoved(a.id, status);
                     if (message) toast.success(message);
                 },
             },
@@ -508,6 +529,12 @@ export function AlertCenter() {
                                     column={col}
                                     items={grouped[col.id]}
                                     totalInColumn={totalCounts[col.id]}
+                                    highlightedAlertId={
+                                        recentlyMoved?.status === col.id
+                                            ? recentlyMoved.alertId
+                                            : null
+                                    }
+                                    isActivated={recentlyMoved?.status === col.id}
                                     isCollapsed={collapsedCols[col.id]}
                                     isExpanded={expandedCols[col.id]}
                                     onToggleCollapse={toggleCollapse}
