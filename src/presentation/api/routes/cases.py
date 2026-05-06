@@ -33,7 +33,6 @@ from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
     get_case_command_handler,
     get_case_query_handler,
-    get_case_repository,
     get_email_repository,
     get_idempotency_repository,
 )
@@ -168,7 +167,7 @@ class TriggerDraftRequest(BaseModel):
 
 @router.post('/{case_id}/email/draft', status_code=202)
 async def trigger_draft(
-    case_id: str,
+    case_id: UUID,
     request: TriggerDraftRequest,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     idempotency_repo: Annotated[
@@ -189,7 +188,7 @@ async def trigger_draft(
                 }
 
         command = TriggerDraftCommand(
-            case_id=UUID(case_id),
+            case_id=case_id,
             user_id=user.id,
             booking_link=request.booking_link,
         )
@@ -238,13 +237,13 @@ async def review_draft(
 
 @router.get('/{case_id}/email/draft')
 async def get_email_draft(
-    case_id: str,
+    case_id: UUID,
     query_handler: Annotated[CaseQueryHandler, Depends(get_case_query_handler)],
     _: Annotated[User, Depends(require_scope(Scope.ALERTS_READ))],
 ) -> dict[str, Any]:
     """Retrieve the current AI draft status and content for a case."""
     try:
-        return await query_handler.handle_get_draft_status(UUID(case_id))
+        return await query_handler.handle_get_draft_status(case_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
@@ -283,7 +282,6 @@ async def send_nudge_email(
     request: SendEmailRequest,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
-    session: Annotated[AsyncSession, Depends(get_async_session)],
     idempotency_repo: Annotated[
         IdempotencyRepository,
         Depends(get_idempotency_repository),
@@ -311,9 +309,6 @@ async def send_nudge_email(
         if idemp_key:
             await idempotency_repo.record_key(idemp_key)
 
-        # Explicitly commit the transaction before performing external I/O
-        await session.commit()
-
         # 3. External I/O: Send the email AFTER the DB commit succeeds
         logger.info(
             f'DISPATCHING EMAIL for case {case_id} to {target_email}: {request.body[:50]}...',
@@ -330,19 +325,19 @@ async def send_nudge_email(
 
 @router.post('/{case_id}/accept')
 async def accept_task(
-    case_id: str,
+    case_id: UUID,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.CASE_ACCEPT))],
 ) -> dict[str, str]:
     """An advisor accept to solve a case."""
     try:
         command = AcceptCaseCommand(
-            case_id=UUID(case_id),
+            case_id=case_id,
             user_id=user.id,
             accepted_at=datetime.now(UTC),
         )
         await command_handler.handle_accept_case(command)
-        return {'status': 'success', 'task_id': case_id}
+        return {'status': 'success', 'task_id': str(case_id)}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except PermissionError as e:
