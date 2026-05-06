@@ -19,6 +19,8 @@ type KanbanColumnProps = {
   column: ColumnDef
   items: Alert[]
   totalInColumn: number
+  highlightedAlertId?: string | null
+  isActivated?: boolean
   isCollapsed: boolean
   isExpanded: boolean
   onToggleCollapse: (id: CaseStatus) => void
@@ -36,6 +38,8 @@ export function KanbanColumn({
   column: col,
   items,
   totalInColumn,
+  highlightedAlertId,
+  isActivated,
   isCollapsed,
   isExpanded,
   onToggleCollapse,
@@ -54,31 +58,40 @@ export function KanbanColumn({
     <section
       role="listitem"
       className={cn(
-        "flex min-w-[380px] w-[380px] shrink-0 basis-[380px] flex-col rounded-2xl border border-border/60 bg-muted/30 transition-colors",
+        "flex min-w-[380px] w-[380px] shrink-0 basis-[380px] flex-col rounded-2xl border border-border/60 border-t-4 transition-all duration-300",
+        col.containerTone,
+        col.topBorderTone,
         isCollapsed ? "h-auto" : "h-full",
-        isCollapsed && "bg-muted/20",
+        isCollapsed && "opacity-95",
+        isActivated && col.columnHighlightTone,
       )}
       aria-label={col.title}
     >
-      <header className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-3">
+      <header
+        className={cn(
+          "flex items-center justify-between gap-2 border-b border-border/50 px-3 py-3",
+          col.headerTone,
+        )}
+      >
         <div className="flex min-w-0 items-center gap-2.5">
           <span
             className={cn(
-              "grid size-9 shrink-0 place-items-center rounded-lg bg-card ring-1 ring-border/60",
+              "grid size-9 shrink-0 place-items-center rounded-lg ring-1",
+              col.iconContainerTone,
               col.accent,
             )}
             aria-hidden
           >
             <ColIcon className="size-[18px]" />
           </span>
-          <p className="truncate text-base font-semibold">
+          <p className={cn("truncate text-base font-semibold", col.accent)}>
             {col.title}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <Badge
             variant="outline"
-            className="h-7 rounded-md bg-card px-2 font-mono text-sm"
+            className="h-7 rounded-md border-border/50 bg-white/80 px-2 font-mono text-sm"
           >
             {items.length}
             {items.length !== totalInColumn ? (
@@ -112,11 +125,12 @@ export function KanbanColumn({
       {isCollapsed ? null : (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
           {items.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border/60 bg-card/40 p-6 text-center">
+            <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border/60 bg-white/45 p-6 text-center">
               <span
                 aria-hidden
                 className={cn(
-                  "grid size-8 place-items-center rounded-lg bg-card opacity-60 ring-1 ring-border/60",
+                  "grid size-8 place-items-center rounded-lg opacity-75 ring-1",
+                  col.iconContainerTone,
                   col.accent,
                 )}
               >
@@ -138,6 +152,8 @@ export function KanbanColumn({
                   >
                     <KanbanCard
                       alert={a}
+                      isHighlighted={highlightedAlertId === a.id}
+                      highlightTone={col.cardHighlightTone}
                       onViewDetails={() => onViewDetails(a)}
                       onMove={(s, msg) => onMove(a, s, msg)}
                       onOpenGoals={() => onOpenGoals(a.id)}
