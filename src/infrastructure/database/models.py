@@ -87,11 +87,6 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table, integrating with FastAPI-Users."""
 
     role: Mapped[str] = mapped_column(String, default='viewer')
-    advisor_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey('advisors.advisor_id'),
-        unique=True,
-        nullable=True,
-    )
 
     preferences: Mapped[UserSettings] = relationship(
         'UserSettings',
@@ -206,6 +201,11 @@ class Advisor(Base):
         Uuid,
         primary_key=True,
         default=uuid.uuid4,
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey('user.id'),
+        unique=True,
+        nullable=True,
     )
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)

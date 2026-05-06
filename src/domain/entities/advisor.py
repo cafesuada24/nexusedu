@@ -9,6 +9,7 @@ class Advisor:
     """Represents an academic advisor."""
 
     advisor_id: UUID
+    user_id: UUID | None
     name: str
     email: str
     title: str | None = None
