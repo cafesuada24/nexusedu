@@ -30,10 +30,9 @@ async def get_my_profile(
 ) -> Any:
     """Get the current user's advisor profile."""
     from src.presentation.schemas.advisor import AdvisorProfileRead
-
     advisor = await advisor_repo.get_by_user_id(user.id)
     if not advisor:
-        raise HTTPException(status_code=404, detail='Advisor profile not found')
+        raise HTTPException(status_code=404, detail="Advisor profile not found")
     return AdvisorProfileRead.model_validate(advisor)
 
 
@@ -58,8 +57,7 @@ async def update_my_profile(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
 ) -> Any:
     """Update the current user's advisor profile."""
-    from src.presentation.schemas.advisor import AdvisorProfileRead, AdvisorProfileUpdate
-
+    from src.presentation.schemas.advisor import AdvisorProfileUpdate, AdvisorProfileRead
     # Validate payload
     try:
         validated_data = AdvisorProfileUpdate(**update_data)
@@ -68,7 +66,7 @@ async def update_my_profile(
 
     advisor = await advisor_repo.get_by_user_id(user.id)
     if not advisor:
-        raise HTTPException(status_code=404, detail='Advisor profile not found')
+        raise HTTPException(status_code=404, detail="Advisor profile not found")
 
     update_dict = {k: v for k, v in validated_data.model_dump().items() if v is not None}
     if not update_dict:
@@ -76,7 +74,6 @@ async def update_my_profile(
 
     updated_advisor = await advisor_repo.update_profile(advisor.advisor_id, update_dict)
     return AdvisorProfileRead.model_validate(updated_advisor)
-
 
 @router.get('/engagement')
 async def get_engagement_metrics(
