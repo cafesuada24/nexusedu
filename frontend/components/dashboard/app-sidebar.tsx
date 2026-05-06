@@ -21,9 +21,10 @@ import {
     SidebarMenu,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
+import { useAuth } from "@/hooks/use-auth";
 import { NavRow, type NavItem } from "./sidebar/nav-item";
 
-const mainNav: NavItem[] = [
+const baseMainNav: NavItem[] = [
     {
         href: "/dashboard",
         label: "Tổng quan",
@@ -73,6 +74,11 @@ const secondaryNav: NavItem[] = [
 
 export function AppSidebar() {
     const pathname = usePathname();
+    const { user } = useAuth();
+    const canAccessCsvImport = user?.role === "admin";
+    const mainNav = canAccessCsvImport
+        ? baseMainNav
+        : baseMainNav.filter((item) => item.href !== "/dashboard/import");
 
     const isActive = (href: string) => {
         if (href === "/dashboard") return pathname === "/dashboard";
