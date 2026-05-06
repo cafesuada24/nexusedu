@@ -73,9 +73,15 @@ export type ColumnDef = {
     id: CaseStatus;
     title: string;
     icon: React.ElementType;
-    /** Tailwind classes cho dot và viền nhẹ ở header column. */
+    /** Tailwind classes cho icon, điểm nhấn và màu theo trạng thái. */
     accent: string;
     dotClass: string;
+    containerTone: string;
+    headerTone: string;
+    topBorderTone: string;
+    iconContainerTone: string;
+    cardHighlightTone: string;
+    columnHighlightTone: string;
 };
 
 export const COLUMNS: ColumnDef[] = [
@@ -83,29 +89,61 @@ export const COLUMNS: ColumnDef[] = [
         id: "new",
         title: "Mới",
         icon: Sparkles,
-        accent: "text-destructive",
-        dotClass: "bg-destructive",
+        accent: "text-red-600",
+        dotClass: "bg-red-500",
+        containerTone: "bg-red-50/60",
+        headerTone: "bg-red-50/85",
+        topBorderTone: "border-t-red-500",
+        iconContainerTone: "bg-red-100 ring-red-200/70",
+        cardHighlightTone:
+            "border-red-300 bg-red-50/60 ring-1 ring-red-200/70 shadow-[0_10px_24px_-16px_rgba(220,38,38,0.65)]",
+        columnHighlightTone:
+            "ring-2 ring-red-200/80 shadow-[0_0_0_1px_rgba(248,113,113,0.22)]",
     },
     {
         id: "accepted",
         title: "Accepted",
         icon: Sparkles,
-        accent: "text-primary",
-        dotClass: "bg-primary",
+        accent: "text-blue-600",
+        dotClass: "bg-blue-500",
+        containerTone: "bg-blue-50/60",
+        headerTone: "bg-blue-50/85",
+        topBorderTone: "border-t-blue-500",
+        iconContainerTone: "bg-blue-100 ring-blue-200/70",
+        cardHighlightTone:
+            "border-blue-300 bg-blue-50/60 ring-1 ring-blue-200/70 shadow-[0_10px_24px_-16px_rgba(37,99,235,0.6)]",
+        columnHighlightTone:
+            "ring-2 ring-blue-200/80 shadow-[0_0_0_1px_rgba(96,165,250,0.2)]",
     },
     {
         id: "contacted",
         title: "Đã liên hệ",
         icon: Send,
-        accent: "text-primary",
-        dotClass: "bg-primary",
+        accent: "text-amber-600",
+        dotClass: "bg-amber-500",
+        containerTone: "bg-amber-50/60",
+        headerTone: "bg-amber-50/85",
+        topBorderTone: "border-t-amber-500",
+        iconContainerTone: "bg-amber-100 ring-amber-200/70",
+        cardHighlightTone:
+            "border-amber-300 bg-amber-50/60 ring-1 ring-amber-200/70 shadow-[0_10px_24px_-16px_rgba(217,119,6,0.58)]",
+        columnHighlightTone:
+            "ring-2 ring-amber-200/80 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]",
     },
     {
         id: "scheduled",
         title: "Đã đặt hẹn",
         icon: CalendarCheck,
-        accent: "text-warning",
-        dotClass: "bg-warning",
+        accent: "text-green-600",
+        dotClass: "bg-green-500",
+        containerTone: "bg-green-50/60",
+        headerTone: "bg-green-50/85",
+        topBorderTone: "border-t-green-500",
+        iconContainerTone: "bg-green-100 ring-green-200/70",
+        cardHighlightTone:
+            "border-green-300 bg-green-50/60 ring-1 ring-green-200/70 shadow-[0_10px_24px_-16px_rgba(22,163,74,0.58)]",
+        columnHighlightTone:
+            "ring-2 ring-green-200/80 shadow-[0_0_0_1px_rgba(74,222,128,0.2)]",
     },
     {
         id: "in_progress",
@@ -113,6 +151,14 @@ export const COLUMNS: ColumnDef[] = [
         icon: Handshake,
         accent: "text-foreground",
         dotClass: "bg-muted-foreground",
+        containerTone: "bg-muted/30",
+        headerTone: "bg-muted/45",
+        topBorderTone: "border-t-slate-400",
+        iconContainerTone: "bg-card ring-border/70",
+        cardHighlightTone:
+            "border-slate-300 bg-slate-50/70 ring-1 ring-slate-200/70 shadow-[0_10px_24px_-16px_rgba(100,116,139,0.45)]",
+        columnHighlightTone:
+            "ring-2 ring-slate-200/80 shadow-[0_0_0_1px_rgba(148,163,184,0.2)]",
     },
     {
         id: "resolved",
@@ -120,6 +166,14 @@ export const COLUMNS: ColumnDef[] = [
         icon: CheckCircle2,
         accent: "text-success",
         dotClass: "bg-success",
+        containerTone: "bg-success/10",
+        headerTone: "bg-success/15",
+        topBorderTone: "border-t-emerald-500",
+        iconContainerTone: "bg-emerald-100 ring-emerald-200/70",
+        cardHighlightTone:
+            "border-emerald-300 bg-emerald-50/60 ring-1 ring-emerald-200/70 shadow-[0_10px_24px_-16px_rgba(5,150,105,0.52)]",
+        columnHighlightTone:
+            "ring-2 ring-emerald-200/80 shadow-[0_0_0_1px_rgba(110,231,183,0.2)]",
     },
 ];
 

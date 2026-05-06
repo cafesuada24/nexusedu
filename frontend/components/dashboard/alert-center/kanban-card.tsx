@@ -39,6 +39,8 @@ import {
 
 type KanbanCardProps = {
     alert: Alert;
+    isHighlighted?: boolean;
+    highlightTone?: string;
     onViewDetails: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
@@ -50,6 +52,8 @@ type KanbanCardProps = {
 
 function KanbanCardInner({
     alert: a,
+    isHighlighted,
+    highlightTone,
     onViewDetails,
     onMove,
     onOpenGoals,
@@ -78,7 +82,12 @@ function KanbanCardInner({
 
 
     return (
-        <article className="group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-shadow duration-200 hover:border-primary/30 hover:shadow-md">
+        <article
+            className={cn(
+                "group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md",
+                isHighlighted && highlightTone,
+            )}
+        >
             <div className="flex items-start gap-3">
                 <Avatar className="size-12 shrink-0">
                     <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
