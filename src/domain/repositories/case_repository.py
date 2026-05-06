@@ -22,8 +22,12 @@ class CaseRepository(Protocol):
         """Update the status of a case."""
         ...
 
-    async def get_by_id(self, case_id: UUID) -> Case | None:
+    async def get_by_id(self, case_id: UUID) -> Case:
         """Retrieve a case by its ID."""
+        ...
+
+    async def find_by_id(self, case_id: UUID) -> Case | None:
+        """Find a case by its ID."""
         ...
 
     async def get_student_cases(self, sid: UUID) -> list[Case]:
@@ -36,17 +40,4 @@ class CaseRepository(Protocol):
 
     async def save(self, case: Case) -> None:
         """Update a case."""
-        ...
-
-    async def get_cases_list(
-        self,
-        advisor_id: UUID | None = None,
-        limit: int = 20,
-        offset: int = 0,
-    ) -> tuple[list[TaskItemRecord], int]:
-        """Retrieve task list table for advisors with pagination.
-
-        Returns:
-            Tuple of (list of records, total count)
-        """
         ...
