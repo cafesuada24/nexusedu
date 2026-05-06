@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from src.application.exceptions import CaseNotFoundError, MissingAdvisorProfileError
+from src.application.exceptions import AdvisorProfileNotLinkedError, CaseNotFoundError
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.core.logger import logger
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -115,7 +115,7 @@ class CaseCommandHandler:
 
         advisor = await self.advisor_repo.get_by_user_id(command.user_id)
         if advisor is None:
-            raise MissingAdvisorProfileError(command.user_id)
+            raise AdvisorProfileNotLinkedError(command.user_id)
 
         case.assign_advisor(advisor.advisor_id, command.accepted_at)
 

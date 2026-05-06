@@ -26,12 +26,22 @@ class ConcurrencyError(ApplicationError):
     """Raised when a concurrency bad condition happen."""
 
 
-class MissingAdvisorProfileError(ApplicationError):
-    """Raised when an advisor account missing its profile."""
+# ==============================================
+# ================= ADVISOR ====================
+# ==============================================
+
+class AdvisorError(ApplicationError):
+    """Raised when an error related to advisor occured."""
+
+class AdvisorProfileNotLinkedError(ApplicationError):
+    """Raised when an advisor account not linked to an advisor profile."""
 
     def __init__(self, user_id: UUID) -> None:
-        super().__init__(f"account with ID '{user_id}' is missing an advisor profile.")
+        super().__init__(f"account with ID '{user_id}' does not link to any advisor profile.")
 
+# ==============================================
+# =================== CASE =====================
+# ==============================================
 
 class CaseNotFoundError(EntityNotFoundError):
     """Raised when a case is not found."""

@@ -87,17 +87,24 @@ class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table, integrating with FastAPI-Users."""
 
     role: Mapped[str] = mapped_column(String, default='viewer')
+    advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey('advisors.advisor_id'),
+        unique=True,
+        nullable=True,
+    )
 
     preferences: Mapped[UserSettings] = relationship(
         'UserSettings',
         back_populates='user',
+        uselist=False,
         lazy='selectin',
     )
-    advisor_profile: Mapped[Advisor | None] = relationship(
-        'Advisor',
-        back_populates='user',
-        uselist=False,
-    )
+    # advisor_profile: Mapped[Advisor | None] = relationship(
+    #     'Advisor',
+    #     back_populates='user',
+    #     uselist=False,
+    #     lazy='selectin',
+    # )
 
 
 class UserSettings(Base):
@@ -111,7 +118,7 @@ class UserSettings(Base):
     )
     auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    user: Mapped[User] = relationship('User', back_populates='preferences')
+    user: Mapped[User] = relationship('User', back_populates='preferences', uselist=False)
 
 
 class Student(Base):
@@ -160,7 +167,7 @@ class Activity(Base):
     week: Mapped[int | None] = mapped_column(Integer)
 
     # Relationships
-    student: Mapped[Student] = relationship('Student', back_populates='activities')
+    student: Mapped[Student] = relationship('Student', back_populates='activities', uselist=False)
 
 
 class StudentStatusHistory(Base):
@@ -187,7 +194,7 @@ class StudentStatusHistory(Base):
     )
 
     # Relationships
-    student: Mapped[Student] = relationship('Student', back_populates='status_history')
+    student: Mapped[Student] = relationship('Student', back_populates='status_history', uselist=False)
 
 
 class Advisor(Base):
@@ -200,11 +207,6 @@ class Advisor(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey('user.id'),
-        unique=True,
-        nullable=True,
-    )
     name: Mapped[str | None] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
     title: Mapped[str | None] = mapped_column(String)
@@ -214,7 +216,7 @@ class Advisor(Base):
     bio: Mapped[str | None] = mapped_column(Text)
 
     # Relationships
-    user: Mapped[User | None] = relationship('User', back_populates='advisor_profile')
+    user: Mapped[User | None] = relationship('User', uselist=False)
 
 
 class PointLedger(Base):

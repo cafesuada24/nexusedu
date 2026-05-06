@@ -6,7 +6,7 @@ from uuid import UUID
 
 from src.application.dtos.case_dtos import CaseDTO
 from src.application.dtos.student_dtos import EmailDTO
-from src.application.exceptions import MissingAdvisorProfileError
+from src.application.exceptions import AdvisorProfileNotLinkedError
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.domain.repositories.advisor_repository import AdvisorRepository
 
@@ -53,7 +53,7 @@ class CaseQueryHandler:
         """Execute the get task list query."""
         advisor = await self._advisor_repo.get_by_user_id(query.user_id)
         if advisor is None:
-            raise MissingAdvisorProfileError(user_id=query.user_id)
+            raise AdvisorProfileNotLinkedError(user_id=query.user_id)
 
         return await self._case_query_service.find_assigned_to(
             advisor_id=advisor.advisor_id,
