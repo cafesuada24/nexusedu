@@ -35,11 +35,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="hero-gradient relative flex min-h-screen flex-col">
+    <div className="hero-gradient relative flex min-h-screen flex-col bg-background dark:bg-slate-950">
       <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-5 md:px-6">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground dark:text-slate-300 dark:hover:text-slate-100"
         >
           <ArrowLeft className="size-4" />
           Về trang chủ
@@ -53,12 +53,12 @@ export default function LoginPage() {
             <Logo size="lg" href={null} />
           </div>
 
-          <div className="glass-strong rounded-2xl border border-border/60 p-6 shadow-xl shadow-primary/10 md:p-8">
+          <div className="glass-strong rounded-2xl border border-border/60 bg-white/95 p-6 shadow-xl shadow-primary/10 md:p-8 dark:border-slate-800 dark:bg-[#0f172a] dark:shadow-2xl dark:shadow-black/50">
             <div className="text-center">
-              <h1 className="font-serif text-2xl font-bold md:text-3xl">
+              <h1 className="font-serif text-2xl font-bold md:text-3xl dark:text-slate-100">
                 Chào mừng trở lại
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-muted-foreground dark:text-slate-300">
                 Đăng nhập bằng tài khoản nhà trường để tiếp tục.
               </p>
             </div>
@@ -67,7 +67,7 @@ export default function LoginPage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="h-11 rounded-xl"
+                className="h-11 rounded-xl border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                 aria-label="Đăng nhập bằng Google Workspace"
                 disabled={isLoading}
               >
@@ -77,7 +77,7 @@ export default function LoginPage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="h-11 rounded-xl"
+                className="h-11 rounded-xl border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                 aria-label="Đăng nhập bằng Microsoft Workspace"
                 disabled={isLoading}
               >
@@ -88,16 +88,16 @@ export default function LoginPage() {
 
             <div className="my-6 flex items-center gap-3">
               <Separator className="flex-1" />
-              <span className="text-xs text-muted-foreground">hoặc</span>
+              <span className="text-xs text-muted-foreground dark:text-slate-400">hoặc</span>
               <Separator className="flex-1" />
             </div>
 
             <form className="grid gap-4" onSubmit={handleSubmit}>
               <div className="grid gap-2">
-                <Label htmlFor="email">Email trường</Label>
+                <Label htmlFor="email" className="text-slate-700 dark:text-slate-300">Email trường</Label>
                 <div className="relative">
                   <Mail
-                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground dark:text-slate-500"
                     aria-hidden="true"
                   />
                   <Input
@@ -105,7 +105,7 @@ export default function LoginPage() {
                     type="email"
                     required
                     placeholder="giangvien@truong.edu.vn"
-                    className="h-11 rounded-xl pl-9"
+                    className="h-11 rounded-xl border-slate-300 bg-white pl-9 text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-white dark:placeholder:text-slate-500 dark:focus-visible:border-blue-500 dark:focus-visible:ring-blue-500/40"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
@@ -114,17 +114,17 @@ export default function LoginPage() {
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Mật khẩu</Label>
+                  <Label htmlFor="password" className="text-slate-700 dark:text-slate-300">Mật khẩu</Label>
                   <Link
                     href="#"
-                    className="text-xs font-medium text-primary hover:underline"
+                    className="text-xs font-medium text-primary hover:underline dark:text-blue-400 dark:hover:text-blue-300"
                   >
                     Quên mật khẩu?
                   </Link>
                 </div>
                 <div className="relative">
                   <Lock
-                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground dark:text-slate-500"
                     aria-hidden="true"
                   />
                   <Input
@@ -132,7 +132,7 @@ export default function LoginPage() {
                     type="password"
                     required
                     placeholder="••••••••"
-                    className="h-11 rounded-xl pl-9"
+                    className="h-11 rounded-xl border-slate-300 bg-white pl-9 text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950/50 dark:text-white dark:placeholder:text-slate-500 dark:focus-visible:border-blue-500 dark:focus-visible:ring-blue-500/40"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
@@ -163,14 +163,14 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Chưa có tài khoản?{" "}
-            <Link
-              href="#"
-              className="font-medium text-primary hover:underline"
-            >
-              Liên hệ quản trị viên
-            </Link>
+            <p className="mt-6 text-center text-sm text-muted-foreground dark:text-slate-300">
+              Chưa có tài khoản?{" "}
+              <Link
+                href="#"
+                className="font-medium text-primary hover:underline dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Liên hệ quản trị viên
+              </Link>
           </p>
         </div>
       </main>
