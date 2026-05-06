@@ -84,7 +84,7 @@ function KanbanCardInner({
     return (
         <article
             className={cn(
-                "group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md",
+                "group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500",
                 isHighlighted && highlightTone,
             )}
         >
