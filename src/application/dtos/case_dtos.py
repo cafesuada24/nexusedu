@@ -66,6 +66,22 @@ class SendEmailCommand:
     body: str
     user_id: UUID
 
+@dataclass(frozen=True)
+class GetAssignedQuery:
+    """Query to retrieve advisor task list."""
+
+    user_id: UUID
+    limit: int = 20
+    offset: int = 0
+
+
+@dataclass(frozen=True)
+class GetUnassignedQuery:
+    """Query to retrieve advisor task list."""
+
+    limit: int = 20
+    offset: int = 0
+
 
 @dataclass(frozen=True)
 class TaskDTO:
