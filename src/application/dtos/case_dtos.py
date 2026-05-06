@@ -12,6 +12,61 @@ from src.domain.value_objects.status import (
 )
 
 
+@dataclass
+class AcceptCaseCommand:
+    """Command to complete a task and award points."""
+
+    case_id: UUID
+    user_id: UUID
+    accepted_at: datetime
+
+
+@dataclass
+class UpdateStudentStatusCommand:
+    """Command to update a student's intervention status."""
+
+    case_id: UUID
+    status: InterventionStatus
+    user_id: UUID
+
+
+@dataclass
+class AwardReviewPointsCommand:
+    """Command to award points for reviewing a draft."""
+
+    case_id: UUID
+    user_id: UUID
+
+
+@dataclass
+class TriggerDraftCommand:
+    """Command to trigger a background email draft generation."""
+
+    case_id: UUID
+    user_id: UUID
+    booking_link: str | None = None
+    update_db: bool = True
+
+
+@dataclass
+class GenerateEmailDraftCommand:
+    """Command to generate an email draft (intended for worker)."""
+
+    case_id: UUID
+    job_id: UUID
+    booking_link: str | None = None
+    user_id: UUID | None = None
+
+
+@dataclass
+class SendEmailCommand:
+    """Command to record and send an intervention email."""
+
+    case_id: UUID
+    body: str
+    user_id: UUID
+
+
 @dataclass(frozen=True)
 class TaskDTO:
     """DTO for a task associated with a case."""
@@ -46,4 +101,3 @@ class CaseDTO(BaseModel):
     draft_status: str
 
     points_reward: int
-

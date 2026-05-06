@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from src.application.exceptions import AdvisorProfileNotLinkedError, CaseNotFoundError
+from src.application.dtos.case_dtos import AcceptCaseCommand, AwardReviewPointsCommand, GenerateEmailDraftCommand, SendEmailCommand, TriggerDraftCommand, UpdateStudentStatusCommand
+from src.application.exceptions import AdvisorProfileNotLinkedError
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.core.logger import logger
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -22,61 +23,6 @@ from src.domain.value_objects.status import (
     InterventionStatus,
     TaskType,
 )
-
-
-@dataclass
-class AcceptCaseCommand:
-    """Command to complete a task and award points."""
-
-    case_id: UUID
-    user_id: UUID
-    accepted_at: datetime
-
-
-@dataclass
-class UpdateStudentStatusCommand:
-    """Command to update a student's intervention status."""
-
-    case_id: UUID
-    status: InterventionStatus
-    user_id: UUID
-
-
-@dataclass
-class AwardReviewPointsCommand:
-    """Command to award points for reviewing a draft."""
-
-    case_id: UUID
-    user_id: UUID
-
-
-@dataclass
-class TriggerDraftCommand:
-    """Command to trigger a background email draft generation."""
-
-    case_id: UUID
-    user_id: UUID
-    booking_link: str | None = None
-    update_db: bool = True
-
-
-@dataclass
-class GenerateEmailDraftCommand:
-    """Command to generate an email draft (intended for worker)."""
-
-    case_id: UUID
-    job_id: UUID
-    booking_link: str | None = None
-    user_id: UUID | None = None
-
-
-@dataclass
-class SendEmailCommand:
-    """Command to record and send an intervention email."""
-
-    case_id: UUID
-    body: str
-    user_id: UUID
 
 
 class CaseCommandHandler:
@@ -110,10 +56,8 @@ class CaseCommandHandler:
     async def handle_accept_case(self, command: AcceptCaseCommand) -> None:
         """Try assign a case to an advisor."""
         case = await self.case_repo.get_by_id(command.case_id)
-        if case is None:
-            raise CaseNotFoundError(command.case_id)
 
-        advisor = await self.advisor_repo.get_by_user_id(command.user_id)
+        advisor = await self.advisor_repo.find_by_user_id(command.user_id)
         if advisor is None:
             raise AdvisorProfileNotLinkedError(command.user_id)
 
@@ -344,7 +288,7 @@ class CaseCommandHandler:
 
     async def _resolve_advisor_id(self, user_id: UUID) -> UUID | None:
         """Resolve an advisor_id from a user_id."""
-        advisor = await self.advisor_repo.get_by_user_id(user_id)
+        advisor = await self.advisor_repo.find_by_user_id(user_id)
         return advisor.advisor_id if advisor else None
 
     async def _award_points(
@@ -354,16 +298,17 @@ class CaseCommandHandler:
         points: int,
     ) -> None:
         """Orchestrate awarding points for a completed task."""
-        if await self.advisor_repo.has_existing_reward(advisor_id, task_id):
-            logger.info(
-                f'Gamification: Reward already recorded for advisor {advisor_id} and task {task_id}. Skipping.',
-            )
-            return
 
-        if points > 0:
-            await self.advisor_repo.record_points(advisor_id, task_id, points)
-            if self.badge_repo:
-                # Trigger background task to evaluate badges without blocking API
-                await self.task_queue.enqueue(
-                    'run_evaluate_badges_task', advisor_id=str(advisor_id)
-                )
+        # if await self.advisor_repo.has_existing_reward(advisor_id, task_id):
+        #     logger.info(
+        #         f'Gamification: Reward already recorded for advisor {advisor_id} and task {task_id}. Skipping.',
+        #     )
+        #     return
+        #
+        # if points > 0:
+        #     await self.advisor_repo.record_points(advisor_id, task_id, points)
+        #     if self.badge_repo:
+        #         # Trigger background task to evaluate badges without blocking API
+        #         await self.task_queue.enqueue(
+        #             'run_evaluate_badges_task', advisor_id=str(advisor_id)
+        #         )
