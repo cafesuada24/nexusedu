@@ -520,7 +520,7 @@ export function AlertCenter() {
                     <div className="relative min-h-0 w-full max-w-full flex-1 overflow-hidden">
                         <div
                             ref={boardScrollRef}
-                            className="hide-scrollbar flex h-full min-w-0 w-full max-w-full items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-1 [-webkit-overflow-scrolling:touch]"
+                            className="hide-scrollbar flex h-full min-w-0 w-full max-w-full items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-transparent pb-1 [-webkit-overflow-scrolling:touch]"
                             role="list"
                         >
                             {COLUMNS.map((col) => (
