@@ -39,16 +39,6 @@ class AdvisorProfileNotLinkedError(ApplicationError):
     def __init__(self, user_id: UUID) -> None:
         super().__init__(f"account with ID '{user_id}' does not link to any advisor profile.")
 
-# ==============================================
-# =================== CASE =====================
-# ==============================================
-
-class CaseNotFoundError(EntityNotFoundError):
-    """Raised when a case is not found."""
-
-    def __init__(self, case_id: UUID) -> None:
-        super().__init__('Case', case_id)
-
 
 class AuthenticationError(ApplicationError):
     """Raised when authentication fails at the application level."""
