@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import time
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     Integer,
     String,
-    and_,
     case,
     cast,
     desc,
@@ -29,9 +27,12 @@ from sqlalchemy.orm import selectinload
 
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
-from src.domain.entities.case import Case, TaskItemRecord
+from src.domain.exceptions import (
+    AdvisorNotFoundError,
+    CaseNotFoundError,
+    UserIsNotAnAdvisorError,
+)
 from src.domain.value_objects.status import (
-    CaseStatus,
     EmailStatus,
     InterventionStatus,
     RiskStatus,
@@ -40,7 +41,6 @@ from src.infrastructure.database.config import DB_REGISTRY
 from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
-    Advisor,
     AdvisorBadge,
     BackgroundJobTracker,
     IdempotencyKey,
@@ -327,156 +327,50 @@ class SqlAlchemyAdvisorRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def get_by_id(self, advisor_id: uuid.UUID) -> DomainAdvisor | None:
+    async def get_by_id(self, advisor_id: uuid.UUID) -> DomainAdvisor:
         """Retrieve an advisor by their unique ID."""
-        stmt = select(Advisor).where(Advisor.advisor_id == advisor_id)
+        advisor = await self.find_by_id(advisor_id=advisor_id)
+        if advisor is None:
+            raise AdvisorNotFoundError(advisor_id=advisor_id)
+        return advisor
+
+    async def find_by_id(self, advisor_id: uuid.UUID) -> DomainAdvisor | None:
+        """Find an advisor by their unique ID."""
+        stmt = select(OrmAdvisor).where(OrmAdvisor.advisor_id == advisor_id)
         result = await self.session.execute(stmt)
         advisor = result.scalar_one_or_none()
-        return DataMapper.to_domain_advisor(advisor) if advisor else None
+        return DataMapper.to_domain_advisor(advisor) if advisor is not None else None
 
-    async def get_by_user_id(self, user_id: uuid.UUID) -> DomainAdvisor | None:
+    async def find_by_user_id(self, user_id: uuid.UUID) -> DomainAdvisor | None:
         """Retrieve an advisor by their associated user ID."""
-        stmt = select(Advisor).where(Advisor.user_id == user_id)
+        stmt = select(OrmAdvisor).where(OrmAdvisor.user_id == user_id)
         result = await self.session.execute(stmt)
         advisor = result.scalar_one_or_none()
         return DataMapper.to_domain_advisor(advisor) if advisor else None
 
-    async def update_profile(
-        self,
-        advisor_id: uuid.UUID,
-        update_data: dict[str, Any],
-    ) -> DomainAdvisor:
-        """Update an advisor's profile fields."""
-        stmt = (
-            update(Advisor)
-            .where(Advisor.advisor_id == advisor_id)
-            .values(**update_data)
-            .returning(Advisor)
-        )
-        result = await self.session.execute(stmt)
-        updated_advisor = result.scalar_one_or_none()
-        
-        if not updated_advisor:
-            raise ValueError(f"Advisor with id {advisor_id} not found")
-            
-        return DataMapper.to_domain_advisor(updated_advisor)
+    async def get_by_user_id(self, user_id: uuid.UUID) -> DomainAdvisor:
+        """Retrieve an advisor by their associated user ID."""
+        advisor = await self.find_by_user_id(user_id)
+        if advisor is None:
+            raise UserIsNotAnAdvisorError(user_id=user_id)
+        return advisor
 
-    async def get_engagement_metrics(self) -> list[dict[str, Any]]:
-        """Retrieve aggregated engagement metrics by major."""
+    async def save(self, advisor: DomainAdvisor) -> None:
         stmt = (
-            select(
-                Student.major.label('faculty'),
-                func.count(
-                    case(
-                        (
-                            Student.intervention_status.in_(
-                                ['sent', 'booked', 'supporting', 'resolved'],
-                            ),
-                            1,
-                        ),
-                    ),
-                ).label('sent'),
-                func.count(
-                    case((Student.intervention_status == 'notified', 1)),
-                ).label('drafted'),
+            update(OrmAdvisor)
+            .where(
+                OrmAdvisor.advisor_id == advisor.advisor_id,
             )
-            .group_by(Student.major)
-            .order_by(desc('sent'))
-        )
-
-        result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
-
-    async def get_leaderboard(
-        self,
-        time_window: str,
-        limit: int = 10,
-        offset: int = 0,
-    ) -> tuple[list[dict[str, Any]], int]:
-        """Retrieve the advisor leaderboard for a specific time window with pagination."""
-        interval_map = {
-            'weekly': timedelta(days=7),
-            'monthly': timedelta(days=30),
-            'semester': timedelta(days=120),
-        }
-
-        # Calculate cutoff if needed
-        cutoff = None
-        if time_window != 'all_time' and time_window in interval_map:
-            cutoff = datetime.now(UTC) - interval_map[time_window]
-
-        # Base query: Select from Advisor to include everyone even with 0 points
-        # Join with PointLedger and filter by cutoff in the join condition
-        ledger_join_cond = Advisor.advisor_id == PointLedger.advisor_id
-        if cutoff:
-            ledger_join_cond = and_(ledger_join_cond, PointLedger.earned_at >= cutoff)
-
-        stmt = (
-            select(
-                Advisor.advisor_id,
-                Advisor.name,
-                func.coalesce(func.sum(PointLedger.points), 0).label('total_points'),
-                func.count(PointLedger.id).label('actions_count'),
-                func.count(
-                    case((OrmTask.action_type == 'send email', 1)),
-                ).label('sent_count'),
-                func.count(
-                    case((OrmTask.action_type == 'resolve case', 1)),
-                ).label('resolved_count'),
+            .values(
+                name=advisor.name,
+                email=advisor.email,
+                phone=advisor.phone,
+                faculty=advisor.faculty,
+                office=advisor.office,
+                bio=advisor.bio,
             )
-            .outerjoin(PointLedger, ledger_join_cond)
-            .outerjoin(OrmTask, PointLedger.task_id == OrmTask.task_id)
         )
-
-        stmt = stmt.group_by(
-            Advisor.advisor_id,
-            Advisor.name,
-        ).order_by(desc('total_points'))
-
-        # Count total items (total number of advisors)
-        count_stmt = select(func.count(Advisor.advisor_id))
-        count_result = await self.session.execute(count_stmt)
-        total_count = count_result.scalar() or 0
-
-        # Apply paging
-        stmt = stmt.limit(limit).offset(offset)
-        result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()], total_count
-
-    async def get_advisor_points(self, advisor_id: uuid.UUID) -> int:
-        """Get total points for an advisor."""
-        stmt = select(func.coalesce(func.sum(PointLedger.points), 0)).where(
-            PointLedger.advisor_id == advisor_id
-        )
-        result = await self.session.execute(stmt)
-        return result.scalar() or 0
-
-    async def record_points(
-        self,
-        advisor_id: uuid.UUID,
-        task_id: uuid.UUID,
-        points: int,
-    ) -> None:
-        """Record gamification points for a completed task."""
-        entry = PointLedger(
-            advisor_id=advisor_id,
-            task_id=task_id,
-            points=points,
-        )
-        self.session.add(entry)
-
-    async def has_existing_reward(
-        self,
-        advisor_id: uuid.UUID,
-        task_id: uuid.UUID,
-    ) -> bool:
-        """Check if a reward has already been recorded for this advisor/task combination."""
-        stmt = select(PointLedger).where(
-            PointLedger.advisor_id == advisor_id,
-            PointLedger.task_id == task_id,
-        )
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        await self.session.execute(stmt)
 
     async def upsert_advisor_for_user(
         self,
@@ -486,7 +380,7 @@ class SqlAlchemyAdvisorRepository:
     ) -> None:
         """Link a user to an advisor profile, creating one if necessary."""
         # 1. Check if an advisor with this user_id already exists
-        stmt = select(Advisor).where(Advisor.user_id == user_id)
+        stmt = select(OrmAdvisor).where(OrmAdvisor.user_id == user_id)
         result = await self.session.execute(stmt)
         advisor = result.scalar_one_or_none()
 
@@ -496,7 +390,10 @@ class SqlAlchemyAdvisorRepository:
             return
 
         # 2. Check if an advisor with this email already exists but is not linked
-        stmt = select(Advisor).where(Advisor.email == email, Advisor.user_id.is_(None))
+        stmt = select(OrmAdvisor).where(
+            OrmAdvisor.email == email,
+            OrmAdvisor.user_id.is_(None),
+        )
         result = await self.session.execute(stmt)
         advisor = result.scalar_one_or_none()
 
@@ -506,7 +403,7 @@ class SqlAlchemyAdvisorRepository:
             return
 
         # 3. Create new advisor profile
-        new_advisor = Advisor(
+        new_advisor = OrmAdvisor(
             advisor_id=uuid.uuid4(),
             user_id=user_id,
             email=email,
@@ -826,7 +723,7 @@ class SqlAlchemyCaseRepository:
         )
         result = await self.session.execute(stmt)
 
-        if result.rowcount == 0: # type: ignore
+        if result.rowcount == 0:  # type: ignore
             raise ConcurrencyError('Data was modified by another process.')
 
     async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> bool:
@@ -844,18 +741,14 @@ class SqlAlchemyCaseRepository:
         result = await self.session.execute(stmt)
         return result.rowcount > 0  # type: ignore
 
-    async def update_case_status(self, case_id: uuid.UUID, status: CaseStatus) -> None:
-        """Update the status of a case."""
-        stmt = (
-            update(OrmCase)
-            .where(OrmCase.case_id == case_id)
-            .values(status=status.value)
-        )
-        if status in (CaseStatus.RESOLVED, CaseStatus.FAILED):
-            stmt = stmt.values(closed_at=func.current_timestamp())
-        await self.session.execute(stmt)
+    async def get_by_id(self, case_id: uuid.UUID) -> DomainCase:
+        """Retrieve a case by its ID."""
+        case = await self.find_by_id(case_id=case_id)
+        if case is None:
+            raise CaseNotFoundError(case_id=case_id)
+        return case
 
-    async def get_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
+    async def find_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
         """Retrieve a case by its ID."""
         stmt = (
             select(OrmCase)
@@ -876,110 +769,6 @@ class SqlAlchemyCaseRepository:
         )
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
-
-    async def get_cases_list(
-        self,
-        advisor_id: uuid.UUID | None = None,
-        limit: int = 20,
-        offset: int = 0,
-    ) -> tuple[list[TaskItemRecord], int]:
-        """Retrieve task list table for advisors with pagination."""
-        stmt = (
-            select(
-                OrmCase.case_id,
-                OrmCase.sid,
-                OrmCase.created_at,
-                OrmCase.assigned_advisor_id,
-                OrmStudent.student_name,
-                OrmStudent.email,
-                OrmStudent.major,
-                OrmStudent.current_risk_status,
-                OrmStudent.intervention_status,
-                OrmEmail.subject.label('draft_subject'),
-                OrmEmail.body.label('draft_body'),
-                OrmEmail.status.label('draft_status'),
-                OrmAdvisor.name.label('assigned_to'),
-            )
-            .join(OrmStudent, OrmCase.sid == OrmStudent.sid)
-            .outerjoin(OrmEmail, OrmCase.case_id == OrmEmail.case_id)
-            .outerjoin(OrmAdvisor, OrmCase.assigned_advisor_id == OrmAdvisor.advisor_id)
-            .where(OrmCase.status == 'open')
-            .order_by(desc(OrmCase.created_at))
-        )
-        if advisor_id is not None:
-            stmt = stmt.where(
-                or_(
-                    OrmCase.assigned_advisor_id == advisor_id,
-                    OrmCase.assigned_advisor_id.is_(None),
-                ),
-            )
-
-        # Count total items before applying limit/offset
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        count_result = await self.session.execute(count_stmt)
-        total_count = count_result.scalar() or 0
-
-        # Apply limit and offset
-        stmt = stmt.limit(limit).offset(offset)
-        result = await self.session.execute(stmt)
-
-        mappings = result.mappings().all()
-        case_ids = [m['case_id'] for m in mappings]
-
-        # Fetch all tasks for these cases in one go
-        tasks_stmt = select(OrmTask).where(OrmTask.case_id.in_(case_ids))
-        tasks_result = await self.session.execute(tasks_stmt)
-        all_tasks = tasks_result.scalars().all()
-
-        # Group tasks by case_id
-        tasks_by_case = {}
-        for t in all_tasks:
-            if t.case_id not in tasks_by_case:
-                tasks_by_case[t.case_id] = []
-            tasks_by_case[t.case_id].append(DataMapper.to_domain_task(t))
-
-        tasks = []
-        for row in mappings:
-            risk_status_val = row['current_risk_status']
-            if isinstance(risk_status_val, str):
-                try:
-                    risk_status = RiskStatus(risk_status_val)
-                except ValueError:
-                    risk_status = RiskStatus.UNKNOWN
-            else:
-                risk_status = RiskStatus.UNKNOWN
-
-            intervention_status_val = row['intervention_status']
-            if isinstance(intervention_status_val, str):
-                try:
-                    intervention_status = InterventionStatus(intervention_status_val)
-                except ValueError:
-                    intervention_status = InterventionStatus.NONE
-            else:
-                intervention_status = InterventionStatus.NONE
-
-            case_tasks = tasks_by_case.get(row['case_id'], [])
-
-            tasks.append(
-                TaskItemRecord(
-                    case_id=row['case_id'],
-                    sid=row['sid'],
-                    created_at=row['created_at'],
-                    assigned_advisor_id=row['assigned_advisor_id'],
-                    student_name=row['student_name'],
-                    email=row['email'],
-                    major=row['major'] or 'Unknown',
-                    current_risk_status=risk_status,
-                    intervention_status=intervention_status,
-                    draft_subject=row['draft_subject'],
-                    draft_body=row['draft_body'],
-                    draft_status=row['draft_status'],
-                    assigned_to=row['assigned_to'],
-                    suggested_action='N/A',  # Will be populated by the application layer
-                    tasks=case_tasks,
-                ),
-            )
-        return tasks, total_count
 
 
 class SqlAlchemyTaskRepository:
