@@ -26,7 +26,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from src.domain.value_objects.status import CaseStatus, RiskStatus
+from src.domain.value_objects.status import CaseStatus
 
 
 def _all_column_names(constraint: UniqueConstraint | Index, _: Table) -> str:
@@ -46,13 +46,13 @@ _convention = {
 
 
 class UTCDateTime(TypeDecorator[datetime]):
-    """Safely coerce SQLite datetimes to be timezone-aware UTC.
+    """Safely coerce datetimes to be timezone-aware UTC for database storage.
 
-    TypeDecorator[datetime.datetime] tells static analyzers that this
-    decorator works with Python datetime objects.
+    Ensures that naive datetimes are rejected on write and tagged as UTC
+    on read, maintaining consistency across the application.
     """
 
-    impl = DateTime
+    impl = DateTime(timezone=True)
     cache_ok = True
 
     def process_bind_param(
@@ -60,21 +60,40 @@ class UTCDateTime(TypeDecorator[datetime]):
         value: datetime | None,
         _: Dialect,
     ) -> datetime | None:
+        """Logic for sending data TO the database.
+
+        Ensures we only save timezone-aware objects converted to UTC.
+        """
         if value is None:
             return None
+
+        if not isinstance(value, datetime):
+            raise TypeError(f'Expected datetime, received {type(value)}')
+
         if value.tzinfo is None:
-            raise ValueError('Datetime must be timezone-aware')
+            raise ValueError(
+                f'UTCDateTime requires timezone-aware datetimes. Received naive: {value}'
+            )
+
         return value.astimezone(UTC)
 
     def process_result_value(
-        self,
-        value: datetime | None,
-        _: Dialect,
+        self, value: datetime | None, _: Dialect
     ) -> datetime | None:
-        if value is not None and value.tzinfo is None:
-            # SQLite returned a naive datetime, so we "attach" UTC
+        """Logic for receiving data FROM the database.
+
+        Ensures the application always receives a UTC-aware datetime.
+        """
+        if value is None:
+            return None
+
+        # Some DB drivers return naive datetimes.
+        # replace(tzinfo=UTC) 'tags' it without shifting the hours.
+        if value.tzinfo is None:
             return value.replace(tzinfo=UTC)
-        return value
+
+        # If the driver is already TZ-aware, ensure it's converted to UTC
+        return value.astimezone(UTC)
 
 
 class Base(DeclarativeBase):
@@ -113,7 +132,9 @@ class UserSettings(Base):
     )
     auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    user: Mapped[User] = relationship('User', back_populates='preferences', uselist=False)
+    user: Mapped[User] = relationship(
+        'User', back_populates='preferences', uselist=False
+    )
 
 
 class Student(Base):
@@ -162,7 +183,9 @@ class Activity(Base):
     week: Mapped[int | None] = mapped_column(Integer)
 
     # Relationships
-    student: Mapped[Student] = relationship('Student', back_populates='activities', uselist=False)
+    student: Mapped[Student] = relationship(
+        'Student', back_populates='activities', uselist=False
+    )
 
 
 class StudentStatusHistory(Base):
@@ -185,11 +208,15 @@ class StudentStatusHistory(Base):
     z_score: Mapped[float | None] = mapped_column(Double)
     anomaly_flag: Mapped[str | None] = mapped_column(String)
     status_recorded_at: Mapped[datetime] = mapped_column(
-        server_default=func.current_timestamp(),
+        server_default=func.now(),
     )
 
     # Relationships
-    student: Mapped[Student] = relationship('Student', back_populates='status_history', uselist=False)
+    student: Mapped[Student] = relationship(
+        'Student',
+        back_populates='status_history',
+        uselist=False,
+    )
 
 
 class Advisor(Base):
@@ -241,7 +268,7 @@ class PointLedger(Base):
     points: Mapped[int | None] = mapped_column(Integer)
     earned_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
-        server_default=func.current_timestamp(),
+        server_default=func.now(),
     )
 
 
@@ -265,7 +292,7 @@ class AdvisorBadge(Base):
     badge_id: Mapped[str] = mapped_column(String)
     awarded_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
-        server_default=func.current_timestamp(),
+        server_default=func.now(),
     )
 
 
@@ -330,8 +357,13 @@ class Case(Base):
         Uuid,
         ForeignKey('advisors.advisor_id'),
         nullable=True,
+        default=None,
     )
-    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
     # Relationships
     student: Mapped[Student] = relationship('Student')
