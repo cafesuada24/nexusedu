@@ -10,8 +10,8 @@ from src.application.dtos.case_dtos import (
     GetUnassignedQuery,
 )
 from src.application.dtos.student_dtos import EmailDTO
-from src.application.exceptions import AdvisorProfileNotLinkedError
 from src.application.interfaces.case_query_service import CaseQueryService
+from src.domain.exceptions import UserIsNotAnAdvisorError
 from src.domain.repositories.advisor_repository import AdvisorRepository
 
 
@@ -33,7 +33,7 @@ class CaseQueryHandler:
         """Execute the get task list query."""
         advisor = await self._advisor_repo.find_by_user_id(query.user_id)
         if advisor is None:
-            raise AdvisorProfileNotLinkedError(user_id=query.user_id)
+            raise UserIsNotAnAdvisorError(user_id=query.user_id)
 
         return await self._case_query_service.find_assigned_to(
             advisor_id=advisor.advisor_id,
@@ -74,7 +74,7 @@ class CaseQueryHandler:
 
     async def handle_get_case_details(self, case_id: UUID) -> dict[str, Any]:
         """Retrieve full details of a specific case, including its associated email."""
-        return []
+        return {}
         # case = await self.case_repo.get_by_id(case_id)
         # if not case:
         #     raise ValueError(f'Case {case_id} not found.')
