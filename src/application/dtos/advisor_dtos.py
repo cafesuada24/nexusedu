@@ -1,7 +1,35 @@
 """DTOs for advisor-related operations."""
 
 from dataclasses import dataclass
+from typing import Annotated
 from uuid import UUID
+
+from pydantic import BaseModel, EmailStr, Field, PositiveInt
+from pydantic_extra_types.phone_numbers import PhoneNumber, PhoneNumberValidator
+
+# ========== QUERY =========
+
+
+@dataclass(frozen=True)
+class GetLeaderboardQuery:
+    """Query to retrieve the advisor leaderboard."""
+
+    time_window: str
+    limit: int = 10
+    offset: int = 0
+
+
+# @dataclass(frozen=)
+
+@dataclass(frozen=True)
+class GetUserAdvisorProfileQuery:
+    user_id: UUID
+    advisor_id: UUID | None
+
+@dataclass(frozen=True)
+class GetAdvisorProfileQuery:
+    advisor_id: UUID
+    include_metrics: bool
 
 
 @dataclass(frozen=True)
@@ -23,6 +51,27 @@ class LeaderboardEntryDTO:
     actions_count: int
     sent_count: int
     resolved_count: int
+
+
+class AdvisorMetricsDTO(BaseModel):
+    points: PositiveInt = 0
+
+
+class AdvisorProfileDTO(BaseModel):
+    """DTO for an advisor."""
+
+    advisor_id: UUID
+    name: str
+    email: EmailStr
+    title: str | None = Field(default=None)
+    phone: (
+        Annotated[str | PhoneNumber, PhoneNumberValidator(number_format='E164')] | None
+    )
+    faculty: str | None = None
+    office: str | None = None
+    bio: str | None = None
+
+    metrics: AdvisorMetricsDTO | None = None
 
 
 @dataclass(frozen=True)
