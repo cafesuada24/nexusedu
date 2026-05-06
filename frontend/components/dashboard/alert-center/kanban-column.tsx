@@ -58,7 +58,7 @@ export function KanbanColumn({
     <section
       role="listitem"
       className={cn(
-        "flex min-w-[380px] w-[380px] shrink-0 basis-[380px] flex-col rounded-2xl border border-border/60 border-t-4 transition-all duration-300",
+        "flex min-w-[380px] w-[380px] shrink-0 basis-[380px] flex-col rounded-2xl border border-border/60 border-t-4 transition-all duration-300 dark:border-slate-800",
         col.containerTone,
         col.topBorderTone,
         isCollapsed ? "h-auto" : "h-full",
@@ -69,7 +69,7 @@ export function KanbanColumn({
     >
       <header
         className={cn(
-          "flex items-center justify-between gap-2 border-b border-border/50 px-3 py-3",
+          "flex items-center justify-between gap-2 border-b border-border/50 px-3 py-3 dark:border-slate-800 dark:bg-slate-950",
           col.headerTone,
         )}
       >
@@ -91,7 +91,7 @@ export function KanbanColumn({
         <div className="flex shrink-0 items-center gap-1.5">
           <Badge
             variant="outline"
-            className="h-7 rounded-md border-border/50 bg-white/80 px-2 font-mono text-sm"
+            className="h-7 rounded-md border-border/50 bg-white/85 px-2 font-mono text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           >
             {items.length}
             {items.length !== totalInColumn ? (
@@ -125,11 +125,11 @@ export function KanbanColumn({
       {isCollapsed ? null : (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
           {items.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border/60 bg-white/45 p-6 text-center">
+            <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border/60 bg-white/45 p-6 text-center dark:border-slate-800 dark:bg-black/20">
               <span
                 aria-hidden
                 className={cn(
-                  "grid size-8 place-items-center rounded-lg opacity-75 ring-1",
+                  "grid size-8 place-items-center rounded-lg opacity-35 ring-1 dark:opacity-20",
                   col.iconContainerTone,
                   col.accent,
                 )}
@@ -170,7 +170,7 @@ export function KanbanColumn({
                   variant="ghost"
                   size="sm"
                   onClick={() => onToggleExpand(col.id)}
-                  className="mt-1 h-10 w-full justify-center gap-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-card hover:text-foreground"
+                  className="mt-1 h-10 w-full justify-center gap-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-card hover:text-foreground dark:hover:bg-slate-900 dark:hover:text-slate-100"
                   aria-expanded={isExpanded}
                 >
                   {isExpanded ? (
