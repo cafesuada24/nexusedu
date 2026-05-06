@@ -103,10 +103,11 @@ async def get_my_points(
         AdvisorQueryHandler,
         Depends(get_advisor_query_handler),
     ],
-) -> int:
+) -> dict[str, int]:
     """Get the current user's advisor points."""
     try:
-        return await advisor_query_handler.handle_get_user_advisor_points(user.id)
+        points = await advisor_query_handler.handle_get_user_advisor_points(user.id)
+        return {"points": points}
     except (UserIsNotAnAdvisorError, AdvisorNotFoundError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
