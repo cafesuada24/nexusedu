@@ -65,7 +65,9 @@ class AdvisorProfileDTO(BaseModel):
     name: str
     email: EmailStr
     title: str | None = Field(default=None)
-    phone: str | None = None
+    phone: (
+        Annotated[PhoneNumber | str, PhoneNumberValidator(number_format='E164')] | None
+    ) = None
     faculty: str | None = None
     office: str | None = None
     bio: str | None = None
