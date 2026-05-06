@@ -22,7 +22,7 @@ class GetLeaderboardQuery:
 # @dataclass(frozen=)
 
 @dataclass(frozen=True)
-class GetUserAdvisorProfileQuery:
+class GetUsersAdvisorProfileQuery:
     user_id: UUID
     advisor_id: UUID | None
 
