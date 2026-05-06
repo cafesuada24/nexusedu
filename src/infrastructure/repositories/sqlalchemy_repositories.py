@@ -52,8 +52,6 @@ from src.infrastructure.database.models import (
 )
 from src.infrastructure.database.models import Advisor as OrmAdvisor
 from src.infrastructure.database.models import Case as OrmCase
-from src.infrastructure.database.models import InterventionEmail as OrmEmail
-from src.infrastructure.database.models import Student as OrmStudent
 from src.infrastructure.database.models import (
     Task as OrmTask,
 )
@@ -708,7 +706,7 @@ class SqlAlchemyCaseRepository:
         orm_case = result.scalar_one_or_none()
         return DataMapper.to_domain_case(orm_case) if orm_case else None
 
-    async def save(self, case: Case) -> None:
+    async def save(self, case: DomainCase) -> None:
         stmt = (
             update(OrmCase)
             .where(
