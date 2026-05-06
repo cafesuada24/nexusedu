@@ -3,7 +3,7 @@ import os
 import random
 import sys
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +12,7 @@ import pandas as pd
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
+from dateutil import parser
 from src.infrastructure.database.models import (
     Activity,
     Advisor,
@@ -56,7 +57,7 @@ async def reseed() -> None:
     print('Importing students...')
     stu_df = pd.read_csv('data/v2_students.csv')
     students = [
-        Student(**{**row, 'sid': uuid.UUID(row['sid'])})
+        Student(**{**row, 'sid': uuid.UUID(row['sid']), 'last_notified_timestamp':  parser.parse(row['last_notified_timestamp'])})
         for row in stu_df.to_dict(orient='records')
     ]
 
@@ -69,6 +70,7 @@ async def reseed() -> None:
                 **row,
                 'activity_id': uuid.UUID(row['activity_id']),
                 'sid': uuid.UUID(row['sid']),
+                'timestamp': parser.parse(row['timestamp']),
             }
         )
         for row in act_df.to_dict(orient='records')
@@ -86,13 +88,19 @@ async def reseed() -> None:
         advisor_repo = SqlAlchemyAdvisorRepository(session)
         user_manager = UserManager(user_db, user_settings_repo, advisor_repo)
         user = await user_manager.create(
-            UserCreate(email='admin@example.com', password='password123'), safe=True
+            UserCreate(email='dev@example.com', password='dev'), safe=True
+        )
+        adv = await user_manager.create(
+            UserCreate(email='adv@example.com', password='adv'), safe=True
         )
         # Update role to admin
         from sqlalchemy import update
 
         await session.execute(
             update(User).where(User.id == user.id).values(role=UserRole.ADMIN.value)
+        )
+        await session.execute(
+            update(User).where(User.id == adv.id).values(role=UserRole.ADVISOR.value)
         )
 
         await session.commit()
@@ -205,7 +213,7 @@ async def reseed() -> None:
             case_obj = next(c for c in cases if c.case_id == t.case_id)
             aid = case_obj.assigned_advisor_id
             t.status = TaskStatus.COMPLETED.value
-            t.completed_at = datetime.now() - timedelta(days=random.randint(0, 7))
+            t.completed_at = datetime.now(UTC) - timedelta(days=random.randint(0, 7))
             t.completed_by_advisor_id = aid
 
             ledger_entries.append(
@@ -214,7 +222,7 @@ async def reseed() -> None:
                     advisor_id=aid,
                     task_id=t.task_id,
                     points=t.points_reward,
-                    timestamp=t.completed_at,
+                    earned_at=t.completed_at,
                 )
             )
 
