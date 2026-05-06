@@ -13,6 +13,9 @@ from src.application.dtos.student_dtos import EmailDTO
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.domain.exceptions import UserIsNotAnAdvisorError
 from src.domain.repositories.advisor_repository import AdvisorRepository
+from src.domain.repositories.case_repository import CaseRepository
+from src.domain.repositories.email_repository import EmailRepository
+from src.domain.repositories.job_repository import JobRepository
 
 
 class CaseQueryHandler:
@@ -21,10 +24,16 @@ class CaseQueryHandler:
     def __init__(
         self,
         case_query_service: CaseQueryService,
+        case_repo: CaseRepository,
         advisor_repo: AdvisorRepository,
+        email_repo: EmailRepository,
+        job_repo: JobRepository,
     ):
         self._case_query_service = case_query_service
         self._advisor_repo = advisor_repo
+        self.__case_repo = case_repo
+        self.__email_repo = email_repo
+        self.__job_repo = job_repo
 
     async def handle_get_assigned_cases(
         self,
@@ -101,39 +110,38 @@ class CaseQueryHandler:
 
     async def handle_get_draft_status(self, case_id: UUID) -> dict[str, Any]:
         """Retrieve the current AI draft status and content for a case."""
-        return {}
-        # case = await self.case_repo.get_by_id(case_id)
-        # if not case:
-        #     raise ValueError(f'Case {case_id} not found.')
-        #
-        # # 1. Look for existing email record for this case
-        # email = await self.email_repo.get_by_case(case_id)
-        #
-        # is_generating = False
-        # progress = 0
-        # subject = None
-        # body = None
-        #
-        # if email:
-        #     is_generating = email.status.value == 'generating'
-        #     subject = email.subject
-        #     body = email.body
-        #
-        #     # 2. If generating, optionally fetch fine-grained progress from JobRepository
-        #     if is_generating:
-        #         active_job = await self.job_repo.get_active_job(
-        #             case_id, 'case', 'email_draft'
-        #         )
-        #         if active_job:
-        #             job_details = await self.job_repo.get_job(active_job)
-        #             if job_details:
-        #                 progress = job_details.get('progress', 0)
-        #
-        # return {
-        #     'sid': str(case.sid),
-        #     'is_generating': is_generating,
-        #     'progress': progress,
-        #     'subject': subject,
-        #     'body': body,
-        #     'active_case_id': str(case.case_id),
-        # }
+        case = await self.__case_repo.get_by_id(case_id)
+        if not case:
+            raise ValueError(f'Case {case_id} not found.')
+
+        # 1. Look for existing email record for this case
+        email = await self.__email_repo.get_by_case(case_id)
+
+        is_generating = False
+        progress = 0
+        subject = None
+        body = None
+
+        if email:
+            is_generating = email.status.value == 'generating'
+            subject = email.subject
+            body = email.body
+
+            # 2. If generating, optionally fetch fine-grained progress from JobRepository
+            if is_generating:
+                active_job = await self.__job_repo.get_active_job(
+                    case_id, 'case', 'email_draft',
+                )
+                if active_job:
+                    job_details = await self.__job_repo.get_job(active_job)
+                    if job_details:
+                        progress = job_details.get('progress', 0)
+
+        return {
+            'sid': str(case.sid),
+            'is_generating': is_generating,
+            'progress': progress,
+            'subject': subject,
+            'body': body,
+            'active_case_id': str(case.case_id),
+        }
