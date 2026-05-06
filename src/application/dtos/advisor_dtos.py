@@ -21,10 +21,11 @@ class GetLeaderboardQuery:
 
 # @dataclass(frozen=)
 
+
 @dataclass(frozen=True)
 class GetUsersAdvisorProfileQuery:
     user_id: UUID
-    advisor_id: UUID | None
+
 
 @dataclass(frozen=True)
 class GetAdvisorProfileQuery:
@@ -65,8 +66,9 @@ class AdvisorProfileDTO(BaseModel):
     email: EmailStr
     title: str | None = Field(default=None)
     phone: (
-        Annotated[str | PhoneNumber, PhoneNumberValidator(number_format='E164')] | None
-    )
+        (Annotated[str | PhoneNumber, PhoneNumberValidator(number_format='E164')])
+        | None
+    ) = None
     faculty: str | None = None
     office: str | None = None
     bio: str | None = None
