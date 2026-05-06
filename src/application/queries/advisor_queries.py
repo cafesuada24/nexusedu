@@ -55,7 +55,7 @@ class AdvisorQueryHandler:
             name=advisor.name,
             email=advisor.email,
             title=advisor.title,
-            phone=advisor.phone,
+            phone=PhoneNumber(advisor.phone) if advisor.phone is not None else None,
             faculty=advisor.faculty,
             office=advisor.office,
             bio=advisor.bio,

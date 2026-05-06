@@ -1,15 +1,13 @@
 """API routes for Advisor management and Leaderboards."""
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.application.dtos.advisor_dtos import (
     AdvisorProfileDTO,
     GetAdvisorProfileQuery,
-    GetLeaderboardQuery,
-    LeaderboardEntryDTO,
 )
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
@@ -23,11 +21,10 @@ from src.presentation.dependencies.providers import (
     get_advisor_repository,
 )
 from src.presentation.schemas.advisor import AdvisorProfileUpdate
-from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 
-@router.get('/me/profile')
+@router.get('/profile')
 async def get_my_profile(
     advisor_query_handler: Annotated[
         AdvisorQueryHandler,
@@ -42,7 +39,7 @@ async def get_my_profile(
         raise HTTPException(status_code=404, detail=str(e)) from e
 
 
-@router.patch('/me/profile')
+@router.patch('/profile')
 async def update_my_profile(
     update_data: AdvisorProfileUpdate,
     user: Annotated[User, Depends(current_active_user)],
