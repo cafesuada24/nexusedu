@@ -3,14 +3,13 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Bell, Search } from "lucide-react"
+import { Search } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group"
-import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
   Breadcrumb,
@@ -20,7 +19,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Kbd } from "@/components/ui/kbd"
 import { NotificationsDropdown } from "@/components/dashboard/notifications-dropdown"
@@ -41,14 +39,14 @@ export function TopHeader() {
   const segments = pathname.split("/").filter(Boolean)
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/60 glass-strong px-4 md:px-6">
-      <SidebarTrigger className="-ml-1 rounded-lg" />
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-background/85 px-4 backdrop-blur md:px-6 dark:border-slate-800 dark:bg-[#020617]/95">
+      <SidebarTrigger className="-ml-1 rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100" />
       <Separator orientation="vertical" className="h-5" />
 
       <Breadcrumb className="hidden md:block">
-        <BreadcrumbList>
+        <BreadcrumbList className="text-slate-500 dark:text-slate-400">
           <BreadcrumbItem>
-            <BreadcrumbLink asChild>
+            <BreadcrumbLink asChild className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100">
               <Link href="/dashboard">NexusEdu</Link>
             </BreadcrumbLink>
           </BreadcrumbItem>
@@ -58,12 +56,12 @@ export function TopHeader() {
             const label = labels[seg] ?? seg
             return (
               <React.Fragment key={href}>
-                <BreadcrumbSeparator />
+                <BreadcrumbSeparator className="text-slate-400 dark:text-slate-500" />
                 <BreadcrumbItem>
                   {isLast ? (
-                    <BreadcrumbPage>{label}</BreadcrumbPage>
+                    <BreadcrumbPage className="font-medium text-slate-800 dark:text-slate-100">{label}</BreadcrumbPage>
                   ) : (
-                    <BreadcrumbLink asChild>
+                    <BreadcrumbLink asChild className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100">
                       <Link href={href}>{label}</Link>
                     </BreadcrumbLink>
                   )}
@@ -73,9 +71,9 @@ export function TopHeader() {
           })}
           {segments.length === 1 && (
             <>
-              <BreadcrumbSeparator />
+              <BreadcrumbSeparator className="text-slate-400 dark:text-slate-500" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Tổng quan</BreadcrumbPage>
+                <BreadcrumbPage className="font-medium text-slate-800 dark:text-slate-100">Tổng quan</BreadcrumbPage>
               </BreadcrumbItem>
             </>
           )}
@@ -84,21 +82,23 @@ export function TopHeader() {
 
       <div className="ml-auto flex items-center gap-2">
         <div className="hidden w-72 md:block">
-          <InputGroup className="h-10 rounded-xl">
-            <InputGroupAddon>
-              <Search className="size-4 text-muted-foreground" />
+          <InputGroup className="h-10 rounded-xl border-slate-200/90 bg-white/90 shadow-sm shadow-slate-200/40 dark:border-slate-700 dark:bg-slate-900/90 dark:shadow-none">
+            <InputGroupAddon className="text-slate-500 dark:text-slate-400">
+              <Search className="size-4" />
             </InputGroupAddon>
             <InputGroupInput
               placeholder="Tìm sinh viên, cố vấn..."
               aria-label="Tìm kiếm"
+              className="text-slate-800 placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
-            <InputGroupAddon align="inline-end">
-              <Kbd>⌘K</Kbd>
+            <InputGroupAddon align="inline-end" className="text-slate-500 dark:text-slate-400">
+              <Kbd className="bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">⌘K</Kbd>
             </InputGroupAddon>
           </InputGroup>
         </div>
 
         <NotificationsDropdown />
+        <ThemeToggle />
         <AdvisorScore />
         <UserDropdown />
       </div>

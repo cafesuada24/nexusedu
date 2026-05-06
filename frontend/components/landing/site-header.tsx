@@ -37,10 +37,10 @@ export function SiteHeader() {
     return (
         <header
             className={cn(
-                "sticky top-0 z-40 w-full transition-colors transition-shadow duration-300",
+                "sticky top-0 z-50 w-full transition-all duration-300",
                 scrolled
-                    ? "border-b border-border/60 glass-strong"
-                    : "border-b border-transparent",
+                    ? "border-b border-slate-200/80 bg-white/80 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80"
+                    : "border-b border-transparent bg-transparent shadow-none backdrop-blur-0",
             )}
         >
             <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 md:px-6">
@@ -66,7 +66,7 @@ export function SiteHeader() {
                                     });
                                 }
                             }}
-                            className="rounded-lg px-3 py-2 text-base font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            className="rounded-lg px-3 py-2 text-base font-medium text-slate-600 transition-colors hover:bg-accent hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-slate-100"
                         >
                             {l.label}
                         </button>
@@ -81,7 +81,7 @@ export function SiteHeader() {
                                 variant: "ghost",
                                 size: "default",
                             }),
-                            "hidden rounded-xl md:inline-flex text-primary font-semibold shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-shadow duration-300",
+                            "hidden rounded-xl px-4 md:inline-flex text-primary font-semibold shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-shadow duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)]",
                         )}
                     >
                         Đăng nhập
@@ -90,7 +90,7 @@ export function SiteHeader() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="rounded-xl md:hidden"
+                        className="rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100 md:hidden"
                         onClick={() => setOpen((v) => !v)}
                         aria-label="Mở menu"
                         aria-expanded={open}
@@ -105,7 +105,7 @@ export function SiteHeader() {
             </div>
 
             {open && (
-                <div className="border-t border-border/60 bg-background md:hidden">
+                <div className="border-t border-slate-200/80 bg-white/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/90 md:hidden">
                     <nav
                         className="mx-auto flex max-w-7xl flex-col gap-1 p-4"
                         aria-label="Điều hướng di động"
@@ -124,7 +124,7 @@ export function SiteHeader() {
                                         });
                                     }
                                 }}
-                                className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground text-left"
+                                className="rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-600 hover:bg-accent hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-slate-100"
                             >
                                 {l.label}
                             </button>

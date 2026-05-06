@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog";
 import { type Problem, type StudentRow } from "@/lib/csv";
-import { generateAiDraftForAlert } from "@/lib/api";
+import { fetchStudentCases, generateAiDraftForAlert } from "@/lib/api";
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
 import { useSocketEvent } from "@/hooks/use-socket";
 import { useQueryClient } from "@tanstack/react-query";
@@ -53,6 +53,10 @@ export function AlertCenter() {
     const [aiDraftReadyById, setAiDraftReadyById] = React.useState<
         Record<string, boolean>
     >({});
+    const [recentlyMoved, setRecentlyMoved] = React.useState<{
+        alertId: string;
+        status: CaseStatus;
+    } | null>(null);
     const [canScrollLeft, setCanScrollLeft] = React.useState(false);
     const [canScrollRight, setCanScrollRight] = React.useState(false);
     const { dataset } = useDataset();
@@ -238,9 +242,47 @@ export function AlertCenter() {
         [grouped, aiDraftingById],
     );
 
-    const moveTo = (a: Alert, status: CaseStatus, message?: string) => {
+    const markRecentlyMoved = React.useCallback(
+        (alertId: string, status: CaseStatus) => {
+            setRecentlyMoved({ alertId, status });
+        },
+        [],
+    );
+
+    React.useEffect(() => {
+        if (!recentlyMoved) return;
+        const timeoutId = window.setTimeout(() => {
+            setRecentlyMoved(null);
+        }, 3200);
+        return () => window.clearTimeout(timeoutId);
+    }, [recentlyMoved]);
+
+    const resolveCaseIdForAlert = async (a: Alert): Promise<string | null> => {
+        if (a.caseId) return a.caseId;
+        try {
+            const cases = await fetchStudentCases(a.id);
+            const sorted = [...cases].sort(
+                (left, right) =>
+                    new Date(right.created_at).getTime() -
+                    new Date(left.created_at).getTime(),
+            );
+            const latestOpenCase = sorted.find((c) => c.status === "open");
+            return latestOpenCase?.case_id ?? sorted[0]?.case_id ?? null;
+        } catch {
+            return null;
+        }
+    };
+
+    const moveTo = async (a: Alert, status: CaseStatus, message?: string) => {
         const sid = a.id;
-        const entityId = a.caseId ?? sid;
+        const caseId = await resolveCaseIdForAlert(a);
+        if (!caseId) {
+            toast.error("Không thể cập nhật trạng thái", {
+                description:
+                    "Không tìm thấy case đang mở cho sinh viên này. Vui lòng tải lại danh sách.",
+            });
+            return;
+        }
 
         if (status === "accepted") {
             if (!sid) {
@@ -250,9 +292,10 @@ export function AlertCenter() {
             }
 
             updateStatus(
-                { case_id: sid, status: toBackendStatus(status) },
+                { case_id: caseId, status: toBackendStatus(status), sid },
                 {
                     onSuccess: () => {
+                        markRecentlyMoved(a.id, status);
                         setAiDraftErrorById((prev) => {
                             if (!prev[a.id]) return prev;
                             const next = { ...prev };
@@ -316,9 +359,10 @@ export function AlertCenter() {
         }
 
         updateStatus(
-            { case_id: entityId, status: toBackendStatus(status) },
+            { case_id: caseId, status: toBackendStatus(status), sid },
             {
                 onSuccess: () => {
+                    markRecentlyMoved(a.id, status);
                     if (message) toast.success(message);
                 },
             },
@@ -476,7 +520,7 @@ export function AlertCenter() {
                     <div className="relative min-h-0 w-full max-w-full flex-1 overflow-hidden">
                         <div
                             ref={boardScrollRef}
-                            className="hide-scrollbar flex h-full min-w-0 w-full max-w-full items-stretch gap-3 overflow-x-auto overflow-y-hidden pb-1 [-webkit-overflow-scrolling:touch]"
+                            className="hide-scrollbar flex h-full min-w-0 w-full max-w-full items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-transparent pb-1 [-webkit-overflow-scrolling:touch]"
                             role="list"
                         >
                             {COLUMNS.map((col) => (
@@ -485,6 +529,12 @@ export function AlertCenter() {
                                     column={col}
                                     items={grouped[col.id]}
                                     totalInColumn={totalCounts[col.id]}
+                                    highlightedAlertId={
+                                        recentlyMoved?.status === col.id
+                                            ? recentlyMoved.alertId
+                                            : null
+                                    }
+                                    isActivated={recentlyMoved?.status === col.id}
                                     isCollapsed={collapsedCols[col.id]}
                                     isExpanded={expandedCols[col.id]}
                                     onToggleCollapse={toggleCollapse}

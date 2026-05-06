@@ -24,7 +24,7 @@ export function NotificationsDropdown() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative rounded-xl transition-all duration-200 hover:bg-muted"
+          className="relative rounded-xl text-slate-600 transition-all duration-200 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-slate-100"
           aria-label="Thông báo"
         >
           <Bell className="size-5" />
@@ -37,15 +37,15 @@ export function NotificationsDropdown() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-80 p-0 overflow-hidden rounded-2xl border-border/60 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300"
+        className="w-80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 p-0 text-slate-900 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-300 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
       >
-        <div className="flex items-center justify-between px-4 py-3 bg-muted/30">
+        <div className="flex items-center justify-between bg-slate-50/85 px-4 py-3 dark:bg-slate-900/85">
           <h3 className="font-bold text-sm">Thông báo</h3>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2 text-[11px] font-semibold text-primary hover:text-primary hover:bg-primary/10 rounded-lg"
+              className="h-8 rounded-lg px-2 text-[11px] font-semibold text-primary hover:bg-primary/10 hover:text-primary dark:text-blue-300 dark:hover:bg-blue-500/15 dark:hover:text-blue-200"
               onClick={markAllAsRead}
             >
               <CheckCheck className="mr-1 size-3" />
@@ -71,8 +71,9 @@ export function NotificationsDropdown() {
                 <button
                   key={notification.id}
                   className={cn(
-                    "flex flex-col gap-1 p-4 text-left transition-colors hover:bg-muted/50 border-b border-border/40 last:border-0 relative overflow-hidden group",
-                    !notification.isRead && "bg-primary/[0.03]"
+                    "group relative flex flex-col gap-1 overflow-hidden border-b border-slate-200/70 p-4 text-left transition-colors last:border-0 hover:bg-slate-100/70 dark:border-slate-800/70 dark:hover:bg-slate-900/75",
+                    !notification.isRead &&
+                      "bg-blue-50/60 dark:bg-blue-500/10"
                   )}
                   onClick={() => markAsRead(notification.id)}
                 >
@@ -84,8 +85,8 @@ export function NotificationsDropdown() {
                       className={cn(
                         "text-[13px] font-bold leading-tight transition-colors",
                         notification.isRead
-                          ? "text-foreground/80"
-                          : "text-foreground group-hover:text-primary"
+                          ? "text-slate-700 dark:text-slate-300"
+                          : "text-slate-900 group-hover:text-primary dark:text-slate-100 dark:group-hover:text-blue-300"
                       )}
                     >
                       {notification.title}
@@ -113,7 +114,7 @@ export function NotificationsDropdown() {
             <div className="p-2">
               <Button
                 variant="ghost"
-                className="w-full h-9 rounded-lg text-xs font-semibold hover:bg-muted"
+                className="h-9 w-full rounded-lg text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-900"
               >
                 Xem tất cả thông báo
               </Button>

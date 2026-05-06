@@ -192,6 +192,10 @@ export function SettingsView() {
         updateProfileMutation.mutate(values);
     };
 
+    const profileInputClass =
+        "h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-900 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-none dark:focus-visible:border-blue-500 dark:focus-visible:ring-blue-500/40";
+    const profileLabelClass = "text-slate-700 font-semibold dark:text-slate-300";
+
     React.useEffect(() => {
         if (!dataset) return;
         try {
@@ -277,7 +281,7 @@ export function SettingsView() {
 
             {/* Profile */}
             <TabsContent value="profile" className="grid gap-6">
-                <Card className="stripe-sky rounded-2xl border-accent-sky/15 bg-gradient-to-br from-accent-sky/22 via-accent-sky/10 to-card">
+                <Card className="stripe-sky rounded-2xl border-accent-sky/15 bg-gradient-to-br from-accent-sky/22 via-accent-sky/10 to-card dark:border-slate-800 dark:bg-slate-950/50 dark:from-slate-950/90 dark:via-slate-950/70 dark:to-slate-900/50">
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2">
                             <User className="size-4 text-primary" />
@@ -294,16 +298,16 @@ export function SettingsView() {
                         ) : (
                         <Form {...form}>
                             <form id="settings-profile-form" onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-4 rounded-xl border border-slate-200/80 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-900/80">
                                     <div className="grid size-20 place-items-center rounded-2xl bg-primary/10 text-primary text-2xl font-semibold ring-2 ring-primary/20">
                                         {profile?.name ? profile.name.slice(0,2).toUpperCase() : "AD"}
                                     </div>
-                                    <div className="flex flex-col gap-1.5">
+                                    <div className="flex min-h-20 flex-col justify-center gap-1.5">
                                         <Button
                                             type="button"
                                             variant="outline"
                                             size="sm"
-                                            className="rounded-lg"
+                                            className="h-10 rounded-lg border-slate-300 bg-white px-4 text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:text-slate-100"
                                             onClick={() => toast.info("Đang phát triển", { description: "Tính năng tải ảnh đang được cập nhật." })}
                                         >
                                             <Upload className="size-4" />
@@ -321,9 +325,14 @@ export function SettingsView() {
                                         name="name"
                                         render={({ field }) => (
                                             <FormItem className="grid gap-1.5">
-                                                <FormLabel>Họ và tên</FormLabel>
+                                                <FormLabel className={profileLabelClass}>Họ và tên</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                    <Input
+                                                        {...field}
+                                                        value={field.value || ""}
+                                                        placeholder="Nhập họ và tên"
+                                                        className={profileInputClass}
+                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -334,22 +343,27 @@ export function SettingsView() {
                                         name="title"
                                         render={({ field }) => (
                                             <FormItem className="grid gap-1.5">
-                                                <FormLabel>Chức danh</FormLabel>
+                                                <FormLabel className={profileLabelClass}>Chức danh</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                    <Input
+                                                        {...field}
+                                                        value={field.value || ""}
+                                                        placeholder="Ví dụ: Cố vấn học tập"
+                                                        className={profileInputClass}
+                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
                                     <div className="grid gap-1.5">
-                                        <Label htmlFor="email">Email trường</Label>
+                                        <Label htmlFor="email" className={profileLabelClass}>Email trường</Label>
                                         <Input
                                             id="email"
                                             type="email"
                                             value={profile?.email || ""}
                                             disabled
-                                            className="rounded-lg bg-muted/50"
+                                            className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-600 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 disabled:cursor-not-allowed disabled:opacity-100 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300 dark:placeholder:text-slate-500 dark:shadow-none"
                                         />
                                     </div>
                                     <FormField
@@ -357,23 +371,31 @@ export function SettingsView() {
                                         name="phone"
                                         render={({ field }) => (
                                             <FormItem className="grid gap-1.5">
-                                                <FormLabel>Số điện thoại</FormLabel>
+                                                <FormLabel className={profileLabelClass}>Số điện thoại</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                    <Input
+                                                        {...field}
+                                                        value={field.value || ""}
+                                                        placeholder="Ví dụ: +84 9xx xxx xxx"
+                                                        className={profileInputClass}
+                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
                                     <FormField
                                         control={form.control}
                                         name="faculty"
                                         render={({ field }) => (
                                             <FormItem className="grid gap-1.5">
-                                                <FormLabel>Khoa</FormLabel>
+                                                <FormLabel className={profileLabelClass}>Khoa</FormLabel>
                                                 <Select onValueChange={field.onChange} value={field.value || "cntt"}>
                                                     <FormControl>
-                                                        <SelectTrigger className="rounded-lg">
+                                                        <SelectTrigger className={`${profileInputClass} [&_svg]:text-slate-500 dark:[&_svg]:text-slate-400`}>
                                                             <SelectValue placeholder="Chọn khoa" />
                                                         </SelectTrigger>
                                                     </FormControl>
@@ -393,9 +415,14 @@ export function SettingsView() {
                                         name="office"
                                         render={({ field }) => (
                                             <FormItem className="grid gap-1.5">
-                                                <FormLabel>Phòng làm việc</FormLabel>
+                                                <FormLabel className={profileLabelClass}>Phòng làm việc</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} value={field.value || ""} className="rounded-lg" />
+                                                    <Input
+                                                        {...field}
+                                                        value={field.value || ""}
+                                                        placeholder="Ví dụ: A2-304"
+                                                        className={profileInputClass}
+                                                    />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -408,14 +435,20 @@ export function SettingsView() {
                                     name="bio"
                                     render={({ field }) => (
                                         <FormItem className="grid gap-1.5">
-                                            <div className="flex items-center justify-between">
-                                                <FormLabel>Giới thiệu</FormLabel>
-                                                <span className="font-mono text-[11px] text-muted-foreground">
-                                                    ≤ 280
-                                                </span>
-                                            </div>
+                                            <FormLabel className={profileLabelClass}>Giới thiệu</FormLabel>
                                             <FormControl>
-                                                <Textarea {...field} value={field.value || ""} className="min-h-24 rounded-lg" />
+                                                <div className="relative">
+                                                    <Textarea
+                                                        {...field}
+                                                        value={field.value || ""}
+                                                        maxLength={280}
+                                                        placeholder="Viết ngắn gọn về chuyên môn, lĩnh vực hỗ trợ và cách sinh viên nên liên hệ..."
+                                                        className="min-h-36 rounded-xl border border-slate-300 bg-white px-4 py-3 pr-16 text-slate-900 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-none dark:focus-visible:border-blue-500 dark:focus-visible:ring-blue-500/40"
+                                                    />
+                                                    <span className="pointer-events-none absolute bottom-2 right-3 font-mono text-[11px] text-slate-500 dark:text-slate-500">
+                                                        {(field.value || "").length}/280
+                                                    </span>
+                                                </div>
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
