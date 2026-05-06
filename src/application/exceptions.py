@@ -33,13 +33,6 @@ class ConcurrencyError(ApplicationError):
 class AdvisorError(ApplicationError):
     """Raised when an error related to advisor occured."""
 
-class AdvisorProfileNotLinkedError(ApplicationError):
-    """Raised when an advisor account not linked to an advisor profile."""
-
-    def __init__(self, user_id: UUID) -> None:
-        super().__init__(f"account with ID '{user_id}' does not link to any advisor profile.")
-
-
 class AuthenticationError(ApplicationError):
     """Raised when authentication fails at the application level."""
 

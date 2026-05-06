@@ -60,6 +60,18 @@ class AdvisorNotFoundError(AdvisorError):
             ),
         )
 
+class AdvisorProfileNotLinkedError(AdvisorError):
+    """Raised when an advisor account not linked to an advisor profile."""
+
+    def __init__(self, user_id: UUID) -> None:
+        super().__init__(f"account with ID '{user_id}' does not link to any advisor profile.")
+
+class UserIsNotAnAdvisorError(AdvisorError):
+    """Raised when an advisor account not linked to an advisor profile."""
+
+    def __init__(self, user_id: UUID) -> None:
+        super().__init__(f"account with ID '{user_id}' is not an advisor.")
+
 
 class ValidationError(DomainError):
     """Raised when a domain invariant is violated."""
