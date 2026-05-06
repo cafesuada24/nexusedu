@@ -47,10 +47,10 @@ function isBusy(date: Date, slot: string) {
 type Mode = "video" | "inperson"
 
 export function BookingView({
-  studentId,
+  caseId,
   studentName,
 }: {
-  studentId: string
+  caseId: string
   studentName?: string
 }) {
   const today = startOfToday()
@@ -77,11 +77,11 @@ export function BookingView({
 
     try {
       // 1. Update backend status from 'sent' to 'booked' (Contacted -> Scheduled)
-      await updateAlertStatus(studentId, "booked")
+      await updateAlertStatus(caseId, "booked")
 
       // 2. Prepare payload for real-time notification
       const payload = {
-        sid: studentId,
+        sid: caseId,
         date: format(date, "yyyy-MM-dd"),
         slot,
         mode,

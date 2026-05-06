@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog";
 import { type Problem, type StudentRow } from "@/lib/csv";
-import { generateAiDraftForAlert } from "@/lib/api";
+import { fetchStudentCases, generateAiDraftForAlert } from "@/lib/api";
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
 import { useSocketEvent } from "@/hooks/use-socket";
 import { useQueryClient } from "@tanstack/react-query";
@@ -238,9 +238,32 @@ export function AlertCenter() {
         [grouped, aiDraftingById],
     );
 
-    const moveTo = (a: Alert, status: CaseStatus, message?: string) => {
+    const resolveCaseIdForAlert = async (a: Alert): Promise<string | null> => {
+        if (a.caseId) return a.caseId;
+        try {
+            const cases = await fetchStudentCases(a.id);
+            const sorted = [...cases].sort(
+                (left, right) =>
+                    new Date(right.created_at).getTime() -
+                    new Date(left.created_at).getTime(),
+            );
+            const latestOpenCase = sorted.find((c) => c.status === "open");
+            return latestOpenCase?.case_id ?? sorted[0]?.case_id ?? null;
+        } catch {
+            return null;
+        }
+    };
+
+    const moveTo = async (a: Alert, status: CaseStatus, message?: string) => {
         const sid = a.id;
-        const entityId = a.caseId ?? sid;
+        const caseId = await resolveCaseIdForAlert(a);
+        if (!caseId) {
+            toast.error("Không thể cập nhật trạng thái", {
+                description:
+                    "Không tìm thấy case đang mở cho sinh viên này. Vui lòng tải lại danh sách.",
+            });
+            return;
+        }
 
         if (status === "accepted") {
             if (!sid) {
@@ -250,7 +273,7 @@ export function AlertCenter() {
             }
 
             updateStatus(
-                { case_id: sid, status: toBackendStatus(status) },
+                { case_id: caseId, status: toBackendStatus(status), sid },
                 {
                     onSuccess: () => {
                         setAiDraftErrorById((prev) => {
@@ -316,7 +339,7 @@ export function AlertCenter() {
         }
 
         updateStatus(
-            { case_id: entityId, status: toBackendStatus(status) },
+            { case_id: caseId, status: toBackendStatus(status), sid },
             {
                 onSuccess: () => {
                     if (message) toast.success(message);
