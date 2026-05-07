@@ -10,6 +10,7 @@ import {
     Settings,
     CalendarClock,
     LineChart,
+    Sparkles,
 } from "lucide-react";
 import {
     Sidebar,
@@ -30,6 +31,12 @@ const baseMainNav: NavItem[] = [
         label: "Tổng quan",
         icon: LayoutDashboard,
         tone: "primary",
+    },
+    {
+        href: "/dashboard/stories",
+        label: "Câu chuyện thành công",
+        icon: Sparkles,
+        tone: "success",
     },
     {
         href: "/dashboard/import",

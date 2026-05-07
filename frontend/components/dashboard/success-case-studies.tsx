@@ -44,14 +44,14 @@ const MINI_STATS: MiniStat[] = [
   { icon: CheckCircle2, value: "23", label: "Đã đóng", tone: "success" },
 ]
 
-function ImpactHero() {
+export function ImpactHero() {
   const progress = Math.min(
     100,
     Math.round((STUDENTS_HELPED / PERIOD_TOTAL) * 100),
   )
 
   return (
-    <Card className="relative overflow-hidden rounded-2xl border-success/25 ring-1 ring-success/10">
+    <Card className="relative overflow-hidden rounded-2xl border-success/25 bg-white ring-1 ring-success/10 dark:bg-slate-900/40">
       <CardContent className="grid gap-4 p-5 lg:grid-cols-[1.1fr_1fr]">
         {/* Big number with progress */}
         <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-5">
@@ -148,7 +148,7 @@ function ImpactHero() {
   )
 }
 
-type CaseStudy = {
+export type CaseStudy = {
   id: string
   course: string
   metricLabel: string
@@ -160,7 +160,7 @@ type CaseStudy = {
   icon: LucideIcon
 }
 
-const CASE_STUDIES: CaseStudy[] = [
+export const CASE_STUDIES: CaseStudy[] = [
   {
     id: "an",
     course: "Giải tích 1",
@@ -196,7 +196,7 @@ const CASE_STUDIES: CaseStudy[] = [
   },
 ]
 
-function CaseStudyCard({ data: c }: { data: CaseStudy }) {
+export function CaseStudyCard({ data: c }: { data: CaseStudy }) {
   const accent =
     c.accent === "success"
       ? {
@@ -224,7 +224,7 @@ function CaseStudyCard({ data: c }: { data: CaseStudy }) {
   return (
     <Card
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-2xl border-border/60 ring-1 transition-shadow hover:shadow-md",
+        "relative flex flex-col overflow-hidden rounded-2xl border-border/60 bg-white ring-1 transition-shadow hover:shadow-md dark:bg-slate-900/40",
         accent.ring,
       )}
     >
@@ -263,7 +263,7 @@ function CaseStudyCard({ data: c }: { data: CaseStudy }) {
             {c.after}
           </span>
           <span className="ml-auto text-[11px] uppercase tracking-wide text-muted-foreground">
-            {c.metricLabel}
+            <span className="mx-1">{c.metricLabel}</span>
           </span>
         </div>
       </CardHeader>
@@ -288,14 +288,15 @@ function CaseStudyCard({ data: c }: { data: CaseStudy }) {
   )
 }
 
-type ThankYouNote = {
+
+export type ThankYouNote = {
   id: string
   message: string
   studentName: string
   daysAgo: number
 }
 
-const THANK_YOU_NOTES: ThankYouNote[] = [
+export const THANK_YOU_NOTES: ThankYouNote[] = [
   {
     id: "tn-1",
     message:
@@ -319,7 +320,7 @@ const THANK_YOU_NOTES: ThankYouNote[] = [
   },
 ]
 
-function ThankYouNoteCard({ note: n }: { note: ThankYouNote }) {
+export function ThankYouNoteCard({ note: n }: { note: ThankYouNote }) {
   const initials = n.studentName
     .split(" ")
     .map((p) => p[0])
@@ -329,7 +330,7 @@ function ThankYouNoteCard({ note: n }: { note: ThankYouNote }) {
     .toUpperCase()
 
   return (
-    <figure className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-card p-4 ring-1 ring-primary/5 transition-shadow hover:shadow-md">
+    <figure className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-white p-4 ring-1 ring-primary/5 transition-shadow hover:shadow-md dark:bg-slate-900/40">
       <Quote className="size-4 shrink-0 text-primary/60" aria-hidden />
       <blockquote className="text-pretty text-sm leading-relaxed text-foreground">
         {n.message}
@@ -357,41 +358,7 @@ export function SuccessCaseStudies() {
       <div className="flex flex-col gap-4">
         <ImpactHero />
 
-        <Card className="stripe-success rounded-2xl border-success/15 bg-gradient-to-br from-success/18 via-success/8 to-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="flex items-center gap-2 font-serif text-lg">
-              <span
-                aria-hidden
-                className="grid size-7 place-items-center rounded-lg bg-success/10 text-success ring-1 ring-success/15"
-              >
-                <GraduationCap className="size-3.5" />
-              </span>
-              Câu chuyện thành công
-            </CardTitle>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className="rounded-md border-success/30 text-success"
-                >
-                  {CASE_STUDIES.length}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>Cập nhật hàng tháng</TooltipContent>
-            </Tooltip>
-          </CardHeader>
-          <CardContent>
-            <ul role="list" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {CASE_STUDIES.map((c) => (
-                <li key={c.id} className="contents">
-                  <CaseStudyCard data={c} />
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card className="stripe-primary rounded-2xl border-primary/15 bg-gradient-to-br from-primary/18 via-primary/8 to-card">
+        <Card className="stripe-primary rounded-2xl border-primary/15 bg-gradient-to-br from-primary/18 via-primary/8 to-white dark:to-slate-900/40">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="flex items-center gap-2 font-serif text-lg">
               <span
