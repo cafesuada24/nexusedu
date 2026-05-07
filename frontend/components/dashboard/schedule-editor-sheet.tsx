@@ -60,14 +60,158 @@ import {
   type DayKey,
   type Override,
   type WeekSchedule,
+  type DayConfig,
+  type Slot,
 } from "@/lib/schedule"
+
+/* ────────────────────────────────────────────────────────────────
+ * Sub-components (Memoized for 100fps performance)
+ * ──────────────────────────────────────────────────────────────── */
+
+const SlotRow = React.memo(
+  ({
+    dayKey,
+    slot,
+    onUpdate,
+    onRemove,
+  }: {
+    dayKey: DayKey
+    slot: Slot
+    onUpdate: (day: DayKey, id: string, field: "from" | "to", value: string) => void
+    onRemove: (day: DayKey, id: string) => void
+  }) => {
+    return (
+      <div className="flex items-center gap-3 transition-all animate-in fade-in slide-in-from-left-2 duration-200">
+        <div className="relative">
+          <Input
+            type="time"
+            value={slot.from}
+            onChange={(e) => onUpdate(dayKey, slot.id, "from", e.target.value)}
+            className="h-9 w-[110px] rounded-lg border-border/60 bg-background px-3 font-mono text-sm transition-shadow focus-visible:ring-1"
+          />
+        </div>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+          đến
+        </span>
+        <div className="relative">
+          <Input
+            type="time"
+            value={slot.to}
+            onChange={(e) => onUpdate(dayKey, slot.id, "to", e.target.value)}
+            className="h-9 w-[110px] rounded-lg border-border/60 bg-background px-3 font-mono text-sm transition-shadow focus-visible:ring-1"
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-9 shrink-0 rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => onRemove(dayKey, slot.id)}
+          aria-label="Xoá khoảng giờ"
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    )
+  },
+)
+SlotRow.displayName = "SlotRow"
+
+const DayRow = React.memo(
+  ({
+    dayKey,
+    label,
+    shortLabel,
+    config,
+    onToggle,
+    onAddSlot,
+    onRemoveSlot,
+    onUpdateSlot,
+  }: {
+    dayKey: DayKey
+    label: string
+    shortLabel: string
+    config: DayConfig
+    onToggle: (day: DayKey) => void
+    onAddSlot: (day: DayKey) => void
+    onRemoveSlot: (day: DayKey, id: string) => void
+    onUpdateSlot: (day: DayKey, id: string, field: "from" | "to", value: string) => void
+  }) => {
+    return (
+      <div
+        className={cn(
+          "group rounded-2xl border p-4 transition-all duration-300",
+          config.enabled
+            ? "border-border/80 bg-card shadow-sm"
+            : "border-border/30 bg-muted/20 opacity-80",
+        )}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div
+              className={cn(
+                "grid size-10 place-items-center rounded-xl text-sm font-bold shadow-sm transition-colors",
+                config.enabled
+                  ? "bg-primary/15 text-primary ring-1 ring-primary/20"
+                  : "bg-muted text-muted-foreground/60",
+              )}
+            >
+              {shortLabel}
+            </div>
+            <div>
+              <p className="font-serif text-[15px] font-semibold tracking-tight">
+                {label}
+              </p>
+              <p className="text-[11px] leading-none text-muted-foreground/80">
+                {config.enabled
+                  ? `${config.slots.length} khoảng giờ làm việc`
+                  : "Đang được thiết lập là ngày nghỉ"}
+              </p>
+            </div>
+          </div>
+          <Switch
+            checked={config.enabled}
+            onCheckedChange={() => onToggle(dayKey)}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+
+        {config.enabled && (
+          <div className="mt-5 grid gap-3 pl-14">
+            {config.slots.map((slot) => (
+              <SlotRow
+                key={slot.id}
+                dayKey={dayKey}
+                slot={slot}
+                onUpdate={onUpdateSlot}
+                onRemove={onRemoveSlot}
+              />
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 w-fit rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 text-[11px] font-medium text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              onClick={() => onAddSlot(dayKey)}
+            >
+              <Plus className="mr-1.5 size-3.5" />
+              Thêm khoảng giờ
+            </Button>
+          </div>
+        )}
+      </div>
+    )
+  },
+)
+DayRow.displayName = "DayRow"
+
+/* ────────────────────────────────────────────────────────────────
+ * Main Component
+ * ──────────────────────────────────────────────────────────────── */
 
 export function ScheduleEditorSheet() {
   const { schedule, setSchedule, resetSchedule } = useScheduleQuery()
   const [open, setOpen] = React.useState(false)
 
-  // Draft state: edits are held locally until "Lưu lịch" is pressed so that
-  // the Settings card + Booking page don't flicker while the user is editing.
+  // Draft state
   const [week, setWeek] = React.useState<WeekSchedule>(schedule.week)
   const [duration, setDuration] = React.useState(String(schedule.duration))
   const [buffer, setBuffer] = React.useState(String(schedule.buffer))
@@ -79,15 +223,12 @@ export function ScheduleEditorSheet() {
   const [requireReason, setRequireReason] = React.useState(
     schedule.requireReason,
   )
-  const [timezone, setTimezone] = React.useState(schedule.timezone)
   const [overrides, setOverrides] = React.useState<Override[]>(
     schedule.overrides,
   )
   const [newDate, setNewDate] = React.useState("")
   const [newNote, setNewNote] = React.useState("")
 
-  // Every time the sheet opens, re-hydrate the draft from the latest
-  // saved schedule so unsaved edits from a previous session are discarded.
   React.useEffect(() => {
     if (!open) return
     setWeek(schedule.week)
@@ -99,14 +240,14 @@ export function ScheduleEditorSheet() {
     setAutoConfirm(schedule.autoConfirm)
     setAllowOnline(schedule.allowOnline)
     setRequireReason(schedule.requireReason)
-    setTimezone(schedule.timezone)
     setOverrides(schedule.overrides)
   }, [open, schedule])
 
-  const toggleDay = (day: DayKey) =>
+  const toggleDay = React.useCallback((day: DayKey) => {
     setWeek((w) => ({ ...w, [day]: { ...w[day], enabled: !w[day].enabled } }))
+  }, [])
 
-  const addSlot = (day: DayKey) =>
+  const addSlot = React.useCallback((day: DayKey) => {
     setWeek((w) => ({
       ...w,
       [day]: {
@@ -118,45 +259,51 @@ export function ScheduleEditorSheet() {
         ],
       },
     }))
+  }, [])
 
-  const removeSlot = (day: DayKey, id: string) =>
+  const removeSlot = React.useCallback((day: DayKey, id: string) => {
     setWeek((w) => ({
       ...w,
       [day]: { ...w[day], slots: w[day].slots.filter((s) => s.id !== id) },
     }))
+  }, [])
 
-  const updateSlot = (
-    day: DayKey,
-    id: string,
-    field: "from" | "to",
-    value: string,
-  ) =>
-    setWeek((w) => ({
-      ...w,
-      [day]: {
-        ...w[day],
-        slots: w[day].slots.map((s) =>
-          s.id === id ? { ...s, [field]: value } : s,
-        ),
-      },
-    }))
+  const updateSlot = React.useCallback(
+    (day: DayKey, id: string, field: "from" | "to", value: string) => {
+      setWeek((w) => ({
+        ...w,
+        [day]: {
+          ...w[day],
+          slots: w[day].slots.map((s) =>
+            s.id === id ? { ...s, [field]: value } : s,
+          ),
+        },
+      }))
+    },
+    [],
+  )
 
-  const copyWeekday = (source: DayKey) => {
-    const sourceSlots = week[source].slots
-    setWeek((w) => {
-      const next = { ...w }
-      ;(["mon", "tue", "wed", "thu", "fri"] as DayKey[]).forEach((d) => {
-        next[d] = {
-          enabled: true,
-          slots: sourceSlots.map((s) => ({ ...s, id: crypto.randomUUID() })),
-        }
+  const copyWeekday = React.useCallback(
+    (source: DayKey) => {
+      const sourceSlots = week[source].slots
+      setWeek((w) => {
+        const next = { ...w }
+        ;(["mon", "tue", "wed", "thu", "fri"] as DayKey[]).forEach((d) => {
+          next[d] = {
+            enabled: true,
+            slots: sourceSlots.map((s) => ({ ...s, id: crypto.randomUUID() })),
+          }
+        })
+        return next
       })
-      return next
-    })
-    toast.success(`Đã áp lịch ${DAYS.find((d) => d.key === source)?.long} cho T2–T6`)
-  }
+      toast.success(
+        `Đã áp lịch ${DAYS.find((d) => d.key === source)?.long} cho T2–T6`,
+      )
+    },
+    [week],
+  )
 
-  const addOverride = () => {
+  const addOverride = React.useCallback(() => {
     if (!newDate || !newNote) {
       toast.error("Vui lòng nhập ngày và lý do")
       return
@@ -168,12 +315,13 @@ export function ScheduleEditorSheet() {
     setNewDate("")
     setNewNote("")
     toast.success("Đã thêm ngoại lệ lịch")
-  }
+  }, [newDate, newNote])
 
-  const removeOverride = (id: string) =>
+  const removeOverride = React.useCallback((id: string) => {
     setOverrides((prev) => prev.filter((o) => o.id !== id))
+  }, [])
 
-  const reset = () => {
+  const reset = React.useCallback(() => {
     setWeek(DEFAULT_SCHEDULE.week)
     setOverrides(DEFAULT_SCHEDULE.overrides)
     setDuration(String(DEFAULT_SCHEDULE.duration))
@@ -184,12 +332,11 @@ export function ScheduleEditorSheet() {
     setAutoConfirm(DEFAULT_SCHEDULE.autoConfirm)
     setAllowOnline(DEFAULT_SCHEDULE.allowOnline)
     setRequireReason(DEFAULT_SCHEDULE.requireReason)
-    setTimezone(DEFAULT_SCHEDULE.timezone)
     resetSchedule()
     toast.success("Đã khôi phục lịch mặc định")
-  }
+  }, [resetSchedule])
 
-  const save = () => {
+  const save = React.useCallback(() => {
     setSchedule({
       week,
       overrides,
@@ -201,13 +348,27 @@ export function ScheduleEditorSheet() {
       autoConfirm,
       allowOnline,
       requireReason,
-      timezone,
+      timezone: schedule.timezone,
     })
     toast.success("Đã lưu lịch chi tiết", {
-      description: "Thay đổi đã áp dụng cho trang đặt lịch và card Giờ làm việc.",
+      description:
+        "Thay đổi đã áp dụng cho trang đặt lịch và card Giờ làm việc.",
     })
     setOpen(false)
-  }
+  }, [
+    setSchedule,
+    week,
+    overrides,
+    duration,
+    buffer,
+    dailyCap,
+    minNotice,
+    windowDays,
+    autoConfirm,
+    allowOnline,
+    requireReason,
+    schedule.timezone,
+  ])
 
   const totalActiveHours = React.useMemo(() => {
     let minutes = 0
@@ -239,9 +400,9 @@ export function ScheduleEditorSheet() {
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl"
+        className="will-change-transform translate-z-0 w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl border-l border-border/60 bg-background shadow-2xl"
       >
-        <SheetHeader className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-6 py-5 backdrop-blur">
+        <SheetHeader className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-6 py-5 backdrop-blur-md">
           <div className="flex items-start justify-between gap-4">
             <div>
               <SheetTitle className="flex items-center gap-2 font-serif text-xl">
@@ -250,17 +411,32 @@ export function ScheduleEditorSheet() {
                 </span>
                 Chỉnh sửa lịch chi tiết
               </SheetTitle>
-              <SheetDescription className="mt-1">
-                Tuỳ chỉnh khung giờ tiếp sinh viên, độ dài mỗi cuộc, ngày nghỉ
-                và quy tắc đặt lịch công khai.
+              <SheetDescription className="mt-1 text-pretty">
+                Tuỳ chỉnh khung giờ{" "}
+                <strong className="mx-1 font-semibold text-foreground/90">
+                  tiếp sinh viên
+                </strong>
+                ,{" "}
+                <strong className="mx-1 font-semibold text-foreground/90">
+                  độ dài mỗi cuộc
+                </strong>
+                ,{" "}
+                <strong className="mx-1 font-semibold text-foreground/90">
+                  ngày nghỉ
+                </strong>{" "}
+                và{" "}
+                <strong className="mx-1 font-semibold text-foreground/90">
+                  quy tắc đặt lịch công khai
+                </strong>
+                .
               </SheetDescription>
             </div>
             <div className="hidden items-center gap-2 sm:flex">
-              <Badge variant="secondary" className="gap-1 rounded-full">
+              <Badge variant="secondary" className="gap-1 rounded-full px-2.5">
                 <Clock className="size-3" />
                 {totalActiveHours} giờ / tuần
               </Badge>
-              <Badge variant="outline" className="gap-1 rounded-full">
+              <Badge variant="outline" className="gap-1 rounded-full px-2.5">
                 <Users className="size-3" />~{weeklyCapacity} cuộc
               </Badge>
             </div>
@@ -269,8 +445,8 @@ export function ScheduleEditorSheet() {
 
         <div className="grid gap-8 px-6 py-6">
           {/* Weekly schedule */}
-          <section className="grid gap-3">
-            <div className="flex items-end justify-between gap-3">
+          <section className="grid gap-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="font-serif text-base font-medium">
                   Khung giờ theo tuần
@@ -282,142 +458,62 @@ export function ScheduleEditorSheet() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-lg"
+                className="h-8 min-w-[120px] rounded-lg border border-border/40 hover:bg-muted/80"
                 onClick={() => copyWeekday("mon")}
               >
-                <Copy className="size-4" />
+                <Copy className="size-3.5" />
                 Copy T2 → T6
               </Button>
             </div>
 
-            <div className="grid gap-2">
-              {DAYS.map((d) => {
-                const cfg = week[d.key]
-                return (
-                  <div
-                    key={d.key}
-                    className={cn(
-                      "rounded-xl border p-3 transition-colors",
-                      cfg.enabled
-                        ? "border-border/70 bg-card"
-                        : "border-border/40 bg-muted/30",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={cn(
-                            "grid size-9 place-items-center rounded-lg text-sm font-semibold",
-                            cfg.enabled
-                              ? "bg-primary/15 text-primary"
-                              : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {d.short}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{d.long}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {cfg.enabled
-                              ? `${cfg.slots.length} khoảng giờ`
-                              : "Nghỉ"}
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={cfg.enabled}
-                        onCheckedChange={() => toggleDay(d.key)}
-                      />
-                    </div>
-
-                    {cfg.enabled && (
-                      <div className="mt-3 grid gap-2 pl-12">
-                        {cfg.slots.map((slot) => (
-                          <div
-                            key={slot.id}
-                            className="flex items-center gap-2"
-                          >
-                            <Input
-                              type="time"
-                              value={slot.from}
-                              onChange={(e) =>
-                                updateSlot(
-                                  d.key,
-                                  slot.id,
-                                  "from",
-                                  e.target.value,
-                                )
-                              }
-                              className="h-9 w-28 rounded-lg"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              đến
-                            </span>
-                            <Input
-                              type="time"
-                              value={slot.to}
-                              onChange={(e) =>
-                                updateSlot(d.key, slot.id, "to", e.target.value)
-                              }
-                              className="h-9 w-28 rounded-lg"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-8 rounded-lg text-muted-foreground hover:text-destructive"
-                              onClick={() => removeSlot(d.key, slot.id)}
-                              aria-label="Xoá khoảng giờ"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-fit rounded-lg text-muted-foreground"
-                          onClick={() => addSlot(d.key)}
-                        >
-                          <Plus className="size-4" />
-                          Thêm khoảng giờ
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+            <div className="grid gap-3">
+              {DAYS.map((d) => (
+                <DayRow
+                  key={d.key}
+                  dayKey={d.key}
+                  label={d.long}
+                  shortLabel={d.short}
+                  config={week[d.key]}
+                  onToggle={toggleDay}
+                  onAddSlot={addSlot}
+                  onRemoveSlot={removeSlot}
+                  onUpdateSlot={updateSlot}
+                />
+              ))}
             </div>
           </section>
 
-          <Separator />
+          <Separator className="bg-border/60" />
 
           {/* Meeting parameters */}
-          <section className="grid gap-4">
+          <section className="grid gap-5">
             <div>
-              <h3 className="font-serif text-base font-medium">
+              <h3 className="font-serif text-base font-medium text-foreground/90">
                 Thông số cuộc hẹn
               </h3>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Quyết định độ dài mỗi cuộc, thời gian nghỉ giữa các cuộc và
                 giới hạn mỗi ngày.
               </p>
             </div>
 
-            <div className="grid gap-2">
-              <Label className="text-sm">Thời lượng mỗi cuộc (phút)</Label>
+            <div className="grid gap-3">
+              <Label className="text-[13px] font-medium text-foreground/80">
+                Thời lượng mỗi cuộc (phút)
+              </Label>
               <ToggleGroup
                 type="single"
                 value={duration}
                 onValueChange={(v) => v && setDuration(v)}
                 variant="outline"
-                className="w-fit rounded-lg"
+                className="w-fit gap-2"
               >
                 {["15", "30", "45", "60"].map((m) => (
                   <ToggleGroupItem
                     key={m}
                     value={m}
                     aria-label={`${m} phút`}
-                    className="px-4"
+                    className="h-9 min-w-[50px] rounded-lg border-border/60 transition-all data-[state=on]:bg-primary/10 data-[state=on]:text-primary data-[state=on]:ring-1 data-[state=on]:ring-primary/20"
                   >
                     {m}
                   </ToggleGroupItem>
@@ -425,16 +521,16 @@ export function ScheduleEditorSheet() {
               </ToggleGroup>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="buffer" className="text-sm">
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="buffer" className="text-[13px] font-medium text-foreground/80">
                   Nghỉ giữa hai cuộc
                 </Label>
                 <Select value={buffer} onValueChange={setBuffer}>
-                  <SelectTrigger id="buffer" className="rounded-lg">
+                  <SelectTrigger id="buffer" className="h-10 rounded-xl border-border/60 bg-muted/20">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="0">Không nghỉ</SelectItem>
                     <SelectItem value="5">5 phút</SelectItem>
                     <SelectItem value="10">10 phút</SelectItem>
@@ -443,8 +539,8 @@ export function ScheduleEditorSheet() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="cap" className="text-sm">
+              <div className="grid gap-2">
+                <Label htmlFor="cap" className="text-[13px] font-medium text-foreground/80">
                   Số cuộc tối đa mỗi ngày
                 </Label>
                 <Input
@@ -454,18 +550,18 @@ export function ScheduleEditorSheet() {
                   max={20}
                   value={dailyCap}
                   onChange={(e) => setDailyCap(e.target.value)}
-                  className="rounded-lg"
+                  className="h-10 rounded-xl border-border/60 bg-muted/20 px-4"
                 />
               </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="notice" className="text-sm">
+              <div className="grid gap-2">
+                <Label htmlFor="notice" className="text-[13px] font-medium text-foreground/80">
                   Báo trước tối thiểu
                 </Label>
                 <Select value={minNotice} onValueChange={setMinNotice}>
-                  <SelectTrigger id="notice" className="rounded-lg">
+                  <SelectTrigger id="notice" className="h-10 rounded-xl border-border/60 bg-muted/20">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="1h">1 giờ</SelectItem>
                     <SelectItem value="4h">4 giờ</SelectItem>
                     <SelectItem value="12h">12 giờ</SelectItem>
@@ -474,8 +570,8 @@ export function ScheduleEditorSheet() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="window" className="text-sm">
+              <div className="grid gap-2">
+                <Label htmlFor="window" className="text-[13px] font-medium text-foreground/80">
                   Cửa sổ đặt lịch (ngày)
                 </Label>
                 <Input
@@ -485,16 +581,15 @@ export function ScheduleEditorSheet() {
                   max={90}
                   value={windowDays}
                   onChange={(e) => setWindowDays(e.target.value)}
-                  className="rounded-lg"
+                  className="h-10 rounded-xl border-border/60 bg-muted/20 px-4"
                 />
-                <p className="text-[11px] text-muted-foreground">
-                  Sinh viên chỉ được đặt trước tối đa {windowDays} ngày kể từ
-                  hôm nay.
+                <p className="text-[10px] text-muted-foreground/80">
+                  Sinh viên chỉ được đặt trước tối đa {windowDays} ngày.
                 </p>
               </div>
             </div>
 
-            <Separator />
+            <Separator className="bg-border/60" />
 
             <div className="grid gap-3">
               {[
@@ -528,15 +623,15 @@ export function ScheduleEditorSheet() {
               ].map((item) => (
                 <div
                   key={item.key}
-                  className="flex items-start justify-between gap-4 rounded-xl border border-border/60 bg-muted/20 p-3"
+                  className="flex items-center justify-between gap-4 rounded-2xl border border-border/50 bg-muted/20 p-4 transition-all hover:bg-muted/30"
                 >
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                      <item.icon className="size-4" />
+                  <div className="flex items-center gap-4">
+                    <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+                      <item.icon className="size-4.5" />
                     </span>
-                    <div>
-                      <p className="text-sm font-medium">{item.label}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-foreground/90">{item.label}</p>
+                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground/80">
                         {item.detail}
                       </p>
                     </div>
@@ -544,60 +639,60 @@ export function ScheduleEditorSheet() {
                   <Switch
                     checked={item.value}
                     onCheckedChange={item.set}
-                    className="mt-1"
+                    className="data-[state=checked]:bg-primary"
                   />
                 </div>
               ))}
             </div>
           </section>
 
-          <Separator />
+          <Separator className="bg-border/60" />
 
           {/* Overrides */}
-          <section className="grid gap-3">
+          <section className="grid gap-4">
             <div>
-              <h3 className="font-serif text-base font-medium">
+              <h3 className="font-serif text-base font-medium text-foreground/90">
                 Ngoại lệ & ngày nghỉ
               </h3>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Thêm ngày nghỉ lễ, đi công tác, hoặc khung giờ đặc biệt cho
                 ngày cụ thể.
               </p>
             </div>
 
-            <div className="grid gap-2 rounded-xl border border-dashed border-border/60 p-3 sm:grid-cols-[140px_1fr_auto]">
+            <div className="grid gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:grid-cols-[160px_1fr_auto]">
               <Input
                 type="text"
                 placeholder="dd/mm/yyyy"
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
-                className="rounded-lg"
+                className="h-10 rounded-xl border-border/60 bg-background px-4"
               />
               <Input
                 type="text"
                 placeholder="Lý do, ví dụ: Hội thảo tại Đà Nẵng"
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                className="rounded-lg"
+                className="h-10 rounded-xl border-border/60 bg-background px-4"
               />
               <Button
                 variant="secondary"
-                className="rounded-lg"
+                className="h-10 rounded-xl bg-primary/10 text-primary hover:bg-primary/15"
                 onClick={addOverride}
               >
-                <Plus className="size-4" />
+                <Plus className="mr-1.5 size-4" />
                 Thêm
               </Button>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-border/60">
+            <div className="overflow-hidden rounded-2xl border border-border/60 shadow-sm">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="w-32">Ngày</TableHead>
-                    <TableHead>Ghi chú</TableHead>
-                    <TableHead className="w-28">Loại</TableHead>
-                    <TableHead className="w-12" />
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="h-11 px-4 font-serif text-[13px] font-bold">Ngày</TableHead>
+                    <TableHead className="h-11 px-4 font-serif text-[13px] font-bold">Ghi chú</TableHead>
+                    <TableHead className="h-11 px-4 font-serif text-[13px] font-bold">Loại</TableHead>
+                    <TableHead className="h-11 w-12 px-4" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -605,22 +700,22 @@ export function ScheduleEditorSheet() {
                     <TableRow>
                       <TableCell
                         colSpan={4}
-                        className="py-6 text-center text-sm text-muted-foreground"
+                        className="py-8 text-center text-[12px] text-muted-foreground italic"
                       >
                         Chưa có ngoại lệ nào. Lịch chạy theo khung giờ tuần.
                       </TableCell>
                     </TableRow>
                   ) : (
                     overrides.map((o) => (
-                      <TableRow key={o.id}>
-                        <TableCell className="font-mono text-sm">
+                      <TableRow key={o.id} className="hover:bg-muted/30">
+                        <TableCell className="px-4 font-mono text-[12px] font-medium">
                           {o.date}
                         </TableCell>
-                        <TableCell className="text-sm">{o.note}</TableCell>
-                        <TableCell>
+                        <TableCell className="px-4 text-[12px] text-foreground/80">{o.note}</TableCell>
+                        <TableCell className="px-4">
                           <Badge
                             variant={o.type === "off" ? "destructive" : "secondary"}
-                            className="gap-1 rounded-full font-normal"
+                            className="h-6 gap-1.5 rounded-full px-2.5 text-[10px] font-semibold tracking-wide uppercase"
                           >
                             {o.type === "off" ? (
                               <>
@@ -635,15 +730,15 @@ export function ScheduleEditorSheet() {
                             )}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="px-4 text-right">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="size-8 rounded-lg text-muted-foreground hover:text-destructive"
+                            className="size-8 rounded-lg text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => removeOverride(o.id)}
                             aria-label="Xoá ngoại lệ"
                           >
-                            <Trash2 className="size-4" />
+                            <Trash2 className="size-3.5" />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -654,102 +749,78 @@ export function ScheduleEditorSheet() {
             </div>
           </section>
 
-          <Separator />
+          <Separator className="bg-border/60" />
 
           {/* Timezone & link */}
-          <section className="grid gap-4">
+          <section className="grid gap-5">
             <div>
-              <h3 className="font-serif text-base font-medium">
-                Múi giờ & liên kết công khai
+              <h3 className="font-serif text-base font-medium text-foreground/90">
+                Liên kết đặt lịch công khai
               </h3>
-              <p className="text-xs text-muted-foreground">
-                Sinh viên thấy lịch đã được tự động quy đổi sang múi giờ của
-                họ.
+              <p className="text-[11px] text-muted-foreground">
+                Sinh viên có thể đặt lịch hẹn trực tiếp qua liên kết này.
               </p>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="tz" className="text-sm">
-                  Múi giờ
-                </Label>
-                <Select value={timezone} onValueChange={setTimezone}>
-                  <SelectTrigger id="tz" className="rounded-lg">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Asia/Ho_Chi_Minh">
-                      (GMT+7) Hồ Chí Minh
-                    </SelectItem>
-                    <SelectItem value="Asia/Bangkok">
-                      (GMT+7) Bangkok
-                    </SelectItem>
-                    <SelectItem value="Asia/Singapore">
-                      (GMT+8) Singapore
-                    </SelectItem>
-                    <SelectItem value="Asia/Tokyo">(GMT+9) Tokyo</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="grid gap-2">
+              <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-2.5 shadow-inner">
+                <Link2 className="size-4 text-muted-foreground/70" />
+                <code className="flex-1 truncate font-mono text-[12px] text-foreground/70">
+                  nexusedu.app/booking/le-ha
+                </code>
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 rounded-lg text-muted-foreground/60 transition-colors hover:bg-primary/10 hover:text-primary"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(
+                            "https://nexusedu.app/booking/le-ha",
+                          )
+                          toast.success("Đã sao chép liên kết", {
+                            description:
+                              "Thông tin đã được lưu vào bộ nhớ tạm của bạn",
+                          })
+                        }}
+                      >
+                        <Copy className="size-3.5" />
+                        <span className="sr-only">Copy</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Sao chép liên kết</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-
-              <div className="grid gap-1.5">
-                <Label className="text-sm">Liên kết đặt lịch công khai</Label>
-                <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
-                  <Link2 className="size-4 text-muted-foreground" />
-                  <code className="flex-1 truncate text-xs">
-                    nexusedu.app/booking/le-ha
-                  </code>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7 rounded-md"
-                          onClick={() => {
-                            navigator.clipboard?.writeText(
-                              "https://nexusedu.app/booking/le-ha",
-                            )
-                            toast.success("Đã sao chép liên kết", {
-                              description:
-                                "Thông tin đã được lưu vào bộ nhớ tạm của bạn",
-                            })
-                          }}
-                        >
-                          <Copy className="size-3.5" />
-                          <span className="sr-only">Copy</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Sao chép liên kết</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Tự động đính kèm vào email AI gửi sinh viên nguy cơ cao.
-                </p>
-              </div>
+              <p className="text-[10px] text-muted-foreground/70">
+                Tự động đính kèm vào email AI gửi sinh viên.
+              </p>
             </div>
           </section>
         </div>
 
-        <SheetFooter className="sticky bottom-0 z-10 flex-row items-center justify-between gap-2 border-t border-border/60 bg-background/95 px-6 py-4 backdrop-blur">
+        <SheetFooter className="sticky bottom-0 z-10 flex-row items-center justify-between gap-3 border-t border-border/60 bg-background/95 px-6 py-5 backdrop-blur-md">
           <Button
             variant="ghost"
-            className="rounded-lg text-muted-foreground"
+            className="h-10 rounded-xl text-[13px] font-medium text-muted-foreground hover:bg-muted/50"
             onClick={reset}
           >
             Khôi phục mặc định
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              className="rounded-lg"
+              className="h-10 rounded-xl border-border/80 px-6 text-[13px] font-medium transition-colors hover:bg-muted/50"
               onClick={() => setOpen(false)}
             >
               Huỷ
             </Button>
-            <Button className="rounded-lg" onClick={save}>
-              <Check className="size-4" />
+            <Button 
+              className="h-10 rounded-xl bg-primary px-8 text-[13px] font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98]" 
+              onClick={save}
+            >
+              <Check className="mr-2 size-4" />
               Lưu lịch
             </Button>
           </div>
