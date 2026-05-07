@@ -9,7 +9,7 @@ import {
   SidebarMenuBadge,
 } from "@/components/ui/sidebar";
 
-export type Tone = "primary" | "sky" | "cyan" | "indigo" | "destructive" | "slate";
+export type Tone = "primary" | "sky" | "cyan" | "indigo" | "destructive" | "slate" | "success";
 
 export const TONE_CONFIG: Record<
   Tone,
@@ -29,6 +29,14 @@ export const TONE_CONFIG: Record<
     activeBg: "bg-primary/8",
     activeText: "text-primary",
     badge: "bg-primary/15 text-primary",
+  },
+  success: {
+    tile: "bg-success/10 text-success ring-success/15",
+    tileActive: "bg-success text-success-foreground ring-success/40 shadow-sm shadow-success/30",
+    rail: "bg-success",
+    activeBg: "bg-success/8",
+    activeText: "text-success",
+    badge: "bg-success/15 text-success",
   },
   sky: {
     tile: "bg-accent-sky/10 text-accent-sky ring-accent-sky/15",
