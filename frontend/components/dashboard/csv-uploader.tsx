@@ -15,7 +15,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useUploads, type UploadItem } from "@/hooks/use-uploads";
-import { analyzeCsv, csvToLMSRecords, csvToSISRecords, mergeCsv, SAMPLE_CSV } from "@/lib/csv";
+import {
+    analyzeCsv,
+    csvToLMSRecords,
+    csvToSISRecords,
+    mergeCsv,
+    LMS_SAMPLE_CSV,
+    SIS_SAMPLE_CSV,
+} from "@/lib/csv";
+
 import { ingestData, updateUserSettings } from "@/lib/api";
 import { type SourceKey } from "@/lib/constants";
 import { Dropzone, HintLine, type StagedMap } from "./csv-uploader/dropzone";
@@ -35,35 +43,39 @@ export function CsvUploader() {
 
     const isAdmin = user?.role === "admin";
 
-    const stageFile = React.useCallback((file: File, source: SourceKey) => {
-        if (!isAdmin) {
-            toast.error("Bạn không có quyền thực hiện thao tác này");
-            return;
-        }
-        if (!file.name.toLowerCase().endsWith(".csv")) {
-            toast.error("Vui lòng tải file .CSV");
-            return;
-        }
-        const reader = new FileReader();
-        reader.onerror = () => {
-            toast.error("Không đọc được file");
-        };
-        reader.onload = () => {
-            const text = typeof reader.result === "string" ? reader.result : "";
-            setStaged((prev) => ({
-                ...prev,
-                [source]: {
-                    file,
-                    text,
-                    sizeKB: Number((file.size / 1024).toFixed(1)),
-                },
-            }));
-            toast.success(`Đã nạp file ${source}`, {
-                description: file.name,
-            });
-        };
-        reader.readAsText(file);
-    }, [isAdmin]);
+    const stageFile = React.useCallback(
+        (file: File, source: SourceKey) => {
+            if (!isAdmin) {
+                toast.error("Bạn không có quyền thực hiện thao tác này");
+                return;
+            }
+            if (!file.name.toLowerCase().endsWith(".csv")) {
+                toast.error("Vui lòng tải file .CSV");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onerror = () => {
+                toast.error("Không đọc được file");
+            };
+            reader.onload = () => {
+                const text =
+                    typeof reader.result === "string" ? reader.result : "";
+                setStaged((prev) => ({
+                    ...prev,
+                    [source]: {
+                        file,
+                        text,
+                        sizeKB: Number((file.size / 1024).toFixed(1)),
+                    },
+                }));
+                toast.success(`Đã nạp file ${source}`, {
+                    description: file.name,
+                });
+            };
+            reader.readAsText(file);
+        },
+        [isAdmin],
+    );
 
     const removeStaged = (source: SourceKey) => {
         setStaged((prev) => {
@@ -199,10 +211,10 @@ export function CsvUploader() {
     };
 
     const useSampleForBoth = () => {
-        const lmsFile = new File([SAMPLE_CSV], "nexusedu-lms-sample.csv", {
+        const lmsFile = new File([LMS_SAMPLE_CSV], "nexusedu-lms-sample.csv", {
             type: "text/csv",
         });
-        const sisFile = new File([SAMPLE_CSV], "nexusedu-sis-sample.csv", {
+        const sisFile = new File([SIS_SAMPLE_CSV], "nexusedu-sis-sample.csv", {
             type: "text/csv",
         });
         stageFile(lmsFile, "LMS");
