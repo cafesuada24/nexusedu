@@ -16,12 +16,10 @@ import {
   BarChart3,
   CalendarDays,
   Shield,
-  Activity,
-  Timer,
-  Star,
-  Bot,
   Database,
   Smartphone,
+  Copy,
+  Check,
   type LucideIcon,
 } from "lucide-react"
 import {
@@ -45,7 +43,6 @@ import {
 } from "@/components/ui/input-group"
 import { Kbd } from "@/components/ui/kbd"
 import { cn } from "@/lib/utils"
-import { queryAgent, getJobStatus } from "@/lib/api"
 import { toast } from "sonner"
 
 /* ────────────────────────────────────────────────────────────────
@@ -165,152 +162,21 @@ const faqs: Faq[] = [
 ]
 
 /* ────────────────────────────────────────────────────────────────
- * Shortcuts
- * ──────────────────────────────────────────────────────────────── */
-
-const shortcuts: { keys: string[]; label: string }[] = [
-  { keys: ["⌘", "K"], label: "Tìm nhanh" },
-  { keys: ["G", "D"], label: "Tổng quan" },
-  { keys: ["G", "A"], label: "Alert Center" },
-  { keys: ["G", "M"], label: "BGH" },
-  { keys: ["N"], label: "Alert kế tiếp" },
-  { keys: ["E"], label: "Soạn email" },
-  { keys: ["?"], label: "Phím tắt" },
-]
-
-/* ────────────────────────────────────────────────────────────────
- * Tiny inline visualisations
- * ──────────────────────────────────────────────────────────────── */
-
-/** SVG donut showing a percentage. */
-function DonutGauge({
-  value,
-  className,
-  trackClass = "stroke-muted",
-  fillClass = "stroke-success",
-}: {
-  value: number
-  className?: string
-  trackClass?: string
-  fillClass?: string
-}) {
-  const radius = 18
-  const circumference = 2 * Math.PI * radius
-  const offset = circumference * (1 - value / 100)
-  return (
-    <svg
-      viewBox="0 0 48 48"
-      className={cn("size-12", className)}
-      role="img"
-      aria-label={`${value}%`}
-    >
-      <circle
-        cx="24"
-        cy="24"
-        r={radius}
-        strokeWidth="5"
-        className={trackClass}
-        fill="none"
-      />
-      <circle
-        cx="24"
-        cy="24"
-        r={radius}
-        strokeWidth="5"
-        className={fillClass}
-        fill="none"
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        transform="rotate(-90 24 24)"
-      />
-    </svg>
-  )
-}
-
-/** Tiny sparkline for uptime trend. */
-function Sparkline({ data, className }: { data: number[]; className?: string }) {
-  const max = Math.max(...data)
-  const min = Math.min(...data)
-  const range = max - min || 1
-  const points = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * 100
-      const y = 24 - ((v - min) / range) * 20 - 2
-      return `${x},${y}`
-    })
-    .join(" ")
-  return (
-    <svg
-      viewBox="0 0 100 24"
-      preserveAspectRatio="none"
-      className={cn("h-6 w-full", className)}
-      role="img"
-      aria-hidden="true"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        strokeWidth="1.5"
-        className="stroke-success"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-/* ────────────────────────────────────────────────────────────────
  * View
  * ──────────────────────────────────────────────────────────────── */
 
 export function SupportView() {
   const [query, setQuery] = React.useState("")
   const [activeTopic, setActiveTopic] = React.useState<TopicKey | "all">("all")
-  const [isAsking, setIsAsking] = React.useState(false)
-  const [aiResponse, setAiResponse] = React.useState<string | null>(null)
+  const [copiedLabel, setCopiedLabel] = React.useState<string | null>(null)
 
-  const handleAskAI = async () => {
-    if (!query.trim() || isAsking) return
-    setIsAsking(true)
-    setAiResponse(null)
-    const toastId = toast.loading("AI đang phân tích...")
-    
-    try {
-      const { job_id } = await queryAgent(query)
-      
-      let attempts = 0
-      const maxAttempts = 30
-      const poll = async () => {
-        if (attempts >= maxAttempts) {
-          toast.error("Hết thời gian phản hồi", { id: toastId })
-          setIsAsking(false)
-          return
-        }
-        attempts++
-        try {
-          const job = await getJobStatus(job_id)
-          if (job.status === "completed") {
-            setAiResponse(job.result.answer)
-            toast.success("AI đã trả lời", { id: toastId })
-            setIsAsking(false)
-          } else if (job.status === "failed") {
-            const errorMsg = job.error || "AI gặp lỗi khi xử lý"
-            toast.error(errorMsg, { id: toastId })
-            setIsAsking(false)
-          } else {
-            setTimeout(poll, 2000)
-          }
-        } catch (err) {
-          toast.error("Lỗi kết nối", { id: toastId })
-          setIsAsking(false)
-        }
-      }
-      poll()
-    } catch (err) {
-      toast.error("Không thể gửi câu hỏi", { id: toastId })
-      setIsAsking(false)
-    }
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedLabel(label)
+    toast.success(`Đã sao chép ${label.toLowerCase()}`, {
+      description: `Thông tin đã được lưu vào bộ nhớ tạm của bạn.`,
+    })
+    setTimeout(() => setCopiedLabel(null), 2000)
   }
 
   const filteredFaqs = faqs.filter((f) => {
@@ -323,89 +189,11 @@ export function SupportView() {
     return matchesTopic && matchesQuery
   })
 
-  const uptimeData = [99.92, 99.95, 99.93, 99.96, 99.97, 99.94, 99.97]
-
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       {/* ────── Left column ────── */}
       <div className="grid gap-6 lg:col-span-2">
-        {/* Status hero — 3 visual tiles, no prose */}
-        <div className="grid gap-3 sm:grid-cols-3">
-          {/* Uptime gauge */}
-          <Card className="stripe-success rounded-2xl border-success/15 bg-gradient-to-br from-success/18 via-success/8 to-card">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="relative">
-                <DonutGauge value={99.97} />
-                <Activity className="absolute inset-0 m-auto size-4 text-success" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-mono text-lg font-semibold leading-none">
-                  99.97<span className="text-sm text-muted-foreground">%</span>
-                </p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Uptime
-                </p>
-                <Sparkline data={uptimeData} className="mt-1" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Response time */}
-          <Card className="stripe-primary rounded-2xl border-primary/15 bg-gradient-to-br from-primary/18 via-primary/8 to-card">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="grid size-12 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-                <Timer className="size-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-mono text-lg font-semibold leading-none">
-                  ~2 <span className="text-sm text-muted-foreground">phút</span>
-                </p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Phản hồi
-                </p>
-                <div className="mt-2 flex h-1.5 gap-0.5">
-                  {[60, 80, 70, 90, 100, 75, 85].map((w, i) => (
-                    <span
-                      key={i}
-                      className="flex-1 rounded-sm bg-primary/30"
-                      style={{ opacity: w / 100 }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* CSAT */}
-          <Card className="stripe-warning rounded-2xl border-warning/20 bg-gradient-to-br from-warning/22 via-warning/10 to-card">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="grid size-12 place-items-center rounded-xl bg-warning/15 text-warning ring-1 ring-warning/20">
-                <Star className="size-5 fill-current" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-mono text-lg font-semibold leading-none">
-                  4.9<span className="text-sm text-muted-foreground">/5</span>
-                </p>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Hài lòng
-                </p>
-                <div className="mt-1 flex gap-0.5 text-warning">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className={cn(
-                        "size-3",
-                        i < 4 ? "fill-current" : "fill-current opacity-40",
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search */}
+        {/* Search — Promoted to top */}
         <InputGroup className="h-11 rounded-xl">
           <InputGroupAddon>
             <Search className="size-4 text-muted-foreground" />
@@ -605,46 +393,8 @@ export function SupportView() {
 
       {/* ────── Right column ────── */}
       <div className="grid gap-6">
-        {/* AI Assistant — visual gradient CTA, replaces ticket form */}
-        <Card className="relative overflow-hidden rounded-2xl border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-primary/15 blur-2xl"
-          />
-          <CardContent className="relative grid gap-3 p-5">
-            <div className="flex items-center gap-2">
-              <div className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-                <Bot className="size-5" />
-              </div>
-              <div>
-                <p className="font-serif text-base font-semibold">
-                  Trợ lý AI
-                </p>
-                <p className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                  <span aria-hidden className="size-1.5 rounded-full bg-success" />
-                  Online
-                </p>
-              </div>
-            </div>
-            {aiResponse && (
-              <div className="rounded-lg bg-background/50 p-3 text-sm text-foreground ring-1 ring-border/60">
-                <p className="font-medium text-primary mb-1">Kết quả:</p>
-                <div className="whitespace-pre-wrap">{aiResponse}</div>
-              </div>
-            )}
-            <Button 
-              className="rounded-xl" 
-              onClick={handleAskAI}
-              disabled={isAsking || !query.trim()}
-            >
-              <Sparkles className="size-4" />
-              {isAsking ? "Đang trả lời..." : "Hỏi AI về kết quả trên"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Contact tiles */}
-        <Card className="stripe-primary rounded-2xl border-primary/15 bg-gradient-to-br from-primary/18 via-primary/8 to-card">
+        {/* Contact tiles — Promoted for layout balance */}
+        <Card className="stripe-primary rounded-2xl border-primary/15 bg-gradient-to-br from-primary/18 via-primary/8 to-white dark:to-slate-900/40">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Phone className="size-4 text-primary" />
@@ -653,70 +403,58 @@ export function SupportView() {
           </CardHeader>
           <CardContent className="grid gap-2">
             {[
-              {
-                icon: MessageCircle,
-                label: "Chat",
-                detail: "Online",
-                primary: true,
-              },
-              { icon: Mail, label: "Email", detail: "support@nexusedu.vn" },
+              { icon: Mail, label: "Email", detail: "support@nexusedu.vn", primary: true },
               { icon: Phone, label: "Hotline", detail: "1900 0175" },
-            ].map((c) => (
-              <button
-                key={c.label}
-                className={cn(
-                  "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
-                  c.primary
-                    ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
-                    : "border-border/60 hover:bg-muted/40",
-                )}
-              >
-                <div
+            ].map((c) => {
+              const isCopied = copiedLabel === c.label
+              return (
+                <button
+                  key={c.label}
+                  onClick={() => handleCopy(c.detail, c.label)}
                   className={cn(
-                    "grid size-9 place-items-center rounded-lg",
+                    "group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200",
                     c.primary
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground",
+                      ? "border-primary/30 bg-primary/5 hover:bg-primary/10"
+                      : "border-border/60 hover:bg-muted/40",
                   )}
                 >
-                  <c.icon className="size-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{c.label}</p>
-                  <p className="truncate font-mono text-[11px] text-muted-foreground">
-                    {c.detail}
-                  </p>
-                </div>
-                {c.primary && (
-                  <span aria-hidden className="size-2 rounded-full bg-success" />
-                )}
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Shortcuts */}
-        <Card className="stripe-slate rounded-2xl border-accent-slate/15 bg-gradient-to-br from-accent-slate/22 via-accent-slate/10 to-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Kbd className="size-5 text-[10px]">⌘</Kbd>
-              Phím tắt
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-1">
-            {shortcuts.map((s) => (
-              <div
-                key={s.label}
-                className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-muted/50"
-              >
-                <span className="text-sm">{s.label}</span>
-                <div className="flex items-center gap-1">
-                  {s.keys.map((k) => (
-                    <Kbd key={k}>{k}</Kbd>
-                  ))}
-                </div>
-              </div>
-            ))}
+                  <div
+                    className={cn(
+                      "grid size-9 place-items-center rounded-lg transition-transform group-active:scale-95",
+                      c.primary
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground",
+                    )}
+                  >
+                    <c.icon className="size-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{c.label}</p>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">
+                      {c.detail}
+                    </p>
+                  </div>
+                  <div className="relative size-8 shrink-0">
+                    <div
+                      className={cn(
+                        "absolute inset-0 grid place-items-center transition-all duration-300",
+                        isCopied ? "scale-0 opacity-0" : "scale-100 opacity-100",
+                      )}
+                    >
+                      <Copy className="size-4 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </div>
+                    <div
+                      className={cn(
+                        "absolute inset-0 grid place-items-center transition-all duration-300",
+                        isCopied ? "scale-100 opacity-100" : "scale-0 opacity-0",
+                      )}
+                    >
+                      <Check className="size-4 text-success" />
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </CardContent>
         </Card>
       </div>
