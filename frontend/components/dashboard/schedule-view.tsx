@@ -56,7 +56,6 @@ export function ScheduleView() {
           weeklyHours={weeklyHours}
           weeklyCapacity={weeklyCapacity}
           duration={schedule.duration}
-          minNotice={schedule.minNotice}
         />
 
         <div className="grid gap-6 lg:grid-cols-3">
@@ -71,10 +70,6 @@ export function ScheduleView() {
             <BookingLinkCard
               displayUrl={displayUrl}
               bookingUrl={bookingUrl}
-              timezone={schedule.timezone}
-              autoConfirm={schedule.autoConfirm}
-              allowOnline={schedule.allowOnline}
-              windowDays={schedule.windowDays}
             />
           </div>
         </div>
