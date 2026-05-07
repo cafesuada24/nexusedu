@@ -56,7 +56,6 @@ export function ScheduleView() {
           weeklyHours={weeklyHours}
           weeklyCapacity={weeklyCapacity}
           duration={schedule.duration}
-          minNotice={schedule.minNotice}
         />
 
         <div className="grid gap-6 lg:grid-cols-3">
