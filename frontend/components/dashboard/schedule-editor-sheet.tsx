@@ -710,7 +710,10 @@ export function ScheduleEditorSheet() {
                             navigator.clipboard?.writeText(
                               "https://nexusedu.app/booking/le-ha",
                             )
-                            toast.success("Đã sao chép liên kết")
+                            toast.success("Đã sao chép liên kết", {
+                              description:
+                                "Thông tin đã được lưu vào bộ nhớ tạm của bạn",
+                            })
                           }}
                         >
                           <Copy className="size-3.5" />
