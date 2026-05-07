@@ -71,10 +71,6 @@ export function ScheduleView() {
             <BookingLinkCard
               displayUrl={displayUrl}
               bookingUrl={bookingUrl}
-              timezone={schedule.timezone}
-              autoConfirm={schedule.autoConfirm}
-              allowOnline={schedule.allowOnline}
-              windowDays={schedule.windowDays}
             />
           </div>
         </div>
