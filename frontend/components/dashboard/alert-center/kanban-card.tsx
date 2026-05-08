@@ -13,6 +13,8 @@ import {
     Info,
     Loader2,
     History,
+    Sparkles,
+    Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,12 +44,15 @@ type KanbanCardProps = {
     isHighlighted?: boolean;
     highlightTone?: string;
     onViewDetails: () => void;
+    onEditEmail: () => void;
+    onGenerateDraft: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     studentProfile?: StudentRow;
     isAiDrafting?: boolean;
     aiDraftError?: string;
     isAiDraftReady?: boolean;
+    isAcceptingCase?: boolean;
 };
 
 function KanbanCardInner({
@@ -55,12 +60,15 @@ function KanbanCardInner({
     isHighlighted,
     highlightTone,
     onViewDetails,
+    onEditEmail,
+    onGenerateDraft,
     onMove,
     onOpenGoals,
     studentProfile,
     isAiDrafting,
     aiDraftError,
     isAiDraftReady,
+    isAcceptingCase,
 }: KanbanCardProps) {
     const meta = problemMeta[a.problem];
     const ProblemIcon = meta.icon;
@@ -74,12 +82,11 @@ function KanbanCardInner({
             g.deadline !== null &&
             new Date(g.deadline).getTime() < new Date().setHours(0, 0, 0, 0),
     );
-    const severityLabel = a.severity === "high" ? "Critical" : "Elevated";
+    const severityLabel = a.severity === "high" ? "Nguy cơ cao" : "Nguy cơ vừa";
     const severityTone =
         a.severity === "high"
             ? "bg-destructive/10 text-destructive ring-destructive/20"
             : "bg-warning/15 text-warning ring-warning/25";
-
 
     return (
         <article
@@ -113,10 +120,7 @@ function KanbanCardInner({
                             <MoreHorizontal className="size-5" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                        align="end"
-                        className="w-52 rounded-xl"
-                    >
+                    <DropdownMenuContent align="end" className="w-52 rounded-xl">
                         <DropdownMenuLabel className="text-xs text-muted-foreground">
                             Chuyển trạng thái
                         </DropdownMenuLabel>
@@ -139,10 +143,7 @@ function KanbanCardInner({
                             );
                         })}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            onClick={onOpenGoals}
-                            className="gap-2"
-                        >
+                        <DropdownMenuItem onClick={onOpenGoals} className="gap-2">
                             <Target className="size-4 text-primary" />
                             {goalsTotal > 0 ? (
                                 <span>
@@ -169,16 +170,21 @@ function KanbanCardInner({
                 >
                     {severityLabel}
                 </Badge>
-                <Badge
-                    variant="outline"
-                    className={cn(
-                        "max-w-full gap-1.5 rounded-md border-transparent px-2 py-1 text-[13px] ring-1",
-                        meta.tone,
+                {a.summary &&
+                    a.summary !== severityLabel &&
+                    a.summary !==
+                        (a.severity === "high" ? "Critical" : "Elevated") && (
+                        <Badge
+                            variant="outline"
+                            className={cn(
+                                "max-w-full gap-1.5 rounded-md border-transparent px-2 py-1 text-[13px] ring-1",
+                                meta.tone,
+                            )}
+                        >
+                            <ProblemIcon className="size-3.5" />
+                            <span className="truncate">{a.summary}</span>
+                        </Badge>
                     )}
-                >
-                    <ProblemIcon className="size-3.5" />
-                    <span className="truncate">{a.summary}</span>
-                </Badge>
             </div>
 
             {goalsTotal > 0 ? (
@@ -223,9 +229,7 @@ function KanbanCardInner({
                             <div
                                 className={cn(
                                     "h-full rounded-full transition-[width] duration-300",
-                                    hasOverdue
-                                        ? "bg-destructive"
-                                        : "bg-success",
+                                    hasOverdue ? "bg-destructive" : "bg-success",
                                 )}
                                 style={{ width: `${goalsPct}%` }}
                             />
@@ -245,28 +249,28 @@ function KanbanCardInner({
                     AI đang soạn thảo bản thảo...
                 </p>
             ) : a.status === "accepted" && aiDraftError ? (
-                <p className="mt-3 text-[13px] text-destructive">
-                    {aiDraftError}
-                </p>
-            ) : a.status === "accepted" && isAiDraftReady ? (
+                <p className="mt-3 text-[13px] text-destructive">{aiDraftError}</p>
+            ) : a.status === "accepted" && (isAiDraftReady || a.draftSubject) ? (
                 <p className="mt-3 text-[13px] text-success">
-                    Bản nháp AI đã sẵn sàng.
+                    Bản nháp đã sẵn sàng.
                 </p>
-            ) : (
+            ) : a.status !== "new" ? (
                 <p className="mt-3 text-[13px] text-muted-foreground">
                     Cập nhật {relativeTime(a.movedAt)}
                 </p>
-            )}
-
+            ) : null}
 
             <CardActions
                 alert={a}
                 onViewDetails={onViewDetails}
+                onEditEmail={onEditEmail}
+                onGenerateDraft={onGenerateDraft}
                 onMove={onMove}
                 onOpenGoals={onOpenGoals}
                 studentProfile={studentProfile}
                 isAiDrafting={isAiDrafting}
                 isAiDraftReady={isAiDraftReady}
+                isAcceptingCase={isAcceptingCase}
             />
         </article>
     );
@@ -277,40 +281,59 @@ export const KanbanCard = React.memo(KanbanCardInner);
 function CardActions({
     alert: a,
     onViewDetails,
+    onEditEmail,
+    onGenerateDraft,
     onMove,
     onOpenGoals,
     studentProfile,
     isAiDrafting,
     isAiDraftReady,
+    isAcceptingCase,
 }: {
     alert: Alert;
     onViewDetails: () => void;
+    onEditEmail: () => void;
+    onGenerateDraft: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     studentProfile?: StudentRow;
     isAiDrafting?: boolean;
     isAiDraftReady?: boolean;
+    isAcceptingCase?: boolean;
 }) {
     const hasGoals = a.goals.length > 0;
+    const isActuallyDrafting = isAiDrafting || a.isGenerating;
+    const isActuallyReady = isAiDraftReady || !!a.draftSubject;
+
     if (a.status === "new") {
         return (
             <div className="mt-3 flex flex-col gap-2">
                 <Button
                     variant="ghost"
                     size="sm"
+                    disabled={isAcceptingCase}
                     className="h-10 w-full justify-start rounded-lg border border-border/60 text-sm font-medium"
                     onClick={onViewDetails}
                 >
                     <Info className="size-4" />
-                    Get Profile
+                    Xem hồ sơ
                 </Button>
                 <Button
                     size="sm"
+                    disabled={isAcceptingCase}
                     className="h-10 w-full rounded-lg text-sm font-medium"
-                    onClick={() => onMove("accepted", `Đã nhận case của ${a.name}`)}
+                    onClick={() => onMove("accepted", `Đã nhận ca của ${a.name}`)}
                 >
-                    <Handshake className="size-4" />
-                    Accept Case
+                    {isAcceptingCase ? (
+                        <>
+                            AI đang soạn thảo...
+                        </>
+                    ) : (
+                        <>
+                            <Handshake className="size-4" />
+                            Tiếp nhận ca
+                        </>
+                    )}
                 </Button>
                 {!studentProfile ? (
                     <p className="text-[12px] text-muted-foreground">
@@ -339,9 +362,7 @@ function CardActions({
                     size="sm"
                     variant="ghost"
                     className="h-10 w-10 shrink-0 rounded-lg"
-                    onClick={() =>
-                        onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)
-                    }
+                    onClick={() => onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)}
                     aria-label="Chuyển sang Đang hỗ trợ"
                 >
                     <ArrowRight className="size-4" />
@@ -351,37 +372,30 @@ function CardActions({
     }
 
     if (a.status === "accepted") {
-        if (isAiDrafting) {
+        if (isActuallyDrafting && !isActuallyReady) {
             return (
                 <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
-                    className="mt-3 h-10 w-full rounded-lg text-sm font-medium"
+                    className="mt-3 h-10 w-full rounded-lg text-sm font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20"
                     disabled
                 >
                     <Loader2 className="size-4 animate-spin" />
-                    AI đang soạn thảo bản thảo...
+                    AI đang soạn thảo...
                 </Button>
             );
         }
 
-        if (isAiDraftReady) {
+        if (isActuallyReady) {
             return (
-                <div className="mt-3 flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-10 flex-1 rounded-lg text-sm font-medium"
-                        onClick={onViewDetails}
-                    >
-                        View Draft
-                    </Button>
+                <div className="mt-3">
                     <Button
                         size="sm"
-                        className="h-10 flex-1 rounded-lg text-sm font-medium"
-                        onClick={onViewDetails}
+                        className="h-10 w-full rounded-lg text-sm font-medium"
+                        onClick={onEditEmail}
                     >
-                        Edit Email
+                        <Mail className="size-4" />
+                        Nội dung Email
                     </Button>
                 </div>
             );
@@ -390,22 +404,20 @@ function CardActions({
         return (
             <div className="mt-3 flex items-center gap-2">
                 <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
-                    className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() =>
-                        onMove("contacted", `${a.name} đã được liên hệ`)
-                    }
+                    className="h-10 flex-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 transition-colors"
+                    onClick={onGenerateDraft}
                 >
-                    <ArrowRight className="size-4" />
-                    Chuyển Đã liên hệ
+                    <Sparkles className="size-4" />
+                    Tạo nội dung AI
                 </Button>
                 <Button
                     variant="ghost"
                     size="sm"
                     className="h-10 w-10 shrink-0 rounded-lg"
                     onClick={onViewDetails}
-                    aria-label="Get Profile"
+                    aria-label="Xem hồ sơ"
                 >
                     <Info className="size-4" />
                 </Button>
@@ -429,9 +441,7 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() =>
-                        onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)
-                    }
+                    onClick={() => onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)}
                 >
                     <Handshake className="size-4" />
                     Bắt đầu hỗ trợ
@@ -455,9 +465,7 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() =>
-                        onMove("resolved", `Đã đóng case của ${a.name}`)
-                    }
+                    onClick={() => onMove("resolved", `Đã đóng case của ${a.name}`)}
                 >
                     <CheckCircle2 className="size-4" />
                     Giải quyết
