@@ -9,8 +9,8 @@ from src.domain.entities.case import Case
 class CaseRepository(Protocol):
     """Interface for managing student cases."""
 
-    async def create_case(self, case: Case) -> None:
-        """Create a new case."""
+    async def add(self, case: Case) -> None:
+        """Add a case."""
         ...
 
     async def get_active_case(self, sid: UUID) -> Case | None:

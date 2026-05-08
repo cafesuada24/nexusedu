@@ -46,12 +46,6 @@ const baseMainNav: NavItem[] = [
         tone: "sky",
     },
     {
-        href: "/dashboard/alerts",
-        label: "Trung tâm cảnh báo",
-        icon: BellRing,
-        tone: "destructive",
-    },
-    {
         href: "/dashboard/schedule",
         label: "Lịch làm việc",
         icon: CalendarClock,

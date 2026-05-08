@@ -18,7 +18,8 @@ class SqlAlchemyPointLedgerQueryService:
     async def award_points(
         self,
         advisor_id: UUID,
-        task_id: UUID,
+        case_id: UUID,
+        action: str,
         points: int,
         earned_at: datetime,
     ):
@@ -27,7 +28,8 @@ class SqlAlchemyPointLedgerQueryService:
 
         record = PointLedger(
             advisor_id=advisor_id,
-            task_id=task_id,
+            case_id=case_id,
+            action=action,
             points=points,
             earned_at=earned_at,
         )

@@ -45,7 +45,6 @@ class SISRecord(BaseModel):
     current_risk_status: str | None = Field(
         'Normal', description='Current risk status.'
     )
-    intervention_status: str | None = Field('none', description='Intervention status.')
     last_notified_timestamp: AwareDatetime | None = Field(
         description='Timestamp of last nudge.',
     )
@@ -120,3 +119,10 @@ class SendEmailRequest(BaseModel):
     """Schema for sending a personalized nudge email."""
 
     body: str = Field(..., description='The final email body to send.')
+
+
+class TriggerDraftRequest(BaseModel):
+    """Schema for triggering a background AI draft generation."""
+
+    booking_link: str | None = Field(None, description='Optional custom booking link.')
+

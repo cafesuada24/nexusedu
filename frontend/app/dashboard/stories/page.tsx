@@ -46,7 +46,7 @@ export default function StoriesPage() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+        className="flex flex-col gap-4"
       >
         {CASE_STUDIES.map((c) => (
           <motion.div key={c.id} variants={item}>

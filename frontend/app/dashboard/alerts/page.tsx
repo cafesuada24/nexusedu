@@ -1,9 +1,25 @@
 "use client";
 
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import { BellRing } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import { AlertCenter } from "@/components/dashboard/alert-center";
 
 export default function AlertsPage() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  React.useEffect(() => {
+    if (!loading && user?.role === "admin") {
+      router.replace("/dashboard/cases");
+    }
+  }, [user, loading, router]);
+
+  if (loading || user?.role === "admin") {
+    return null;
+  }
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 max-w-full flex-1 flex-col gap-4 overflow-hidden">
       <div className="flex flex-wrap items-center gap-3">
