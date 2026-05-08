@@ -45,7 +45,6 @@ class SISRecord(BaseModel):
     current_risk_status: str | None = Field(
         'Normal', description='Current risk status.'
     )
-    intervention_status: str | None = Field('none', description='Intervention status.')
     last_notified_timestamp: AwareDatetime | None = Field(
         description='Timestamp of last nudge.',
     )
