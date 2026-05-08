@@ -2,14 +2,13 @@ import os
 import random
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
 # Constants
 NUM_STUDENTS = 100
 NUM_COURSES = 10
-NUM_ADVISORS = 5
 YEARS = [1, 2, 3, 4]
 SEMESTERS = [1, 2]
 WEEKS_PER_SEMESTER = 16
@@ -43,7 +42,7 @@ TEST_TYPES = [
 
 
 def generate_mock_data():
-    # 1. Generate Students
+    # 1. Generate Students (SIS data)
     students = []
     for i in range(NUM_STUDENTS):
         sid = uuid.uuid4()
@@ -58,26 +57,13 @@ def generate_mock_data():
                 'email': f'student_{i}@university.edu',
                 'major': random.choice(MAJORS),
                 'current_risk_status': 'Normal',
-                'intervention_status': 'none',
-                'last_notified_timestamp': datetime(1970, 1, 1, tzinfo=timezone.utc),
+                'last_notified_timestamp': None,
                 'last_notified_satisfaction': 0,
                 'profile': profile,  # Temporary for score generation
             }
         )
 
-    # 2. Generate Advisors
-    advisors = []
-    for i in range(NUM_ADVISORS):
-        aid = uuid.uuid4()
-        advisors.append(
-            {
-                'advisor_id': str(aid),
-                'name': f'Advisor {i}',
-                'email': f'advisor_{i}@university.edu',
-            }
-        )
-
-    # 3. Generate Activities
+    # 2. Generate Activities (LMS data)
     activities = []
     base_timestamp = int(time.time()) - (4 * 365 * 24 * 3600)  # Start 4 years ago
 
@@ -134,7 +120,7 @@ def generate_mock_data():
                                         + semester_offset
                                         + (week * 7 * 24 * 3600)
                                         + random.randint(0, 86400),
-                                        tz=timezone.utc,
+                                        tz=UTC,
                                     ),
                                     'academic_year': year,
                                     'semester': semester,
@@ -146,29 +132,18 @@ def generate_mock_data():
     for s in students:
         del s['profile']
 
-    return students, activities, advisors
+    return students, activities
 
 
 if __name__ == '__main__':
-    students, activities, advisors = generate_mock_data()
+    students, activities = generate_mock_data()
 
     os.makedirs('data', exist_ok=True)
 
     # Save to individual files
     pd.DataFrame(students).to_csv('data/v2_students.csv', index=False)
     pd.DataFrame(activities).to_csv('data/v2_activities.csv', index=False)
-    pd.DataFrame(advisors).to_csv('data/v2_advisors.csv', index=False)
-
-    # For backward compatibility / legacy combined file
-    # We'll merge students and activities but keep it flattened
-    df_students = pd.DataFrame(students)
-    df_activities = pd.DataFrame(activities)
-    legacy_df = df_activities.merge(
-        df_students[['sid', 'student_name', 'email']], on='sid', how='left'
-    )
-    legacy_df.to_csv('data/mock_student_scores.csv', index=False)
 
     print(f'Generated {len(students)} students.')
     print(f'Generated {len(activities)} activities.')
-    print(f'Generated {len(advisors)} advisors.')
-    print('Files saved to data/v2_*.csv and data/mock_student_scores.csv')
+    print('Files saved to data/v2_students.csv and data/v2_activities.csv')

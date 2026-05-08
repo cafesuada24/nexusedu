@@ -47,16 +47,6 @@ class QueryResponse(BaseModel):
     )
 
 
-class JobAcceptedResponse(BaseModel):
-    """Response returned when a query is accepted for background processing."""
-
-    job_id: str = Field(
-        ...,
-        description='The unique identifier for the background job.',
-    )
-    status: str = Field('processing', description='The current status of the job.')
-
-
 class JobStatusResponse(BaseModel):
     """Response returned when polling for job status."""
 
@@ -75,55 +65,3 @@ class JobStatusResponse(BaseModel):
     started_at: str | None = Field(None, description='Job start timestamp.')
     completed_at: str | None = Field(None, description='Job completion timestamp.')
 
-
-class AlertStudent(BaseModel):
-    """Schema for a student in the Kanban alert dashboard."""
-
-    sid: str = Field(..., description='Student identifier.')
-    student_name: str = Field(..., description='Student name.')
-    email: str = Field(..., description='Student email.')
-    current_risk_status: str = Field(..., description='The type of anomaly detected.')
-    intervention_status: str = Field(..., description='The current Kanban state.')
-    is_generating: bool = Field(
-        False,
-        description='Whether a background AI draft generation is running.',
-    )
-    active_case_id: str | None = Field(
-        None, description='The ID of the currently active case.'
-    )
-
-
-class TaskDetail(BaseModel):
-    """Schema for a specific task within a case."""
-
-    task_id: str = Field(..., description='Unique task identifier.')
-    action_type: str = Field(..., description='The action required (e.g., send email).')
-    status: str = Field(..., description='Task status (pending, completed).')
-    points_reward: int = Field(..., description='Points awarded upon completion.')
-    completed_at: str | None = Field(None, description='When the task was completed.')
-    completed_by_advisor_id: str | None = Field(
-        None, description='Who completed the task.'
-    )
-
-
-class TaskItem(BaseModel):
-    """Schema for a task in the advisor task list."""
-
-    case_id: str = Field(..., description='Case identifier.')
-    sid: str = Field(..., description='Student id')
-    created_at: str = Field(..., description='When the case was created.')
-    assigned_advisor_id: str | None = Field(
-        None, description='Advisor assigned to the case.'
-    )
-    student_name: str | None = Field(None, description='Student name.')
-    email: str | None = Field(None, description='Student email.')
-    major: str = Field(..., description='Student major.')
-    current_risk_status: str = Field(..., description='Risk status.')
-    intervention_status: str = Field(..., description='Intervention status.')
-    draft_subject: str | None = Field(None, description='Draft email subject.')
-    draft_body: str | None = Field(None, description='Draft email body.')
-    draft_status: str | None = Field(None, description='Draft email status.')
-    assigned_to: str | None = Field(None, description='Name of assigned advisor.')
-    suggested_action: str = Field(..., description='Computed action to take.')
-    points_reward: int = Field(..., description='Points for completing action.')
-    tasks: list[TaskDetail] | None = Field(None, description='Detailed sub-tasks.')

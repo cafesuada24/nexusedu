@@ -126,7 +126,8 @@ class CaseCommandHandler:
     #     await self.case_repo.save(case)
 
     async def handle_trigger_draft(
-        self, command: TriggerDraftCommand
+        self,
+        command: TriggerDraftCommand,
     ) -> TriggerDraftDTO:
         """Execute the trigger draft command."""
         advisor = await self.advisor_repo.find_by_user_id(command.user_id)
@@ -163,10 +164,12 @@ class CaseCommandHandler:
 
         # 2. Create/Update placeholder entry in intervention_emails
         if not existing_email:
-            iemail = InterventionEmail(case_id=case.case_id)
-            await self.email_repo.add(iemail)
+            existing_email = InterventionEmail(case_id=case.case_id)
+            existing_email.mark_as_generating()
+            await self.email_repo.add(existing_email)
         else:
             existing_email.prepare_for_regeneration()
+            existing_email.mark_as_generating()
             await self.email_repo.save(existing_email)
 
         job_id = uuid4()
@@ -250,6 +253,10 @@ class CaseCommandHandler:
 
         # 1. Fetch case and student info
         case = await self.case_repo.get_by_id(command.case_id)
+        email = await self.email_repo.get_by_case(case.case_id)
+        email.mark_as_generating()
+        await self.email_repo.save(email)
+
         student_data = await self.student_repo.get_by_id(case.sid)
 
         # 2. Fetch performance data
@@ -269,7 +276,6 @@ class CaseCommandHandler:
         )
 
         # 4. Persistent storage: Update the existing placeholder
-        email = await self.email_repo.get_by_case(case.case_id)
         email.set_draft_content(
             'Checking in on your academic progress',
             personalized_body,

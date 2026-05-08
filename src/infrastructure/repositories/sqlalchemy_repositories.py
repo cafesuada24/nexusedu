@@ -567,7 +567,7 @@ class SqlAlchemyEmailRepository:
             body=email.body,
             subject=email.subject,
             created_at=email.created_at,
-            sent_as=email.sent_at,
+            sent_at=email.sent_at,
         )
         self.session.add(new_mail)
 
@@ -580,7 +580,7 @@ class SqlAlchemyEmailRepository:
                 status=email.status,
                 body=email.body,
                 subject=email.subject,
-                sent_as=email.sent_at,
+                sent_at=email.sent_at,
             )
         )
         await self.session.execute(stmt)
@@ -852,7 +852,7 @@ class SqlAlchemyJobRepository:
             job_id=job.job_id,
             status=job.status,
             correlation_id=job.correlation_id,
-            correlatio_type=job.correlation_type,
+            correlation_type=job.correlation_type,
             created_at=job.created_at,
             started_at=job.started_at,
             completed_at=job.ended_at,
