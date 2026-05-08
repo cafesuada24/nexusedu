@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
@@ -24,23 +23,18 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.orm import selectinload
 
-from src.application import mappers
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
-from src.domain.entities.job import Job
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseNotFoundError,
     EmailNotFoundError,
-    EmailUnavailableError,
     JobNotFoundError,
     StudentNotFoundError,
     UserIsNotAnAdvisorError,
 )
 from src.domain.value_objects.status import (
-    EmailStatus,
     InterventionStatus,
     RiskStatus,
 )
@@ -50,7 +44,6 @@ from src.infrastructure.database.models import (
     Activity,
     AdvisorBadge,
     BackgroundJobTracker,
-    Case,
     IdempotencyKey,
     InterventionEmail,
     PointLedger,
@@ -62,7 +55,6 @@ from src.infrastructure.database.models import Advisor as OrmAdvisor
 from src.infrastructure.database.models import Case as OrmCase
 
 if TYPE_CHECKING:
-
     from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import Session
@@ -72,10 +64,11 @@ if TYPE_CHECKING:
     from src.domain.entities.intervention_email import (
         InterventionEmail as DomainInterventionEmail,
     )
-    from src.domain.entities.student import Student as DomainStudent
+    from src.domain.entities.job import Job
     from src.domain.entities.point_ledger import PointLedger as DomainLedger
-    from src.domain.repositories.point_ledger_repository import PointLedgerRepository
+    from src.domain.entities.student import Student as DomainStudent
     from src.domain.repositories.metadata_repository import DBDescription
+    from src.domain.repositories.point_ledger_repository import PointLedgerRepository
 
 
 class SqlAlchemyStudentRepository:
@@ -782,7 +775,9 @@ class SqlAlchemyMetricsRepository:
         dropout_rate = (dropout / total) * 100
 
         # 2. Interventions
-        int_stmt = select(func.count(distinct(OrmCase.sid))).where(OrmCase.intervention_status != InterventionStatus.NEW)
+        int_stmt = select(func.count(distinct(OrmCase.sid))).where(
+            OrmCase.intervention_status != InterventionStatus.NEW
+        )
         int_res = await self.session.execute(int_stmt)
         int_count = int_res.scalar() or 0
 
@@ -1000,4 +995,3 @@ class SqlAlchemyPointLedgerRepository:
             self.session.add(orm_entry)
 
         ledger.clear_pending_entries()
-

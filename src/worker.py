@@ -142,19 +142,25 @@ async def run_dispatch_email_task(
     logger.info(f'Email body preview: {body[:50]}...')
     async for session in get_async_session():
         case_repo = SqlAlchemyCaseRepository(session)
-        case = await case_repo.get_by_id(case_id=case_id)
-        assert case.assigned_advisor_id is not None
         student_repo = SqlAlchemyStudentRepository(session)
-        student = await student_repo.get_by_id(case.sid)
-
-        case.mark_as_sent()
-
-        await case_repo.save(case)
-
-    async for session in get_async_session():
-        assert case.assigned_advisor_id is not None
+        email_repo = SqlAlchemyEmailRepository(session)
         point_ledger_repo = SqlAlchemyPointLedgerRepository(session)
         gamification_service = GamificationService()
+
+        case = await case_repo.get_by_id(case_id=case_id)
+        assert case.assigned_advisor_id is not None
+        email = await email_repo.get_by_case(case_id)
+        student = await student_repo.get_by_id(case.sid)
+
+        student.last_notified_timestamp = datetime.now(UTC)
+        await student_repo.save(student=student)
+
+        email.mark_as_sent()
+        case.mark_as_sent()
+
+        await email_repo.save(email)
+        await case_repo.save(case)
+
         points = gamification_service.calculate_points(
             GamificationService.Action.SEND_EMAIL,
             case.assigned_at,

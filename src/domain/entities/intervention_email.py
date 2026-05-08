@@ -6,9 +6,11 @@ from uuid import UUID, uuid4
 
 from src.domain.exceptions import (
     EmptyEmailError,
+    InvalidActionError,
     InvalidStateTransitionError,
 )
 from src.domain.value_objects.status import EmailStatus
+from src.presentation.schemas.response import EmailDraft
 
 
 @dataclass
@@ -28,14 +30,34 @@ class InterventionEmail:
         """Return if the email is generating."""
         return self.status == EmailStatus.GENERATING
 
+    @property
+    def is_ready_to_send(self) -> bool:
+        """Return if the email is generating."""
+        return self.status == EmailStatus.DRAFT
+
     def set_draft_content(self, subject: str, body: str) -> None:
         """Called by the background worker when the AI is done."""
+        if self.status != EmailStatus.GENERATING:
+            raise InvalidActionError('The email is not generating, cannot update.')
         if not subject.strip() or not body.strip():
             raise ValueError('Draft content cannot be empty')
 
         self.subject = subject
         self.body = body
         self.status = EmailStatus.DRAFT
+
+    def update_draft(self, subject: str, body: str) -> None:
+        """Manually update the draft content by an advisor."""
+        if self.status not in (EmailStatus.DRAFT, EmailStatus.UNAVAILABLE):
+            raise InvalidActionError(
+                f'Cannot update draft as the email is {self.status}',
+            )
+
+        if not subject.strip() or not body.strip():
+            raise ValueError('Draft content cannot be empty')
+
+        self.subject = subject
+        self.body = body
 
     def mark_as_sent(self) -> None:
         """Mark this email as sent."""
