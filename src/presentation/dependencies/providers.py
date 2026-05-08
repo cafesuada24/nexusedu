@@ -14,13 +14,11 @@ from src.application.interfaces.advisor_query_service import AdvisorQueryService
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
-from src.application.queries.alert_queries import AlertQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
-from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
@@ -31,7 +29,6 @@ from src.domain.repositories.metrics_repository import MetricsRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
-from src.domain.repositories.task_repository import TaskRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
 from src.domain.services.gamification import GamificationService
@@ -51,7 +48,6 @@ from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
-    SqlAlchemyAlertRepository,
     SqlAlchemyBadgeRepository,
     SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
@@ -61,7 +57,6 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetricsRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
-    SqlAlchemyTaskRepository,
     SqlAlchemyUserSettingsRepository,
 )
 
@@ -102,13 +97,6 @@ async def get_case_repository(
     return SqlAlchemyCaseRepository(session)
 
 
-async def get_alert_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> AlertRepository:
-    """Dependency provider for the AlertRepository."""
-    return SqlAlchemyAlertRepository(session)
-
-
 async def get_activity_repository(
     session: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> ActivityRepository:
@@ -142,13 +130,6 @@ async def get_job_repository(
 ) -> JobRepository:
     """Dependency provider for the JobRepository."""
     return SqlAlchemyJobRepository(session)
-
-
-async def get_task_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> TaskRepository:
-    """Dependency provider for the TaskRepository."""
-    return SqlAlchemyTaskRepository(session)
 
 
 async def get_user_settings_repository(
@@ -249,9 +230,9 @@ async def get_case_command_handler(
     ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
-    task_repo: Annotated[TaskRepository, Depends(get_task_repository)],
     point_ledger_query_service: Annotated[
-        PointLedgerQueryService, Depends(get_point_ledger_query_service),
+        PointLedgerQueryService,
+        Depends(get_point_ledger_query_service),
     ],
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
@@ -264,32 +245,25 @@ async def get_case_command_handler(
         job_repo,
         gamification_service,
         task_queue,
-        task_repo=task_repo,
         email_drafting_service=BamlEmailDraftingService(),
         badge_repo=badge_repo,
         point_ledger_query_service=point_ledger_query_service,
     )
 
 
-async def get_alert_query_handler(
-    alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
-    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
-    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-) -> AlertQueryHandler:
-    """Dependency provider for the AlertQueryHandler."""
-    return AlertQueryHandler(alert_repo, email_repo, student_repo)
-
-
 async def get_advisor_query_handler(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
     advisor_query_service: Annotated[
-        AdvisorQueryService, Depends(get_advisor_query_service)
+        AdvisorQueryService,
+        Depends(get_advisor_query_service),
     ],
 ) -> AdvisorQueryHandler:
     """Dependency provider for the AdvisorQueryHandler."""
     return AdvisorQueryHandler(
-        advisor_repo, badge_repo, advisor_query_service=advisor_query_service
+        advisor_repo,
+        badge_repo,
+        advisor_query_service=advisor_query_service,
     )
 
 
@@ -297,7 +271,7 @@ async def get_case_query_handler(
     case_query_service: Annotated[CaseQueryService, Depends(get_case_query_service)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
+    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
 ) -> CaseQueryHandler:
     """Dependency provider for the CaseQueryHandler."""
@@ -305,8 +279,8 @@ async def get_case_query_handler(
         case_query_service=case_query_service,
         advisor_repo=advisor_repo,
         case_repo=case_repo,
-        job_repo=job_repo,
         email_repo=email_repo,
+        student_repo=student_repo,
     )
 
 

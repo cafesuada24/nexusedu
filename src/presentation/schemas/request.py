@@ -120,3 +120,10 @@ class SendEmailRequest(BaseModel):
     """Schema for sending a personalized nudge email."""
 
     body: str = Field(..., description='The final email body to send.')
+
+
+class TriggerDraftRequest(BaseModel):
+    """Schema for triggering a background AI draft generation."""
+
+    booking_link: str | None = Field(None, description='Optional custom booking link.')
+

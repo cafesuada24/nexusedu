@@ -26,7 +26,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from src.domain.value_objects.status import CaseStatus
+from src.domain.value_objects.status import (
+    EmailStatus,
+    InterventionStatus,
+    JobStatus,
+)
 
 
 def _all_column_names(constraint: UniqueConstraint | Index, _: Table) -> str:
@@ -143,11 +147,10 @@ class Student(Base):
     __tablename__ = 'students'
 
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_name: Mapped[str | None] = mapped_column(String)
+    student_name: Mapped[str] = mapped_column(String)
     email: Mapped[str | None] = mapped_column(String)
     major: Mapped[str] = mapped_column(String, default='Unknown')
     current_risk_status: Mapped[str] = mapped_column(String, default='Normal')
-    intervention_status: Mapped[str] = mapped_column(String, default='none')
     last_notified_timestamp: Mapped[datetime | None] = mapped_column(UTCDateTime)
     last_notified_satisfaction: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -184,7 +187,9 @@ class Activity(Base):
 
     # Relationships
     student: Mapped[Student] = relationship(
-        'Student', back_populates='activities', uselist=False
+        'Student',
+        back_populates='activities',
+        uselist=False,
     )
 
 
@@ -234,8 +239,8 @@ class Advisor(Base):
         unique=True,
         nullable=True,
     )
-    name: Mapped[str | None] = mapped_column(String)
-    email: Mapped[str | None] = mapped_column(String)
+    name: Mapped[str] = mapped_column(String)
+    email: Mapped[str] = mapped_column(String)
     title: Mapped[str | None] = mapped_column(String)
     phone: Mapped[str | None] = mapped_column(String)
     faculty: Mapped[str | None] = mapped_column(String)
@@ -250,22 +255,23 @@ class PointLedger(Base):
     """Ledger recording points earned by users for completed tasks."""
 
     __tablename__ = 'point_ledger'
-    __table_args__ = (Index('ix_ledger_advisor_task', 'advisor_id', 'task_id'),)
+    __table_args__ = (Index('ix_ledger_advisor_case', 'advisor_id', 'case_id'),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
         default=uuid.uuid4,
     )
-    advisor_id: Mapped[uuid.UUID | None] = mapped_column(
+    advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         ForeignKey('advisors.advisor_id'),
     )
-    task_id: Mapped[uuid.UUID | None] = mapped_column(
+    case_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
-        ForeignKey('tasks.task_id'),
+        ForeignKey('cases.case_id'),
     )
-    points: Mapped[int | None] = mapped_column(Integer)
+    action: Mapped[str] = mapped_column(String)
+    points: Mapped[int] = mapped_column(Integer)
     earned_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
@@ -306,19 +312,14 @@ class InterventionEmail(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
-    case_id: Mapped[uuid.UUID | None] = mapped_column(
+    case_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         ForeignKey('cases.case_id'),
         nullable=True,
     )
-    advisor_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid,
-        ForeignKey('advisors.advisor_id'),
-    )
     subject: Mapped[str | None] = mapped_column(String)
     body: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str | None] = mapped_column(String)  # 'draft', 'sent'
+    status: Mapped[EmailStatus] = mapped_column(Enum(EmailStatus), default=EmailStatus.UNAVAILABLE)  # 'draft', 'sent'
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
@@ -342,9 +343,9 @@ class Case(Base):
         default=uuid.uuid4,
     )
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
-    status: Mapped[CaseStatus] = mapped_column(
-        Enum(CaseStatus),
-        default=CaseStatus.OPEN,
+    intervention_status: Mapped[InterventionStatus] = mapped_column(
+        Enum(InterventionStatus),
+        default=InterventionStatus.NEW,
     )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
@@ -367,46 +368,38 @@ class Case(Base):
 
     # Relationships
     student: Mapped[Student] = relationship('Student')
-    tasks: Mapped[list[Task]] = relationship(
-        'Task',
-        back_populates='case',
-        cascade='all, delete-orphan',
-        lazy='selectin',
-    )
+    # tasks: Mapped[list[Task]] = relationship(
+    #     'Task',
+    #     back_populates='case',
+    #     cascade='all, delete-orphan',
+    #     lazy='selectin',
+    # )
 
 
-class Task(Base):
-    """Represents a specific task associated with an intervention case."""
-
-    __tablename__ = 'tasks'
-
-    task_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-    case_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid,
-        ForeignKey('cases.case_id'),
-    )
-    action_type: Mapped[str] = mapped_column(
-        String,
-    )  # 'send email', 'student book', 'resolve case'
-    status: Mapped[str] = mapped_column(String, default='pending')
-    points_reward: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(
-        UTCDateTime,
-        server_default=func.now(),
-    )
-    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
-
-    completed_by_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid,
-        ForeignKey('advisors.advisor_id'),
-    )
-
-    # Relationships
-    case: Mapped[Case] = relationship('Case', back_populates='tasks')
+# class Task(Base):
+#     """Represents a specific task associated with an intervention case."""
+#
+#     __tablename__ = 'tasks'
+#
+#     task_id: Mapped[uuid.UUID] = mapped_column(
+#         Uuid,
+#         primary_key=True,
+#         default=uuid.uuid4,
+#     )
+#     case_id: Mapped[uuid.UUID] = mapped_column(
+#         Uuid,
+#         ForeignKey('cases.case_id'),
+#     )
+#     name: Mapped[str] = mapped_column(String)
+#     status: Mapped[TaskStatus] = mapped_column(Enum(TaskStatus), default=TaskStatus.BLOCKED)
+#     points_reward: Mapped[int] = mapped_column(Integer, default=0)
+#     created_at: Mapped[datetime] = mapped_column(
+#         UTCDateTime,
+#         server_default=func.now(),
+#     )
+#     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+#     # Relationships
+#     case: Mapped[Case] = relationship('Case', back_populates='tasks')
 
 
 class IdempotencyKey(Base):
@@ -431,8 +424,9 @@ class BackgroundJobTracker(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    job_type: Mapped[str] = mapped_column(String, default='email_draft')
-    status: Mapped[str] = mapped_column(String, default='running')
+    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.PENDING)
+    correlation_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    correlation_type: Mapped[str] = mapped_column(String)
 
     # Observability
     created_at: Mapped[datetime] = mapped_column(
@@ -441,9 +435,5 @@ class BackgroundJobTracker(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
-    error_message: Mapped[str | None] = mapped_column(Text)
-    progress: Mapped[int] = mapped_column(Integer, default=0)
 
     # Correlation to connect jobs with other entities (e.g., cases, students)
-    correlation_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
-    correlation_type: Mapped[str | None] = mapped_column(String)
