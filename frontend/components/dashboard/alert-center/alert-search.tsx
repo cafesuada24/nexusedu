@@ -34,7 +34,7 @@ export function AlertSearch({
                     <Search className="size-4 text-muted-foreground" />
                 </InputGroupAddon>
                 <InputGroupInput
-                    placeholder="Tìm theo tên, MSSV, email..."
+                    placeholder="Tìm sinh viên, cố vấn..."
                     value={query}
                     onChange={(e) => onQueryChange(e.target.value)}
                     aria-label="Tìm cảnh báo"
