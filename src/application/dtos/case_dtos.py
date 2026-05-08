@@ -2,14 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, EmailStr, NonNegativeInt
+from pydantic import AwareDatetime, BaseModel, EmailStr
 
 from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
     JobStatus,
     RiskStatus,
-    TaskStatus,
 )
 
 
@@ -48,6 +47,16 @@ class SendEmailCommand:
     case_id: UUID
     body: str
     user_id: UUID
+
+
+@dataclass
+class UpdateEmailCommand:
+    """Command to manually update an email draft."""
+
+    case_id: UUID
+    user_id: UUID
+    subject: str | None = None
+    body: str | None = None
 
 
 @dataclass(frozen=True)
