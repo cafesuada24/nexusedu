@@ -28,8 +28,8 @@ import { AdvisorScore } from "@/components/dashboard/advisor-score"
 const labels: Record<string, string> = {
   dashboard: "Tổng quan",
   import: "Nhập CSV",
-  alerts: "Alert Center",
-  metrics: "BGH Dashboard",
+  alerts: "Trung tâm cảnh báo",
+  metrics: "Báo cáo BGH",
   settings: "Cài đặt",
   support: "Hỗ trợ",
 }
