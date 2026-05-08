@@ -12,6 +12,7 @@ from sqlalchemy import (
     case,
     cast,
     desc,
+    distinct,
     func,
     inspect,
     literal,
@@ -25,11 +26,17 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import selectinload
 
+from src.application import mappers
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
+from src.domain.entities.job import Job
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseNotFoundError,
+    EmailNotFoundError,
+    EmailUnavailableError,
+    JobNotFoundError,
+    StudentNotFoundError,
     UserIsNotAnAdvisorError,
 )
 from src.domain.value_objects.status import (
@@ -43,6 +50,7 @@ from src.infrastructure.database.models import (
     Activity,
     AdvisorBadge,
     BackgroundJobTracker,
+    Case,
     IdempotencyKey,
     InterventionEmail,
     PointLedger,
@@ -52,25 +60,19 @@ from src.infrastructure.database.models import (
 )
 from src.infrastructure.database.models import Advisor as OrmAdvisor
 from src.infrastructure.database.models import Case as OrmCase
-from src.infrastructure.database.models import (
-    Task as OrmTask,
-)
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
 
     from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import Session
 
     from src.domain.entities.advisor import Advisor as DomainAdvisor
-    from src.domain.entities.alert import Alert as DomainAlert
     from src.domain.entities.case import Case as DomainCase
     from src.domain.entities.intervention_email import (
         InterventionEmail as DomainInterventionEmail,
     )
     from src.domain.entities.student import Student as DomainStudent
-    from src.domain.entities.task import Task as DomainTask
     from src.domain.repositories.metadata_repository import DBDescription
 
 
@@ -82,52 +84,29 @@ class SqlAlchemyStudentRepository:
         self.session = session
         self.chunk_size = config.db_ingest_chunk_size
 
-    async def get_by_id(self, sid: uuid.UUID) -> DomainStudent | None:
+    async def get_by_id(self, sid: uuid.UUID) -> DomainStudent:
         """Retrieve a student by their unique ID."""
         stmt = select(Student).where(Student.sid == sid)
         result = await self.session.execute(stmt)
         student = result.scalar_one_or_none()
-        return DataMapper.to_domain_student(student) if student else None
+        if student is None:
+            raise StudentNotFoundError(sid)
+        return DataMapper.to_domain_student(student)
 
-    async def get_pii(self, sid: uuid.UUID) -> dict[str, Any] | None:
-        """Retrieve student PII (name and email)."""
-        stmt = select(Student.student_name, Student.email).where(Student.sid == sid)
-        result = await self.session.execute(stmt)
-        row = result.first()
-        return {'student_name': row.student_name, 'email': row.email} if row else None
-
-    async def update_intervention_status(
-        self,
-        sid: uuid.UUID,
-        status: InterventionStatus,
-    ) -> None:
-        """Update the intervention status for a student."""
+    async def save(self, student: DomainStudent) -> None:
         stmt = (
             update(Student)
-            .where(Student.sid == sid)
-            .values(intervention_status=status.value)
+            .where(Student.sid == student.sid)
+            .values(
+                student_name=student.student_name,
+                email=student.email,
+                major=student.major,
+                current_risk_status=student.current_risk_status.value,
+                last_notified_timestamp=student.last_notified_timestamp,
+                last_notified_satisfaction=student.last_notified_satisfaction,
+            )
         )
         await self.session.execute(stmt)
-
-    async def update_last_notified(self, sid: uuid.UUID) -> None:
-        """Update the last notified timestamp for a student."""
-        stmt = (
-            update(Student)
-            .where(Student.sid == sid)
-            .values(last_notified_timestamp=datetime.now(UTC))
-        )
-        await self.session.execute(stmt)
-
-    async def get_latest_status_timestamp(self, sid: uuid.UUID) -> datetime | None:
-        """Retrieve the latest status recording timestamp for a student."""
-        stmt = (
-            select(StudentStatusHistory.status_recorded_at)
-            .where(StudentStatusHistory.sid == sid)
-            .order_by(desc(StudentStatusHistory.status_recorded_at))
-            .limit(1)
-        )
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def get_recent_performance(
         self,
@@ -152,7 +131,7 @@ class SqlAlchemyStudentRepository:
             .limit(limit)
         )
         result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
+        return [dict(row) for row in result.mappings().all()]
 
     async def ingest_students(self, records: list[dict[str, Any]]) -> None:
         """Bulk ingest student records using upsert logic."""
@@ -181,20 +160,6 @@ class SqlAlchemyStudentRepository:
                 stmt = sqlite_insert(Student).values(batch).on_conflict_do_nothing()
 
             await self.session.execute(stmt)
-
-    async def update_risk_status(
-        self,
-        sid: uuid.UUID,
-        risk_status: RiskStatus,
-        intervention_status: InterventionStatus | None = None,
-    ) -> None:
-        """Update the risk and optionally intervention status for a student."""
-        values = {'current_risk_status': risk_status.value}
-        if intervention_status:
-            values['intervention_status'] = intervention_status.value
-
-        stmt = update(Student).where(Student.sid == sid).values(values)
-        await self.session.execute(stmt)
 
 
 class SqlAlchemyActivityRepository:
@@ -261,7 +226,7 @@ class SqlAlchemyActivityRepository:
             )
         )
         result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
+        return [dict(row) for row in result.mappings().all()]
 
 
 class SqlAlchemyStatusHistoryRepository:
@@ -298,7 +263,7 @@ class SqlAlchemyStatusHistoryRepository:
             StudentStatusHistory.week,
         )
         result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()]
+        return [dict(row) for row in result.mappings().all()]
 
     async def get_latest_anomaly(self, sid: uuid.UUID) -> RiskStatus | None:
         """Get the most recent anomaly flag for a student."""
@@ -458,67 +423,67 @@ class SqlAlchemyBadgeRepository:
 
     async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
         # Get total points and action count
-        stmt = select(
-            func.sum(PointLedger.points),
-            func.count(PointLedger.id),
-        ).where(PointLedger.advisor_id == advisor_id)
-
-        row = (await self.session.execute(stmt)).first()
-        total_points = row[0] or 0
-        total_actions = row[1] or 0
-
-        # Get resolves
-        stmt_resolves = (
-            select(func.count(PointLedger.id))
-            .where(
-                PointLedger.advisor_id == advisor_id,
-                OrmTask.action_type == 'resolve case',
-            )
-            .join(OrmTask, PointLedger.task_id == OrmTask.task_id)
-        )
-        total_resolves = (await self.session.execute(stmt_resolves)).scalar() or 0
-
-        # Fast actions
-        stmt_times = (
-            select(OrmCase.created_at, PointLedger.earned_at)
-            .join(OrmTask, OrmCase.case_id == OrmTask.case_id)
-            .join(PointLedger, OrmTask.task_id == PointLedger.task_id)
-            .where(OrmCase.assigned_advisor_id == advisor_id)
-            .where(PointLedger.advisor_id == advisor_id)
-        )
-        time_pairs = (await self.session.execute(stmt_times)).all()
-
-        total_hours = 0.0
-        fast_action_count = 0
-        valid_pairs = 0
-        for created_at, action_time in time_pairs:
-            if created_at and action_time:
-                delta_hours = (
-                    action_time.replace(tzinfo=None) - created_at.replace(tzinfo=None)
-                ).total_seconds() / 3600.0
-                if delta_hours < 0:
-                    delta_hours = 0.0
-                total_hours += delta_hours
-                valid_pairs += 1
-                if delta_hours <= 12.0:
-                    fast_action_count += 1
-
-        avg_response_hours = total_hours / valid_pairs if valid_pairs > 0 else 999.0
-
-        # Get total cases assigned
-        stmt_cases = select(func.count(OrmCase.case_id)).where(
-            OrmCase.assigned_advisor_id == advisor_id,
-        )
-        total_cases = (await self.session.execute(stmt_cases)).scalar() or 0
-        recovery_rate = total_resolves / total_cases if total_cases > 0 else 0.0
-
+        # stmt = select(
+        #     func.sum(PointLedger.points),
+        #     func.count(PointLedger.id),
+        # ).where(PointLedger.advisor_id == advisor_id)
+        #
+        # row = (await self.session.execute(stmt)).first()
+        # total_points = row[0] or 0
+        # total_actions = row[1] or 0
+        #
+        # # Get resolves
+        # stmt_resolves = (
+        #     select(func.count(PointLedger.id))
+        #     .where(
+        #         PointLedger.advisor_id == advisor_id,
+        #         OrmTask.action_type == 'resolve case',
+        #     )
+        #     .join(OrmTask, PointLedger.task_id == OrmTask.task_id)
+        # )
+        # total_resolves = (await self.session.execute(stmt_resolves)).scalar() or 0
+        #
+        # # Fast actions
+        # stmt_times = (
+        #     select(OrmCase.created_at, PointLedger.earned_at)
+        #     .join(OrmTask, OrmCase.case_id == OrmTask.case_id)
+        #     .join(PointLedger, OrmTask.task_id == PointLedger.task_id)
+        #     .where(OrmCase.assigned_advisor_id == advisor_id)
+        #     .where(PointLedger.advisor_id == advisor_id)
+        # )
+        # time_pairs = (await self.session.execute(stmt_times)).all()
+        #
+        # total_hours = 0.0
+        # fast_action_count = 0
+        # valid_pairs = 0
+        # for created_at, action_time in time_pairs:
+        #     if created_at and action_time:
+        #         delta_hours = (
+        #             action_time.replace(tzinfo=None) - created_at.replace(tzinfo=None)
+        #         ).total_seconds() / 3600.0
+        #         if delta_hours < 0:
+        #             delta_hours = 0.0
+        #         total_hours += delta_hours
+        #         valid_pairs += 1
+        #         if delta_hours <= 12.0:
+        #             fast_action_count += 1
+        #
+        # avg_response_hours = total_hours / valid_pairs if valid_pairs > 0 else 999.0
+        #
+        # # Get total cases assigned
+        # stmt_cases = select(func.count(OrmCase.case_id)).where(
+        #     OrmCase.assigned_advisor_id == advisor_id,
+        # )
+        # total_cases = (await self.session.execute(stmt_cases)).scalar() or 0
+        # recovery_rate = total_resolves / total_cases if total_cases > 0 else 0.0
+        #
         return {
-            'total_points': total_points,
-            'fast_action_count': fast_action_count,
-            'avg_response_hours': avg_response_hours,
-            'total_actions': total_actions,
-            'recovery_rate': recovery_rate,
-            'total_resolves': total_resolves,
+            'total_points': 0,
+            'fast_action_count': 0,
+            'avg_response_hours': 0,
+            'total_actions': 0,
+            'recovery_rate': 0,
+            'total_resolves': 0,
         }
 
 
@@ -593,40 +558,41 @@ class SqlAlchemyEmailRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def create_placeholder(
-        self,
-        case_id: uuid.UUID,
-        sid: uuid.UUID,
-        advisor_id: uuid.UUID | None,
-    ) -> uuid.UUID:
-        """Create a placeholder email with 'generating' status."""
-        email_id = uuid.uuid4()
-        email = InterventionEmail(
-            email_id=email_id,
-            sid=sid,
-            case_id=case_id,
-            advisor_id=advisor_id,
-            status='generating',
+    async def add(self, email: DomainInterventionEmail) -> None:
+        """Add an intervention email."""
+        new_mail = InterventionEmail(
+            email_id=email.email_id,
+            case_id=email.case_id,
+            status=email.status,
+            body=email.body,
+            subject=email.subject,
+            created_at=email.created_at,
+            sent_as=email.sent_at,
         )
-        self.session.add(email)
-        return email_id
+        self.session.add(new_mail)
 
-    async def update_content(
-        self,
-        case_id: uuid.UUID,
-        subject: str,
-        body: str,
-        status: EmailStatus,
-    ) -> None:
+    async def save(self, email: DomainInterventionEmail) -> None:
         """Update the content and status of an existing case email."""
         stmt = (
             update(InterventionEmail)
-            .where(InterventionEmail.case_id == case_id)
-            .values(subject=subject, body=body, status=status.value)
+            .where(InterventionEmail.case_id == email.case_id)
+            .values(
+                status=email.status,
+                body=email.body,
+                subject=email.subject,
+                sent_as=email.sent_at,
+            )
         )
         await self.session.execute(stmt)
 
-    async def get_by_case(self, case_id: uuid.UUID) -> DomainInterventionEmail | None:
+    async def get_by_case(self, case_id: uuid.UUID) -> DomainInterventionEmail:
+        """Find the email associated with a specific case."""
+        email = await self.find_by_case(case_id=case_id)
+        if email is None:
+            raise EmailNotFoundError(case_id=case_id)
+        return email
+
+    async def find_by_case(self, case_id: uuid.UUID) -> DomainInterventionEmail | None:
         """Retrieve the email associated with a specific case."""
         stmt = (
             select(InterventionEmail)
@@ -637,29 +603,6 @@ class SqlAlchemyEmailRepository:
         email = result.scalar_one_or_none()
         return DataMapper.to_domain_email(email) if email else None
 
-    async def mark_as_sent(self, case_id: uuid.UUID, body: str) -> None:
-        """Mark the case email as sent."""
-        stmt = (
-            update(InterventionEmail)
-            .where(InterventionEmail.case_id == case_id)
-            .values(
-                body=body,
-                status=EmailStatus.SENT.value,
-                sent_at=func.current_timestamp(),
-            )
-        )
-        await self.session.execute(stmt)
-
-    async def get_history(self, sid: uuid.UUID) -> list[DomainInterventionEmail]:
-        """Retrieve the communication history for a student."""
-        stmt = (
-            select(InterventionEmail)
-            .where(InterventionEmail.sid == sid)
-            .order_by(desc(InterventionEmail.created_at))
-        )
-        result = await self.session.execute(stmt)
-        return [DataMapper.to_domain_email(row[0]) for row in result.all()]
-
 
 class SqlAlchemyCaseRepository:
     """SQLAlchemy implementation of the CaseRepository."""
@@ -668,39 +611,37 @@ class SqlAlchemyCaseRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def create_case(self, case: DomainCase) -> None:
-        """Create a new case with initial tasks."""
-        orm_case = OrmCase(
+    async def add(self, case: DomainCase) -> None:
+        """Add a new case."""
+        new_case = OrmCase(
             case_id=case.case_id,
             sid=case.sid,
-            status=case.status.value,
+            intervention_status=case.intervention_status,
             created_at=case.created_at,
+            assigned_at=case.assigned_at,
+            closed_at=case.closed_at,
+            version=case.version,
+            assigned_advisor_id=case.assigned_advisor_id,
         )
-        self.session.add(orm_case)
-
-        # Automatically generate standard tasks
-        # These points values should ideally come from a config or service
-        standard_tasks = [
-            ('send email', 10),
-            ('student book', 20),
-            ('resolve case', 50),
-            ('review draft', 5),
-        ]
-        for action_type, points in standard_tasks:
-            task = OrmTask(
-                task_id=uuid.uuid4(),
-                case_id=case.case_id,
-                action_type=action_type,
-                status='pending',
-                points_reward=points,
-                created_at=case.created_at,
-            )
-            self.session.add(task)
+        self.session.add(new_case)
 
     async def get_active_case(self, sid: uuid.UUID) -> DomainCase | None:
         """Retrieve the active case for a student, if any."""
         stmt = (
-            select(OrmCase).where(OrmCase.sid == sid, OrmCase.status == 'open').limit(1)
+            select(OrmCase)
+            .where(
+                OrmCase.sid == sid,
+                OrmCase.intervention_status.in_(
+                    [
+                        InterventionStatus.NEW,
+                        InterventionStatus.ACCEPTED,
+                        InterventionStatus.SENT,
+                        InterventionStatus.BOOKED,
+                        InterventionStatus.SUPPORTING,
+                    ],
+                ),
+            )
+            .limit(1)
         )
         result = await self.session.execute(stmt)
         orm_case = result.scalar_one_or_none()
@@ -715,7 +656,7 @@ class SqlAlchemyCaseRepository:
             )
             .values(
                 assigned_advisor_id=case.assigned_advisor_id,
-                status=case.status,
+                intervention_status=case.intervention_status,
                 version=case.version + 1,
             )
         )
@@ -748,11 +689,7 @@ class SqlAlchemyCaseRepository:
 
     async def find_by_id(self, case_id: uuid.UUID) -> DomainCase | None:
         """Retrieve a case by its ID."""
-        stmt = (
-            select(OrmCase)
-            .where(OrmCase.case_id == case_id)
-            .options(selectinload(OrmCase.tasks))
-        )
+        stmt = select(OrmCase).where(OrmCase.case_id == case_id)
         result = await self.session.execute(stmt)
         case = result.scalar_one_or_none()
         return DataMapper.to_domain_case(case) if case else None
@@ -760,128 +697,57 @@ class SqlAlchemyCaseRepository:
     async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
         """Retrieve all cases for a specific student."""
         stmt = (
-            select(OrmCase)
-            .where(OrmCase.sid == sid)
-            .options(selectinload(OrmCase.tasks))
-            .order_by(desc(OrmCase.created_at))
+            select(OrmCase).where(OrmCase.sid == sid).order_by(desc(OrmCase.created_at))
         )
         result = await self.session.execute(stmt)
         return [DataMapper.to_domain_case(row[0]) for row in result.all()]
 
 
-class SqlAlchemyTaskRepository:
-    """SQLAlchemy implementation of the TaskRepository."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize with a SQLAlchemy async session."""
-        self.session = session
-
-    async def create_task(self, task: DomainTask) -> None:
-        """Create a new task."""
-        orm_task = OrmTask(
-            task_id=task.task_id,
-            case_id=task.case_id,
-            action_type=task.action_type.value,
-            status=task.status.value,
-            points_reward=task.points_reward,
-            created_at=task.created_at,
-        )
-        self.session.add(orm_task)
-
-    async def get_by_id(self, task_id: uuid.UUID) -> DomainTask | None:
-        """Retrieve a task by its ID."""
-        stmt = select(OrmTask).where(OrmTask.task_id == task_id)
-        result = await self.session.execute(stmt)
-        task = result.scalar_one_or_none()
-        return DataMapper.to_domain_task(task) if task else None
-
-    async def get_by_case(self, case_id: uuid.UUID) -> list[DomainTask]:
-        """Retrieve all tasks for a specific case."""
-        stmt = select(OrmTask).where(OrmTask.case_id == case_id)
-        result = await self.session.execute(stmt)
-        return [DataMapper.to_domain_task(t) for t in result.scalars().all()]
-
-    async def update_task(self, task: DomainTask) -> None:
-        """Update an existing task."""
-        stmt = (
-            update(OrmTask)
-            .where(OrmTask.task_id == task.task_id)
-            .values(
-                status=task.status.value,
-                points_reward=task.points_reward,
-                completed_at=task.completed_at,
-                completed_by_advisor_id=task.completed_by_advisor_id,
-            )
-        )
-        await self.session.execute(stmt)
-
-
-class SqlAlchemyAlertRepository:
-    """SQLAlchemy implementation of the AlertRepository."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize with a SQLAlchemy async session."""
-        self.session = session
-
-    async def get_active_alerts(
-        self,
-        status_filter: str | None = None,
-        limit: int = 20,
-        offset: int = 0,
-    ) -> tuple[list[DomainAlert], int]:
-        """Retrieve students with active alerts for the Kanban board."""
-        # Subquery to get latest draft
-        subq = (
-            select(
-                InterventionEmail.sid,
-                InterventionEmail.subject,
-                InterventionEmail.body,
-                func.row_number()
-                .over(
-                    partition_by=InterventionEmail.sid,
-                    order_by=desc(InterventionEmail.created_at),
-                )
-                .label('rn'),
-            )
-            .where(InterventionEmail.status == 'draft')
-            .subquery()
-        )
-
-        latest_draft = select(subq).where(subq.c.rn == 1).subquery()
-
-        stmt = (
-            select(Student, latest_draft.c.subject, latest_draft.c.body)
-            .outerjoin(latest_draft, Student.sid == latest_draft.c.sid)
-            .where(Student.intervention_status != 'none')
-        )
-
-        if status_filter:
-            stmt = stmt.where(Student.intervention_status == status_filter)
-
-        # Count total items
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        count_result = await self.session.execute(count_stmt)
-        total_count = count_result.scalar() or 0
-
-        # Apply paging
-        stmt = stmt.limit(limit).offset(offset)
-        result = await self.session.execute(stmt)
-        alerts: list[DomainAlert] = []
-        for row in result.all():
-            row_tuple = tuple(row)
-            orm_student = row_tuple[0]
-            draft_subject = row_tuple[1]
-            draft_body = row_tuple[2]
-            alerts.append(
-                DataMapper.to_domain_alert(
-                    orm_student,
-                    {
-                        'draft_subject': draft_subject,
-                        'draft_body': draft_body,
-                    },
-                ),
-            )
-        return alerts, total_count
+# class SqlAlchemyTaskRepository:
+#     """SQLAlchemy implementation of the TaskRepository."""
+#
+#     def __init__(self, session: AsyncSession) -> None:
+#         """Initialize with a SQLAlchemy async session."""
+#         self.session = session
+#
+#     async def create_task(self, task: DomainTask) -> None:
+#         """Create a new task."""
+#         orm_task = OrmTask(
+#             task_id=task.task_id,
+#             case_id=task.case_id,
+#             action_type=task.action_type.value,
+#             status=task.status.value,
+#             points_reward=task.points_reward,
+#             created_at=task.created_at,
+#         )
+#         self.session.add(orm_task)
+#
+#     async def get_by_id(self, task_id: uuid.UUID) -> DomainTask | None:
+#         """Retrieve a task by its ID."""
+#         stmt = select(OrmTask).where(OrmTask.task_id == task_id)
+#         result = await self.session.execute(stmt)
+#         task = result.scalar_one_or_none()
+#         return DataMapper.to_domain_task(task) if task else None
+#
+#     async def get_by_case(self, case_id: uuid.UUID) -> list[DomainTask]:
+#         """Retrieve all tasks for a specific case."""
+#         stmt = select(OrmTask).where(OrmTask.case_id == case_id)
+#         result = await self.session.execute(stmt)
+#         return [DataMapper.to_domain_task(t) for t in result.scalars().all()]
+#
+#     async def update_task(self, task: DomainTask) -> None:
+#         """Update an existing task."""
+#         stmt = (
+#             update(OrmTask)
+#             .where(OrmTask.task_id == task.task_id)
+#             .values(
+#                 status=task.status.value,
+#                 points_reward=task.points_reward,
+#                 completed_at=task.completed_at,
+#                 completed_by_advisor_id=task.completed_by_advisor_id,
+#             )
+#         )
+#         await self.session.execute(stmt)
 
 
 class SqlAlchemyMetricsRepository:
@@ -914,9 +780,7 @@ class SqlAlchemyMetricsRepository:
         dropout_rate = (dropout / total) * 100
 
         # 2. Interventions
-        int_stmt = select(func.count(Student.sid)).where(
-            Student.intervention_status != 'none',
-        )
+        int_stmt = select(func.count(distinct(OrmCase.sid))).where(OrmCase.intervention_status != InterventionStatus.NEW)
         int_res = await self.session.execute(int_stmt)
         int_count = int_res.scalar() or 0
 
@@ -982,137 +846,67 @@ class SqlAlchemyJobRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def create_job(
-        self,
-        job_id: uuid.UUID,
-        job_type: str,
-        correlation_id: uuid.UUID | None = None,
-        correlation_type: str | None = None,
-    ) -> None:
-        """Record a new background job with optional correlation."""
-        entry = BackgroundJobTracker(
-            job_id=job_id,
-            job_type=job_type,
-            correlation_id=correlation_id,
-            correlation_type=correlation_type,
-            status='running',
+    async def add(self, job: Job) -> None:
+        """Record an background job."""
+        orm_job = BackgroundJobTracker(
+            job_id=job.job_id,
+            status=job.status,
+            correlation_id=job.correlation_id,
+            correlatio_type=job.correlation_type,
+            created_at=job.created_at,
+            started_at=job.started_at,
+            completed_at=job.ended_at,
         )
-        self.session.add(entry)
+        self.session.add(orm_job)
 
-    async def update_job_progress(
-        self,
-        job_id: uuid.UUID,
-        progress: int,
-        status_message: str | None = None,
-    ) -> None:
-        """Update the progress and status message of a job."""
-        stmt = (
-            update(BackgroundJobTracker)
-            .where(BackgroundJobTracker.job_id == job_id)
-            .values(progress=progress, error_message=status_message)
+    async def get_by_id(self, job_id: uuid.UUID) -> Job:
+        """Get a job by id."""
+        stmt = select(BackgroundJobTracker).where(
+            BackgroundJobTracker.job_id == job_id,
         )
-        await self.session.execute(stmt)
+        result = await self.session.execute(stmt)
+        value = result.scalar_one_or_none()
+        if value is None:
+            raise JobNotFoundError(job_id=job_id)
+        return DataMapper.to_domain_job(value)
 
-    async def start_job(self, job_id: uuid.UUID) -> None:
-        """Mark a job as started."""
-        stmt = (
-            update(BackgroundJobTracker)
-            .where(BackgroundJobTracker.job_id == job_id)
-            .values(started_at=func.current_timestamp(), status='processing')
-        )
-        await self.session.execute(stmt)
-
-    async def complete_job(self, job_id: uuid.UUID) -> None:
-        """Mark a background job as completed."""
-        stmt = (
-            update(BackgroundJobTracker)
-            .where(BackgroundJobTracker.job_id == job_id)
-            .values(
-                completed_at=func.current_timestamp(),
-                status='completed',
-                progress=100,
-            )
-        )
-        await self.session.execute(stmt)
-
-    async def fail_job(self, job_id: uuid.UUID, error_message: str) -> None:
-        """Mark a background job as failed."""
-        stmt = (
-            update(BackgroundJobTracker)
-            .where(BackgroundJobTracker.job_id == job_id)
-            .values(
-                completed_at=func.current_timestamp(),
-                status='failed',
-                error_message=error_message,
-            )
-        )
-        await self.session.execute(stmt)
-
-    async def get_active_job(
+    async def find_by_correlation_id(
         self,
         correlation_id: uuid.UUID,
         correlation_type: str,
-        job_type: str,
-    ) -> uuid.UUID | None:
-        """Retrieve the active job ID for a specific correlation context."""
-        stmt = select(BackgroundJobTracker.job_id).where(
+    ) -> Job | None:
+        """Find job by a correlation id."""
+        stmt = select(BackgroundJobTracker).where(
             BackgroundJobTracker.correlation_id == correlation_id,
             BackgroundJobTracker.correlation_type == correlation_type,
-            BackgroundJobTracker.job_type == job_type,
-            BackgroundJobTracker.status.in_(['running', 'processing']),
         )
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+        value = result.scalar_one_or_none()
+        return DataMapper.to_domain_job(value) if value else None
 
-    async def batch_create_jobs(
+    async def get_by_correlation_id(
         self,
-        jobs: Sequence[tuple[uuid.UUID, str, uuid.UUID | None, str | None]],
-    ) -> None:
-        """Batch record multiple background jobs."""
-        if not jobs:
-            return
+        correlation_id: uuid.UUID,
+        correlation_type: str,
+    ) -> Job:
+        """Find job by a correlation id."""
+        res = await self.find_by_correlation_id(correlation_id, correlation_type)
+        if res is None:
+            raise JobNotFoundError(correlation_id=correlation_id)
+        return res
 
-        entries = [
-            BackgroundJobTracker(
-                job_id=job_id,
-                job_type=job_type,
-                correlation_id=corr_id,
-                correlation_type=corr_type,
-                status='running',
+    async def save(self, job: Job) -> None:
+        """Update an existing job."""
+        stmt = (
+            update(BackgroundJobTracker)
+            .where(BackgroundJobTracker.job_id == job.job_id)
+            .values(
+                status=job.status,
+                started_at=job.started_at,
+                completed_at=job.ended_at,
             )
-            for job_id, job_type, corr_id, corr_type in jobs
-        ]
-        self.session.add_all(entries)
-
-    async def get_job(self, job_id: uuid.UUID) -> dict[str, Any] | None:
-        """Retrieve job details for observability."""
-        stmt = select(BackgroundJobTracker).where(BackgroundJobTracker.job_id == job_id)
-        result = await self.session.execute(stmt)
-        orm_job = result.scalar_one_or_none()
-
-        if not orm_job:
-            return None
-
-        return {
-            'job_id': str(orm_job.job_id),
-            'job_type': orm_job.job_type,
-            'status': orm_job.status,
-            'progress': orm_job.progress,
-            'error_message': orm_job.error_message,
-            'created_at': orm_job.created_at.isoformat()
-            if orm_job.created_at
-            else None,
-            'started_at': orm_job.started_at.isoformat()
-            if orm_job.started_at
-            else None,
-            'completed_at': orm_job.completed_at.isoformat()
-            if orm_job.completed_at
-            else None,
-            'correlation_id': str(orm_job.correlation_id)
-            if orm_job.correlation_id
-            else None,
-            'correlation_type': orm_job.correlation_type,
-        }
+        )
+        await self.session.execute(stmt)
 
 
 class SqlAlchemyUserSettingsRepository:
