@@ -641,6 +641,33 @@ export async function fetchTasks(
 }
 
 /**
+ * Pulls the list of open (unassigned) cases for the admin oversight view.
+ * Backed by GET /cases/open which returns CaseDTO with the assigned advisor
+ * already joined in.
+ */
+export async function fetchOpenCases(
+    limit: number = 100,
+    offset: number = 0,
+): Promise<TaskPagedResponse> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                endpoint(`/cases/open?limit=${limit}&offset=${offset}`),
+                { method: "GET" },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        const message = errorBody.detail || res.statusText;
+        throw new Error(`Không thể lấy danh sách case: ${message}`);
+    }
+    const data = await res.json();
+    return TaskPagedResponseSchema.parse(data);
+}
+
+/**
  * Pushes a status transition for a single student.
  */
 export async function updateAlertStatus(
