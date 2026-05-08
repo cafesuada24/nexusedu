@@ -11,6 +11,7 @@ import {
     CalendarClock,
     LineChart,
     Sparkles,
+    ClipboardList,
 } from "lucide-react";
 import {
     Sidebar,
@@ -45,12 +46,6 @@ const baseMainNav: NavItem[] = [
         tone: "sky",
     },
     {
-        href: "/dashboard/alerts",
-        label: "Trung tâm cảnh báo",
-        icon: BellRing,
-        tone: "destructive",
-    },
-    {
         href: "/dashboard/schedule",
         label: "Lịch làm việc",
         icon: CalendarClock,
@@ -82,10 +77,33 @@ const secondaryNav: NavItem[] = [
 export function AppSidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
-    const canAccessCsvImport = user?.role === "admin";
-    const mainNav = canAccessCsvImport
+    const isAdmin = user?.role === "admin";
+
+    const alertsOrCasesItem: NavItem = isAdmin
+        ? {
+              href: "/dashboard/cases",
+              label: "Quản lý case sinh viên",
+              icon: ClipboardList,
+              tone: "primary",
+          }
+        : {
+              href: "/dashboard/alerts",
+              label: "Trung tâm cảnh báo",
+              icon: BellRing,
+              tone: "destructive",
+          };
+
+    const filteredBase = isAdmin
         ? baseMainNav
         : baseMainNav.filter((item) => item.href !== "/dashboard/import");
+    const insertAt = filteredBase.findIndex(
+        (item) => item.href === "/dashboard/schedule",
+    );
+    const mainNav = [
+        ...filteredBase.slice(0, insertAt),
+        alertsOrCasesItem,
+        ...filteredBase.slice(insertAt),
+    ];
 
     const isActive = (href: string) => {
         if (href === "/dashboard") return pathname === "/dashboard";
