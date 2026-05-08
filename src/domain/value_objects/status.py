@@ -6,54 +6,48 @@ from enum import StrEnum
 class RiskStatus(StrEnum):
     """Student risk status levels."""
 
-    NORMAL = "Normal"
-    ELEVATED = "Elevated"
-    CRITICAL = "Critical"
-    UNKNOWN = "Unknown"
+    NORMAL = 'Normal'
+    ELEVATED = 'Elevated'
+    CRITICAL = 'Critical'
+    UNKNOWN = 'Unknown'
 
 
 class InterventionStatus(StrEnum):
     """Student intervention status levels."""
 
-    NONE = "none"
-    NOTIFIED = "notified"
-    BOOKED = "booked"
-    SENT = "sent"
-    SUPPORTING = "supporting"
-    RESOLVED = "resolved"
-    DISMISSED = "dismissed"
-    EXPIRED = "expired"
+    NEW = 'new'
+    ACCEPTED = 'accepted'
+    SENT = 'sent'
+    BOOKED = 'booked'
+    SUPPORTING = 'supporting'
+    RESOLVED = 'resolved'
+    DISMISSED = 'dismissed'
+    EXPIRED = 'expired'
 
 
-class CaseStatus(StrEnum):
-    """Status of a student case."""
+class JobStatus(StrEnum):
+    """Status of a background job."""
 
-    OPEN = "open"
-    ASSIGNED = "assigned"
-    RESOLVED = "resolved"
-    FAILED = "failed"
-
-
-class TaskStatus(StrEnum):
-    """Status of a task."""
-
-    PENDING = "pending"
-    COMPLETED = "completed"
-
-
-class TaskType(StrEnum):
-    """Types of tasks that can be performed on a case."""
-
-    SEND_EMAIL = "send email"
-    STUDENT_BOOK = "student book"
-    RESOLVE_CASE = "resolve case"
-    REVIEW_DRAFT = "review draft"
+    PENDING = 'pending'
+    RUNNING = 'running'
+    SUCCESS = 'success'
+    ERROR = 'error'
+    CANCELLED = 'cancelled'
 
 
 class EmailStatus(StrEnum):
     """Status of an intervention email."""
 
-    GENERATING = "generating"
-    DRAFT = "draft"
-    SENT = "sent"
+    UNAVAILABLE = 'unavailable'
+    GENERATING = 'generating'
+    DRAFT = 'draft'
+    SENT = 'sent'
 
+
+class TaskStatus(StrEnum):
+    """Status of a task."""
+
+    AVAILABLE = 'available'
+    BLOCKED = 'blocked'
+    FAILED = 'failed'
+    DONE = 'done'

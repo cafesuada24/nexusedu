@@ -2,13 +2,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, EmailStr
+from pydantic import AwareDatetime, BaseModel, EmailStr, NonNegativeInt
 
 from src.domain.value_objects.status import (
+    EmailStatus,
     InterventionStatus,
+    JobStatus,
     RiskStatus,
     TaskStatus,
-    TaskType,
 )
 
 
@@ -22,30 +23,12 @@ class AcceptCaseCommand:
 
 
 @dataclass
-class UpdateStudentStatusCommand:
-    """Command to update a student's intervention status."""
-
-    case_id: UUID
-    status: InterventionStatus
-    user_id: UUID
-
-
-@dataclass
-class AwardReviewPointsCommand:
-    """Command to award points for reviewing a draft."""
-
-    case_id: UUID
-    user_id: UUID
-
-
-@dataclass
 class TriggerDraftCommand:
     """Command to trigger a background email draft generation."""
 
     case_id: UUID
     user_id: UUID
     booking_link: str | None = None
-    update_db: bool = True
 
 
 @dataclass
@@ -66,6 +49,7 @@ class SendEmailCommand:
     body: str
     user_id: UUID
 
+
 @dataclass(frozen=True)
 class GetAssignedQuery:
     """Query to retrieve advisor task list."""
@@ -83,17 +67,26 @@ class GetUnassignedQuery:
     offset: int = 0
 
 
-@dataclass(frozen=True)
-class TaskDTO:
-    """DTO for a task associated with a case."""
+# ==========================
+# ========== DTOs ==========
+# ==========================
 
-    task_id: UUID
-    action_type: TaskType
-    status: TaskStatus
-    points_reward: int
-    completed_at: datetime | None
-    completed_by_advisor_id: UUID | None
 
+class TriggerDraftDTO(BaseModel):
+    job_id: UUID
+    status: JobStatus
+    is_new_job: bool
+
+
+class QueryEmailDTO(BaseModel):
+    email_id: UUID
+
+    recipent: EmailStr
+    subject: str | None = None
+    body: str | None = None
+    status: EmailStatus
+    created_at: datetime
+    sent_at: datetime | None = None
 
 class CaseDTO(BaseModel):
     """Schema for a student case."""
@@ -111,9 +104,4 @@ class CaseDTO(BaseModel):
     current_risk_status: RiskStatus
     intervention_status: InterventionStatus
 
-    email: EmailStr
-    draft_subject: str | None
-    draft_body: str | None
-    draft_status: str | None
-
-    points_reward: int
+    email: QueryEmailDTO | None

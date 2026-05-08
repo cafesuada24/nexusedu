@@ -31,16 +31,3 @@ class AlertDTO:
 
     student: StudentDTO
     alert_details: dict[str, Any]
-
-
-@dataclass
-class EmailDTO:
-    """DTO for intervention email data."""
-
-    email_id: UUID
-    sid: UUID
-    subject: str | None
-    body: str | None
-    status: str
-    created_at: str
-    sent_at: str | None = None

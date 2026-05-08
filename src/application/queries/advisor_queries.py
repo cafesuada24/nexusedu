@@ -1,23 +1,22 @@
 """Query handlers for advisor-related operations."""
 
-import json
 from uuid import UUID
 
-from arq import ArqRedis
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
 from src.application.dtos.advisor_dtos import (
     AdvisorProfileDTO,
     BadgeDTO,
-    EngagementMetricsDTO,
     GetAdvisorProfileQuery,
+)
+from src.application.dtos.gamification_dtos import (
+    EngagementMetricsEntryDTO,
     GetLeaderboardQuery,
     LeaderboardEntryDTO,
 )
 from src.application.interfaces.advisor_query_service import AdvisorQueryService
 from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.interfaces import AdvisorRepository
-from src.domain.value_objects.badges import BADGE_MAP
 
 
 class AdvisorQueryHandler:
@@ -72,9 +71,9 @@ class AdvisorQueryHandler:
             advisor_id=advisor_id,
         )
 
-    async def handle_get_engagement_metrics(self) -> list[EngagementMetricsDTO]:
+    async def handle_get_engagement_metrics(self) -> list[EngagementMetricsEntryDTO]:
         """Execute the get engagement metrics query."""
-        ...
+        return []
         # metrics = await self.__advisor_repo.get_engagement_metrics()
         # return [
         #     EngagementMetricsDTO(

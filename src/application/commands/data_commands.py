@@ -15,7 +15,7 @@ from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
-from src.domain.value_objects.status import CaseStatus, InterventionStatus, RiskStatus
+from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
 
 class DataCommandHandler:
@@ -99,37 +99,27 @@ class DataCommandHandler:
         # 5. Transition student statuses and identify new at-risk students
         new_at_risk_sids: list[tuple[UUID, UUID]] = []
         for sid, latest_risk in risk_statuses.items():
-            if latest_risk == RiskStatus.NORMAL:
-                continue
-
             student = await self.student_repo.get_by_id(sid)
             if not student:
                 continue
 
-            if student.intervention_status in (
-                InterventionStatus.NONE,
-                InterventionStatus.RESOLVED,
-            ):
-                await self.student_repo.update_risk_status(
-                    sid,
-                    risk_status=latest_risk,
-                    intervention_status=InterventionStatus.NOTIFIED,
-                )
+            # Always update student risk status
+            student.update_risk(latest_risk)
+            await self.student_repo.save(student)
 
-                # Create a new Case for this student
-                new_case = Case(sid=sid, status=CaseStatus.OPEN)
-                await self.case_repo.create_case(new_case)
+            if latest_risk == RiskStatus.NORMAL:
+                continue
+
+            active_case = await self.case_repo.get_active_case(sid)
+
+            if active_case is None:
+                # Create a new Case for this student if they don't have an active one
+
+                new_case = Case(sid=sid, intervention_status=InterventionStatus.NEW)
+                await self.case_repo.add(new_case)
                 case_id = new_case.case_id
             else:
-                await self.student_repo.update_risk_status(sid, risk_status=latest_risk)
-                case = await self.case_repo.get_active_case(sid)
-                if case is None:
-                    logger.warning(
-                        f'Student id {sid} having risk status outside'
-                        ' (NONE, RESOLVED) has no active case, ignoring...',
-                    )
-                    continue
-                case_id = case.case_id
+                case_id = active_case.case_id
 
             new_at_risk_sids.append((sid, case_id))
 
