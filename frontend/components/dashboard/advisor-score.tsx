@@ -55,7 +55,7 @@ export function AdvisorScore({ className }: AdvisorScoreProps) {
           </div>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-xs text-xs">
-          <p className="font-semibold mb-1">Advisor Score</p>
+          <p className="font-semibold mb-1">Điểm cố vấn</p>
           <p className="text-muted-foreground">
             Điểm thưởng tích lũy từ các hoạt động can thiệp và hỗ trợ sinh viên.
           </p>
