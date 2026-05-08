@@ -91,6 +91,14 @@ class AlertStudent(BaseModel):
     active_case_id: str | None = Field(
         None, description='The ID of the currently active case.'
     )
+    assigned_advisor_id: str | None = Field(
+        None,
+        description='The advisor assigned to the active case, if any.',
+    )
+    assigned_to: str | None = Field(
+        None,
+        description='Display name of the advisor assigned to the active case.',
+    )
 
 
 class TaskDetail(BaseModel):
