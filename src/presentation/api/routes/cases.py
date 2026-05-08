@@ -257,7 +257,9 @@ async def accept_task(
         raise HTTPException(status_code=409, detail=str(e)) from e
     except StudentNotFoundError as e:
         logger.error('[Mismatch] A case exists without an associated student.')
-        raise HTTPException(status_code=404, detail="Student information not found.") from e
+        raise HTTPException(
+            status_code=404, detail='Student information not found.',
+        ) from e
     except Exception as e:
         logger.error(f'Error in complete_task: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
