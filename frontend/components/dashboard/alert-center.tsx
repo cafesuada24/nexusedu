@@ -4,12 +4,17 @@ import * as React from "react";
 import { ChevronLeft, ChevronRight, Mail, Inbox } from "lucide-react";
 import { LayoutGroup } from "framer-motion";
 import { toast } from "sonner";
+import { z } from "zod";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog";
 import { type Problem, type StudentRow } from "@/lib/csv";
-import { fetchStudentCases, generateAiDraftForAlert } from "@/lib/api";
+import {
+    fetchStudentCases,
+    generateAiDraftForAlert,
+    ingestData,
+} from "@/lib/api";
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
 import { useSocketEvent } from "@/hooks/use-socket";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,7 +32,8 @@ import {
 } from "@/lib/alerts";
 import { AlertSearch } from "./alert-center/alert-search";
 import { KanbanColumn } from "./alert-center/kanban-column";
-import { StudentDetailDrawer } from "./alert-center/student-detail-drawer";
+import { StudentDetailModal } from "./alert-center/student-detail-modal";
+import { EmailEditorSheet } from "./email-editor-sheet";
 
 export function AlertCenter() {
     const boardScrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -39,6 +45,9 @@ export function AlertCenter() {
         null,
     );
     const [detailsTargetId, setDetailsTargetId] = React.useState<string | null>(
+        null,
+    );
+    const [emailTargetId, setEmailTargetId] = React.useState<string | null>(
         null,
     );
     const [requestedDraftById, setRequestedDraftById] = React.useState<
@@ -53,6 +62,12 @@ export function AlertCenter() {
     const [aiDraftReadyById, setAiDraftReadyById] = React.useState<
         Record<string, boolean>
     >({});
+    const [acceptingCaseById, setAcceptingCaseById] = React.useState<
+        Record<string, boolean>
+    >({});
+    const [hiddenAlerts, setHiddenAlerts] = React.useState<Set<string>>(
+        new Set(),
+    );
     const [recentlyMoved, setRecentlyMoved] = React.useState<{
         alertId: string;
         status: CaseStatus;
@@ -112,7 +127,7 @@ export function AlertCenter() {
         const now = Math.floor(Date.now() / 1000);
 
         const getProblemFromStatus = (status: string): Problem => {
-            const s = status.toLowerCase();
+            const s = (status || "").toLowerCase();
             if (s.includes("final")) return "failed_final";
             if (s.includes("midterm") || s.includes("critical"))
                 return "failed_midterm";
@@ -120,35 +135,50 @@ export function AlertCenter() {
         };
 
         return remoteAlerts
-            .filter((r) => r.intervention_status !== "dismissed")
-            .map((r) => ({
-                id: r.sid,
-                caseId: r.active_case_id ?? null,
-                name: r.student_name,
-                mssv: r.sid.slice(0, 8).toUpperCase(),
-                email: r.email,
-                problem: getProblemFromStatus(r.current_risk_status),
-                summary: r.current_risk_status,
-                severity: r.current_risk_status
-                    .toLowerCase()
-                    .includes("elevated")
-                    ? ("medium" as const)
-                    : ("high" as const),
-                subject: "",
-                body: "",
-                lastContactedAt: null,
-                status: fromBackendStatus(r.intervention_status),
-                movedAt: now,
-                draftJobId: null,
-                draftSubject: null,
-                draftBody: null,
-                appointmentAt:
-                    r.intervention_status === "booked"
-                        ? pickRandomAppointment()
-                        : null,
-                goals: localAlertState[r.sid]?.goals || [],
-            }));
-    }, [remoteAlerts, localAlertState]);
+            .filter(
+                (r) =>
+                    (r.intervention_status || "").toLowerCase() !== "dismissed",
+            )
+            .filter((r) => !hiddenAlerts.has(r.sid || ""))
+            .map((r) => {
+                const baseStatus = fromBackendStatus(r.intervention_status);
+                // If it's in /cases/assigned (has advisor) but still 'notified', it should be in 'accepted' column
+                const status =
+                    baseStatus === "new" && r.assigned_advisor_id
+                        ? "accepted"
+                        : baseStatus;
+
+                return {
+                    id: r.sid || `missing-${Math.random()}`,
+                    caseId: r.case_id || r.active_case_id || null,
+                    name: r.student_name || "Unknown Student",
+                    mssv: (r.sid || "").slice(0, 8).toUpperCase() || "N/A",
+                    email: r.email || "",
+                    problem: getProblemFromStatus(r.current_risk_status || ""),
+                    summary: r.current_risk_status || "Unknown risk",
+                    severity: (r.current_risk_status || "")
+                        .toLowerCase()
+                        .includes("elevated")
+                        ? ("medium" as const)
+                        : ("high" as const),
+                    subject: "",
+                    body: "",
+                    lastContactedAt: null,
+                    status: status,
+                    movedAt: now,
+                    draftJobId: null,
+                    draftSubject: r.draft_subject || null,
+                    draftBody: r.draft_body || null,
+                    isGenerating:
+                        r.is_generating || r.draft_status === "generating",
+                    appointmentAt:
+                        (r.intervention_status || "").toLowerCase() === "booked"
+                            ? pickRandomAppointment()
+                            : null,
+                    goals: localAlertState[r.sid]?.goals || [],
+                };
+            });
+    }, [remoteAlerts, localAlertState, hiddenAlerts]);
 
     const [collapsedCols, setCollapsedCols] = React.useState<
         Record<CaseStatus, boolean>
@@ -224,7 +254,6 @@ export function AlertCenter() {
         return map;
     }, [alerts]);
 
-
     const problemCounts = React.useMemo(() => {
         const counts: Record<Problem, number> = {
             failed_final: 0,
@@ -257,104 +286,178 @@ export function AlertCenter() {
         return () => window.clearTimeout(timeoutId);
     }, [recentlyMoved]);
 
-    const resolveCaseIdForAlert = async (a: Alert): Promise<string | null> => {
-        if (a.caseId) return a.caseId;
-        try {
-            const cases = await fetchStudentCases(a.id);
-            const sorted = [...cases].sort(
-                (left, right) =>
-                    new Date(right.created_at).getTime() -
-                    new Date(left.created_at).getTime(),
-            );
-            const latestOpenCase = sorted.find((c) => c.status === "open");
-            return latestOpenCase?.case_id ?? sorted[0]?.case_id ?? null;
-        } catch {
-            return null;
-        }
-    };
+    const resolveCaseIdForAlert = (a: Alert): string | null =>
+        a.caseId || a.activeCaseId || null;
 
-    const moveTo = async (a: Alert, status: CaseStatus, message?: string) => {
-        const sid = a.id;
-        const caseId = await resolveCaseIdForAlert(a);
+    const handleGenerateDraft = async (a: Alert) => {
+        const caseId = resolveCaseIdForAlert(a);
         if (!caseId) {
-            toast.error("Không thể cập nhật trạng thái", {
-                description:
-                    "Không tìm thấy case đang mở cho sinh viên này. Vui lòng tải lại danh sách.",
+            toast.error("Không tìm thấy mã case", {
+                description: "Vui lòng thử tải lại trang hoặc nhận lại ca.",
             });
             return;
         }
 
+        setAiDraftingById((prev) => ({ ...prev, [a.id]: true }));
+        setAiDraftErrorById((prev) => {
+            if (!prev[a.id]) return prev;
+            const next = { ...prev };
+            delete next[a.id];
+            return next;
+        });
+
+        try {
+            await generateAiDraftForAlert(a.id, caseId);
+            setRequestedDraftById((prev) => ({ ...prev, [a.id]: true }));
+            setAiDraftReadyById((prev) => ({ ...prev, [a.id]: true }));
+            toast.success("Bản nháp đã sẵn sàng", {
+                description: "AI đã soạn xong nội dung email hỗ trợ.",
+            });
+        } catch (err: any) {
+            const draftError = String(err?.message || err || "");
+            setAiDraftErrorById((prev) => ({
+                ...prev,
+                [a.id]: draftError || "Không thể tạo bản nháp AI.",
+            }));
+            toast.error("Không thể tạo nội dung email", {
+                description: draftError,
+            });
+        } finally {
+            setAiDraftingById((prev) => {
+                const next = { ...prev };
+                delete next[a.id];
+                return next;
+            });
+        }
+    };
+
+    const handleSaveEmail = (a: Alert) => {
+        // When we save from the editor, we effectively "contact" the student
+        moveTo(a, "contacted", "Đã lưu bản thảo và sẵn sàng gửi");
+        setEmailTargetId(null);
+    };
+
+    const moveTo = async (a: Alert, status: CaseStatus, message: string) => {
+        const sid = a.id;
+        let caseId = resolveCaseIdForAlert(a);
+
+        // --- UPSERT LOGIC (Ghost Case Prevention) ---
+        // If we're accepting a student who doesn't have an active case record yet,
+        // we must force the backend to create one via a minimal SIS data ingestion.
+        if (status === "accepted" && !caseId) {
+            const profile = studentProfilesById[sid];
+            if (profile) {
+                console.log(
+                    "[AlertCenter] Triggering 'Upsert' for ghost student:",
+                    sid,
+                );
+                try {
+                    await ingestData([
+                        {
+                            source_type: "sis",
+                            records: [
+                                {
+                                    sid: profile.id,
+                                    student_name: profile.name,
+                                    email: profile.email,
+                                    major: profile.major || "Unknown",
+                                    current_risk_status:
+                                        a.severity === "high"
+                                            ? "Critical"
+                                            : "Elevated",
+                                    intervention_status: "new",
+                                },
+                            ],
+                        },
+                    ]);
+
+                    // Refresh alerts to get the newly created case ID
+                    await queryClient.invalidateQueries({
+                        queryKey: queryKeys.alerts.list(),
+                    });
+                    // Small wait to allow the refetch and the zipping logic in useAlerts to settle
+                    await new Promise((r) => setTimeout(r, 1000));
+
+                    // Look up the newly resolved case ID from the freshly fetched data
+                    const latestData = queryClient.getQueryData<any[]>(
+                        queryKeys.alerts.list(),
+                    );
+                    const latestAlert = latestData?.find(
+                        (la) => la.sid === sid,
+                    );
+                    caseId = latestAlert?.active_case_id || null;
+                } catch (err) {
+                    console.error("[AlertCenter] Upsert failed:", err);
+                }
+            }
+        }
         if (status === "accepted") {
-            if (!sid) {
-                // Debug aid for local environment diagnostics.
-                console.error("[Debug] Missing sid for student:", a);
+            if (!z.string().uuid().safeParse(sid).success) {
+                toast.error("Mã sinh viên không hợp lệ", {
+                    description:
+                        "Không thể nhận case vì student_id không phải UUID hợp lệ.",
+                });
                 return;
             }
 
-            updateStatus(
-                { case_id: caseId, status: toBackendStatus(status), sid },
-                {
-                    onSuccess: () => {
-                        markRecentlyMoved(a.id, status);
-                        setAiDraftErrorById((prev) => {
-                            if (!prev[a.id]) return prev;
-                            const next = { ...prev };
-                            delete next[a.id];
-                            return next;
-                        });
-                        setAiDraftReadyById((prev) => {
-                            if (!prev[a.id]) return prev;
-                            const next = { ...prev };
-                            delete next[a.id];
-                            return next;
-                        });
-                        if (message) toast.success(message);
+            setAcceptingCaseById((prev) => ({ ...prev, [a.id]: true }));
+            setAiDraftErrorById((prev) => {
+                if (!prev[a.id]) return prev;
+                const next = { ...prev };
+                delete next[a.id];
+                return next;
+            });
+            setAiDraftReadyById((prev) => {
+                if (!prev[a.id]) return prev;
+                const next = { ...prev };
+                delete next[a.id];
+                return next;
+            });
 
-                        if (!requestedDraftById[a.id]) {
-                            setAiDraftingById((prev) => ({ ...prev, [a.id]: true }));
-                            void generateAiDraftForAlert(a.id, a.caseId)
-                                .then(() => {
-                                    setRequestedDraftById((prev) => ({
-                                        ...prev,
-                                        [a.id]: true,
-                                    }));
-                                    setAiDraftReadyById((prev) => ({
-                                        ...prev,
-                                        [a.id]: true,
-                                    }));
-                                    setAiDraftErrorById((prev) => {
-                                        if (!prev[a.id]) return prev;
-                                        const next = { ...prev };
-                                        delete next[a.id];
-                                        return next;
-                                    });
-                                })
-                                .catch((err: any) => {
-                                    const message = String(err?.message || "");
-                                    const aiUnavailable =
-                                        message.includes("[404]") ||
-                                        message.toLowerCase().includes("not found");
-                                    const errorMessage = aiUnavailable
-                                        ? "Không tìm thấy dịch vụ AI. Vui lòng kiểm tra lại kết nối."
-                                        : message || "Vui lòng thử lại sau.";
-                                    setAiDraftErrorById((prev) => ({
-                                        ...prev,
-                                        [a.id]: errorMessage,
-                                    }));
-                                    toast.error("Không thể tạo nội dung email", {
-                                        description: errorMessage,
-                                    });
-                                })
-                                .finally(() => {
-                                    setAiDraftingById((prev) => ({
-                                        ...prev,
-                                        [a.id]: false,
-                                    }));
-                                });
-                        }
+            updateStatus(
+                {
+                    case_id: caseId || sid,
+                    status: toBackendStatus(status),
+                    sid,
+                    isAccept: true,
+                },
+                {
+                    onSuccess: async () => {
+                        markRecentlyMoved(a.id, status);
+                        // Manual trigger removed - AI draft is now triggered by Advisor
+                    },
+                    onError: () => {
+                        setAcceptingCaseById((prev) => {
+                            const next = { ...prev };
+                            delete next[a.id];
+                            return next;
+                        });
+                    },
+                    onSettled: () => {
+                        setAcceptingCaseById((prev) => {
+                            const next = { ...prev };
+                            delete next[a.id];
+                            return next;
+                        });
                     },
                 },
             );
+            return;
+        }
+
+        if (!caseId) {
+            // Non-accept transitions without a case are treated as a ghost case
+            toast.error("Không tìm thấy hồ sơ case (Ghost Case)", {
+                description:
+                    "Sinh viên chưa có case trong hệ thống. Vui lòng thử 'Tiếp nhận ca' trước.",
+                action: {
+                    label: "Tải lại",
+                    onClick: () =>
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.alerts.list(),
+                        }),
+                },
+            });
             return;
         }
 
@@ -534,18 +637,29 @@ export function AlertCenter() {
                                             ? recentlyMoved.alertId
                                             : null
                                     }
-                                    isActivated={recentlyMoved?.status === col.id}
+                                    isActivated={
+                                        recentlyMoved?.status === col.id
+                                    }
                                     isCollapsed={collapsedCols[col.id]}
                                     isExpanded={expandedCols[col.id]}
                                     onToggleCollapse={toggleCollapse}
                                     onToggleExpand={toggleExpand}
                                     onViewDetails={handleGetProfile}
+                                    onEditEmail={(a) => setEmailTargetId(a.id)}
+                                    onGenerateDraft={handleGenerateDraft}
                                     onMove={moveTo}
                                     onOpenGoals={(id) => setGoalsTargetId(id)}
                                     studentProfilesById={studentProfilesById}
-                                    aiDraftingById={aiDraftingById}
+                                    aiDraftingById={Object.fromEntries(
+                                        Object.entries(aiDraftingById).concat(
+                                            filteredAlerts
+                                                .filter((a) => a.isGenerating)
+                                                .map((a) => [a.id, true]),
+                                        ),
+                                    )}
                                     aiDraftErrorById={aiDraftErrorById}
                                     aiDraftReadyById={aiDraftReadyById}
+                                    acceptingCaseById={acceptingCaseById}
                                 />
                             ))}
                         </div>
@@ -609,7 +723,7 @@ export function AlertCenter() {
                 )}
             </div>
 
-            <StudentDetailDrawer
+            <StudentDetailModal
                 open={detailsTargetId !== null}
                 onOpenChange={(open) => {
                     if (!open) setDetailsTargetId(null);
@@ -620,6 +734,16 @@ export function AlertCenter() {
                         ? studentProfilesById[detailsTarget.id]
                         : undefined
                 }
+            />
+
+            <EmailEditorSheet
+                alert={
+                    emailTargetId
+                        ? alerts.find((a) => a.id === emailTargetId) ?? null
+                        : null
+                }
+                onClose={() => setEmailTargetId(null)}
+                onSave={handleSaveEmail}
             />
 
             <GoalsDialog
