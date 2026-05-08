@@ -1,19 +1,16 @@
 """Gamification query service implementation."""
 
 from datetime import UTC, datetime, timedelta
-from typing import Literal
 
 from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.gamification_dtos import (
-    EngagementMetricsEntryDTO,
     LeaderboardEntryDTO,
 )
-from src.application.dtos.pagination import PagedResponse
+from src.application.dtos.pagination import PagedResponse, PaginationMetadata
 from src.domain.value_objects.gamification import RankingType
-from src.domain.value_objects.status import InterventionStatus
-from src.infrastructure.database.models import Advisor, PointLedger, Student
+from src.infrastructure.database.models import Advisor, PointLedger
 
 
 class SqlAlchemyGamificationQueryService:
@@ -51,59 +48,47 @@ class SqlAlchemyGamificationQueryService:
                 func.coalesce(func.sum(PointLedger.points), 0).label('total_points'),
                 func.count(PointLedger.id).label('actions_count'),
                 func.count(
-                    case((OrmTask.action_type == 'send email', 1)),
+                    case((PointLedger.action == 'send_email', 1)),
                 ).label('sent_count'),
                 func.count(
-                    case((OrmTask.action_type == 'resolve case', 1)),
+                    case((PointLedger.action == 'resolve_case', 1)),
                 ).label('resolved_count'),
             )
             .outerjoin(PointLedger, ledger_join_cond)
-            .outerjoin(OrmTask, PointLedger.task_id == OrmTask.task_id)
+            .group_by(
+                Advisor.advisor_id,
+                Advisor.name,
+            )
+            .order_by(desc('total_points'))
         )
-
-        stmt = stmt.group_by(
-            Advisor.advisor_id,
-            Advisor.name,
-        ).order_by(desc('total_points'))
 
         # Count total items (total number of advisors)
         count_stmt = select(func.count(Advisor.advisor_id))
-        count_result = await self.session.execute(count_stmt)
+        count_result = await self.__session.execute(count_stmt)
         total_count = count_result.scalar() or 0
 
         # Apply paging
         stmt = stmt.limit(limit).offset(offset)
-        result = await self.session.execute(stmt)
-        return [row._asdict() for row in result.all()], total_count
-
-    async def get_engagement_metrics(self) -> list[EngagementMetricsEntryDTO]:
-        """Retrieve aggregated engagement metrics by major."""
-        stmt = (
-            select(
-                Student.major.label('faculty'),
-                func.count(
-                    case(
-                        (
-                            Student.intervention_status
-                            != InterventionStatus.NONE.value,
-                            1,
-                        ),
-                    ),
-                ).label('sent'),
-                func.count(
-                    case((Student.intervention_status == 'notified', 1)),
-                ).label('drafted'),
-            )
-            .group_by(Student.major)
-            .order_by(desc('sent'))
-        )
-
         result = await self.__session.execute(stmt)
-        return [
-            EngagementMetricsEntryDTO(
-                major=row['faculty'],
-                sent_count=row['sent'],
-                drafted_count=row['drafted'],
+
+        entries = [
+            LeaderboardEntryDTO(
+                advisor_id=row.advisor_id,
+                name=row.name,
+                total_points=row.total_points,
+                actions_count=row.actions_count,
+                sent_count=row.sent_count,
+                resolved_count=row.resolved_count,
             )
-            for row in result.mappings().all()
+            for row in result.all()
         ]
+
+        return PagedResponse(
+            items=entries,
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
+                has_next=(offset + limit) < total_count,
+            ),
+        )
