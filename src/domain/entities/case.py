@@ -4,15 +4,33 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from src.application.exceptions import InvalidStatusTransitionError
-from src.domain.entities.task import Task
-from src.domain.exceptions import CaseAlreadyAssignedError
-from src.domain.value_objects.status import (
-    CaseStatus,
-    EmailStatus,
-    InterventionStatus,
-    RiskStatus,
-)
+from src.domain.exceptions import CaseAlreadyAssignedError, InvalidStateTransitionError
+from src.domain.value_objects.status import InterventionStatus
+
+_INTERVENTION_STATUS_TRANSITION = {
+    InterventionStatus.NEW: [InterventionStatus.ACCEPTED, InterventionStatus.DISMISSED],
+    InterventionStatus.ACCEPTED: [
+        InterventionStatus.SENT,
+        InterventionStatus.DISMISSED,
+    ],
+    InterventionStatus.SENT: [
+        InterventionStatus.BOOKED,
+        InterventionStatus.EXPIRED,
+        InterventionStatus.DISMISSED,
+    ],
+    InterventionStatus.BOOKED: [
+        InterventionStatus.SUPPORTING,
+        InterventionStatus.DISMISSED,
+    ],
+    InterventionStatus.SUPPORTING: [
+        InterventionStatus.RESOLVED,
+        InterventionStatus.DISMISSED,
+    ],
+    # Terminal states have no outgoing transitions
+    InterventionStatus.RESOLVED: [],
+    InterventionStatus.DISMISSED: [],
+    InterventionStatus.EXPIRED: [],
+}
 
 
 @dataclass
@@ -21,12 +39,11 @@ class Case:
 
     sid: UUID
     case_id: UUID = field(default_factory=uuid4)
-    status: CaseStatus = CaseStatus.OPEN
+    intervention_status: InterventionStatus = InterventionStatus.NEW
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     assigned_at: datetime | None = None
     closed_at: datetime | None = None
     assigned_advisor_id: UUID | None = None
-    tasks: list[Task] = field(default_factory=list[Task])
     version: int = field(default=0)
 
     @property
@@ -42,52 +59,56 @@ class Case:
     @property
     def is_active(self) -> bool:
         """Helper to check if the case is currently being worked on."""
-        return self.status == CaseStatus.ASSIGNED
+        return self.intervention_status not in (
+            InterventionStatus.DISMISSED,
+            InterventionStatus.EXPIRED,
+            InterventionStatus.RESOLVED,
+        )
+
+    @property
+    def is_open(self) -> bool:
+        """Helper to check if the case is open."""
+        return self.intervention_status == InterventionStatus.NEW
+
+    @property
+    def is_assigned(self) -> bool:
+        """Helper to check if the case is open."""
+        return (
+            self.intervention_status == InterventionStatus.ACCEPTED
+            and self.assigned_advisor_id is not None
+        )
 
     def assign_advisor(self, advisor_id: UUID, occurred_at: datetime) -> None:
         """Assign this case to an advisor."""
-        if self.assigned_advisor_id is not None:
+        if self.is_assigned:
             raise CaseAlreadyAssignedError(self.case_id)
 
         self.assigned_advisor_id = advisor_id
         self.assigned_at = occurred_at
-        self.__transition_to(new_status=CaseStatus.ASSIGNED, occurred_at=occurred_at)
+        self._transition_to(InterventionStatus.ACCEPTED)
 
-    def __transition_to(self, new_status: CaseStatus, occurred_at: datetime) -> None:
-        """Perform case status transistion."""
-        if new_status == CaseStatus.RESOLVED and self.assigned_advisor_id is None:
-            raise InvalidStatusTransitionError('Cannot resolve unassigned case.')
+    def mark_as_sent(self) -> None:
+        """The intervention email has been sent."""
+        self._transition_to(InterventionStatus.SENT)
 
-        self.status = new_status
-
-        if new_status in (CaseStatus.FAILED, CaseStatus.RESOLVED):
-            self.closed_at = occurred_at
+    def record_booking(self) -> None:
+        """Student booked an appointment."""
+        self._transition_to(InterventionStatus.BOOKED)
 
     def resolve(self, occured_at: datetime) -> None:
         """Mark the case as resolved."""
-        self.__transition_to(CaseStatus.RESOLVED, occurred_at=occured_at)
+        self._transition_to(InterventionStatus.RESOLVED)
+        self.closed_at = occured_at
 
-    def fail(self, occured_at: datetime) -> None:
-        """Mark this case as failed."""
-        self.__transition_to(CaseStatus.FAILED, occurred_at=occured_at)
+    def _transition_to(self, next_status: InterventionStatus) -> None:
+        """The 'Bouncer' that enforces the matrix."""
+        if next_status not in _INTERVENTION_STATUS_TRANSITION[self.intervention_status]:
+            raise InvalidStateTransitionError(
+                current_status=self.intervention_status.value,
+                attempted_action=next_status,
+            )
+        self.intervention_status = next_status
 
-
-@dataclass
-class TaskItemRecord:
-    """Represents a task for an advisor."""
-
-    case_id: UUID
-    sid: UUID
-    created_at: datetime
-    assigned_advisor_id: UUID | None
-    student_name: str | None
-    email: str | None
-    major: str
-    current_risk_status: RiskStatus
-    intervention_status: InterventionStatus
-    draft_subject: str | None
-    draft_body: str | None
-    draft_status: EmailStatus | str | None
-    assigned_to: str | None
-    suggested_action: str
-    tasks: list[Task] = field(default_factory=list[Task])
+    def can_generate_draft(self) -> bool:
+        """Check if this case can perform AI email generation."""
+        return self.intervention_status == InterventionStatus.ACCEPTED
