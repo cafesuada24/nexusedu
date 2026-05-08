@@ -280,7 +280,7 @@ export function CaseStudyCard({ data: c }: { data: CaseStudy }) {
               vectorEffect="non-scaling-stroke"
             />
           </svg>
-          <span className="absolute right-0 top-2 size-2.5 rounded-full bg-current opacity-80" />
+          <span className="absolute right-0 top-[10%] size-2.5 -translate-y-1/2 rounded-full bg-current opacity-80" />
         </div>
         <div className="flex flex-col items-end">
           <span className={cn("mb-0.5 text-[11px]", a.metric)}>Sau</span>
