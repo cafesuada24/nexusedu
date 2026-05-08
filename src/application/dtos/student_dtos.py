@@ -23,6 +23,8 @@ class StudentDTO:
     last_notified_at: datetime
     is_generating: bool = False
     active_case_id: UUID4 | None = None
+    assigned_advisor_id: UUID4 | None = None
+    assigned_to: str | None = None
 
 
 @dataclass
