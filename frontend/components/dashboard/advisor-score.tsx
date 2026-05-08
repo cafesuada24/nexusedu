@@ -44,7 +44,7 @@ export function AdvisorScore({ className }: AdvisorScoreProps) {
             className={cn(
               "group flex items-center gap-2 px-3 py-1.5 rounded-full",
               "bg-primary/10 text-primary border border-primary/20",
-              "transition-all duration-300 hover:bg-primary/20 hover:scale-105 cursor-help",
+              "transition-all duration-300 hover:bg-primary/20 hover:scale-105 cursor-default",
               className
             )}
           >
@@ -54,7 +54,7 @@ export function AdvisorScore({ className }: AdvisorScoreProps) {
             </span>
           </div>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-xs text-xs">
+        <TooltipContent side="bottom" className="max-w-xs text-xs bg-white text-gray-900 border border-gray-200 shadow-md">
           <p className="font-semibold mb-1">Điểm cố vấn</p>
           <p className="text-muted-foreground">
             Điểm thưởng tích lũy từ các hoạt động can thiệp và hỗ trợ sinh viên.
