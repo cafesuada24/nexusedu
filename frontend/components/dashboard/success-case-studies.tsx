@@ -1,12 +1,13 @@
 "use client"
 
 import {
-  ArrowRight,
+  ArrowUpRight,
   CheckCircle2,
   Clock,
   GraduationCap,
   Heart,
   Mail,
+  MessageSquare,
   Quote,
   Timer,
   TrendingUp,
@@ -151,12 +152,16 @@ export function ImpactHero() {
 export type CaseStudy = {
   id: string
   course: string
+  duration: string
   metricLabel: string
   before: string
   after: string
   studentName: string
+  studentYear: string
   quote: string
-  accent: "success" | "primary"
+  advisorComment: string
+  advisorName: string
+  accent: "success" | "primary" | "warning"
   icon: LucideIcon
 }
 
@@ -164,54 +169,73 @@ export const CASE_STUDIES: CaseStudy[] = [
   {
     id: "an",
     course: "Giải tích 1",
+    duration: "Sau 8 tuần",
     metricLabel: "Điểm TB",
     before: "3.2",
     after: "7.5",
     studentName: "Nguyễn Văn An",
+    studentYear: "Sinh viên năm nhất",
     quote: "Em hiểu mình mất gốc ở đâu — và biết bắt đầu lại.",
+    advisorComment:
+      "An có thái độ học tập tích cực, tiến bộ rất nhanh khi nắm được phương pháp đúng.",
+    advisorName: "Cô Nguyễn Lan, Cố vấn học tập",
     accent: "success",
     icon: TrendingUp,
   },
   {
     id: "binh",
     course: "GPA học kỳ",
+    duration: "Sau 1 học kỳ",
     metricLabel: "GPA",
     before: "2.1",
     after: "3.4",
     studentName: "Trần Thị Bình",
+    studentYear: "Sinh viên năm hai",
     quote: "Một cuộc gọi 15 phút mỗi tuần — đổi cả học kỳ.",
+    advisorComment:
+      "Bình rất chủ động liên hệ và biết tự đánh giá điểm yếu của mình mỗi tuần.",
+    advisorName: "Anh Phạm Quang, Cố vấn học tập",
     accent: "primary",
     icon: GraduationCap,
   },
   {
     id: "duc",
     course: "Vật lý đại cương",
+    duration: "Sau 6 tuần",
     metricLabel: "Đi học",
     before: "42%",
     after: "96%",
     studentName: "Lê Minh Đức",
+    studentYear: "Sinh viên năm nhất",
     quote: "Em không cảm thấy bị bỏ lại phía sau.",
-    accent: "success",
+    advisorComment:
+      "Đức kiên trì luyện từng dạng bài. 96% là minh chứng cho sự nỗ lực bền bỉ.",
+    advisorName: "Cô Trần Mai, Cố vấn học tập",
+    accent: "warning",
     icon: Heart,
   },
 ]
 
-export function CaseStudyCard({ data: c }: { data: CaseStudy }) {
-  const accent =
-    c.accent === "success"
-      ? {
-          ring: "ring-success/15",
-          tint: "bg-success/10 text-success",
-          stripe: "from-success/40 via-success/10 to-transparent",
-          metric: "text-success",
-        }
-      : {
-          ring: "ring-primary/15",
-          tint: "bg-primary/10 text-primary",
-          stripe: "from-primary/40 via-primary/10 to-transparent",
-          metric: "text-primary",
-        }
+const ACCENT_MAP = {
+  success: {
+    badge: "bg-success/10 text-success",
+    metric: "text-success",
+    line: "text-success",
+  },
+  primary: {
+    badge: "bg-primary/10 text-primary",
+    metric: "text-primary",
+    line: "text-primary",
+  },
+  warning: {
+    badge: "bg-warning/10 text-warning",
+    metric: "text-warning",
+    line: "text-warning",
+  },
+} as const
 
+export function CaseStudyCard({ data: c }: { data: CaseStudy }) {
+  const a = ACCENT_MAP[c.accent]
   const Icon = c.icon
   const initials = c.studentName
     .split(" ")
@@ -222,69 +246,91 @@ export function CaseStudyCard({ data: c }: { data: CaseStudy }) {
     .toUpperCase()
 
   return (
-    <Card
-      className={cn(
-        "relative flex flex-col overflow-hidden rounded-2xl border-border/60 bg-white ring-1 transition-shadow hover:shadow-md dark:bg-slate-900/40",
-        accent.ring,
-      )}
-    >
-      <div
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r",
-          accent.stripe,
-        )}
-      />
-
-      <CardHeader className="pb-3">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-card p-5 transition-shadow hover:shadow-md">
+      {/* Badge + duration */}
+      <div className="flex items-center gap-2">
         <Badge
           variant="secondary"
-          className={cn(
-            "w-fit gap-1 rounded-md font-medium hover:bg-current/10",
-            accent.tint,
-          )}
+          className={cn("gap-1 rounded-md font-medium", a.badge)}
         >
           <Icon className="size-3" />
           {c.course}
         </Badge>
+        <span className="text-xs text-muted-foreground">{c.duration}</span>
+      </div>
 
-        {/* Big number transform — the visual centerpiece */}
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="font-mono text-xl font-medium text-muted-foreground line-through decoration-muted-foreground/40">
+      {/* Trend: before → line → after */}
+      <div className="flex items-end gap-4">
+        <div className="flex flex-col">
+          <span className="mb-0.5 text-[11px] text-muted-foreground">Trước</span>
+          <span className="font-mono text-xl font-medium text-muted-foreground">
             {c.before}
           </span>
-          <ArrowRight className="size-4 text-muted-foreground" />
+        </div>
+        <div className={cn("flex-1 self-center pb-1", a.line)}>
+          <svg
+            viewBox="0 0 120 36"
+            className="h-9 w-full"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            <line
+              x1="0" y1="32" x2="116" y2="4"
+              stroke="currentColor" strokeWidth="1.5" opacity="0.45"
+            />
+            <circle cx="116" cy="4" r="3.5" fill="currentColor" />
+          </svg>
+        </div>
+        <div className="flex flex-col items-end">
+          <span className={cn("mb-0.5 text-[11px]", a.metric)}>Sau</span>
           <span
             className={cn(
-              "font-serif text-3xl font-bold tabular-nums",
-              accent.metric,
+              "font-serif text-4xl font-bold tabular-nums leading-none",
+              a.metric,
             )}
           >
             {c.after}
           </span>
-          <span className="ml-auto text-[11px] uppercase tracking-wide text-muted-foreground">
-            <span className="mx-1">{c.metricLabel}</span>
+        </div>
+      </div>
+
+      {/* Quote */}
+      <p className="text-sm italic leading-relaxed text-foreground">
+        &ldquo;{c.quote}&rdquo;
+      </p>
+
+      <div className="h-px bg-border/60" />
+
+      {/* Student */}
+      <div className="flex items-center gap-2.5">
+        <Avatar className="size-8">
+          <AvatarFallback className={cn("text-[11px] font-medium", a.badge)}>
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <p className="text-sm font-medium leading-none">{c.studentName}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{c.studentYear}</p>
+        </div>
+      </div>
+
+      {/* Advisor comment */}
+      <div className="rounded-xl bg-muted/40 px-3 py-2.5">
+        <div className="mb-1.5 flex items-center gap-1.5">
+          <MessageSquare className="size-3 text-muted-foreground/60" aria-hidden />
+          <span className="text-[11px] font-medium text-muted-foreground">
+            Cố vấn nhận xét
           </span>
         </div>
-      </CardHeader>
-
-      <CardContent className="mt-auto flex flex-col gap-3 pt-0">
-        <figure className="rounded-xl border border-border/60 bg-muted/40 p-3">
-          <Quote className="size-3.5 text-muted-foreground/70" aria-hidden />
-          <blockquote className="mt-1 text-sm leading-relaxed text-foreground">
-            {c.quote}
-          </blockquote>
-          <figcaption className="mt-2 flex items-center gap-2 text-xs">
-            <Avatar className="size-6">
-              <AvatarFallback className={cn("text-[10px] font-medium", accent.tint)}>
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <span className="truncate font-medium">{c.studentName}</span>
-          </figcaption>
-        </figure>
-      </CardContent>
-    </Card>
+        <p className="text-sm leading-relaxed text-foreground">
+          &ldquo;{c.advisorComment}&rdquo;
+        </p>
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-[11px] text-muted-foreground">— {c.advisorName}</p>
+          <ArrowUpRight className="size-3.5 text-muted-foreground/40" aria-hidden />
+        </div>
+      </div>
+    </div>
   )
 }
 
