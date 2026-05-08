@@ -4,9 +4,9 @@ from uuid import UUID
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.dtos.case_dtos import CaseDTO
+from src.application.dtos.case_dtos import CaseDTO, QueryEmailDTO
 from src.domain.services.gamification import GamificationService
-from src.domain.value_objects.status import CaseStatus, InterventionStatus, RiskStatus
+from src.domain.value_objects.status import InterventionStatus, RiskStatus
 from src.infrastructure.database.models import Advisor as OrmAdvisor
 from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.models import InterventionEmail as OrmEmail
@@ -38,15 +38,17 @@ class SqlAlchemyCaseQueryService:
                 OrmCase.sid,
                 OrmCase.created_at,
                 OrmCase.assigned_advisor_id,
+                OrmCase.intervention_status,
                 OrmAdvisor.name.label('assigned_to'),
                 OrmStudent.student_name,
                 OrmStudent.major,
                 OrmStudent.current_risk_status,
-                OrmStudent.intervention_status,
                 OrmStudent.email,
+                OrmStudent.email.label('student_email'),
                 OrmEmail.subject.label('draft_subject'),
                 OrmEmail.body.label('draft_body'),
                 OrmEmail.status.label('draft_status'),
+                OrmEmail.email_id,
             )
             .join(OrmStudent, OrmCase.sid == OrmStudent.sid)
             .outerjoin(OrmEmail, OrmCase.case_id == OrmEmail.case_id)
@@ -57,12 +59,12 @@ class SqlAlchemyCaseQueryService:
         if advisor_id is None:
             stmt = stmt.where(
                 OrmCase.assigned_advisor_id.is_(None),
-                OrmCase.status == CaseStatus.OPEN,
+                OrmCase.intervention_status == InterventionStatus.NEW,
             )
         else:
             stmt = stmt.where(
                 OrmCase.assigned_advisor_id == advisor_id,
-                OrmCase.status != CaseStatus.OPEN,
+                OrmCase.intervention_status != InterventionStatus.NEW,
             )
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -90,9 +92,9 @@ class SqlAlchemyCaseQueryService:
                 try:
                     intervention_status = InterventionStatus(intervention_status_val)
                 except ValueError:
-                    intervention_status = InterventionStatus.NONE
+                    intervention_status = InterventionStatus.NEW
             else:
-                intervention_status = InterventionStatus.NONE
+                intervention_status = InterventionStatus.NEW
 
             tasks.append(
                 CaseDTO(
@@ -102,18 +104,17 @@ class SqlAlchemyCaseQueryService:
                     assigned_advisor_id=advisor_id,
                     assigned_to=row['assigned_to'],
                     student_name=row['student_name'],
-                    email=row['email'],
                     major=row['major'] or 'Unknown',
                     current_risk_status=risk_status,
                     intervention_status=intervention_status,
-                    draft_subject=row['draft_subject'],
-                    draft_body=row['draft_body'],
-                    draft_status=row['draft_status'],
-                    points_reward=self.gamification_service.calculate_points(
-                        GamificationService.Action.SEND_EMAIL,
-                        row['created_at'],
-                        risk_status,
-                    ),
+                    email=QueryEmailDTO(
+                        email_id=row['email_id'],
+                        recipent=row['student_email'],
+                        subject=row['draft_subject'],
+                        body=row['draft_body'],
+                        status=row['draft_status'],
+                        created_at=row['created_at'],
+                    ) if row['email_id'] else None,
                 ),
             )
         return tasks, total_count
