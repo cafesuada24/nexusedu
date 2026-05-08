@@ -16,8 +16,6 @@ export type Schedule = {
   duration: number // minutes
   buffer: number // minutes
   dailyCap: number
-  minNotice: string
-  windowDays: number
   autoConfirm: boolean
   allowOnline: boolean
   requireReason: boolean
@@ -106,8 +104,6 @@ export const DEFAULT_SCHEDULE: Schedule = {
   duration: 30,
   buffer: 10,
   dailyCap: 6,
-  minNotice: "4h",
-  windowDays: 21,
   autoConfirm: true,
   allowOnline: true,
   requireReason: true,

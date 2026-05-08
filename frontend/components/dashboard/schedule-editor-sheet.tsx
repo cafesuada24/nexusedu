@@ -216,8 +216,6 @@ export function ScheduleEditorSheet() {
   const [duration, setDuration] = React.useState(String(schedule.duration))
   const [buffer, setBuffer] = React.useState(String(schedule.buffer))
   const [dailyCap, setDailyCap] = React.useState(String(schedule.dailyCap))
-  const [minNotice, setMinNotice] = React.useState(schedule.minNotice)
-  const [windowDays, setWindowDays] = React.useState(String(schedule.windowDays))
   const [autoConfirm, setAutoConfirm] = React.useState(schedule.autoConfirm)
   const [allowOnline, setAllowOnline] = React.useState(schedule.allowOnline)
   const [requireReason, setRequireReason] = React.useState(
@@ -235,8 +233,6 @@ export function ScheduleEditorSheet() {
     setDuration(String(schedule.duration))
     setBuffer(String(schedule.buffer))
     setDailyCap(String(schedule.dailyCap))
-    setMinNotice(schedule.minNotice)
-    setWindowDays(String(schedule.windowDays))
     setAutoConfirm(schedule.autoConfirm)
     setAllowOnline(schedule.allowOnline)
     setRequireReason(schedule.requireReason)
@@ -327,8 +323,6 @@ export function ScheduleEditorSheet() {
     setDuration(String(DEFAULT_SCHEDULE.duration))
     setBuffer(String(DEFAULT_SCHEDULE.buffer))
     setDailyCap(String(DEFAULT_SCHEDULE.dailyCap))
-    setMinNotice(DEFAULT_SCHEDULE.minNotice)
-    setWindowDays(String(DEFAULT_SCHEDULE.windowDays))
     setAutoConfirm(DEFAULT_SCHEDULE.autoConfirm)
     setAllowOnline(DEFAULT_SCHEDULE.allowOnline)
     setRequireReason(DEFAULT_SCHEDULE.requireReason)
@@ -343,8 +337,6 @@ export function ScheduleEditorSheet() {
       duration: parseInt(duration, 10) || DEFAULT_SCHEDULE.duration,
       buffer: parseInt(buffer, 10) || 0,
       dailyCap: parseInt(dailyCap, 10) || DEFAULT_SCHEDULE.dailyCap,
-      minNotice,
-      windowDays: parseInt(windowDays, 10) || DEFAULT_SCHEDULE.windowDays,
       autoConfirm,
       allowOnline,
       requireReason,
@@ -362,8 +354,6 @@ export function ScheduleEditorSheet() {
     duration,
     buffer,
     dailyCap,
-    minNotice,
-    windowDays,
     autoConfirm,
     allowOnline,
     requireReason,
@@ -412,23 +402,8 @@ export function ScheduleEditorSheet() {
                 Chỉnh sửa lịch chi tiết
               </SheetTitle>
               <SheetDescription className="mt-1 text-pretty">
-                Tuỳ chỉnh khung giờ{" "}
-                <strong className="mx-1 font-semibold text-foreground/90">
-                  tiếp sinh viên
-                </strong>
-                ,{" "}
-                <strong className="mx-1 font-semibold text-foreground/90">
-                  độ dài mỗi cuộc
-                </strong>
-                ,{" "}
-                <strong className="mx-1 font-semibold text-foreground/90">
-                  ngày nghỉ
-                </strong>{" "}
-                và{" "}
-                <strong className="mx-1 font-semibold text-foreground/90">
-                  quy tắc đặt lịch công khai
-                </strong>
-                .
+                Tuỳ chỉnh khung giờ tiếp sinh viên, độ dài mỗi cuộc, ngày nghỉ
+                và quy tắc đặt lịch công khai.
               </SheetDescription>
             </div>
             <div className="hidden items-center gap-2 sm:flex">
@@ -552,40 +527,6 @@ export function ScheduleEditorSheet() {
                   onChange={(e) => setDailyCap(e.target.value)}
                   className="h-10 rounded-xl border-border/60 bg-muted/20 px-4"
                 />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="notice" className="text-[13px] font-medium text-foreground/80">
-                  Báo trước tối thiểu
-                </Label>
-                <Select value={minNotice} onValueChange={setMinNotice}>
-                  <SelectTrigger id="notice" className="h-10 rounded-xl border-border/60 bg-muted/20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="1h">1 giờ</SelectItem>
-                    <SelectItem value="4h">4 giờ</SelectItem>
-                    <SelectItem value="12h">12 giờ</SelectItem>
-                    <SelectItem value="24h">24 giờ</SelectItem>
-                    <SelectItem value="48h">48 giờ</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="window" className="text-[13px] font-medium text-foreground/80">
-                  Cửa sổ đặt lịch (ngày)
-                </Label>
-                <Input
-                  id="window"
-                  type="number"
-                  min={1}
-                  max={90}
-                  value={windowDays}
-                  onChange={(e) => setWindowDays(e.target.value)}
-                  className="h-10 rounded-xl border-border/60 bg-muted/20 px-4"
-                />
-                <p className="text-[10px] text-muted-foreground/80">
-                  Sinh viên chỉ được đặt trước tối đa {windowDays} ngày.
-                </p>
               </div>
             </div>
 

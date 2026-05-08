@@ -66,11 +66,6 @@ export function BookingView({
     [date, schedule],
   )
 
-  const maxDate = React.useMemo(
-    () => addDays(today, schedule.windowDays),
-    [today, schedule.windowDays],
-  )
-
   const confirm = async () => {
     if (!date || !slot) return
     setStage("syncing")
@@ -234,10 +229,9 @@ export function BookingView({
               setDate(d)
               setSlot(null)
             }}
-            disabled={(d) => d < today || d > maxDate || isDateOff(d, schedule)}
+            disabled={(d) => d < today || isDateOff(d, schedule)}
             className="rounded-xl border border-border bg-card p-3"
           />
-
           <div>
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium">
