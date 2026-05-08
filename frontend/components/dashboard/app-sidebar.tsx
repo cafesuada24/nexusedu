@@ -11,6 +11,7 @@ import {
     CalendarClock,
     LineChart,
     Sparkles,
+    Users,
 } from "lucide-react";
 import {
     Sidebar,
@@ -62,6 +63,12 @@ const baseMainNav: NavItem[] = [
         icon: BarChart3,
         tone: "primary",
     },
+    {
+        href: "/dashboard/advisors",
+        label: "Cố vấn",
+        icon: Users,
+        tone: "primary",
+    },
 ];
 
 const secondaryNav: NavItem[] = [
@@ -82,10 +89,12 @@ const secondaryNav: NavItem[] = [
 export function AppSidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
-    const canAccessCsvImport = user?.role === "admin";
-    const mainNav = canAccessCsvImport
-        ? baseMainNav
-        : baseMainNav.filter((item) => item.href !== "/dashboard/import");
+    const isAdmin = user?.role === "admin";
+    const mainNav = baseMainNav.filter((item) => {
+        if (item.href === "/dashboard/import") return isAdmin;
+        if (item.href === "/dashboard/advisors") return isAdmin;
+        return true;
+    });
 
     const isActive = (href: string) => {
         if (href === "/dashboard") return pathname === "/dashboard";
