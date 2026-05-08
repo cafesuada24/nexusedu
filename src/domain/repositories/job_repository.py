@@ -1,52 +1,38 @@
 """Job repository interface."""
 
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
+
+from src.domain.entities.job import Job
 
 
 class JobRepository(Protocol):
     """Interface for background job data operations."""
 
-    async def create_job(
+    async def add(self, job: Job) -> None:
+        """Record an background job."""
+        ...
+
+    async def get_by_id(self, job_id: UUID) -> Job:
+        """Get a job by id."""
+        ...
+
+    async def find_by_correlation_id(
         self,
-        job_id: UUID,
-        job_type: str,
-        correlation_id: UUID | None = None,
-        correlation_type: str | None = None,
-    ) -> None:
-        """Record a new background job with optional correlation."""
+        correlation_id: UUID,
+        correlation_type: str,
+    ) -> Job | None:
+        """Find job by a correlation id."""
         ...
 
-    async def update_job_progress(
-        self, job_id: UUID, progress: int, status_message: str | None = None
-    ) -> None:
-        """Update the progress and status message of a job."""
+    async def get_by_correlation_id(
+        self,
+        correlation_id: UUID,
+        correlation_type: str,
+    ) -> Job:
+        """Find job by a correlation id."""
         ...
 
-    async def start_job(self, job_id: UUID) -> None:
-        """Mark a job as started."""
-        ...
-
-    async def complete_job(self, job_id: UUID) -> None:
-        """Mark a background job as completed."""
-        ...
-
-    async def fail_job(self, job_id: UUID, error_message: str) -> None:
-        """Mark a background job as failed."""
-        ...
-
-    async def get_active_job(
-        self, correlation_id: UUID, correlation_type: str, job_type: str
-    ) -> UUID | None:
-        """Retrieve the active job ID for a specific correlation context."""
-        ...
-
-    async def batch_create_jobs(
-        self, jobs: list[tuple[UUID, str, UUID | None, str | None]]
-    ) -> None:
-        """Batch record multiple background jobs."""
-        ...
-
-    async def get_job(self, job_id: UUID) -> dict[str, Any] | None:
-        """Retrieve job details for observability."""
+    async def save(self, job: Job) -> None:
+        """Update an existing job."""
         ...
