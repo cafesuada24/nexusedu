@@ -91,41 +91,8 @@ class CaseCommandHandler:
         )
         await self.__point_ledger_repo.save(ledger)
 
-        # if command.auto_generate_draft_email:
-        #     for sid, case_id in new_sids:
-        #         trigger_command = TriggerDraftCommand(
-        #             case_id=case_id,
-        #             user_id=user_id,
-        #             update_db=False,
-        #         )
-        #         job_id = await self.case_command_handler.handle_trigger_draft(
-        #             trigger_command,
-        #         )
-        #         triggered_jobs.append({'sid': sid, 'job_id': job_id})
-        #         db_updates.append((job_id, 'email_draft', case_id, 'case'))
-        #
-        # Batch create job tracking records
-
-    # async def handle_update_status(self, command: UpdateStudentStatusCommand) -> None:
-    #     """Execute the status update command."""
-    #     case = await self.case_repo.get_by_id(command.case_id)
-    #     if not case:
-    #         raise ValueError(f'Case {command.case_id} not found.')
-    #
-    #     await self.student_repo.update_intervention_status(case.sid, command.status)
-    #
-    #     now = datetime.now(UTC)
-    #
-    #     # Case transition logic
-    #     if command.status == InterventionStatus.RESOLVED:
-    #         case.resolve(now)
-    #     elif command.status in (
-    #         InterventionStatus.EXPIRED,
-    #         InterventionStatus.DISMISSED,
-    #     ):
-    #         case.fail(now)
-    #
-    #     await self.case_repo.save(case)
+        new_email = InterventionEmail(case_id=case.case_id)
+        await self.email_repo.add(new_email)
 
     async def handle_trigger_draft(
         self,
@@ -145,8 +112,8 @@ class CaseCommandHandler:
                 'Current case state does not allow email generation.',
             )
         # 1. Check for existing email record for this case
-        existing_email = await self.email_repo.find_by_case(case.case_id)
-        if existing_email and existing_email.is_generating:
+        existing_email = await self.email_repo.get_by_case(case.case_id)
+        if existing_email.is_generating:
             # Already in progress, just find the job_id
             try:
                 active_job = await self.job_repo.get_by_correlation_id(
@@ -164,15 +131,9 @@ class CaseCommandHandler:
                 is_new_job=False,
             )
 
-        # 2. Create/Update placeholder entry in intervention_emails
-        if not existing_email:
-            existing_email = InterventionEmail(case_id=case.case_id)
-            existing_email.mark_as_generating()
-            await self.email_repo.add(existing_email)
-        else:
-            existing_email.prepare_for_regeneration()
-            existing_email.mark_as_generating()
-            await self.email_repo.save(existing_email)
+        existing_email.prepare_for_regeneration()
+        existing_email.mark_as_generating()
+        await self.email_repo.save(existing_email)
 
         job_id = uuid4()
         new_job = Job(
