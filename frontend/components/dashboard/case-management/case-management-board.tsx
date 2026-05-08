@@ -33,9 +33,9 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useAlerts } from "@/hooks/use-alerts";
+import { useOpenCases } from "@/hooks/use-alerts";
 import { useDataset } from "@/hooks/use-dataset";
-import { type BackendAlert, type BackendInterventionStatus } from "@/lib/api";
+import { type TaskItem, type BackendInterventionStatus } from "@/lib/api";
 import { type StudentRow, type Problem } from "@/lib/csv";
 import { type Alert, getInitials, fromBackendStatus } from "@/lib/alerts";
 import { cn } from "@/lib/utils";
@@ -92,7 +92,7 @@ function getProblemFromRisk(risk: string): Problem {
     return "low_average";
 }
 
-function toAlert(row: BackendAlert): Alert {
+function toAlert(row: TaskItem): Alert {
     const now = Math.floor(Date.now() / 1000);
     const severity: Alert["severity"] = row.current_risk_status
         .toLowerCase()
@@ -101,10 +101,10 @@ function toAlert(row: BackendAlert): Alert {
         : "high";
     return {
         id: row.sid,
-        caseId: row.active_case_id ?? null,
-        name: row.student_name,
+        caseId: row.case_id,
+        name: row.student_name ?? "",
         mssv: row.sid.slice(0, 8).toUpperCase(),
-        email: row.email,
+        email: row.email ?? "",
         problem: getProblemFromRisk(row.current_risk_status),
         summary: row.current_risk_status,
         severity,
@@ -114,8 +114,8 @@ function toAlert(row: BackendAlert): Alert {
         status: fromBackendStatus(row.intervention_status),
         movedAt: now,
         draftJobId: null,
-        draftSubject: null,
-        draftBody: null,
+        draftSubject: row.draft_subject ?? null,
+        draftBody: row.draft_body ?? null,
         appointmentAt: null,
         goals: [],
     };
@@ -148,7 +148,8 @@ const RISK_FILTER_OPTIONS: Array<{
 ];
 
 export function CaseManagementBoard() {
-    const { data: rows = [], isLoading } = useAlerts();
+    const { data: paged, isLoading } = useOpenCases();
+    const rows = React.useMemo<TaskItem[]>(() => paged?.items ?? [], [paged]);
     const { dataset } = useDataset();
 
     const [search, setSearch] = React.useState("");
@@ -158,7 +159,7 @@ export function CaseManagementBoard() {
     const [riskFilter, setRiskFilter] = React.useState<
         "all" | "critical" | "elevated" | "normal" | "unknown"
     >("all");
-    const [selectedSid, setSelectedSid] = React.useState<string | null>(null);
+    const [selectedCaseId, setSelectedCaseId] = React.useState<string | null>(null);
 
     const studentProfilesById = React.useMemo(() => {
         const map: Record<string, StudentRow | undefined> = {};
@@ -173,8 +174,8 @@ export function CaseManagementBoard() {
         return rows.filter((r) => {
             const matchesQuery =
                 !q ||
-                r.student_name.toLowerCase().includes(q) ||
-                r.email.toLowerCase().includes(q) ||
+                (r.student_name ?? "").toLowerCase().includes(q) ||
+                (r.email ?? "").toLowerCase().includes(q) ||
                 r.sid.toLowerCase().includes(q);
             const matchesStatus =
                 statusFilter === "all" || r.intervention_status === statusFilter;
@@ -187,24 +188,20 @@ export function CaseManagementBoard() {
     const stats = React.useMemo(() => {
         const total = rows.length;
         const byRisk = { critical: 0, elevated: 0, normal: 0, unknown: 0 };
-        const active = rows.filter(
-            (r) =>
-                r.intervention_status !== "resolved" &&
-                r.intervention_status !== "dismissed" &&
-                r.intervention_status !== "expired",
-        ).length;
-        const resolved = rows.filter(
-            (r) => r.intervention_status === "resolved",
-        ).length;
+        const unassigned = rows.filter((r) => !r.assigned_to).length;
+        const assigned = rows.filter((r) => !!r.assigned_to).length;
         for (const r of rows) {
             byRisk[riskKey(r.current_risk_status)]++;
         }
-        return { total, active, resolved, byRisk };
+        return { total, unassigned, assigned, byRisk };
     }, [rows]);
 
     const selectedRow = React.useMemo(
-        () => (selectedSid ? rows.find((r) => r.sid === selectedSid) ?? null : null),
-        [rows, selectedSid],
+        () =>
+            selectedCaseId
+                ? rows.find((r) => r.case_id === selectedCaseId) ?? null
+                : null,
+        [rows, selectedCaseId],
     );
     const selectedAlert = React.useMemo(
         () => (selectedRow ? toAlert(selectedRow) : null),
@@ -216,8 +213,8 @@ export function CaseManagementBoard() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                 <StatCard label="Tổng số case" value={stats.total} tone="primary" />
                 <StatCard
-                    label="Đang theo dõi"
-                    value={stats.active}
+                    label="Chưa phân công"
+                    value={stats.unassigned}
                     tone="warning"
                 />
                 <StatCard
@@ -227,8 +224,8 @@ export function CaseManagementBoard() {
                     icon={<AlertTriangle className="size-4" />}
                 />
                 <StatCard
-                    label="Đã giải quyết"
-                    value={stats.resolved}
+                    label="Đã giao advisor"
+                    value={stats.assigned}
                     tone="success"
                 />
             </div>
@@ -358,28 +355,26 @@ export function CaseManagementBoard() {
                                     const rKey = riskKey(row.current_risk_status);
                                     return (
                                         <TableRow
-                                            key={row.sid}
+                                            key={row.case_id}
                                             className="cursor-pointer"
-                                            onClick={() => setSelectedSid(row.sid)}
+                                            onClick={() => setSelectedCaseId(row.case_id)}
                                         >
                                             <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                                                {row.active_case_id
-                                                    ? row.active_case_id.slice(0, 8)
-                                                    : "—"}
+                                                {row.case_id.slice(0, 8)}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="size-9">
                                                         <AvatarFallback className="text-xs font-semibold">
-                                                            {getInitials(row.student_name)}
+                                                            {getInitials(row.student_name ?? "")}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="flex flex-col">
                                                         <span className="font-medium">
-                                                            {row.student_name}
+                                                            {row.student_name ?? "—"}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground">
-                                                            {row.email}
+                                                            {row.email ?? ""}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -429,7 +424,7 @@ export function CaseManagementBoard() {
                                                     size="sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setSelectedSid(row.sid);
+                                                        setSelectedCaseId(row.case_id);
                                                     }}
                                                 >
                                                     <Eye className="size-4" />
@@ -446,13 +441,13 @@ export function CaseManagementBoard() {
             </Card>
 
             <StudentDetailDrawer
-                open={selectedSid !== null}
+                open={selectedCaseId !== null}
                 onOpenChange={(open) => {
-                    if (!open) setSelectedSid(null);
+                    if (!open) setSelectedCaseId(null);
                 }}
                 alert={selectedAlert}
                 studentProfile={
-                    selectedSid ? studentProfilesById[selectedSid] : undefined
+                    selectedRow ? studentProfilesById[selectedRow.sid] : undefined
                 }
             />
         </div>
