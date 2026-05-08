@@ -9,7 +9,7 @@ import {
     DrawerHeader,
     DrawerTitle,
 } from "@/components/ui/drawer";
-import { type Alert, relativeTime } from "@/lib/alerts";
+import { type Alert } from "@/lib/alerts";
 import { type StudentRow } from "@/lib/csv";
 
 type StudentDetailDrawerProps = {
@@ -20,8 +20,8 @@ type StudentDetailDrawerProps = {
 };
 
 const severityLabel: Record<Alert["severity"], string> = {
-    high: "Critical",
-    medium: "Elevated",
+    high: "Nguy cơ cao",
+    medium: "Nguy cơ vừa",
 };
 
 const severityTone: Record<Alert["severity"], string> = {
@@ -69,12 +69,13 @@ export function StudentDetailDrawer({
                             >
                                 {severityLabel[alert.severity]}
                             </Badge>
-                            <Badge variant="outline" className="font-mono text-xs">
-                                {alert.summary}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                                Cập nhật {relativeTime(alert.movedAt)}
-                            </Badge>
+                            {alert.summary &&
+                                alert.summary !== severityLabel[alert.severity] &&
+                                alert.summary !== (alert.severity === "high" ? "Critical" : "Elevated") && (
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                        {alert.summary}
+                                    </Badge>
+                                )}
                         </div>
 
                         <section className="rounded-xl border border-border/60 bg-card/60 p-3">
