@@ -3,15 +3,18 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.application.dtos.advisor_dtos import (
     AdvisorProfileDTO,
     GetAdvisorProfileQuery,
+    GetLeaderboardQuery,
+    LeaderboardEntryDTO,
 )
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
 )
+from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 from src.core.logger import logger
 from src.domain.exceptions import AdvisorNotFoundError, UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
@@ -167,49 +170,40 @@ async def get_my_points(
 #         ) from e
 
 
-# @router.get('/leaderboard')
-# async def get_leaderboard(
-#     query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
-#     _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
-#     time_window: str = Query(
-#         'all_time',
-#         pattern='^(weekly|monthly|semester|all_time)$',
-#     ),
-#     limit: int = Query(10, ge=1, le=50),
-#     offset: int = Query(0, ge=0),
-# ) -> PagedResponse[LeaderboardEntryDTO]:
-#     """Retrieve the advisor leaderboard based on gamification points.
-#
-#     Args:
-#         query_handler: The advisor query handler dependency.
-#         _user: Authenticated user with read access.
-#         time_window: The time window for the leaderboard.
-#
-#     Returns:
-#         List of advisors and their scores.
-#     """
-#     try:
-#         query = GetLeaderboardQuery(
-#             time_window=time_window,
-#             limit=limit,
-#             offset=offset,
-#         )
-#         entries, total_count = await query_handler.handle_get_leaderboard(query)
-#         return PagedResponse(
-#             items=entries,
-#             metadata=PaginationMetadata(
-#                 total_count=total_count,
-#                 limit=limit,
-#                 offset=offset,
-#                 has_next=(query.offset + query.limit) < total_count,
-#             ),
-#         )
-#     except Exception as e:
-#         logger.error(f'Failed to fetch leaderboard: {e}')
-#         raise HTTPException(
-#             status_code=500,
-#             detail='Failed to retrieve leaderboard',
-#         ) from e
-#
+
+@router.get('/leaderboard')
+async def get_leaderboard(
+    query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+    time_window: str = Query(
+        'all_time',
+        pattern='^(weekly|monthly|semester|all_time)$',
+    ),
+    limit: int = Query(10, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+) -> PagedResponse[LeaderboardEntryDTO]:
+    """Retrieve the advisor leaderboard based on gamification points."""
+    try:
+        query = GetLeaderboardQuery(
+            time_window=time_window,
+            limit=limit,
+            offset=offset,
+        )
+        entries, total_count = await query_handler.handle_get_leaderboard(query)
+        return PagedResponse(
+            items=entries,
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
+                has_next=(query.offset + query.limit) < total_count,
+            ),
+        )
+    except Exception as e:
+        logger.error(f'Failed to fetch leaderboard: {e}')
+        raise HTTPException(
+            status_code=500,
+            detail='Failed to retrieve leaderboard',
+        ) from e
 
 
