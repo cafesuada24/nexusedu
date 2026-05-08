@@ -47,11 +47,13 @@ async def run_email_draft_task(
     start_time = datetime.now(UTC)
     logger.info(f'Worker: Starting email draft task for {case_id}')
 
-    async with async_session_maker() as session:
+    async for session in get_async_session():
+        job_repo = SqlAlchemyJobRepository(session)
+        job = await job_repo.get_by_id(job_id)
         try:
-            job_repo = SqlAlchemyJobRepository(session)
-            job = await job_repo.get_by_id(job_id)
             job.start(start_time)
+            await job_repo.save(job)
+            await session.commit()
 
             student_repo = SqlAlchemyStudentRepository(session)
             advisor_repo = SqlAlchemyAdvisorRepository(session)
@@ -86,17 +88,19 @@ async def run_email_draft_task(
                 user_id=user_id,
             )
 
+            await handler.handle_generate_email_draft(command)
+
             job.finish(datetime.now(UTC))
+            await job_repo.save(job)
             logger.info(
                 f'Worker: Email generated job finished sucessfully for case with id {case_id}',
             )
-            return await handler.handle_generate_email_draft(command)
         except Exception as e:
             job.fail(datetime.now(UTC))
+            await job_repo.save(job)
             logger.info(
                 f'Worker: Email generated job failed for case with id {case_id}, error: {e}',
             )
-            raise
 
 
 async def run_agent_task(
