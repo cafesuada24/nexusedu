@@ -107,7 +107,7 @@ const quickLinks: QuickLink[] = [
   { icon: FileSpreadsheet, title: "Nhập CSV", time: "5p", topic: "data" },
   { icon: BellRing, title: "Điểm rủi ro", time: "8p", topic: "ai" },
   { icon: Sparkles, title: "Email AI", time: "4p", topic: "ai" },
-  { icon: BarChart3, title: "BGH Dashboard", time: "6p", topic: "report" },
+  { icon: BarChart3, title: "Báo cáo BGH", time: "6p", topic: "report" },
   { icon: CalendarDays, title: "Lịch hẹn", time: "3p", topic: "platform" },
   { icon: Shield, title: "Bảo mật", time: "7p", topic: "privacy" },
 ]
@@ -151,7 +151,7 @@ const faqs: Faq[] = [
   },
   {
     q: "Tôi xuất báo cáo cho BGH thế nào?",
-    a: "BGH Dashboard → Xuất báo cáo (PDF / Excel), lọc theo khoa hoặc kỳ.",
+    a: "Báo cáo BGH → Xuất báo cáo (PDF / Excel), lọc theo khoa hoặc kỳ.",
     topic: "report",
   },
   {
