@@ -54,7 +54,11 @@ class AlertQueryHandler:
                         intervention_status=alert.student.intervention_status,
                         last_notified_at=alert.student.last_notified_timestamp,
                         is_generating=False,
-                        active_case_id=None,
+                        active_case_id=alert.alert_details.get("active_case_id"),
+                        assigned_advisor_id=alert.alert_details.get(
+                            "assigned_advisor_id",
+                        ),
+                        assigned_to=alert.alert_details.get("assigned_to"),
                     ),
                     alert_details={
                         "latest_draft_subject": alert.alert_details.get("draft_subject"),
