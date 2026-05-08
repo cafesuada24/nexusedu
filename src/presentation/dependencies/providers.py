@@ -31,7 +31,6 @@ from src.domain.repositories.metrics_repository import MetricsRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
-from src.domain.repositories.task_repository import TaskRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
 from src.domain.services.gamification import GamificationService
