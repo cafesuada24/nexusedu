@@ -10,7 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.commands.agent_commands import AgentCommandHandler
 from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
+from src.application.interfaces.advisor_metrics_query_service import (
+    AdvisorMetricsQueryService,
+)
 from src.application.interfaces.case_query_service import CaseQueryService
+from src.application.interfaces.gamification_query_service import (
+    GamificationQueryService,
+)
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
@@ -35,8 +41,14 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
+from src.infrastructure.persistence.query_services.advisor_metrics_query_service import (
+    SqlAlchemyAdvisorMetricsQueryService,
+)
 from src.infrastructure.persistence.query_services.case_query_service import (
     SqlAlchemyCaseQueryService,
+)
+from src.infrastructure.persistence.query_services.gamification_query_service import (
+    SqlAlchemyGamificationQueryService,
 )
 from src.infrastructure.persistence.query_services.point_ledger_query_service import (
     SqlAlchemyPointLedgerQueryService,
@@ -203,6 +215,18 @@ async def get_point_ledger_query_service(
     return SqlAlchemyPointLedgerQueryService(session=session)
 
 
+async def get_gamification_query_service(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> GamificationQueryService:
+    return SqlAlchemyGamificationQueryService(session=session)
+
+
+async def get_advisor_metrics_query_service(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> AdvisorMetricsQueryService:
+    return SqlAlchemyAdvisorMetricsQueryService(session=session)
+
+
 async def get_case_query_service(
     session: Annotated[AsyncSession, Depends(get_async_session)],
     gamification_service: Annotated[
@@ -256,11 +280,21 @@ async def get_advisor_query_handler(
         PointLedgerQueryService,
         Depends(get_point_ledger_query_service),
     ],
+    gamification_query_service: Annotated[
+        GamificationQueryService,
+        Depends(get_gamification_query_service),
+    ],
+    advisor_metrics_query_service: Annotated[
+        AdvisorMetricsQueryService,
+        Depends(get_advisor_metrics_query_service),
+    ],
 ) -> AdvisorQueryHandler:
     """Dependency provider for the AdvisorQueryHandler."""
     return AdvisorQueryHandler(
         advisor_repo=advisor_repo,
         point_ledger_query_service=point_ledger_query_service,
+        gamification_query_service=gamification_query_service,
+        advisor_metrics_query_service=advisor_metrics_query_service,
     )
 
 
