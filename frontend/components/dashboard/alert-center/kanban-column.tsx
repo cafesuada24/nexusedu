@@ -26,12 +26,15 @@ type KanbanColumnProps = {
   onToggleCollapse: (id: CaseStatus) => void
   onToggleExpand: (id: CaseStatus) => void
   onViewDetails: (a: Alert) => void
+  onEditEmail: (a: Alert) => void
+  onGenerateDraft: (a: Alert) => void
   onMove: (a: Alert, status: CaseStatus, message?: string) => void
   onOpenGoals: (id: string) => void
   studentProfilesById: Record<string, StudentRow | undefined>
   aiDraftingById: Record<string, boolean>
   aiDraftErrorById: Record<string, string>
   aiDraftReadyById: Record<string, boolean>
+  acceptingCaseById: Record<string, boolean>
 }
 
 export function KanbanColumn({
@@ -45,12 +48,15 @@ export function KanbanColumn({
   onToggleCollapse,
   onToggleExpand,
   onViewDetails,
+  onEditEmail,
+  onGenerateDraft,
   onMove,
   onOpenGoals,
   studentProfilesById,
   aiDraftingById,
   aiDraftErrorById,
   aiDraftReadyById,
+  acceptingCaseById,
 }: KanbanColumnProps) {
   const ColIcon = col.icon
 
@@ -123,7 +129,7 @@ export function KanbanColumn({
       </header>
 
       {isCollapsed ? null : (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5 hide-scrollbar">
           {items.length === 0 ? (
             <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border/60 bg-white/45 p-6 text-center dark:border-slate-800 dark:bg-black/20">
               <span
@@ -155,12 +161,15 @@ export function KanbanColumn({
                       isHighlighted={highlightedAlertId === a.id}
                       highlightTone={col.cardHighlightTone}
                       onViewDetails={() => onViewDetails(a)}
+                      onEditEmail={() => onEditEmail(a)}
+                      onGenerateDraft={() => onGenerateDraft(a)}
                       onMove={(s, msg) => onMove(a, s, msg)}
                       onOpenGoals={() => onOpenGoals(a.id)}
                       studentProfile={studentProfilesById[a.id]}
                       isAiDrafting={Boolean(aiDraftingById[a.id])}
                       aiDraftError={aiDraftErrorById[a.id]}
                       isAiDraftReady={Boolean(aiDraftReadyById[a.id])}
+                      isAcceptingCase={Boolean(acceptingCaseById[a.id])}
                     />
                   </motion.div>
                 ))}
