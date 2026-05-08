@@ -58,6 +58,7 @@ class InterventionEmail:
 
         self.subject = subject
         self.body = body
+        self.status = EmailStatus.DRAFT
 
     def mark_as_sent(self) -> None:
         """Mark this email as sent."""

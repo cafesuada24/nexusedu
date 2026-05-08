@@ -20,7 +20,7 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker, get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
-from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyBadgeRepository,
     SqlAlchemyCaseRepository,

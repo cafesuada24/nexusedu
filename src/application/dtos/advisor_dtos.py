@@ -4,10 +4,17 @@ from dataclasses import dataclass
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, NonNegativeInt, PositiveInt
+from pydantic import (
+    BaseModel,
+    EmailStr,
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+)
 from pydantic_extra_types.phone_numbers import PhoneNumber, PhoneNumberValidator
 
 # ========== QUERY =========
+
 
 @dataclass(frozen=True)
 class GetUsersAdvisorProfileQuery:
@@ -19,8 +26,16 @@ class GetAdvisorProfileQuery:
     advisor_id: UUID
     include_metrics: bool
 
-class AdvisorMetricsDTO(BaseModel):
-    points: PositiveInt = 0
+
+class PersonalAdvisorMetricsDTO(BaseModel):
+    """Deep personal performance metrics for an advisor."""
+
+    total_points: NonNegativeInt = 0
+    total_actions: NonNegativeInt = 0
+    total_resolves: NonNegativeInt = 0
+    fast_action_count: NonNegativeInt = 0
+    avg_response_hours: NonNegativeFloat = 0.0
+    recovery_rate: NonNegativeFloat = 0.0
 
 
 class AdvisorProfileDTO(BaseModel):
@@ -37,7 +52,7 @@ class AdvisorProfileDTO(BaseModel):
     office: str | None = None
     bio: str | None = None
 
-    metrics: AdvisorMetricsDTO | None = None
+    personal_metrics: PersonalAdvisorMetricsDTO | None = None
 
 
 @dataclass(frozen=True)

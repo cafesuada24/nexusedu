@@ -8,11 +8,18 @@ from src.application.dtos.advisor_dtos import (
     AdvisorProfileDTO,
     BadgeDTO,
     GetAdvisorProfileQuery,
+    PersonalAdvisorMetricsDTO,
 )
 from src.application.dtos.gamification_dtos import (
-    EngagementMetricsEntryDTO,
     GetLeaderboardQuery,
     LeaderboardEntryDTO,
+)
+from src.application.dtos.pagination import PagedResponse
+from src.application.interfaces.advisor_metrics_query_service import (
+    AdvisorMetricsQueryService,
+)
+from src.application.interfaces.gamification_query_service import (
+    GamificationQueryService,
 )
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.domain.repositories.interfaces import AdvisorRepository
@@ -25,15 +32,20 @@ class AdvisorQueryHandler:
         self,
         advisor_repo: AdvisorRepository,
         point_ledger_query_service: PointLedgerQueryService,
-        # arq_pool: ArqRedis,
-    ):
+        gamification_query_service: GamificationQueryService,
+        advisor_metrics_query_service: AdvisorMetricsQueryService,
+    ) -> None:
+        """Initialize with required repositories and services."""
         self.__advisor_repo = advisor_repo
         self.__point_ledger_query_service = point_ledger_query_service
+        self.__gamification_query_service = gamification_query_service
+        self.__advisor_metrics_query_service = advisor_metrics_query_service
 
     async def handle_get_user_advisor_profile(
         self,
         user_id: UUID,
     ) -> AdvisorProfileDTO:
+        """Retrieve the advisor profile associated with a user ID."""
         advisor = await self.__advisor_repo.get_by_user_id(user_id)
         subquery = GetAdvisorProfileQuery(
             advisor_id=advisor.advisor_id,
@@ -45,7 +57,17 @@ class AdvisorQueryHandler:
         self,
         query: GetAdvisorProfileQuery,
     ) -> AdvisorProfileDTO:
+        """Retrieve a specific advisor profile by advisor ID."""
         advisor = await self.__advisor_repo.get_by_id(advisor_id=query.advisor_id)
+
+        personal_metrics = None
+        if query.include_metrics:
+            personal_metrics = (
+                await self.__advisor_metrics_query_service.get_advisor_metrics(
+                    query.advisor_id,
+                )
+            )
+
         return AdvisorProfileDTO(
             advisor_id=query.advisor_id,
             name=advisor.name,
@@ -55,87 +77,39 @@ class AdvisorQueryHandler:
             faculty=advisor.faculty,
             office=advisor.office,
             bio=advisor.bio,
+            personal_metrics=personal_metrics,
         )
 
     async def handle_get_user_advisor_points(self, user_id: UUID) -> int:
+        """Retrieve total points for the advisor associated with a user ID."""
         advisor = await self.__advisor_repo.get_by_user_id(user_id)
         return await self.__point_ledger_query_service.get_total_points(
             advisor_id=advisor.advisor_id,
         )
 
-    async def handle_get_engagement_metrics(self) -> list[EngagementMetricsEntryDTO]:
-        """Execute the get engagement metrics query."""
-        return []
-        # metrics = await self.__advisor_repo.get_engagement_metrics()
-        # return [
-        #     EngagementMetricsDTO(
-        #         major=m['faculty'],
-        #         sent_count=m['sent'],
-        #         drafted_count=m.get('drafted', 0),
-        #     )
-        #     for m in metrics
-        # ]
-
     async def handle_get_leaderboard(
         self,
         query: GetLeaderboardQuery,
-    ) -> tuple[list[LeaderboardEntryDTO], int]:
+    ) -> PagedResponse[LeaderboardEntryDTO]:
         """Execute the get leaderboard query."""
-        ...
-        # items, total_count = await self.__advisor_repo.get_leaderboard(
-        #     query.time_window,
-        #     limit=query.limit,
-        #     offset=query.offset,
-        # )
-        # return [
-        #     LeaderboardEntryDTO(
-        #         advisor_id=i['advisor_id'],
-        #         name=i['name'],
-        #         total_points=i['total_points'],
-        #         actions_count=i['actions_count'],
-        #         sent_count=i['sent_count'],
-        #         resolved_count=i['resolved_count'],
-        #     )
-        #     for i in items
-        # ], total_count
+        return await self.__gamification_query_service.get_leaderboard(
+            time_window=query.time_window,
+            limit=query.limit,
+            offset=query.offset,
+        )
+
+    async def handle_get_advisor_metrics(
+        self,
+        advisor_id: UUID,
+    ) -> PersonalAdvisorMetricsDTO:
+        """Execute the get advisor metrics query."""
+        # Ensure advisor exists
+        await self.__advisor_repo.get_by_id(advisor_id)
+        return await self.__advisor_metrics_query_service.get_advisor_metrics(
+            advisor_id
+        )
 
     async def handle_get_advisor_badges(self, advisor_id: UUID) -> list[BadgeDTO]:
         """Execute the get advisor badges query with caching."""
+        _ = advisor_id
         return []
-        # cache_key = f'advisor_badges:{advisor_id}'
-        #
-        # # 1. Try to get from cache
-        # cached_data = await self.__arq_pool.get(cache_key)
-        # if cached_data:
-        #     data = json.loads(cached_data)
-        #     return [BadgeDTO(**b) for b in data]
-        #
-        # # 2. If not in cache, fetch from DB
-        # badge_ids = await self.__badge_repo.get_advisor_badges(advisor_id)
-        #
-        # badges: list[BadgeDTO] = []
-        # for b_id in badge_ids:
-        #     if b_id in BADGE_MAP:
-        #         b = BADGE_MAP[b_id]
-        #         badges.append(
-        #             BadgeDTO(
-        #                 badge_id=b.badge_id,
-        #                 name=b.name,
-        #                 description=b.description,
-        #                 icon=b.icon,
-        #             ),
-        #         )
-        #
-        # # 3. Store in cache for 5 minutes (300s)
-        # badges_dict = [
-        #     {
-        #         'badge_id': b.badge_id,
-        #         'name': b.name,
-        #         'description': b.description,
-        #         'icon': b.icon,
-        #     }
-        #     for b in badges
-        # ]
-        # await self.__arq_pool.setex(cache_key, 300, json.dumps(badges_dict))
-        #
-        # return badges

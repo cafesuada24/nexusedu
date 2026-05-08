@@ -12,6 +12,7 @@ from src.domain.entities.case import Case
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.value_objects.status import EmailStatus, InterventionStatus
 from src.infrastructure.database.models import Advisor
+from src.presentation.api.auth import UserRole
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -32,6 +33,7 @@ async def seed_data(
     email_repository: EmailRepository
 ) -> tuple[uuid.UUID, uuid.UUID, uuid.UUID]:
     """Seed an advisor, student, case, and email draft."""
+    mock_user.role = UserRole.ADVISOR.value
     advisor_id = uuid.uuid4()
     sid = uuid.uuid4()
     cid = uuid.uuid4()
@@ -59,6 +61,7 @@ async def seed_data(
     
     # 4. Seed Email Draft
     email = InterventionEmail(case_id=cid, email_id=eid)
+    email.mark_as_generating()
     email.set_draft_content("Original Subject", "Original Body")
     await email_repository.add(email)
     
@@ -126,6 +129,7 @@ async def test_update_email_draft_unauthorized_advisor(
 ) -> None:
     """Verify an advisor cannot update an email for a case they don't own."""
     # 1. Seed Advisor for mock_user so we pass the "is advisor" check
+    mock_user.role = UserRole.ADVISOR.value
     test_db_session.add(
         Advisor(
             advisor_id=uuid.uuid4(),
@@ -151,6 +155,7 @@ async def test_update_email_draft_unauthorized_advisor(
     await case_repository.add(case)
     
     email = InterventionEmail(case_id=cid)
+    email.mark_as_generating()
     email.set_draft_content("S", "B")
     await email_repository.add(email)
     
@@ -183,4 +188,50 @@ async def test_update_email_draft_invalid_state(
     response = client.patch(f"/api/v1/cases/{cid}/email", json=payload)
     
     assert response.status_code == 400
-    assert "current status is sent" in response.json()["detail"].lower()
+    assert "email is sent" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_email_created_on_accept(
+    client: TestClient,
+    test_db_session: AsyncSession,
+    case_repository: CaseRepository,
+    student_repository: StudentRepository,
+    email_repository: EmailRepository,
+    mock_user: User,
+) -> None:
+    """Verify that an InterventionEmail is created immediately when a case is accepted."""
+    mock_user.role = UserRole.ADVISOR.value
+    # 1. Seed Advisor
+    test_db_session.add(
+        Advisor(
+            advisor_id=uuid.uuid4(),
+            user_id=mock_user.id,
+            name='Test Advisor',
+            email=mock_user.email,
+        )
+    )
+    
+    # 2. Seed Student and NEW Case
+    sid = uuid.uuid4()
+    cid = uuid.uuid4()
+    await student_repository.ingest_students(
+        [{'sid': sid, 'student_name': 'New Student', 'email': 'new@example.com'}]
+    )
+    case = Case(case_id=cid, sid=sid)
+    await case_repository.add(case)
+    await test_db_session.commit()
+    
+    # 3. Verify no email exists yet
+    email_before = await email_repository.find_by_case(cid)
+    assert email_before is None
+    
+    # 4. Accept Case via API
+    response = client.post(f"/api/v1/cases/{cid}/accept")
+    assert response.status_code == 200
+    
+    # 5. Verify email record was created
+    email_after = await email_repository.find_by_case(cid)
+    assert email_after is not None
+    assert email_after.case_id == cid
+    assert email_after.status == EmailStatus.UNAVAILABLE

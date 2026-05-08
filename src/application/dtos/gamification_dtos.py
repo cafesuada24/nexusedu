@@ -22,11 +22,3 @@ class LeaderboardEntryDTO(BaseModel):
     actions_count: NonNegativeInt
     sent_count: NonNegativeInt
     resolved_count: NonNegativeInt
-
-
-class EngagementMetricsEntryDTO(BaseModel):
-    """DTO for aggregated engagement metrics."""
-
-    major: str
-    sent_count: NonNegativeInt
-    drafted_count: NonNegativeInt
