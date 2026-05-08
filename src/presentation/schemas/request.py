@@ -126,3 +126,10 @@ class TriggerDraftRequest(BaseModel):
 
     booking_link: str | None = Field(None, description='Optional custom booking link.')
 
+
+class UpdateEmailRequest(BaseModel):
+    """Schema for manually updating a draft email."""
+
+    subject: str | None = Field(None, description='The updated email subject.')
+    body: str | None = Field(None, description='The updated email body.')
+
