@@ -44,8 +44,7 @@ from src.infrastructure.persistance.query_services.case_query_service import (
 from src.infrastructure.persistance.query_services.point_ledger_query_service import (
     SqlAlchemyPointLedgerQueryService,
 )
-from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyBadgeRepository,
@@ -59,6 +58,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyStudentRepository,
     SqlAlchemyUserSettingsRepository,
 )
+from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 
 
 # Repository Providers

@@ -25,7 +25,7 @@ from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import get_async_session
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyUserSettingsRepository,
 )

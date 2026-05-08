@@ -23,8 +23,7 @@ from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingSer
 from src.infrastructure.persistance.query_services.point_ledger_query_service import (
     SqlAlchemyPointLedgerQueryService,
 )
-from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyBadgeRepository,
     SqlAlchemyCaseRepository,
@@ -34,6 +33,7 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetadataRepository,
     SqlAlchemyStudentRepository,
 )
+from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 
 
 async def run_email_draft_task(
