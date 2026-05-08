@@ -148,7 +148,7 @@ class Student(Base):
 
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     student_name: Mapped[str] = mapped_column(String)
-    email: Mapped[str | None] = mapped_column(String)
+    email: Mapped[str] = mapped_column(String)
     major: Mapped[str] = mapped_column(String, default='Unknown')
     current_risk_status: Mapped[str] = mapped_column(String, default='Normal')
     last_notified_timestamp: Mapped[datetime | None] = mapped_column(UTCDateTime)
