@@ -14,13 +14,11 @@ from src.application.interfaces.advisor_query_service import AdvisorQueryService
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
-from src.application.queries.alert_queries import AlertQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
-from src.domain.repositories.alert_repository import AlertRepository
 from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
