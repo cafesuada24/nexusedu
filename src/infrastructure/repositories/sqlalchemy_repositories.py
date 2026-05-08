@@ -849,41 +849,9 @@ class SqlAlchemyAlertRepository:
 
         latest_draft = select(subq).where(subq.c.rn == 1).subquery()
 
-        # Subquery: most recent non-closed case per student so we can surface
-        # the active case_id and the advisor currently handling it.
-        case_subq = (
-            select(
-                OrmCase.sid,
-                OrmCase.case_id,
-                OrmCase.assigned_advisor_id,
-                func.row_number()
-                .over(
-                    partition_by=OrmCase.sid,
-                    order_by=desc(OrmCase.created_at),
-                )
-                .label('rn'),
-            )
-            .where(OrmCase.status.in_(['open', 'assigned']))
-            .subquery()
-        )
-
-        latest_case = select(case_subq).where(case_subq.c.rn == 1).subquery()
-
         stmt = (
-            select(
-                Student,
-                latest_draft.c.subject,
-                latest_draft.c.body,
-                latest_case.c.case_id,
-                latest_case.c.assigned_advisor_id,
-                OrmAdvisor.name.label('assigned_to'),
-            )
+            select(Student, latest_draft.c.subject, latest_draft.c.body)
             .outerjoin(latest_draft, Student.sid == latest_draft.c.sid)
-            .outerjoin(latest_case, Student.sid == latest_case.c.sid)
-            .outerjoin(
-                OrmAdvisor,
-                latest_case.c.assigned_advisor_id == OrmAdvisor.advisor_id,
-            )
             .where(Student.intervention_status != 'none')
         )
 
@@ -904,18 +872,12 @@ class SqlAlchemyAlertRepository:
             orm_student = row_tuple[0]
             draft_subject = row_tuple[1]
             draft_body = row_tuple[2]
-            active_case_id = row_tuple[3]
-            assigned_advisor_id = row_tuple[4]
-            assigned_to = row_tuple[5]
             alerts.append(
                 DataMapper.to_domain_alert(
                     orm_student,
                     {
                         'draft_subject': draft_subject,
                         'draft_body': draft_body,
-                        'active_case_id': active_case_id,
-                        'assigned_advisor_id': assigned_advisor_id,
-                        'assigned_to': assigned_to,
                     },
                 ),
             )

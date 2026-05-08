@@ -53,10 +53,6 @@ async def get_alerts(
                     'active_case_id': str(d.student.active_case_id)
                     if d.student.active_case_id
                     else None,
-                    'assigned_advisor_id': str(d.student.assigned_advisor_id)
-                    if d.student.assigned_advisor_id
-                    else None,
-                    'assigned_to': d.student.assigned_to,
                 }
                 for d in paged_dto.items
             ],
