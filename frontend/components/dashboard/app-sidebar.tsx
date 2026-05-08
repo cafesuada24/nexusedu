@@ -11,7 +11,7 @@ import {
     CalendarClock,
     LineChart,
     Sparkles,
-    ClipboardList,
+    Users,
 } from "lucide-react";
 import {
     Sidebar,
@@ -57,6 +57,12 @@ const baseMainNav: NavItem[] = [
         icon: BarChart3,
         tone: "primary",
     },
+    {
+        href: "/dashboard/advisors",
+        label: "Cố vấn",
+        icon: Users,
+        tone: "primary",
+    },
 ];
 
 const secondaryNav: NavItem[] = [
@@ -78,32 +84,11 @@ export function AppSidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
     const isAdmin = user?.role === "admin";
-
-    const alertsOrCasesItem: NavItem = isAdmin
-        ? {
-              href: "/dashboard/cases",
-              label: "Quản lý case sinh viên",
-              icon: ClipboardList,
-              tone: "primary",
-          }
-        : {
-              href: "/dashboard/alerts",
-              label: "Trung tâm cảnh báo",
-              icon: BellRing,
-              tone: "destructive",
-          };
-
-    const filteredBase = isAdmin
-        ? baseMainNav
-        : baseMainNav.filter((item) => item.href !== "/dashboard/import");
-    const insertAt = filteredBase.findIndex(
-        (item) => item.href === "/dashboard/schedule",
-    );
-    const mainNav = [
-        ...filteredBase.slice(0, insertAt),
-        alertsOrCasesItem,
-        ...filteredBase.slice(insertAt),
-    ];
+    const mainNav = baseMainNav.filter((item) => {
+        if (item.href === "/dashboard/import") return isAdmin;
+        if (item.href === "/dashboard/advisors") return isAdmin;
+        return true;
+    });
 
     const isActive = (href: string) => {
         if (href === "/dashboard") return pathname === "/dashboard";
