@@ -11,13 +11,13 @@ from src.application.dtos.case_dtos import (
     TriggerDraftDTO,
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
-from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
 from src.domain.exceptions import (
     CaseAlreadyClosedError,
     CaseNotFoundError,
+    EmailUnavailableError,
     InvalidActionError,
     JobNotFoundError,
     UserIsNotAnAdvisorError,
@@ -210,6 +210,10 @@ class CaseCommandHandler:
         if not case.is_active:
             raise CaseAlreadyClosedError(command.case_id)
 
+        email = await self.email_repo.find_by_case(case_id=case.case_id)
+        if email is None or not email.is_ready_to_send:
+            raise EmailUnavailableError(case.case_id)
+
         # 1. Fetch student PII to get email
         student = await self.student_repo.get_by_id(case.sid)
 
@@ -225,22 +229,11 @@ class CaseCommandHandler:
 
         await self.task_queue.enqueue(
             'run_dispatch_email_task',
-            case_id=str(case.case_id),
+            case_id=case.case_id,
             body=command.body,
             target_email=recipient_email,
         )
         await self.job_repo.add(new_job)
-        # 2. Database Write: Update existing email record for the case
-        case.mark_as_sent()
-        student.last_notified_timestamp = datetime.now(UTC)
-        await self.student_repo.save(student=student)
-
-        await self.task_queue.enqueue(
-            'run_dispatch_email_task',
-            case_id=str(case.case_id),
-            body=command.body,
-            target_email=recipient_email,
-        )
 
         # 4. Return recipient email for dispatching
         return recipient_email
