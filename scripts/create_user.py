@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import async_session_maker
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyUserSettingsRepository,
 )

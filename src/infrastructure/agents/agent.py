@@ -25,7 +25,7 @@ from src.infrastructure.agents.nodes import (
 )
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import async_session_maker
-from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetadataRepository,
 )
 

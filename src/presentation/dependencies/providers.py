@@ -35,13 +35,13 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
-from src.infrastructure.persistance.query_services.case_query_service import (
+from src.infrastructure.persistence.query_services.case_query_service import (
     SqlAlchemyCaseQueryService,
 )
-from src.infrastructure.persistance.query_services.point_ledger_query_service import (
+from src.infrastructure.persistence.query_services.point_ledger_query_service import (
     SqlAlchemyPointLedgerQueryService,
 )
-from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyBadgeRepository,
