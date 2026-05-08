@@ -2319,7 +2319,7 @@ export function csvToLMSRecords(text: string): Array<{
     course_name: string;
     test_type: string;
     score: number;
-    timestamp: number;
+    timestamp: string;
     academic_year: number;
     semester: number;
     week?: number;
@@ -2352,6 +2352,8 @@ export function csvToLMSRecords(text: string): Array<{
         const score = toNumber(r[col.score]);
         if (score === undefined) continue;
 
+        const ts = (col.timestamp ? toNumber(r[col.timestamp]) : undefined) ?? 0;
+
         out.push({
             activity_id: col.activity_id ? r[col.activity_id] : undefined,
             sid,
@@ -2359,8 +2361,7 @@ export function csvToLMSRecords(text: string): Array<{
             course_name: (col.courseName && r[col.courseName]) || "",
             test_type: col.testType ? r[col.testType] : "other",
             score,
-            timestamp:
-                (col.timestamp ? toNumber(r[col.timestamp]) : undefined) ?? 0,
+            timestamp: new Date(ts * 1000).toISOString(),
             academic_year:
                 (col.academicYear
                     ? toInteger(r[col.academicYear])
@@ -2383,7 +2384,7 @@ export function csvToSISRecords(text: string): Array<{
     major?: string;
     current_risk_status?: string;
     intervention_status?: string;
-    last_notified_timestamp?: number;
+    last_notified_timestamp?: string | null;
     last_notified_satisfaction?: number;
 }> {
     const { headers, rows } = parseCsv(text);
@@ -2420,16 +2421,29 @@ export function csvToSISRecords(text: string): Array<{
         const sid = r[col.sid]?.trim();
         if (!sid) continue;
 
+        const riskStatus = col.risk ? r[col.risk] : undefined;
+        let interventionStatus = col.status ? r[col.status] : undefined;
+
+        if (
+            riskStatus &&
+            (riskStatus.toLowerCase() === "elevated" || riskStatus.toLowerCase() === "critical") &&
+            (!interventionStatus || interventionStatus.toLowerCase() === "none")
+        ) {
+            interventionStatus = "new";
+        }
+
+        const lnt = col.lastNotifiedTimestamp
+            ? parseLastNotified(r[col.lastNotifiedTimestamp])
+            : null;
+
         out.push({
             sid,
             student_name: (col.name && r[col.name]) || sid,
             email: (col.email && r[col.email]) || "",
             major: col.major ? r[col.major] : undefined,
-            current_risk_status: col.risk ? r[col.risk] : undefined,
-            intervention_status: col.status ? r[col.status] : undefined,
-            last_notified_timestamp: col.lastNotifiedTimestamp
-                ? (parseLastNotified(r[col.lastNotifiedTimestamp]) ?? 0)
-                : 0,
+            current_risk_status: riskStatus,
+            intervention_status: interventionStatus,
+            last_notified_timestamp: lnt ? new Date(lnt * 1000).toISOString() : null,
             last_notified_satisfaction: col.lastNotifiedSatisfaction
                 ? (toInteger(r[col.lastNotifiedSatisfaction]) ?? 0)
                 : 0,
