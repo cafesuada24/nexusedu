@@ -6,13 +6,8 @@ from uuid import UUID
 
 
 class PointLedgerQueryService(Protocol):
-    """Query Service for Point Ledger."""
+    """Query Service for Point Ledger (Read-only)."""
 
-    async def award_points(
-        self,
-        advisor_id: UUID,
-        case_id: UUID,
-        action: str,
-        points: int,
-        earned_at: datetime,
-    ): ...
+    async def get_total_points(self, advisor_id: UUID) -> int:
+        """Calculates total points for an advisor."""
+        ...

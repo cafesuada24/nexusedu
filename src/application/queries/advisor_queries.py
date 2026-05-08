@@ -14,8 +14,7 @@ from src.application.dtos.gamification_dtos import (
     GetLeaderboardQuery,
     LeaderboardEntryDTO,
 )
-from src.application.interfaces.advisor_query_service import AdvisorQueryService
-from src.domain.repositories.badge_repository import BadgeRepository
+from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.domain.repositories.interfaces import AdvisorRepository
 
 
@@ -25,14 +24,11 @@ class AdvisorQueryHandler:
     def __init__(
         self,
         advisor_repo: AdvisorRepository,
-        badge_repo: BadgeRepository,
-        advisor_query_service: AdvisorQueryService,
+        point_ledger_query_service: PointLedgerQueryService,
         # arq_pool: ArqRedis,
     ):
         self.__advisor_repo = advisor_repo
-        self.__badge_repo = badge_repo
-        # self.__arq_pool = arq_pool
-        self.__advisor_query_service = advisor_query_service
+        self.__point_ledger_query_service = point_ledger_query_service
 
     async def handle_get_user_advisor_profile(
         self,
@@ -46,7 +42,8 @@ class AdvisorQueryHandler:
         return await self.handle_get_advisor_profile(subquery)
 
     async def handle_get_advisor_profile(
-        self, query: GetAdvisorProfileQuery
+        self,
+        query: GetAdvisorProfileQuery,
     ) -> AdvisorProfileDTO:
         advisor = await self.__advisor_repo.get_by_id(advisor_id=query.advisor_id)
         return AdvisorProfileDTO(
@@ -62,13 +59,8 @@ class AdvisorQueryHandler:
 
     async def handle_get_user_advisor_points(self, user_id: UUID) -> int:
         advisor = await self.__advisor_repo.get_by_user_id(user_id)
-        return await self.__advisor_query_service.get_advisor_points(
+        return await self.__point_ledger_query_service.get_total_points(
             advisor_id=advisor.advisor_id,
-        )
-
-    async def handle_get_advisor_points(self, advisor_id: UUID) -> int:
-        return await self.__advisor_query_service.get_advisor_points(
-            advisor_id=advisor_id,
         )
 
     async def handle_get_engagement_metrics(self) -> list[EngagementMetricsEntryDTO]:

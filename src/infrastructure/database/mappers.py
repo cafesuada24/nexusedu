@@ -1,6 +1,7 @@
 """Mappers between SQLAlchemy ORM models and Domain Entities."""
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from src.domain.entities.advisor import Advisor as DomainAdvisor
 from src.domain.entities.case import Case as DomainCase
@@ -8,6 +9,12 @@ from src.domain.entities.intervention_email import (
     InterventionEmail as DomainInterventionEmail,
 )
 from src.domain.entities.job import Job as DomainJob
+from src.domain.entities.point_ledger import (
+    PointLedger as DomainLedger,
+)
+from src.domain.entities.point_ledger import (
+    PointLedgerEntry as DomainLedgerEntry,
+)
 from src.domain.entities.student import Student as DomainStudent
 from src.domain.value_objects.status import (
     EmailStatus,
@@ -26,12 +33,46 @@ from src.infrastructure.database.models import (
     InterventionEmail as OrmInterventionEmail,
 )
 from src.infrastructure.database.models import (
+    PointLedger as OrmLedger,
+)
+from src.infrastructure.database.models import (
     Student as OrmStudent,
 )
 
 
 class DataMapper:
     """Static mapping methods for domain-infrastructure conversion."""
+
+    @staticmethod
+    def to_domain_ledger(
+        advisor_id: UUID,
+        orm_entries: list[OrmLedger],
+    ) -> DomainLedger:
+        """Map ORM PointLedger records to Domain PointLedger aggregate."""
+        entries = [
+            DomainLedgerEntry(
+                id=entry.id,
+                advisor_id=entry.advisor_id,
+                case_id=entry.case_id,
+                action=entry.action,
+                points=entry.points,
+                earned_at=entry.earned_at,
+            )
+            for entry in orm_entries
+        ]
+        return DomainLedger(advisor_id=advisor_id, entries=entries)
+
+    @staticmethod
+    def to_orm_ledger(domain_entry: DomainLedgerEntry) -> OrmLedger:
+        """Map Domain PointLedgerEntry to ORM PointLedger."""
+        return OrmLedger(
+            id=domain_entry.id,
+            advisor_id=domain_entry.advisor_id,
+            case_id=domain_entry.case_id,
+            action=domain_entry.action,
+            points=domain_entry.points,
+            earned_at=domain_entry.earned_at,
+        )
 
     @staticmethod
     def to_domain_student(orm_student: OrmStudent) -> DomainStudent:

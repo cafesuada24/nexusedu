@@ -1,37 +1,24 @@
-"""Ledger query service interface."""
+"""Ledger query service implementation."""
 
-from datetime import datetime
 from uuid import UUID
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.database.models import PointLedger
 
 
 class SqlAlchemyPointLedgerQueryService:
-    """SqlAlchemy implementation for Point Ledger."""
+    """SqlAlchemy implementation for Point Ledger queries."""
 
     def __init__(self, session: AsyncSession) -> None:
-
         self.__session = session
 
-    async def award_points(
-        self,
-        advisor_id: UUID,
-        case_id: UUID,
-        action: str,
-        points: int,
-        earned_at: datetime,
-    ):
-        if points <= 0:
-            raise ValueError('Points must be positive.')
-
-        record = PointLedger(
-            advisor_id=advisor_id,
-            case_id=case_id,
-            action=action,
-            points=points,
-            earned_at=earned_at,
+    async def get_total_points(self, advisor_id: UUID) -> int:
+        """Calculates total points for an advisor."""
+        stmt = (
+            select(func.sum(PointLedger.points))
+            .where(PointLedger.advisor_id == advisor_id)
         )
-
-        self.__session.add(record)
+        result = await self.__session.execute(stmt)
+        return result.scalar() or 0

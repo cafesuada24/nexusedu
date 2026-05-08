@@ -73,6 +73,8 @@ if TYPE_CHECKING:
         InterventionEmail as DomainInterventionEmail,
     )
     from src.domain.entities.student import Student as DomainStudent
+    from src.domain.entities.point_ledger import PointLedger as DomainLedger
+    from src.domain.repositories.point_ledger_repository import PointLedgerRepository
     from src.domain.repositories.metadata_repository import DBDescription
 
 
@@ -970,3 +972,32 @@ class SqlAlchemyUserSettingsRepository:
         )
 
         self.session.add(new_settings)
+
+
+class SqlAlchemyPointLedgerRepository:
+    """SQLAlchemy implementation of the PointLedgerRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+
+    async def get_by_advisor_id(self, advisor_id: uuid.UUID) -> DomainLedger:
+        """Retrieve the point ledger for a specific advisor."""
+        stmt = (
+            select(PointLedger)
+            .where(PointLedger.advisor_id == advisor_id)
+            .order_by(PointLedger.earned_at.asc())
+        )
+        result = await self.session.execute(stmt)
+        entries = list(result.scalars().all())
+        return DataMapper.to_domain_ledger(advisor_id, entries)
+
+    async def save(self, ledger: DomainLedger) -> None:
+        """Persist new entries from the ledger."""
+        pending = ledger.get_pending_entries()
+        for domain_entry in pending:
+            orm_entry = DataMapper.to_orm_ledger(domain_entry)
+            self.session.add(orm_entry)
+
+        ledger.clear_pending_entries()
+

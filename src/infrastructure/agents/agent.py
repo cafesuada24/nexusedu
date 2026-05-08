@@ -13,6 +13,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import Checkpointer, CompiledStateGraph
 
 from src.application.services.agent_metadata import AgentMetadataService
+from src.core.logger import logger
 from src.infrastructure.agents.nodes import (
     discovery_node,
     email_agent_node,
@@ -24,10 +25,9 @@ from src.infrastructure.agents.nodes import (
 )
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import async_session_maker
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
     SqlAlchemyMetadataRepository,
 )
-from src.core.logger import logger
 
 
 def create_graph(
