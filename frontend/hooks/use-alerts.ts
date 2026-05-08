@@ -10,6 +10,7 @@ import {
     fetchCaseDetails,
     fetchCaseEmail,
     fetchTasks,
+    fetchOpenCases,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
@@ -202,6 +203,26 @@ export function useTasks(limit: number = 20, offset: number = 0) {
     return useQuery({
         queryKey: [...queryKeys.cases.tasks(), limit, offset],
         queryFn: () => fetchTasks(limit, offset),
+        enabled: isMounted && isAuthenticated,
+        refetchOnWindowFocus: true,
+        refetchInterval: 10000,
+    });
+}
+
+/**
+ * Hook to fetch open (unassigned) cases for admin oversight.
+ */
+export function useOpenCases(limit: number = 100, offset: number = 0) {
+    const { isAuthenticated } = useAuth();
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    return useQuery({
+        queryKey: [...queryKeys.cases.all, "open", limit, offset],
+        queryFn: () => fetchOpenCases(limit, offset),
         enabled: isMounted && isAuthenticated,
         refetchOnWindowFocus: true,
         refetchInterval: 10000,
