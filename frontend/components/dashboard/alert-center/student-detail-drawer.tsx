@@ -20,8 +20,8 @@ type StudentDetailDrawerProps = {
 };
 
 const severityLabel: Record<Alert["severity"], string> = {
-    high: "Critical",
-    medium: "Elevated",
+    high: "Nguy cơ cao",
+    medium: "Nguy cơ vừa",
 };
 
 const severityTone: Record<Alert["severity"], string> = {
