@@ -20,9 +20,6 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker, get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
-from src.infrastructure.persistance.query_services.point_ledger_query_service import (
-    SqlAlchemyPointLedgerQueryService,
-)
 from src.infrastructure.persistance.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyBadgeRepository,
@@ -31,6 +28,7 @@ from src.infrastructure.persistance.repositories.sqlalchemy_repositories import 
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyJobRepository,
     SqlAlchemyMetadataRepository,
+    SqlAlchemyPointLedgerRepository,
     SqlAlchemyStudentRepository,
 )
 from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
@@ -59,7 +57,7 @@ async def run_email_draft_task(
             advisor_repo = SqlAlchemyAdvisorRepository(session)
             case_repo = SqlAlchemyCaseRepository(session)
             email_repo = SqlAlchemyEmailRepository(session)
-            point_ledger_query_service = SqlAlchemyPointLedgerQueryService(session)
+            point_ledger_repo = SqlAlchemyPointLedgerRepository(session)
 
             # Domain Service
             gamification_service = GamificationService()
@@ -78,7 +76,7 @@ async def run_email_draft_task(
                 gamification_service=gamification_service,
                 task_queue=task_queue,
                 email_drafting_service=BamlEmailDraftingService(),
-                point_ledger_query_service=point_ledger_query_service,
+                point_ledger_repo=point_ledger_repo,
             )
 
             command = GenerateEmailDraftCommand(
@@ -155,20 +153,21 @@ async def run_dispatch_email_task(
 
     async for session in get_async_session():
         assert case.assigned_advisor_id is not None
-        point_ledger_query_service = SqlAlchemyPointLedgerQueryService(session)
+        point_ledger_repo = SqlAlchemyPointLedgerRepository(session)
         gamification_service = GamificationService()
         points = gamification_service.calculate_points(
             GamificationService.Action.SEND_EMAIL,
             case.assigned_at,
             student.current_risk_status,
         )
-        await point_ledger_query_service.award_points(
-            advisor_id=case.assigned_advisor_id,
+        ledger = await point_ledger_repo.get_by_advisor_id(case.assigned_advisor_id)
+        ledger.award_points(
             case_id=case.case_id,
             action='send_email',
             points=points,
             earned_at=datetime.now(UTC),
         )
+        await point_ledger_repo.save(ledger)
     # Mock success
 
 
