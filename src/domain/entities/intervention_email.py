@@ -28,6 +28,11 @@ class InterventionEmail:
         """Return if the email is generating."""
         return self.status == EmailStatus.GENERATING
 
+    @property
+    def is_ready_to_send(self) -> bool:
+        """Return if the email is generating."""
+        return self.status == EmailStatus.DRAFT
+
     def set_draft_content(self, subject: str, body: str) -> None:
         """Called by the background worker when the AI is done."""
         if not subject.strip() or not body.strip():
