@@ -52,6 +52,8 @@ export const BackendAlertSchema = z.object({
     intervention_status: BackendInterventionStatusSchema,
     is_generating: z.boolean().optional(),
     active_case_id: z.string().nullable().optional(),
+    assigned_advisor_id: z.string().nullable().optional(),
+    assigned_to: z.string().nullable().optional(),
 });
 export type BackendAlert = z.infer<typeof BackendAlertSchema>;
 
