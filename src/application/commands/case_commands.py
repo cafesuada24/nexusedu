@@ -9,6 +9,7 @@ from src.application.dtos.case_dtos import (
     SendEmailCommand,
     TriggerDraftCommand,
     TriggerDraftDTO,
+    UpdateEmailCommand,
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.core.logger import logger
@@ -237,6 +238,29 @@ class CaseCommandHandler:
 
         # 4. Return recipient email for dispatching
         return recipient_email
+
+    async def handle_update_email(self, command: UpdateEmailCommand) -> None:
+        """Execute the update email command."""
+        advisor = await self.advisor_repo.find_by_user_id(command.user_id)
+        if advisor is None:
+            raise UserIsNotAnAdvisorError(command.user_id)
+
+        case = await self.case_repo.get_by_id(command.case_id)
+        if case.assigned_advisor_id != advisor.advisor_id:
+            raise CaseNotFoundError(case_id=case.case_id)
+
+        email = await self.email_repo.find_by_case(case_id=case.case_id)
+        if email is None:
+            raise EmailUnavailableError(case.case_id)
+
+        # Merge partial updates
+        new_subject = command.subject if command.subject is not None else email.subject
+        new_body = command.body if command.body is not None else email.body
+
+        # Update the entity
+        email.update_draft(new_subject or '', new_body or '')
+
+        await self.email_repo.save(email)
 
     async def handle_generate_email_draft(
         self,
