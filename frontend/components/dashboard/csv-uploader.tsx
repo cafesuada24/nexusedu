@@ -26,6 +26,8 @@ import {
 
 import { ingestData, updateUserSettings } from "@/lib/api";
 import { type SourceKey } from "@/lib/constants";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { Dropzone, HintLine, type StagedMap } from "./csv-uploader/dropzone";
 import { UploadHistoryRow } from "./csv-uploader/upload-history";
 
@@ -34,6 +36,7 @@ import { useAuth } from "@/hooks/use-auth";
 export function CsvUploader() {
     const { user } = useAuth();
     const { uploads, addUpload, updateUpload, removeUpload } = useUploads();
+    const queryClient = useQueryClient();
 
     const [staged, setStaged] = React.useState<StagedMap>({});
     const [draggingOver, setDraggingOver] = React.useState<SourceKey | null>(
@@ -149,8 +152,24 @@ export function CsvUploader() {
 
             if (dataSources.length > 0) {
                 try {
+                    console.log("[CSV] Submitting data sources:", {
+                        sourceCount: dataSources.length,
+                        sources: dataSources.map(s => ({
+                            type: s.source_type,
+                            recordCount: s.records.length,
+                        })),
+                        totalRecords: dataSources.reduce((sum, s) => sum + s.records.length, 0),
+                    });
+
                     await updateUserSettings({ auto_draft_enabled: false });
-                    await ingestData(dataSources);
+                    const ingestResponse = await ingestData(dataSources);
+                    console.log("[CSV] /data/ingest response:", ingestResponse);
+
+                    // Invalidate alerts query so the Alert Center reflects the new data
+                    queryClient.invalidateQueries({
+                        queryKey: queryKeys.alerts.list(),
+                    });
+
                     updateUpload(id, {
                         status: "ready",
                         totalStudents: result.totalStudents,
@@ -163,7 +182,11 @@ export function CsvUploader() {
                         )} sinh viên đã được cập nhật hệ thống.`,
                     });
                 } catch (err: any) {
-                    console.warn("[v0] /data/ingest failed", err);
+                    console.error("[CSV] /data/ingest failed with error:", {
+                        message: err.message,
+                        detail: err.detail,
+                        stack: err.stack,
+                    });
 
                     let errorMessage =
                         err.message || "Không thể đồng bộ với máy chủ.";
