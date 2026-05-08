@@ -18,7 +18,6 @@ from src.application.dtos.pagination import PagedResponse
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
 )
-from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 from src.core.logger import logger
 from src.domain.exceptions import AdvisorNotFoundError, UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
