@@ -11,7 +11,8 @@ class PointLedgerQueryService(Protocol):
     async def award_points(
         self,
         advisor_id: UUID,
-        task_id: UUID,
+        case_id: UUID,
+        action: str,
         points: int,
         earned_at: datetime,
     ): ...
