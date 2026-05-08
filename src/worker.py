@@ -1,5 +1,6 @@
 """ARQ Worker for background job processing."""
 
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -19,7 +20,9 @@ from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker, get_async_session
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
-from src.infrastructure.persistance.query_services.point_ledger_query_service import SqlAlchemyPointLedgerQueryService
+from src.infrastructure.persistance.query_services.point_ledger_query_service import (
+    SqlAlchemyPointLedgerQueryService,
+)
 from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
@@ -35,53 +38,65 @@ from src.infrastructure.repositories.sqlalchemy_repositories import (
 
 async def run_email_draft_task(
     ctx: dict[str, Any],
-    case_id: str,
-    job_id: str,
+    case_id: UUID,
+    job_id: UUID,
+    user_id: UUID,
     booking_link: str | None = None,
-    user_id: str | None = None,
 ) -> None:
     """Worker task to generate email draft using AlertCommandHandler."""
+    start_time = datetime.now(UTC)
     logger.info(f'Worker: Starting email draft task for {case_id}')
 
     async with async_session_maker() as session:
-        # Repositories
-        student_repo = SqlAlchemyStudentRepository(session)
-        advisor_repo = SqlAlchemyAdvisorRepository(session)
-        case_repo = SqlAlchemyCaseRepository(session)
-        email_repo = SqlAlchemyEmailRepository(session)
-        job_repo = SqlAlchemyJobRepository(session)
-        point_ledger_query_service = SqlAlchemyPointLedgerQueryService(session)
+        try:
+            job_repo = SqlAlchemyJobRepository(session)
+            job = await job_repo.get_by_id(job_id)
+            job.start(start_time)
 
-        # Domain Service
-        gamification_service = GamificationService()
+            student_repo = SqlAlchemyStudentRepository(session)
+            advisor_repo = SqlAlchemyAdvisorRepository(session)
+            case_repo = SqlAlchemyCaseRepository(session)
+            email_repo = SqlAlchemyEmailRepository(session)
+            point_ledger_query_service = SqlAlchemyPointLedgerQueryService(session)
 
-        # Task Queue (Adapter for worker context)
+            # Domain Service
+            gamification_service = GamificationService()
 
-        task_queue = ArqTaskQueueAdapter(ctx['redis'])
+            # Task Queue (Adapter for worker context)
 
-        # Command Handler
-        handler = CaseCommandHandler(
-            student_repo=student_repo,
-            email_repo=email_repo,
-            case_repo=case_repo,
-            advisor_repo=advisor_repo,
-            job_repo=job_repo,
-            gamification_service=gamification_service,
-            task_queue=task_queue,
-            email_drafting_service=BamlEmailDraftingService(),
-            point_ledger_query_service=point_ledger_query_service,
-        )
+            task_queue = ArqTaskQueueAdapter(ctx['redis'])
 
-        command = GenerateEmailDraftCommand(
-            case_id=UUID(case_id),
-            job_id=UUID(job_id),
-            booking_link=booking_link,
-            user_id=UUID(user_id) if user_id else None,
-        )
+            # Command Handler
+            handler = CaseCommandHandler(
+                student_repo=student_repo,
+                email_repo=email_repo,
+                case_repo=case_repo,
+                advisor_repo=advisor_repo,
+                job_repo=job_repo,
+                gamification_service=gamification_service,
+                task_queue=task_queue,
+                email_drafting_service=BamlEmailDraftingService(),
+                point_ledger_query_service=point_ledger_query_service,
+            )
 
-        result = await handler.handle_generate_email_draft(command)
-        await session.commit()
-        return result
+            command = GenerateEmailDraftCommand(
+                case_id=case_id,
+                job_id=job_id,
+                booking_link=booking_link,
+                user_id=user_id,
+            )
+
+            job.finish(datetime.now(UTC))
+            logger.info(
+                f'Worker: Email generated job finished sucessfully for case with id {case_id}',
+            )
+            return await handler.handle_generate_email_draft(command)
+        except Exception as e:
+            job.fail(datetime.now(UTC))
+            logger.info(
+                f'Worker: Email generated job failed for case with id {case_id}, error: {e}',
+            )
+            raise
 
 
 async def run_agent_task(
@@ -115,7 +130,7 @@ async def run_agent_task(
 
 async def run_dispatch_email_task(
     _: dict[str, Any],
-    case_id: str,
+    case_id: UUID,
     body: str,
     target_email: str,
 ) -> None:
@@ -123,6 +138,33 @@ async def run_dispatch_email_task(
     logger.info(f'Worker: Dispatching email for case {case_id} to {target_email}')
     # Placeholder for actual external email service integration (e.g. SendGrid, AWS SES)
     logger.info(f'Email body preview: {body[:50]}...')
+    async for session in get_async_session():
+        case_repo = SqlAlchemyCaseRepository(session)
+        case = await case_repo.get_by_id(case_id=case_id)
+        assert case.assigned_advisor_id is not None
+        student_repo = SqlAlchemyStudentRepository(session)
+        student = await student_repo.get_by_id(case.sid)
+
+        case.mark_as_sent()
+
+        await case_repo.save(case)
+
+    async for session in get_async_session():
+        assert case.assigned_advisor_id is not None
+        point_ledger_query_service = SqlAlchemyPointLedgerQueryService(session)
+        gamification_service = GamificationService()
+        points = gamification_service.calculate_points(
+            GamificationService.Action.SEND_EMAIL,
+            case.assigned_at,
+            student.current_risk_status,
+        )
+        await point_ledger_query_service.award_points(
+            advisor_id=case.assigned_advisor_id,
+            case_id=case.case_id,
+            action='send_email',
+            points=points,
+            earned_at=datetime.now(UTC),
+        )
     # Mock success
 
 
