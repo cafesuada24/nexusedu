@@ -11,6 +11,7 @@ from src.application.commands.case_commands import (
     CaseCommandHandler,
     SendEmailCommand,
     TriggerDraftCommand,
+    UpdateEmailCommand,
 )
 from src.application.dtos.case_dtos import CaseDTO, QueryEmailDTO, TriggerDraftDTO
 from src.application.queries.case_queries import (
@@ -25,6 +26,7 @@ from src.domain.exceptions import (
     EmailNotFoundError,
     EmailUnavailableError,
     InvalidActionError,
+    InvalidStateTransitionError,
     StudentNotFoundError,
     UserIsNotAnAdvisorError,
 )
@@ -39,6 +41,7 @@ from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 from src.presentation.schemas.request import (
     SendEmailRequest,
     TriggerDraftRequest,
+    UpdateEmailRequest,
 )
 
 router = APIRouter(prefix='/cases', tags=['cases'])
@@ -187,6 +190,34 @@ async def get_email_draft(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.patch('/{case_id}/email')
+async def update_email_draft(
+    case_id: UUID,
+    request: UpdateEmailRequest,
+    command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+) -> dict[str, str]:
+    """Manually update the subject or body of a draft email."""
+    try:
+        command = UpdateEmailCommand(
+            case_id=case_id,
+            user_id=user.id,
+            subject=request.subject,
+            body=request.body,
+        )
+        await command_handler.handle_update_email(command)
+        return {'status': 'success', 'message': 'Draft updated'}
+    except UserIsNotAnAdvisorError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except (CaseNotFoundError, EmailUnavailableError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except (InvalidActionError, InvalidStateTransitionError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error in update_email_draft: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.post('/{case_id}/email/send')
 async def send_nudge_email(
     case_id: UUID,
@@ -258,7 +289,8 @@ async def accept_task(
     except StudentNotFoundError as e:
         logger.error('[Mismatch] A case exists without an associated student.')
         raise HTTPException(
-            status_code=404, detail='Student information not found.',
+            status_code=404,
+            detail='Student information not found.',
         ) from e
     except Exception as e:
         logger.error(f'Error in complete_task: {str(e)}', exc_info=True)
