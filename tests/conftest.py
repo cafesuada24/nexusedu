@@ -12,10 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from src.infrastructure.database.models import Base, UserSettings
 from src.infrastructure.database.session import get_async_session
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
-    SqlAlchemyAlertRepository,
     SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
