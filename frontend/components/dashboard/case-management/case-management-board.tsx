@@ -297,11 +297,11 @@ export function CaseManagementBoard() {
                     <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/30">
-                                <TableHead className="px-4">Sinh viên</TableHead>
-                                <TableHead>MSSV</TableHead>
+                                <TableHead className="px-4">Case ID</TableHead>
+                                <TableHead>Sinh viên</TableHead>
+                                <TableHead>Cố vấn phụ trách</TableHead>
                                 <TableHead>Mức độ rủi ro</TableHead>
                                 <TableHead>Trạng thái can thiệp</TableHead>
-                                <TableHead>Case ID</TableHead>
                                 <TableHead className="text-right pr-4">
                                     Hành động
                                 </TableHead>
@@ -312,6 +312,9 @@ export function CaseManagementBoard() {
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <TableRow key={`skeleton-${i}`}>
                                         <TableCell className="px-4">
+                                            <Skeleton className="h-4 w-24" />
+                                        </TableCell>
+                                        <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <Skeleton className="size-9 rounded-full" />
                                                 <div className="flex flex-col gap-1">
@@ -321,16 +324,13 @@ export function CaseManagementBoard() {
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Skeleton className="h-4 w-20" />
+                                            <Skeleton className="h-4 w-28" />
                                         </TableCell>
                                         <TableCell>
                                             <Skeleton className="h-5 w-20" />
                                         </TableCell>
                                         <TableCell>
                                             <Skeleton className="h-5 w-24" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Skeleton className="h-4 w-24" />
                                         </TableCell>
                                         <TableCell className="text-right pr-4">
                                             <Skeleton className="ml-auto h-8 w-20" />
@@ -362,7 +362,12 @@ export function CaseManagementBoard() {
                                             className="cursor-pointer"
                                             onClick={() => setSelectedSid(row.sid)}
                                         >
-                                            <TableCell className="px-4 py-3">
+                                            <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                                                {row.active_case_id
+                                                    ? row.active_case_id.slice(0, 8)
+                                                    : "—"}
+                                            </TableCell>
+                                            <TableCell>
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="size-9">
                                                         <AvatarFallback className="text-xs font-semibold">
@@ -379,8 +384,16 @@ export function CaseManagementBoard() {
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="font-mono text-xs">
-                                                {row.sid.slice(0, 8).toUpperCase()}
+                                            <TableCell>
+                                                {row.assigned_to ? (
+                                                    <span className="text-sm">
+                                                        {row.assigned_to}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs italic text-muted-foreground">
+                                                        Chưa giao
+                                                    </span>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge
@@ -409,11 +422,6 @@ export function CaseManagementBoard() {
                                                         ]
                                                     }
                                                 </Badge>
-                                            </TableCell>
-                                            <TableCell className="font-mono text-xs text-muted-foreground">
-                                                {row.active_case_id
-                                                    ? row.active_case_id.slice(0, 8)
-                                                    : "—"}
                                             </TableCell>
                                             <TableCell className="text-right pr-4">
                                                 <Button
