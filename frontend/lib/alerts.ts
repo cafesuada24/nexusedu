@@ -8,6 +8,7 @@ import {
     Handshake,
     CheckCircle2,
     Sparkles,
+    BellDot,
 } from "lucide-react";
 import { problemLabels, type Problem } from "@/lib/csv";
 import { type BackendInterventionStatus } from "@/lib/api";
@@ -88,7 +89,7 @@ export const COLUMNS: ColumnDef[] = [
     {
         id: "new",
         title: "Mới",
-        icon: Sparkles,
+        icon: BellDot,
         accent: "text-red-600 dark:text-red-300",
         dotClass: "bg-red-500",
         containerTone: "bg-red-50/60 dark:bg-slate-900/40",
@@ -102,7 +103,7 @@ export const COLUMNS: ColumnDef[] = [
     },
     {
         id: "accepted",
-        title: "Accepted",
+        title: "Đã chấp nhận",
         icon: Sparkles,
         accent: "text-blue-600 dark:text-blue-300",
         dotClass: "bg-blue-500",
@@ -260,10 +261,9 @@ export function toBackendStatus(s: CaseStatus): BackendInterventionStatus {
  * column id. `none` and `expired` both fold into "new" — the PD should
  * see them together at the top of the funnel for re-engagement.
  */
-export function fromBackendStatus(s: BackendInterventionStatus): CaseStatus {
-    switch (s) {
-        case "accepted":
-            return "accepted";
+export function fromBackendStatus(s: BackendInterventionStatus | string | null | undefined): CaseStatus {
+    const status = (s || "none").toLowerCase();
+    switch (status) {
         case "sent":
             return "contacted";
         case "booked":
