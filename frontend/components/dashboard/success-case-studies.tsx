@@ -267,19 +267,20 @@ export function CaseStudyCard({ data: c }: { data: CaseStudy }) {
             {c.before}
           </span>
         </div>
-        <div className={cn("flex-1 self-center pb-1", a.line)}>
+        <div className={cn("relative flex-1 self-stretch", a.line)}>
           <svg
-            viewBox="0 0 120 36"
-            className="h-9 w-full"
+            className="absolute inset-0 h-full w-full"
+            viewBox="0 0 100 100"
             preserveAspectRatio="none"
             aria-hidden
           >
             <line
-              x1="0" y1="32" x2="116" y2="4"
+              x1="0" y1="90" x2="100" y2="10"
               stroke="currentColor" strokeWidth="1.5" opacity="0.45"
+              vectorEffect="non-scaling-stroke"
             />
-            <circle cx="116" cy="4" r="3.5" fill="currentColor" />
           </svg>
+          <span className="absolute right-0 top-2 size-2.5 rounded-full bg-current opacity-80" />
         </div>
         <div className="flex flex-col items-end">
           <span className={cn("mb-0.5 text-[11px]", a.metric)}>Sau</span>
