@@ -473,11 +473,14 @@ export function AlertCenter() {
                 return;
             }
             try {
-                // Ensure email record is in DRAFT status (UNAVAILABLE → DRAFT via PATCH)
-                await updateEmailDraft(caseId, {
-                    subject: emailSubject,
-                    body: emailBody,
-                });
+                // If no AI draft yet (UNAVAILABLE), PATCH sets content + status to DRAFT.
+                // Skip PATCH when draftBody already exists (email is already DRAFT from AI).
+                if (!a.draftBody) {
+                    await updateEmailDraft(caseId, {
+                        subject: emailSubject,
+                        body: emailBody,
+                    });
+                }
                 await sendNudge(caseId, { body: emailBody });
                 markRecentlyMoved(a.id, status);
                 setEmailTargetId(null);

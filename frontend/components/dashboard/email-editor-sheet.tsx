@@ -284,6 +284,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                         Đóng
                     </Button>
                     <Button
+                        disabled={isGenerating || !body.trim()}
                         className="h-11 rounded-xl bg-primary px-8 font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90"
                         onClick={() => {
                             if (!alert) return;
