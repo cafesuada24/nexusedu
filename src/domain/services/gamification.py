@@ -4,6 +4,7 @@ import datetime
 from enum import StrEnum
 
 from src.domain.value_objects.status import RiskStatus
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 
 class GamificationService:
@@ -39,6 +40,7 @@ class GamificationService:
         action_type: Action,
         recorded_dt: datetime.datetime | None,
         risk_level: RiskStatus = RiskStatus.UNKNOWN,
+        satisfaction: StudentSatisfaction | None = None,
     ) -> int:
         """Calculate points for an advisor action.
 
@@ -46,6 +48,7 @@ class GamificationService:
             action_type: The gamified action (e.g. 'draft_reviewed').
             recorded_dt: Timestamp of the student's last status recording.
             risk_level: The student's current risk status for weighting.
+            satisfaction: Student's satisfaction score for resolution actions.
 
         Returns:
             Calculated integer points after risk and SLA multipliers.
@@ -58,8 +61,21 @@ class GamificationService:
         risk_multiplier = self.RISK_MULTIPLIERS.get(risk_level, 0.3)
         points_after_risk = base_points * risk_multiplier
 
+        # Satisfaction multiplier for RESOLVE_CASE
+        satisfaction_multiplier = 1.0
+        if action_type == self.Action.RESOLVE_CASE and satisfaction:
+
+            satisfaction_map = {
+                StudentSatisfaction.VERY_GOOD: 1.5,
+                StudentSatisfaction.GOOD: 1.0,
+                StudentSatisfaction.NORMAL: 0.5,
+                StudentSatisfaction.BAD: 0.0,
+                StudentSatisfaction.VERY_BAD: 0.0,
+            }
+            satisfaction_multiplier = satisfaction_map.get(satisfaction, 1.0)
+
         if recorded_dt is None:
-            return int(points_after_risk)
+            return int(points_after_risk * satisfaction_multiplier)
 
         # Tiered SLA multiplier (12h / 24h / 72h)
         now = datetime.datetime.now(datetime.UTC)
@@ -77,7 +93,7 @@ class GamificationService:
         else:
             sla_multiplier = 0.8  # Penalty for taking longer than 72h
 
-        return int(points_after_risk * sla_multiplier)
+        return int(points_after_risk * sla_multiplier * satisfaction_multiplier)
 
     def check_badges(self, advisor_stats: dict) -> list[str]:
         """Check which badges the advisor qualifies for based on their stats.

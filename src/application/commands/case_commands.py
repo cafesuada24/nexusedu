@@ -10,6 +10,7 @@ from src.application.dtos.case_dtos import (
     ResolveCaseCommand,
     SendEmailCommand,
     StartSupportingCommand,
+    SubmitCaseReviewCommand,
     TriggerDraftCommand,
     TriggerDraftDTO,
     UpdateEmailCommand,
@@ -33,6 +34,7 @@ from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 
 class CaseCommandHandler:
@@ -278,7 +280,7 @@ class CaseCommandHandler:
         case.clear_events()
 
     async def handle_resolve_case(self, command: ResolveCaseCommand) -> None:
-        """Advisor marks the case as resolved."""
+        """Advisor marks the case as pending review."""
         advisor = await self.advisor_repo.find_by_user_id(command.user_id)
         if advisor is None:
             raise UserIsNotAnAdvisorError(command.user_id)
@@ -287,10 +289,34 @@ class CaseCommandHandler:
         if case.assigned_advisor_id != advisor.advisor_id:
             raise CaseNotFoundError(case_id=case.case_id)
 
-        case.resolve(datetime.now(UTC))
+        case.request_resolution(datetime.now(UTC))
 
         await self.case_repo.save(case)
 
         # Dispatch events via publisher
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
+
+    async def handle_submit_case_review(self, command: SubmitCaseReviewCommand) -> None:
+        """Finalize the case resolution based on student review."""
+        case = await self.case_repo.get_by_id(command.case_id)
+        if not case:
+            raise CaseNotFoundError(command.case_id)
+
+        is_failed = command.satisfaction in (
+            StudentSatisfaction.BAD,
+            StudentSatisfaction.VERY_BAD,
+        )
+
+        case.finalize_resolution(
+            datetime.now(UTC),
+            satisfaction=command.satisfaction,
+            comment=command.comment,
+            is_failed=is_failed,
+        )
+
+        await self.case_repo.save(case)
+
+        # Dispatch events via publisher (CaseResolvedEvent or CaseFailedEvent)
         await self.event_publisher.publish(case.domain_events)
         case.clear_events()
