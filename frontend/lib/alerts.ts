@@ -255,6 +255,9 @@ export function fromBackendStatus(s: BackendInterventionStatus | string | null |
         case "booked":
             return "scheduled";
         case "supporting":
+        case "awaiting_feedback":
+            // AWAITING_FEEDBACK giữ ở column "Đang hỗ trợ"; card dùng
+            // `interventionStatus` để hiển thị state "Chờ sinh viên đánh giá".
             return "in_progress";
         case "resolved":
             return "resolved";

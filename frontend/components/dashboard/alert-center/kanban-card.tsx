@@ -81,6 +81,9 @@ function KanbanCardInner({
 
     const isEmailSent =
         a.status === "accepted" && a.interventionStatus === "sent";
+    const isAwaitingFeedback =
+        a.status === "in_progress" &&
+        a.interventionStatus === "awaiting_feedback";
 
     return (
         <article
@@ -89,6 +92,8 @@ function KanbanCardInner({
                 isHighlighted && highlightTone,
                 isEmailSent &&
                     "border-success/40 bg-success/5 dark:border-success/40 dark:bg-success/10",
+                isAwaitingFeedback &&
+                    "border-amber-300/60 bg-amber-50/40 dark:border-amber-400/40 dark:bg-amber-500/10",
             )}
         >
             <div className="flex items-start gap-3">
@@ -220,6 +225,7 @@ function KanbanCardInner({
                 isAiDrafting={isAiDrafting}
                 isAcceptingCase={isAcceptingCase}
                 isEmailSent={isEmailSent}
+                isAwaitingFeedback={isAwaitingFeedback}
             />
         </article>
     );
@@ -239,6 +245,7 @@ function CardActions({
     isAiDrafting,
     isAcceptingCase,
     isEmailSent,
+    isAwaitingFeedback,
 }: {
     alert: Alert;
     onViewDetails: () => void;
@@ -251,6 +258,7 @@ function CardActions({
     isAiDrafting?: boolean;
     isAcceptingCase?: boolean;
     isEmailSent?: boolean;
+    isAwaitingFeedback?: boolean;
 }) {
     const hasGoals = a.goals.length > 0;
     const isActuallyDrafting = isAiDrafting || a.isGenerating;
@@ -343,6 +351,23 @@ function CardActions({
     }
 
     if (a.status === "in_progress") {
+        if (isAwaitingFeedback) {
+            return (
+                <div className="mt-3 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 px-3 py-2.5 dark:border-amber-400/40 dark:bg-amber-500/10">
+                        <Clock className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div className="min-w-0">
+                            <p className="text-[13px] font-medium text-amber-800 dark:text-amber-300">
+                                Chờ sinh viên đánh giá
+                            </p>
+                            <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70">
+                                Đã gửi yêu cầu · {relativeTime(a.movedAt)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="mt-3 flex items-center gap-2">
                 <Button
