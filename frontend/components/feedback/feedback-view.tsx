@@ -20,7 +20,23 @@ const RATING_LABELS = ["", "Không hài lòng", "Tạm được", "Ổn", "Hài 
 type Submitting = "none" | "resolved" | "unresolved"
 type Stage = "form" | "done_resolved" | "done_unresolved"
 
-export function FeedbackView({ caseId }: { caseId: string }) {
+function decodeToken(token: string): { case_id?: string } | null {
+  try {
+    const payload = token.split(".")[1]
+    const padded = payload
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(payload.length / 4) * 4, "=")
+    return JSON.parse(atob(padded))
+  } catch {
+    return null
+  }
+}
+
+export function FeedbackView({ token }: { token: string }) {
+  const claims = React.useMemo(() => decodeToken(token), [token])
+  const caseId = claims?.case_id ?? ""
+
   const [rating, setRating] = React.useState(0)
   const [hovered, setHovered] = React.useState(0)
   const [comment, setComment] = React.useState("")
@@ -32,6 +48,7 @@ export function FeedbackView({ caseId }: { caseId: string }) {
 
   const emit = (resolved: boolean) => {
     socket.emit("student_feedback", {
+      token,
       case_id: caseId,
       resolved,
       rating,
