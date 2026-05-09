@@ -14,11 +14,21 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { useSocket } from "@/hooks/use-socket"
+import { submitFeedback, type StudentSatisfaction } from "@/lib/api"
 
 const RATING_LABELS = ["", "Không hài lòng", "Tạm được", "Ổn", "Hài lòng", "Rất hài lòng"]
 
 type Submitting = "none" | "resolved" | "unresolved"
 type Stage = "form" | "done_resolved" | "done_unresolved"
+
+function toSatisfaction(rating: number, resolved: boolean): StudentSatisfaction {
+  if (!resolved) return "very_bad"
+  if (rating <= 1) return "very_bad"
+  if (rating === 2) return "bad"
+  if (rating === 3) return "normal"
+  if (rating === 4) return "good"
+  return "very_good"
+}
 
 function decodeToken(token: string): { case_id?: string } | null {
   try {
@@ -65,7 +75,7 @@ export function FeedbackView({ token }: { token: string }) {
     setSubmitting("resolved")
     try {
       emit(true)
-      // small UX delay so the button doesn't pop instantly
+      await submitFeedback(token, toSatisfaction(rating, true), comment.trim() || null)
       await new Promise((r) => setTimeout(r, 400))
       setStage("done_resolved")
     } catch {
@@ -82,6 +92,7 @@ export function FeedbackView({ token }: { token: string }) {
     setSubmitting("unresolved")
     try {
       emit(false)
+      await submitFeedback(token, toSatisfaction(0, false), comment.trim())
       await new Promise((r) => setTimeout(r, 400))
       setStage("done_unresolved")
     } catch {
