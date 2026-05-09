@@ -949,13 +949,13 @@ export async function fetchAdvisorsEngagement(): Promise<
 }
 
 /**
- * GET /advisors/me/profile — returns current user's advisor profile.
+ * GET /advisors/profile — returns current user's advisor profile.
  */
 export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint("/advisors/me/profile"),
+                endpoint("/advisors/profile"),
                 { method: "GET" },
                 signal,
             ),
@@ -993,7 +993,7 @@ export async function fetchAdvisorPoints(): Promise<AdvisorPoints> {
 }
 
 /**
- * PATCH /advisors/me/profile — updates current user's advisor profile.
+ * PATCH /advisors/profile — updates current user's advisor profile.
  */
 export async function updateAdvisorProfile(
     payload: AdvisorProfileUpdate,
@@ -1001,7 +1001,7 @@ export async function updateAdvisorProfile(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint("/advisors/me/profile"),
+                endpoint("/advisors/profile"),
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
