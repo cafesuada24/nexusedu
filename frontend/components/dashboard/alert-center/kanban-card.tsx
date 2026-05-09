@@ -328,7 +328,11 @@ function CardActions({
                     size="sm"
                     disabled={isAcceptingCase}
                     className="h-10 w-full rounded-lg text-sm font-medium"
-                    onClick={() => onMove("accepted", `Đã nhận ca của ${a.name}`)}
+                    onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn tiếp nhận ca của ${a.name}?`)) {
+                            onMove("accepted", `Đã nhận ca của ${a.name}`);
+                        }
+                    }}
                 >
                     {isAcceptingCase ? (
                         <>
@@ -398,7 +402,11 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() => onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)}
+                    onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn bắt đầu hỗ trợ ${a.name}?`)) {
+                            onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`);
+                        }
+                    }}
                 >
                     <Handshake className="size-4" />
                     Bắt đầu hỗ trợ
@@ -422,7 +430,11 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() => onMove("resolved", `Đã đóng case của ${a.name}`)}
+                    onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn giải quyết và đóng ca của ${a.name}?`)) {
+                            onMove("resolved", `Đã đóng case của ${a.name}`);
+                        }
+                    }}
                 >
                     <CheckCircle2 className="size-4" />
                     Giải quyết
