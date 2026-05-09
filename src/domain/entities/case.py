@@ -48,7 +48,7 @@ class Case:
     closed_at: datetime | None = None
     assigned_advisor_id: UUID | None = None
     version: int = field(default=0)
-    _domain_events: list[DomainEvent] = field(default_factory=list, init=False)
+    _domain_events: list[DomainEvent] = field(default_factory=list[DomainEvent], init=False)
 
     @property
     def domain_events(self) -> list[DomainEvent]:
@@ -119,6 +119,10 @@ class Case:
     def record_booking(self) -> None:
         """Student booked an appointment."""
         self._transition_to(InterventionStatus.BOOKED)
+
+    def start_supporting(self) -> None:
+        """Advisor starts supporting the student after they booked."""
+        self._transition_to(InterventionStatus.SUPPORTING)
 
     def resolve(self, occured_at: datetime) -> None:
         """Mark the case as resolved."""

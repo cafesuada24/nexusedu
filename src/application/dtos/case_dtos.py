@@ -67,6 +67,22 @@ class BookAppointmentCommand:
 
 
 @dataclass(frozen=True)
+class StartSupportingCommand:
+    """Command for an advisor to start supporting a case."""
+
+    case_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True)
+class ResolveCaseCommand:
+    """Command for an advisor to resolve a case."""
+
+    case_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True)
 class GetAssignedQuery:
     """Query to retrieve advisor task list."""
 
@@ -92,6 +108,13 @@ class TriggerDraftDTO(BaseModel):
     job_id: UUID
     status: JobStatus
     is_new_job: bool
+
+
+class ActionResponseDTO(BaseModel):
+    """Generic response for status updates and actions."""
+
+    status: str
+    message: str
 
 
 class QueryEmailDTO(BaseModel):
