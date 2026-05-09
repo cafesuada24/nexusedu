@@ -96,14 +96,9 @@ async def run_agent_task(
 async def run_dispatch_email_task(
     _: dict[str, Any],
     case_id: UUID,
-    header: str,
-    body: str,
-    target_email: str,
 ) -> None:
     """Worker task to send an email to the student."""
-    logger.info(f'Worker: Dispatching email for case {case_id} to {target_email}')
-    # Placeholder for actual external email service integration (e.g. SendGrid, AWS SES)
-    logger.info(f'Email body preview: {body[:50]}...')
+    logger.info(f'Worker: Dispatching intervention email for case {case_id} to {target_email}')
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -121,9 +116,9 @@ async def run_dispatch_email_task(
 
         # Send actual email
         await email_sending_service.send_email(
-            to_email=target_email,
-            subject=header,
-            body=body,
+            to_email=student.email,
+            subject=email.subject,
+            body=email.body,
         )
 
         student.last_notified_timestamp = datetime.now(UTC)
@@ -148,6 +143,29 @@ async def run_dispatch_email_task(
             earned_at=datetime.now(UTC),
         )
         await point_ledger_repo.save(ledger)
+        await session.commit()
+
+
+async def run_dispatch_review_email_task(
+    _: dict[str, Any],
+    case_id: UUID,
+    header: str,
+    body: str,
+    target_email: str,
+) -> None:
+    """Worker task to send a review email to the student."""
+    logger.info(f'Worker: Dispatching review email for case {case_id} to {target_email}')
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        email_sending_service = container.email_sending_service
+
+        # Send actual email
+        await email_sending_service.send_email(
+            to_email=target_email,
+            subject=header,
+            body=body,
+        )
         await session.commit()
 
 
@@ -378,7 +396,7 @@ async def run_case_review_requested_task(
         )
 
         await container.task_queue.enqueue(
-            'run_dispatch_email_task',
+            'run_dispatch_review_email_task',
             case_id=case_id,
             header='Review support',
             body=email_body,
@@ -430,6 +448,7 @@ class WorkerSettings:
         run_email_draft_task,
         run_agent_task,
         run_dispatch_email_task,
+        run_dispatch_review_email_task,
         run_evaluate_badges_task,
         run_case_accepted_task,
         run_student_booked_task,
