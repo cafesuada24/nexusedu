@@ -131,7 +131,7 @@ class CaseCommandHandler:
         )
         await self.job_repo.add(new_job)
 
-        booking_link = f'{config.frontend_url}/le-ha?cid={case.case_id}'
+        booking_link = f'{config.frontend_url}/booking/advisor?cid={case.case_id}'
         # 3. Queue the job
         await self.task_queue.enqueue(
             'run_email_draft_task',

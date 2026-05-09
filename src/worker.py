@@ -389,8 +389,7 @@ async def run_case_review_requested_task(
         )
 
         # 2. Dispatch email (Using existing email dispatch logic as base)
-        frontend_url = getattr(config, 'frontend_url', 'http://localhost:3000')
-        review_link = f'{frontend_url}/cases/review?token={token}'
+        review_link = config.review_url_template.format(token=token)
         email_body = (
             f'Hi {student.student_name},\n\n'
             f'Your advisor has marked your case as resolved. '
