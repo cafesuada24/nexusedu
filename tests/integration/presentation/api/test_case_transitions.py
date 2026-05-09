@@ -168,13 +168,14 @@ async def test_resolve_case_success(
     assert response.status_code == 200
     assert response.json() == {
         'status': 'success',
-        'message': 'Case resolved successfully',
+        'message': 'Resolution request sent to student',
     }
 
-    # Verify status changed in DB
+    # Check status in DB
     updated_case = await case_repository.get_by_id(cid)
-    assert updated_case.intervention_status == InterventionStatus.RESOLVED
-    assert updated_case.closed_at is not None
+    assert updated_case.intervention_status == InterventionStatus.PENDING_REVIEW
+
+    assert updated_case.closed_at is None
 
 @pytest.mark.asyncio
 async def test_book_appointment_case_not_found(client: TestClient) -> None:

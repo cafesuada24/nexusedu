@@ -10,6 +10,7 @@ from src.domain.value_objects.status import (
     JobStatus,
     RiskStatus,
 )
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 
 @dataclass
@@ -83,6 +84,15 @@ class ResolveCaseCommand:
 
 
 @dataclass(frozen=True)
+class SubmitCaseReviewCommand:
+    """Command to submit a student review and finalize the case."""
+
+    case_id: UUID
+    satisfaction: StudentSatisfaction
+    comment: str | None = None
+
+
+@dataclass(frozen=True)
 class GetAssignedQuery:
     """Query to retrieve advisor task list."""
 
@@ -115,6 +125,13 @@ class ActionResponseDTO(BaseModel):
 
     status: str
     message: str
+
+
+class ReviewCaseDTO(BaseModel):
+    """Schema for submitting a student review."""
+
+    satisfaction: StudentSatisfaction
+    comment: str | None = None
 
 
 class QueryEmailDTO(BaseModel):

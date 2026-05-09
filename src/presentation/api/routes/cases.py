@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
+import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 
 from src.application.commands.case_commands import (
@@ -11,6 +12,7 @@ from src.application.commands.case_commands import (
     BookAppointmentCommand,
     CaseCommandHandler,
     SendEmailCommand,
+    SubmitCaseReviewCommand,
     TriggerDraftCommand,
     UpdateEmailCommand,
 )
@@ -19,6 +21,7 @@ from src.application.dtos.case_dtos import (
     CaseDTO,
     QueryEmailDTO,
     ResolveCaseCommand,
+    ReviewCaseDTO,
     StartSupportingCommand,
     TriggerDraftDTO,
 )
@@ -27,6 +30,7 @@ from src.application.queries.case_queries import (
     GetAssignedQuery,
     GetUnassignedQuery,
 )
+from src.core.config import config
 from src.core.logger import logger
 from src.domain.exceptions import (
     CaseAlreadyAssignedError,
@@ -364,7 +368,7 @@ async def resolve_case(
         await command_handler.handle_resolve_case(command)
         return ActionResponseDTO(
             status='success',
-            message='Case resolved successfully',
+            message='Resolution request sent to student',
         )
     except (CaseNotFoundError, UserIsNotAnAdvisorError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -372,4 +376,41 @@ async def resolve_case(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f'Error in resolve_case: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/review')
+async def submit_case_review(
+    token: Annotated[str, Query(...)],
+    request: ReviewCaseDTO,
+    command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
+) -> ActionResponseDTO:
+    """Student submits a review for a case resolution."""
+    try:
+        # 1. Verify JWT token
+        payload = jwt.decode(token, config.jwt_secret, algorithms=['HS256'])
+        case_id = UUID(payload['case_id'])
+
+        # 2. Execute command
+        command = SubmitCaseReviewCommand(
+            case_id=case_id,
+            satisfaction=request.satisfaction,
+            comment=request.comment,
+        )
+        await command_handler.handle_submit_case_review(command)
+
+        return ActionResponseDTO(
+            status='success',
+            message='Review submitted successfully',
+        )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail='Token has expired') from None
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail='Invalid token') from None
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error in submit_case_review: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -6,7 +6,13 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.case_events import CaseAcceptedEvent
+from src.domain.events.case_events import (
+    CaseAcceptedEvent,
+    CaseFailedEvent,
+    CaseResolvedEvent,
+    CaseReviewRequestedEvent,
+    StudentBookedEvent,
+)
 from src.domain.exceptions import CaseAlreadyAssignedError, InvalidStateTransitionError
 from src.domain.value_objects.status import InterventionStatus
 
@@ -14,23 +20,27 @@ _INTERVENTION_STATUS_TRANSITION = {
     InterventionStatus.NEW: [InterventionStatus.ACCEPTED, InterventionStatus.DISMISSED],
     InterventionStatus.ACCEPTED: [
         InterventionStatus.SENT,
-        InterventionStatus.DISMISSED,
+        InterventionStatus.EXPIRED,
     ],
     InterventionStatus.SENT: [
         InterventionStatus.BOOKED,
         InterventionStatus.EXPIRED,
-        InterventionStatus.DISMISSED,
     ],
     InterventionStatus.BOOKED: [
         InterventionStatus.SUPPORTING,
-        InterventionStatus.DISMISSED,
+        InterventionStatus.EXPIRED,
     ],
     InterventionStatus.SUPPORTING: [
+        InterventionStatus.PENDING_REVIEW,
+        InterventionStatus.EXPIRED,
+    ],
+    InterventionStatus.PENDING_REVIEW: [
         InterventionStatus.RESOLVED,
-        InterventionStatus.DISMISSED,
+        InterventionStatus.FAILED,
     ],
     # Terminal states have no outgoing transitions
     InterventionStatus.RESOLVED: [],
+    InterventionStatus.FAILED: [],
     InterventionStatus.DISMISSED: [],
     InterventionStatus.EXPIRED: [],
 }
@@ -80,6 +90,7 @@ class Case:
             InterventionStatus.DISMISSED,
             InterventionStatus.EXPIRED,
             InterventionStatus.RESOLVED,
+            InterventionStatus.FAILED,
         )
 
     @property
@@ -119,15 +130,60 @@ class Case:
     def record_booking(self) -> None:
         """Student booked an appointment."""
         self._transition_to(InterventionStatus.BOOKED)
+        self.register_event(
+            StudentBookedEvent(
+                case_id=self.case_id,
+                occurred_at=datetime.now(UTC),
+            ),
+        )
 
     def start_supporting(self) -> None:
         """Advisor starts supporting the student after they booked."""
         self._transition_to(InterventionStatus.SUPPORTING)
 
-    def resolve(self, occured_at: datetime) -> None:
-        """Mark the case as resolved."""
-        self._transition_to(InterventionStatus.RESOLVED)
-        self.closed_at = occured_at
+    def request_resolution(self, occurred_at: datetime) -> None:
+        """Mark the case as pending review from the student."""
+        self._transition_to(InterventionStatus.PENDING_REVIEW)
+        self.register_event(
+            CaseReviewRequestedEvent(
+                case_id=self.case_id,
+                advisor_id=self.assigned_advisor_id,  # type: ignore
+                occurred_at=occurred_at,
+            ),
+        )
+
+    def finalize_resolution(
+        self,
+        occurred_at: datetime,
+        satisfaction: str | None = None,
+        comment: str | None = None,
+        is_failed: bool = False,
+    ) -> None:
+        """Mark the case as resolved or failed after review."""
+        next_status = InterventionStatus.FAILED if is_failed else InterventionStatus.RESOLVED
+        self._transition_to(next_status)
+        self.closed_at = occurred_at
+
+        if is_failed:
+            self.register_event(
+                CaseFailedEvent(
+                    case_id=self.case_id,
+                    advisor_id=self.assigned_advisor_id,  # type: ignore
+                    occurred_at=occurred_at,
+                    satisfaction=satisfaction,
+                    comment=comment,
+                ),
+            )
+        else:
+            self.register_event(
+                CaseResolvedEvent(
+                    case_id=self.case_id,
+                    advisor_id=self.assigned_advisor_id,  # type: ignore
+                    occurred_at=occurred_at,
+                    satisfaction=satisfaction,
+                    comment=comment,
+                ),
+            )
 
     def _transition_to(self, next_status: InterventionStatus) -> None:
         """The 'Bouncer' that enforces the matrix."""

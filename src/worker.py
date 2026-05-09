@@ -1,17 +1,22 @@
 """ARQ Worker for background job processing."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+import jwt
 from arq.connections import RedisSettings
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.application.commands.case_commands import GenerateEmailDraftCommand
+from src.application.commands.case_commands import (
+    GenerateEmailDraftCommand,
+    SubmitCaseReviewCommand,
+)
 from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
 from src.core.config import config
 from src.core.container import Container
 from src.core.logger import logger
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker, get_async_session
 
@@ -104,6 +109,7 @@ async def run_dispatch_email_task(
         case_repo = container.case_repo
         student_repo = container.student_repo
         email_repo = container.email_repo
+        email_sending_service = container.email_sending_service
         point_ledger_repo = container.point_ledger_repo
         gamification_service = container.gamification_service
 
@@ -111,6 +117,13 @@ async def run_dispatch_email_task(
         assert case.assigned_advisor_id is not None
         email = await email_repo.get_by_case(case_id)
         student = await student_repo.get_by_id(case.sid)
+
+        # Send actual email
+        await email_sending_service.send_email(
+            to_email=target_email,
+            subject=email.subject,
+            body=body,
+        )
 
         student.last_notified_timestamp = datetime.now(UTC)
         await student_repo.save(student=student)
@@ -195,7 +208,7 @@ async def run_case_accepted_task(
         gamification_service = container.gamification_service
         points = gamification_service.calculate_points(
             gamification_service.Action.ACCEPT_TASK,
-            occurred_at,
+            case.created_at,
             student.current_risk_status,
         )
 
@@ -212,6 +225,202 @@ async def run_case_accepted_task(
     logger.info(f'Worker: Finished CaseAcceptedEvent for case {case_id}')
 
 
+async def run_student_booked_task(
+    _: dict[Any, Any],
+    case_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    """Worker task to handle StudentBookedEvent."""
+    logger.info(f'Worker: Handling StudentBookedEvent for case {case_id}')
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        case_repo = container.case_repo
+        student_repo = container.student_repo
+        point_ledger_repo = container.point_ledger_repo
+
+        case = await case_repo.get_by_id(case_id)
+        assert case.assigned_advisor_id is not None
+        student = await student_repo.get_by_id(case.sid)
+
+        gamification_service = container.gamification_service
+        # For student booking, we bypass action time extra points as requested
+        points = gamification_service.calculate_points(
+            gamification_service.Action.STUDENT_BOOK,
+            None,
+            student.current_risk_status,
+        )
+
+        ledger = await point_ledger_repo.get_by_advisor_id(case.assigned_advisor_id)
+        ledger.award_points(
+            case_id=case_id,
+            action='student_booked',
+            points=points,
+            earned_at=occurred_at,
+        )
+        await point_ledger_repo.save(ledger)
+        await session.commit()
+
+    logger.info(f'Worker: Finished StudentBookedEvent for case {case_id}')
+
+
+async def run_case_resolved_task(
+    _: dict[Any, Any],
+    case_id: UUID,
+    advisor_id: UUID,
+    occurred_at: datetime,
+    satisfaction: StudentSatisfaction,
+    comment: str | None = None,
+) -> None:
+    """Worker task to handle CaseResolvedEvent."""
+    logger.info(
+        f'Worker: Handling CaseResolvedEvent for case {case_id} (Satisfaction: {satisfaction})',
+    )
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        case_repo = container.case_repo
+        student_repo = container.student_repo
+        point_ledger_repo = container.point_ledger_repo
+
+        case = await case_repo.get_by_id(case_id)
+        student = await student_repo.get_by_id(case.sid)
+
+        gamification_service = container.gamification_service
+        # For resolution, we measure from assignment time
+        points = gamification_service.calculate_points(
+            gamification_service.Action.RESOLVE_CASE,
+            case.assigned_at,
+            student.current_risk_status,
+            satisfaction=satisfaction,
+        )
+
+        ledger = await point_ledger_repo.get_by_advisor_id(advisor_id)
+        ledger.award_points(
+            case_id=case_id,
+            action='resolve_case',
+            points=points,
+            earned_at=occurred_at,
+        )
+        await point_ledger_repo.save(ledger)
+        await session.commit()
+
+    logger.info(f'Worker: Finished CaseResolvedEvent for case {case_id}')
+
+
+async def run_case_failed_task(
+    _: dict[Any, Any],
+    case_id: UUID,
+    advisor_id: UUID,
+    occurred_at: datetime,
+    satisfaction: str | None = None,
+    comment: str | None = None,
+) -> None:
+    """Worker task to handle CaseFailedEvent."""
+    logger.info(
+        f'Worker: Handling CaseFailedEvent for case {case_id} (Satisfaction: {satisfaction})',
+    )
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        point_ledger_repo = container.point_ledger_repo
+
+        # Per requirement, failed cases award 0 points
+        ledger = await point_ledger_repo.get_by_advisor_id(advisor_id)
+        ledger.award_points(
+            case_id=case_id,
+            action='resolve_case_failed',
+            points=0,
+            earned_at=occurred_at,
+        )
+        await point_ledger_repo.save(ledger)
+        await session.commit()
+
+    logger.info(f'Worker: Finished CaseFailedEvent for case {case_id}')
+
+
+async def run_case_review_requested_task(
+    ctx: dict[Any, Any],
+    case_id: UUID,
+    advisor_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    """Worker task to handle CaseReviewRequestedEvent."""
+    logger.info(f'Worker: Handling CaseReviewRequestedEvent for case {case_id}')
+
+    async for session in get_async_session():
+        container = Container(session=session, redis_pool=ctx.get('redis'))
+        case_repo = container.case_repo
+        student_repo = container.student_repo
+
+        case = await case_repo.get_by_id(case_id)
+        student = await student_repo.get_by_id(case.sid)
+
+        # 1. Generate JWT token
+        payload = {
+            'case_id': str(case_id),
+            'exp': datetime.now(UTC) + timedelta(days=7),
+            'iat': datetime.now(UTC),
+        }
+        token = jwt.encode(
+            payload, config.jwt_secret or 'insecure_default', algorithm='HS256'
+        )
+
+        # 2. Dispatch email (Using existing email dispatch logic as base)
+        frontend_url = getattr(config, 'frontend_url', 'http://localhost:3000')
+        review_link = f'{frontend_url}/cases/review?token={token}'
+        email_body = (
+            f'Hi {student.student_name},\n\n'
+            f'Your advisor has marked your case as resolved. '
+            f'Please take a moment to review the support you received: {review_link}\n\n'
+            f'Thank you!'
+        )
+
+        await container.task_queue.enqueue(
+            'run_dispatch_email_task',
+            case_id=case_id,
+            body=email_body,
+            target_email=student.email,
+        )
+
+        # 3. Schedule auto-resolution after 7 days
+        await container.task_queue.enqueue(
+            'run_auto_resolve_case_task',
+            case_id=case_id,
+            _defer_by=timedelta(days=7),
+        )
+
+    logger.info(f'Worker: Finished CaseReviewRequestedEvent for case {case_id}')
+
+
+async def run_auto_resolve_case_task(
+    _: dict[Any, Any],
+    case_id: UUID,
+) -> None:
+    """Task to auto-resolve a case if the student hasn't reviewed it after 7 days."""
+    logger.info(f'Worker: Running auto-resolve check for case {case_id}')
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        case_repo = container.case_repo
+        case = await case_repo.get_by_id(case_id)
+
+        if case.intervention_status == 'pending_review':
+            logger.info(f'Worker: Auto-resolving case {case_id}')
+            handler = container.get_case_command_handler()
+            command = SubmitCaseReviewCommand(
+                case_id=case_id,
+                satisfaction=StudentSatisfaction.NORMAL,
+                comment='Auto-resolved after 7 days.',
+            )
+            await handler.handle_submit_case_review(command)
+            await session.commit()
+        else:
+            logger.info(
+                f'Worker: Case {case_id} already finalized, skipping auto-resolve.'
+            )
+
+
 class WorkerSettings:
     """ARQ Worker configuration."""
 
@@ -221,6 +430,11 @@ class WorkerSettings:
         run_dispatch_email_task,
         run_evaluate_badges_task,
         run_case_accepted_task,
+        run_student_booked_task,
+        run_case_resolved_task,
+        run_case_failed_task,
+        run_case_review_requested_task,
+        run_auto_resolve_case_task,
     ]
     redis_settings = RedisSettings(
         host=config.redis_host,

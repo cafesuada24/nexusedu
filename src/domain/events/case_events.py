@@ -1,7 +1,6 @@
 """Case-related domain events."""
 
 from dataclasses import dataclass
-from datetime import datetime
 from uuid import UUID
 
 from src.domain.events.base import DomainEvent
@@ -13,4 +12,38 @@ class CaseAcceptedEvent(DomainEvent):
 
     case_id: UUID
     advisor_id: UUID
-    occurred_at: datetime
+
+
+@dataclass(frozen=True)
+class StudentBookedEvent(DomainEvent):
+    """Event triggered when a student books an appointment."""
+
+    case_id: UUID
+
+
+@dataclass(frozen=True)
+class CaseReviewRequestedEvent(DomainEvent):
+    """Event triggered when an advisor requests a case resolution, pending student review."""
+
+    case_id: UUID
+    advisor_id: UUID
+
+
+@dataclass(frozen=True)
+class CaseResolvedEvent(DomainEvent):
+    """Event triggered when a case is successfully resolved after review."""
+
+    case_id: UUID
+    advisor_id: UUID
+    satisfaction: str | None = None
+    comment: str | None = None
+
+
+@dataclass(frozen=True)
+class CaseFailedEvent(DomainEvent):
+    """Event triggered when a case resolution fails based on student review."""
+
+    case_id: UUID
+    advisor_id: UUID
+    satisfaction: str | None = None
+    comment: str | None = None
