@@ -60,6 +60,13 @@ class UpdateEmailCommand:
 
 
 @dataclass(frozen=True)
+class BookAppointmentCommand:
+    """Command to record a student booking an appointment."""
+
+    case_id: UUID
+
+
+@dataclass(frozen=True)
 class GetAssignedQuery:
     """Query to retrieve advisor task list."""
 

@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
+    BookAppointmentCommand,
     GenerateEmailDraftCommand,
     SendEmailCommand,
     TriggerDraftCommand,
@@ -12,6 +13,7 @@ from src.application.dtos.case_dtos import (
     UpdateEmailCommand,
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
+from src.application.interfaces.event_publisher import EventPublisher
 from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
@@ -24,14 +26,11 @@ from src.domain.exceptions import (
     UserIsNotAnAdvisorError,
 )
 from src.domain.repositories.advisor_repository import AdvisorRepository
-from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
-from src.domain.repositories.point_ledger_repository import PointLedgerRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.email_drafting import EmailDraftingService
-from src.domain.services.gamification import GamificationService
 
 
 class CaseCommandHandler:
@@ -44,11 +43,9 @@ class CaseCommandHandler:
         case_repo: CaseRepository,
         advisor_repo: AdvisorRepository,
         job_repo: JobRepository,
-        gamification_service: GamificationService,
         task_queue: BackgroundTaskQueue,
-        point_ledger_repo: PointLedgerRepository,
+        event_publisher: EventPublisher,
         email_drafting_service: EmailDraftingService,
-        badge_repo: BadgeRepository | None = None,
     ) -> None:
         """Initialize the handler with required dependencies."""
         self.student_repo = student_repo
@@ -56,11 +53,9 @@ class CaseCommandHandler:
         self.case_repo = case_repo
         self.advisor_repo = advisor_repo
         self.job_repo = job_repo
-        self.__point_ledger_repo = point_ledger_repo
-        self.gamification_service = gamification_service
         self.email_drafting_service = email_drafting_service
         self.task_queue = task_queue
-        self.badge_repo = badge_repo
+        self.event_publisher = event_publisher
 
     async def handle_accept_case(self, command: AcceptCaseCommand) -> None:
         """Try assign a case to an advisor."""
@@ -74,22 +69,9 @@ class CaseCommandHandler:
 
         await self.case_repo.save(case)
 
-        student = await self.student_repo.get_by_id(case.sid)
-
-        points = self.gamification_service.calculate_points(
-            GamificationService.Action.ACCEPT_TASK,
-            case.assigned_at,
-            student.current_risk_status,
-        )
-
-        ledger = await self.__point_ledger_repo.get_by_advisor_id(advisor.advisor_id)
-        ledger.award_points(
-            case_id=case.case_id,
-            action='accept_case',
-            points=points,
-            earned_at=datetime.now(UTC),
-        )
-        await self.__point_ledger_repo.save(ledger)
+        # Dispatch events via publisher
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
 
         new_email = InterventionEmail(case_id=case.case_id)
         await self.email_repo.add(new_email)
@@ -260,3 +242,17 @@ class CaseCommandHandler:
             personalized_body,
         )
         await self.email_repo.save(email)
+
+    async def handle_book_appointment(self, command: BookAppointmentCommand) -> None:
+        """Record that a student has booked an appointment for their case."""
+        case = await self.case_repo.get_by_id(command.case_id)
+        if not case:
+            raise CaseNotFoundError(command.case_id)
+
+        case.record_booking()
+
+        await self.case_repo.save(case)
+
+        # Dispatch events via publisher
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
