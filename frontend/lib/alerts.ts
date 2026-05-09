@@ -151,7 +151,7 @@ export const COLUMNS: ColumnDef[] = [
     },
     {
         id: "resolved",
-        title: "Đã giải quyết",
+        title: "Đã hoàn thành",
         icon: CheckCircle2,
         accent: "text-success dark:text-emerald-300",
         dotClass: "bg-success",
@@ -257,10 +257,13 @@ export function fromBackendStatus(s: BackendInterventionStatus | string | null |
         case "booked":
             return "scheduled";
         case "supporting":
-        case "awaiting_feedback":
-            // AWAITING_FEEDBACK giữ ở column "Đang hỗ trợ"; card dùng
-            // `interventionStatus` để hiển thị state "Chờ sinh viên đánh giá".
             return "in_progress";
+        case "awaiting_feedback":
+            // Sau khi advisor click "Giải quyết", card chuyển ngay sang column
+            // "Đã hoàn thành" với indicator "Chờ sinh viên xác nhận"; khi
+            // sinh viên feedback xong, override được clear và BE chính thức
+            // báo "resolved" → card chuyển sang trạng thái xanh.
+            return "resolved";
         case "resolved":
             return "resolved";
         case "notified":
