@@ -23,6 +23,7 @@ from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
 from src.application.services.event_publisher import TaskQueueEventPublisher
+from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.badge_repository import BadgeRepository
@@ -38,8 +39,10 @@ from src.domain.repositories.status_history_repository import StatusHistoryRepos
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
+from src.domain.services.email_sending import EmailSendingService
 from src.domain.services.gamification import GamificationService
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
+from src.infrastructure.extern.email_sender import AioSmtpEmailSender
 from src.infrastructure.persistence.query_services.advisor_metrics_query_service import (
     SqlAlchemyAdvisorMetricsQueryService,
 )
@@ -145,6 +148,16 @@ class Container:
     @cached_property
     def gamification_service(self) -> GamificationService:
         return GamificationService()
+
+    @cached_property
+    def email_sending_service(self) -> EmailSendingService:
+        return AioSmtpEmailSender(
+            host=config.smtp_host,
+            port=config.smtp_port,
+            user=config.smtp_user,
+            password=config.smtp_password,
+            from_email=config.smtp_from_email,
+        )
 
     @cached_property
     def anomaly_engine(self) -> AnomalyEngine:

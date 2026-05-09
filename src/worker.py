@@ -109,6 +109,7 @@ async def run_dispatch_email_task(
         case_repo = container.case_repo
         student_repo = container.student_repo
         email_repo = container.email_repo
+        email_sending_service = container.email_sending_service
         point_ledger_repo = container.point_ledger_repo
         gamification_service = container.gamification_service
 
@@ -116,6 +117,13 @@ async def run_dispatch_email_task(
         assert case.assigned_advisor_id is not None
         email = await email_repo.get_by_case(case_id)
         student = await student_repo.get_by_id(case.sid)
+
+        # Send actual email
+        await email_sending_service.send_email(
+            to_email=target_email,
+            subject=email.subject,
+            body=body,
+        )
 
         student.last_notified_timestamp = datetime.now(UTC)
         await student_repo.save(student=student)
@@ -354,7 +362,9 @@ async def run_case_review_requested_task(
             'exp': datetime.now(UTC) + timedelta(days=7),
             'iat': datetime.now(UTC),
         }
-        token = jwt.encode(payload, config.jwt_secret or 'insecure_default', algorithm='HS256')
+        token = jwt.encode(
+            payload, config.jwt_secret or 'insecure_default', algorithm='HS256'
+        )
 
         # 2. Dispatch email (Using existing email dispatch logic as base)
         frontend_url = getattr(config, 'frontend_url', 'http://localhost:3000')
@@ -406,7 +416,9 @@ async def run_auto_resolve_case_task(
             await handler.handle_submit_case_review(command)
             await session.commit()
         else:
-            logger.info(f'Worker: Case {case_id} already finalized, skipping auto-resolve.')
+            logger.info(
+                f'Worker: Case {case_id} already finalized, skipping auto-resolve.'
+            )
 
 
 class WorkerSettings:

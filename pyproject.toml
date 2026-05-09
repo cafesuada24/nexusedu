@@ -31,6 +31,7 @@ dependencies = [
     "pydantic-extra-types>=2.11.1",
     "phonenumbers>=9.0.29",
     "pyjwt>=2.12.1",
+    "aiosmtplib>=5.1.0",
 ]
 # dependencies = []
 
