@@ -12,10 +12,10 @@ from src.application.dtos.case_dtos import (
     UpdateEmailCommand,
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
+from src.application.interfaces.event_publisher import EventPublisher
 from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
-from src.domain.events.case_events import CaseAcceptedEvent
 from src.domain.exceptions import (
     CaseAlreadyClosedError,
     CaseNotFoundError,
@@ -43,6 +43,7 @@ class CaseCommandHandler:
         advisor_repo: AdvisorRepository,
         job_repo: JobRepository,
         task_queue: BackgroundTaskQueue,
+        event_publisher: EventPublisher,
         email_drafting_service: EmailDraftingService,
     ) -> None:
         """Initialize the handler with required dependencies."""
@@ -53,6 +54,7 @@ class CaseCommandHandler:
         self.job_repo = job_repo
         self.email_drafting_service = email_drafting_service
         self.task_queue = task_queue
+        self.event_publisher = event_publisher
 
     async def handle_accept_case(self, command: AcceptCaseCommand) -> None:
         """Try assign a case to an advisor."""
@@ -66,16 +68,8 @@ class CaseCommandHandler:
 
         await self.case_repo.save(case)
 
-        # Dispatch events
-        for event in case.domain_events:
-            if isinstance(event, CaseAcceptedEvent):
-                await self.task_queue.enqueue(
-                    'run_case_accepted_task',
-                    case_id=event.case_id,
-                    advisor_id=event.advisor_id,
-                    occurred_at=event.occurred_at,
-                )
-
+        # Dispatch events via publisher
+        await self.event_publisher.publish(case.domain_events)
         case.clear_events()
 
         new_email = InterventionEmail(case_id=case.case_id)

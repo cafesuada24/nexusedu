@@ -22,6 +22,8 @@ from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
+from src.application.services.event_publisher import TaskQueueEventPublisher
+from src.core.container import Container
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.badge_repository import BadgeRepository
@@ -36,124 +38,113 @@ from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
-from src.domain.services.anomaly_engine.zscore import ZScore
 from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
-from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
-from src.infrastructure.persistence.query_services.advisor_metrics_query_service import (
-    SqlAlchemyAdvisorMetricsQueryService,
-)
-from src.infrastructure.persistence.query_services.case_query_service import (
-    SqlAlchemyCaseQueryService,
-)
-from src.infrastructure.persistence.query_services.gamification_query_service import (
-    SqlAlchemyGamificationQueryService,
-)
-from src.infrastructure.persistence.query_services.point_ledger_query_service import (
-    SqlAlchemyPointLedgerQueryService,
-)
-from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
-    SqlAlchemyActivityRepository,
-    SqlAlchemyAdvisorRepository,
-    SqlAlchemyBadgeRepository,
-    SqlAlchemyCaseRepository,
-    SqlAlchemyEmailRepository,
-    SqlAlchemyIdempotencyRepository,
-    SqlAlchemyJobRepository,
-    SqlAlchemyMetadataRepository,
-    SqlAlchemyMetricsRepository,
-    SqlAlchemyPointLedgerRepository,
-    SqlAlchemyStatusHistoryRepository,
-    SqlAlchemyStudentRepository,
-    SqlAlchemyUserSettingsRepository,
-)
-from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
+
+
+async def get_container(
+    session: Annotated[AsyncSession, Depends(get_async_session)],
+    request: Request,
+) -> Container:
+    """Dependency provider for the DI Container."""
+    app_state = getattr(request.app.state, 'app_state', None)
+    redis_pool = getattr(app_state, 'arq_pool', None) if app_state else None
+    agent = getattr(app_state, 'agent', None) if app_state else None
+
+    return Container(session=session, redis_pool=redis_pool, agent=agent)
 
 
 # Repository Providers
 async def get_student_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> StudentRepository:
     """Dependency provider for the StudentRepository."""
-    return SqlAlchemyStudentRepository(session)
+    return container.student_repo
 
 
 async def get_advisor_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> AdvisorRepository:
     """Dependency provider for the AdvisorRepository."""
-    return SqlAlchemyAdvisorRepository(session)
+    return container.advisor_repo
 
 
 async def get_idempotency_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> IdempotencyRepository:
     """Dependency provider for the IdempotencyRepository."""
-    return SqlAlchemyIdempotencyRepository(session)
+    return container.idempotency_repo
 
 
 async def get_email_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> EmailRepository:
     """Dependency provider for the EmailRepository."""
-    return SqlAlchemyEmailRepository(session)
+    return container.email_repo
 
 
 async def get_case_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> CaseRepository:
     """Dependency provider for the CaseRepository."""
-    return SqlAlchemyCaseRepository(session)
+    return container.case_repo
 
 
 async def get_activity_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> ActivityRepository:
     """Dependency provider for the ActivityRepository."""
-    return SqlAlchemyActivityRepository(session)
+    return container.activity_repo
 
 
 async def get_status_history_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> StatusHistoryRepository:
     """Dependency provider for the StatusHistoryRepository."""
-    return SqlAlchemyStatusHistoryRepository(session)
+    return container.status_history_repo
 
 
 async def get_metrics_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> MetricsRepository:
     """Dependency provider for the MetricsRepository."""
-    return SqlAlchemyMetricsRepository(session)
+    return container.metrics_repo
 
 
 async def get_metadata_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> MetadataRepository:
     """Dependency provider for the MetadataRepository."""
-    return SqlAlchemyMetadataRepository(session)
+    return container.metadata_repo
 
 
 async def get_job_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> JobRepository:
     """Dependency provider for the JobRepository."""
-    return SqlAlchemyJobRepository(session)
+    return container.job_repo
 
 
 async def get_user_settings_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> UserSettingsRepository:
     """Dependency provider for the UserSettingsRepository."""
-    return SqlAlchemyUserSettingsRepository(session)
+    return container.user_settings_repo
 
 
 async def get_point_ledger_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> PointLedgerRepository:
     """Dependency provider for the PointLedgerRepository."""
-    return SqlAlchemyPointLedgerRepository(session)
+    return container.point_ledger_repo
+
+
+async def get_badge_repository(
+    container: Annotated[Container, Depends(get_container)],
+) -> BadgeRepository:
+    """Dependency provider for the BadgeRepository."""
+    return container.badge_repo
 
 
 # Service Providers
@@ -163,185 +154,92 @@ def get_arq_pool(request: Request) -> ArqRedis:
     return state.arq_pool
 
 
-async def get_gamification_service() -> GamificationService:
+async def get_gamification_service(
+    container: Annotated[Container, Depends(get_container)],
+) -> GamificationService:
     """Dependency provider for the GamificationService."""
-    return GamificationService()
+    return container.gamification_service
 
 
-async def get_anomaly_engine() -> AnomalyEngine:
+async def get_anomaly_engine(
+    container: Annotated[Container, Depends(get_container)],
+) -> AnomalyEngine:
     """Dependency provider for the AnomalyEngine."""
-    return ZScore()
-
-
-async def get_badge_repository(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-) -> BadgeRepository:
-    """Dependency provider for the BadgeRepository."""
-    return SqlAlchemyBadgeRepository(session)
-
-
-# async def get_alert_command_handler(
-#     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-#     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
-#     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-#     alert_repo: Annotated[AlertRepository, Depends(get_alert_repository)],
-#     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-#     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
-#     gamification_service: Annotated[
-#         GamificationService, Depends(get_gamification_service),
-#     ],
-#     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
-#     badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
-# ) -> AlertCommandHandler:
-#     """Dependency provider for the AlertCommandHandler."""
-#     task_queue = ArqTaskQueueAdapter(arq_pool)
-#     return AlertCommandHandler(
-#         student_repo,
-#         email_repo,
-#         case_repo,
-#         alert_repo,
-#         advisor_repo,
-#         job_repo,
-#         gamification_service,
-#         task_queue,
-#         email_drafting_service=BamlEmailDraftingService(),
-#         badge_repo=badge_repo,
-#     )
+    return container.anomaly_engine
 
 
 async def get_point_ledger_query_service(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> PointLedgerQueryService:
-    return SqlAlchemyPointLedgerQueryService(session=session)
+    return container.point_ledger_query_service
 
 
 async def get_gamification_query_service(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> GamificationQueryService:
-    return SqlAlchemyGamificationQueryService(session=session)
+    return container.gamification_query_service
 
 
 async def get_advisor_metrics_query_service(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> AdvisorMetricsQueryService:
-    return SqlAlchemyAdvisorMetricsQueryService(session=session)
+    return container.advisor_metrics_query_service
 
 
 async def get_case_query_service(
-    session: Annotated[AsyncSession, Depends(get_async_session)],
-    gamification_service: Annotated[
-        GamificationService,
-        Depends(get_gamification_service),
-    ],
+    container: Annotated[Container, Depends(get_container)],
 ) -> CaseQueryService:
     """Dependency provider for the CaseQueryService."""
-    return SqlAlchemyCaseQueryService(
-        session=session,
-        gamification_service=gamification_service,
-    )
+    return container.case_query_service
+
+
+async def get_event_publisher(
+    container: Annotated[Container, Depends(get_container)],
+) -> TaskQueueEventPublisher:
+    """Dependency provider for the EventPublisher."""
+    return container.event_publisher
 
 
 async def get_case_command_handler(
-    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
-    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
-    arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
-    task_queue = ArqTaskQueueAdapter(arq_pool)
-    return CaseCommandHandler(
-        student_repo,
-        email_repo,
-        case_repo,
-        advisor_repo,
-        job_repo,
-        task_queue,
-        email_drafting_service=BamlEmailDraftingService(),
-    )
+    return container.get_case_command_handler()
 
 
 async def get_advisor_query_handler(
-    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    point_ledger_query_service: Annotated[
-        PointLedgerQueryService,
-        Depends(get_point_ledger_query_service),
-    ],
-    gamification_query_service: Annotated[
-        GamificationQueryService,
-        Depends(get_gamification_query_service),
-    ],
-    advisor_metrics_query_service: Annotated[
-        AdvisorMetricsQueryService,
-        Depends(get_advisor_metrics_query_service),
-    ],
+    container: Annotated[Container, Depends(get_container)],
 ) -> AdvisorQueryHandler:
     """Dependency provider for the AdvisorQueryHandler."""
-    return AdvisorQueryHandler(
-        advisor_repo=advisor_repo,
-        point_ledger_query_service=point_ledger_query_service,
-        gamification_query_service=gamification_query_service,
-        advisor_metrics_query_service=advisor_metrics_query_service,
-    )
+    return container.get_advisor_query_handler()
 
 
 async def get_case_query_handler(
-    case_query_service: Annotated[CaseQueryService, Depends(get_case_query_service)],
-    advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
-    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-    email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> CaseQueryHandler:
     """Dependency provider for the CaseQueryHandler."""
-    return CaseQueryHandler(
-        case_query_service=case_query_service,
-        advisor_repo=advisor_repo,
-        case_repo=case_repo,
-        email_repo=email_repo,
-        student_repo=student_repo,
-    )
+    return container.get_case_query_handler()
 
 
 async def get_data_command_handler(
-    student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
-    activity_repo: Annotated[ActivityRepository, Depends(get_activity_repository)],
-    history_repo: Annotated[
-        StatusHistoryRepository,
-        Depends(get_status_history_repository),
-    ],
-    case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
-    job_repo: Annotated[JobRepository, Depends(get_job_repository)],
-    anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
-    case_command_handler: Annotated[
-        CaseCommandHandler,
-        Depends(get_case_command_handler),
-    ],
+    container: Annotated[Container, Depends(get_container)],
 ) -> DataCommandHandler:
     """Dependency provider for the DataCommandHandler."""
-    return DataCommandHandler(
-        student_repo,
-        activity_repo,
-        history_repo,
-        case_repo,
-        job_repo,
-        anomaly_engine,
-        case_command_handler,
-    )
+    return container.get_data_command_handler()
 
 
 async def get_metrics_query_handler(
-    metrics_repo: Annotated[MetricsRepository, Depends(get_metrics_repository)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> MetricsQueryHandler:
     """Dependency provider for the MetricsQueryHandler."""
-    return MetricsQueryHandler(metrics_repo)
+    return container.get_metrics_query_handler()
 
 
 async def get_agent_metadata_service(
-    metadata_repo: Annotated[MetadataRepository, Depends(get_metadata_repository)],
+    container: Annotated[Container, Depends(get_container)],
 ) -> AgentMetadataService:
     """Dependency provider for the AgentMetadataService."""
-    return AgentMetadataService(metadata_repo)
+    return container.agent_metadata_service
 
 
 def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentState]:
@@ -351,18 +249,7 @@ def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentStat
 
 
 async def get_agent_command_handler(
-    agent: Annotated[
-        CompiledStateGraph[AgentState, Any, AgentState],
-        Depends(get_agent),
-    ],
-    metadata_service: Annotated[
-        AgentMetadataService,
-        Depends(get_agent_metadata_service),
-    ],
-    idempotency_repo: Annotated[
-        IdempotencyRepository,
-        Depends(get_idempotency_repository),
-    ],
+    container: Annotated[Container, Depends(get_container)],
 ) -> AgentCommandHandler:
     """Dependency provider for the AgentCommandHandler."""
-    return AgentCommandHandler(agent, metadata_service, idempotency_repo)
+    return container.get_agent_command_handler()

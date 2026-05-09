@@ -5,7 +5,6 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from src.application.commands.case_commands import CaseCommandHandler
 from src.application.dtos.data_dtos import DataIngestionCommand
 from src.core.logger import logger
 from src.domain.entities.case import Case
@@ -29,7 +28,6 @@ class DataCommandHandler:
         case_repo: CaseRepository,
         job_repo: JobRepository,
         anomaly_engine: AnomalyEngine,
-        case_command_handler: CaseCommandHandler,
     ):
         self.student_repo = student_repo
         self.activity_repo = activity_repo
@@ -37,7 +35,6 @@ class DataCommandHandler:
         self.case_repo = case_repo
         self.job_repo = job_repo
         self.anomaly_engine = anomaly_engine
-        self.case_command_handler = case_command_handler
 
     async def handle_ingest_data(self, command: DataIngestionCommand) -> Mapping[str, Any]:
         """Execute the data ingestion command with orchestration."""
@@ -57,17 +54,9 @@ class DataCommandHandler:
             f'Anomaly engine execution completed. Found {len(new_sids)} new transitions.',
         )
 
-        # Trigger automatic draft generation for new at-risk students
-        triggered_jobs: list[dict[str, Any]] = []
-        db_updates: list[tuple[UUID, str, UUID | None, str | None]] = []
-
-        if db_updates:
-            await self.job_repo.batch_create_jobs(db_updates)
-
         return {
             'results': results,
             'new_sids': new_sids,
-            'triggered_jobs': triggered_jobs,
         }
 
     async def _run_anomaly_detection(self) -> list[tuple[UUID, UUID]]:
