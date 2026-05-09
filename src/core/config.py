@@ -2,8 +2,11 @@
 
 from typing import Annotated, Literal
 
+from dotenv import load_dotenv
 from pydantic import Field, PositiveInt, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+load_dotenv()
 
 
 class Config(BaseSettings):
@@ -12,7 +15,7 @@ class Config(BaseSettings):
     environment: Literal['production', 'development', 'test'] = 'development'
     log_level: Literal['INFO', 'WARNING', 'ERROR', 'DEBUG'] = 'DEBUG'
     jwt_secret: str = 'PLEASE_SET_ME_IN_PRODUCTION'
-    database_url: str = 'sqlite+aiosqlite:///./data/app.db'
+    database_url: str = 'sqlite+aiosqlite:///./data/app.d'
     pg_dsn: PostgresDsn | None = None
     motherduck_token: str | None = None
     db_ingest_chunk_size: PositiveInt = 50
@@ -35,8 +38,8 @@ class Config(BaseSettings):
 
 
     model_config = SettingsConfigDict(
-        env_file='.env',
-        env_file_encoding='utf-8',
+        # env_file='.env',
+        # env_file_encoding='utf-8',
         extra='ignore',
     )
 

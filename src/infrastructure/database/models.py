@@ -15,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     String,
     Table,
@@ -30,6 +31,7 @@ from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
     JobStatus,
+    OutboxStatus,
 )
 
 
@@ -438,3 +440,32 @@ class BackgroundJobTracker(Base):
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     # Correlation to connect jobs with other entities (e.g., cases, students)
+
+
+class OutboxEvent(Base):
+    """Reliable storage for background tasks to ensure atomic consistency."""
+
+    __tablename__ = 'outbox_events'
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    task_name: Mapped[str] = mapped_column(String, nullable=False)
+    payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    status: Mapped[OutboxStatus] = mapped_column(
+        Enum(OutboxStatus),
+        default=OutboxStatus.PENDING,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime,
+        nullable=True,
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
