@@ -3,7 +3,6 @@ import {
     GraduationCap,
     BookOpen,
     TrendingDown,
-    Send,
     CalendarCheck,
     Handshake,
     CheckCircle2,
@@ -17,7 +16,6 @@ import { type Goal } from "@/components/dashboard/goals-dialog";
 export type CaseStatus =
     | "new"
     | "accepted"
-    | "contacted"
     | "scheduled"
     | "in_progress"
     | "resolved";
@@ -43,6 +41,9 @@ export type Alert = {
     draftBody?: string | null;
     isGenerating?: boolean;
     activeCaseId?: string | null;
+    /** Raw backend intervention status (e.g. "sent", "booked"). Used to
+     *  distinguish SENT (email đã gửi) from ACCEPTED inside the same column. */
+    interventionStatus?: string | null;
     /** Thời gian cuộc hẹn (Unix seconds) — chỉ có khi đã đặt hẹn. */
     appointmentAt: number | null;
     /** Danh sách mục tiêu can thiệp. */
@@ -115,21 +116,6 @@ export const COLUMNS: ColumnDef[] = [
             "border-blue-300 bg-blue-50/60 ring-1 ring-blue-200/70 shadow-[0_10px_24px_-16px_rgba(37,99,235,0.6)] dark:border-blue-400/45 dark:bg-blue-500/10 dark:ring-blue-400/30",
         columnHighlightTone:
             "ring-2 ring-blue-200/80 shadow-[0_0_0_1px_rgba(96,165,250,0.2)] dark:ring-blue-400/35 dark:shadow-[0_0_0_1px_rgba(96,165,250,0.16)]",
-    },
-    {
-        id: "contacted",
-        title: "Đã liên hệ",
-        icon: Send,
-        accent: "text-amber-600 dark:text-amber-300",
-        dotClass: "bg-amber-500",
-        containerTone: "bg-amber-50/60 dark:bg-slate-900/40",
-        headerTone: "bg-amber-50/85",
-        topBorderTone: "border-t-amber-500",
-        iconContainerTone: "bg-amber-100 ring-amber-200/70 dark:bg-amber-500/10 dark:ring-amber-400/30",
-        cardHighlightTone:
-            "border-amber-300 bg-amber-50/60 ring-1 ring-amber-200/70 shadow-[0_10px_24px_-16px_rgba(217,119,6,0.58)] dark:border-amber-400/45 dark:bg-amber-500/10 dark:ring-amber-400/30",
-        columnHighlightTone:
-            "ring-2 ring-amber-200/80 shadow-[0_0_0_1px_rgba(251,191,36,0.2)] dark:ring-amber-400/35 dark:shadow-[0_0_0_1px_rgba(251,191,36,0.16)]",
     },
     {
         id: "scheduled",
@@ -245,8 +231,6 @@ export function toBackendStatus(s: CaseStatus): BackendInterventionStatus {
             return "notified";
         case "accepted":
             return "notified";
-        case "contacted":
-            return "sent";
         case "scheduled":
             return "booked";
         case "in_progress":
@@ -265,7 +249,9 @@ export function fromBackendStatus(s: BackendInterventionStatus | string | null |
     const status = (s || "none").toLowerCase();
     switch (status) {
         case "sent":
-            return "contacted";
+            // Email đã gửi nhưng chưa đặt lịch — vẫn coi là "Đã chấp nhận"
+            // (card sẽ hiển thị indicator riêng để phân biệt với accepted thuần).
+            return "accepted";
         case "booked":
             return "scheduled";
         case "supporting":

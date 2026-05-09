@@ -12,6 +12,7 @@ import {
     LineChart,
     Sparkles,
     Users,
+    ClipboardList,
 } from "lucide-react";
 import {
     Sidebar,
@@ -31,6 +32,18 @@ const baseMainNav: NavItem[] = [
         href: "/dashboard",
         label: "Tổng quan",
         icon: LayoutDashboard,
+        tone: "primary",
+    },
+    {
+        href: "/dashboard/alerts",
+        label: "Trung tâm cảnh báo",
+        icon: BellRing,
+        tone: "destructive",
+    },
+    {
+        href: "/dashboard/cases",
+        label: "Quản lý case",
+        icon: ClipboardList,
         tone: "primary",
     },
     {
@@ -84,9 +97,12 @@ export function AppSidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
     const isAdmin = user?.role === "admin";
+    const isAdvisor = user?.role === "advisor";
     const mainNav = baseMainNav.filter((item) => {
         if (item.href === "/dashboard/import") return isAdmin;
         if (item.href === "/dashboard/advisors") return isAdmin;
+        if (item.href === "/dashboard/cases") return isAdmin;
+        if (item.href === "/dashboard/alerts") return isAdvisor;
         return true;
     });
 

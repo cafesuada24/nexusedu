@@ -6,6 +6,7 @@ import {
     Sparkles,
     Send,
     RotateCcw,
+    Loader2,
     CalendarDays,
     ExternalLink,
     Mail,
@@ -36,15 +37,17 @@ type Props = {
     alert: Alert | null;
     onClose: () => void;
     onSave: (a: Alert) => void;
+    onGenerateDraft: () => void;
+    isAiDrafting?: boolean;
 };
 
-export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
-    // Only poll for draft status while there's an active case.
+export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAiDrafting }: Props) {
+    // Poll draft status using caseId (activeCaseId is not populated in alert mapping).
     const {
         data: draft,
         isFetching,
         isError,
-    } = useDraftStatus(alert?.activeCaseId);
+    } = useDraftStatus(alert?.caseId);
     const [subject, setSubject] = React.useState("");
     const [body, setBody] = React.useState("");
 
@@ -76,16 +79,17 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
         }
     };
 
+    // Prefer the 5s draft poll over the stale 10s alert poll for generating state.
     const isGenerating =
-        alert?.isGenerating ||
-        draft?.is_generating ||
+        isAiDrafting ||
+        (draft !== undefined ? !!draft?.is_generating : !!alert?.isGenerating) ||
         (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
     const bookingUrl = alert
-        ? `/booking/le-ha?cid=${alert.activeCaseId}`
+        ? `/booking/le-ha?cid=${alert.caseId}`
         : "/booking/le-ha";
     const displayUrl = alert
-        ? `nexusedu.app/booking/le-ha?cid=${alert.activeCaseId}`
+        ? `nexusedu.app/booking/le-ha?cid=${alert.caseId}`
         : "nexusedu.app/booking/le-ha";
 
     return (
@@ -180,10 +184,35 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
                                 >
                                     Nội dung chi tiết
                                 </Label>
-                                <span className="text-[11px] text-muted-foreground">
-                                    {body.split(/\s+/).filter(Boolean).length}{" "}
-                                    từ
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={body ? "ghost" : "secondary"}
+                                        disabled={isGenerating}
+                                        onClick={onGenerateDraft}
+                                        className={cn(
+                                            "h-7 gap-1.5 px-2 text-[11px] font-medium",
+                                            !body && "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300",
+                                        )}
+                                    >
+                                        {isGenerating ? (
+                                            <>
+                                                <Loader2 className="size-3 animate-spin" />
+                                                AI đang soạn...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="size-3" />
+                                                {body ? "Tạo lại bằng AI" : "Tạo nội dung AI"}
+                                            </>
+                                        )}
+                                    </Button>
+                                    <span className="text-[11px] text-muted-foreground">
+                                        {body.split(/\s+/).filter(Boolean).length}{" "}
+                                        từ
+                                    </span>
+                                </div>
                             </div>
                             <Textarea
                                 id="body"
@@ -255,6 +284,7 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
                         Đóng
                     </Button>
                     <Button
+                        disabled={isGenerating || !body.trim()}
                         className="h-11 rounded-xl bg-primary px-8 font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90"
                         onClick={() => {
                             if (!alert) return;

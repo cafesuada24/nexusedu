@@ -2,15 +2,17 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-    fetchAlerts,
-    updateAlertStatus,
     type BackendInterventionStatus,
     fetchDraftStatus,
     fetchStudentCases,
     fetchCaseDetails,
     fetchCaseEmail,
     fetchTasks,
+    acceptCase,
+    startSupporting,
+    resolveCase,
     fetchOpenCases,
+    fetchAssignedCases,
 } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
@@ -20,6 +22,8 @@ import { useAuth } from "@/hooks/use-auth";
 
 /**
  * Hook to fetch the list of alerts (at-risk students).
+ * Merges /alerts with /cases data to resolve active_case_id which is
+ * currently hardcoded to null in the backend's /alerts query handler.
  */
 export function useAlerts() {
     const { isAuthenticated } = useAuth();
@@ -31,11 +35,49 @@ export function useAlerts() {
 
     return useQuery({
         queryKey: queryKeys.alerts.list(),
-        queryFn: fetchAlerts,
+        queryFn: async () => {
+            console.log(
+                "[useAlerts] Fetching open and assigned cases...",
+            );
+            try {
+                // Fetch open and assigned cases
+                const [openRes, assignedRes] = await Promise.all([
+                    fetchOpenCases(100, 0),
+                    fetchAssignedCases(100, 0),
+                ]);
+
+                const allItems = [...openRes.items, ...assignedRes.items];
+
+                // Map cases to the unified alert shape expected by the UI
+                const enriched = allItems.map((c) => ({
+                    sid: c.sid,
+                    student_name: c.student_name,
+                    email: c.email || "",
+                    current_risk_status: c.current_risk_status,
+                    intervention_status: c.intervention_status,
+                    active_case_id: c.case_id,
+                    case_id: c.case_id,
+                    assigned_advisor_id: c.assigned_advisor_id,
+                    assigned_to: c.assigned_to,
+                    draft_subject: c.draft_subject || null,
+                    draft_body: c.draft_body || null,
+                    draft_status: c.draft_status || null,
+                    is_generating: c.draft_status === "generating",
+                }));
+
+                console.log(
+                    "[useAlerts] Unified alerts from cases:",
+                    enriched.length,
+                );
+                return enriched;
+            } catch (err) {
+                console.error("[useAlerts] Fetch error:", err);
+                throw err;
+            }
+        },
         enabled: isMounted && isAuthenticated,
-        // Ensure we refetch when coming back to the tab to keep Kanban fresh
         refetchOnWindowFocus: true,
-        refetchInterval: 10000, // Balanced 10s polling for real-time Kanban updates
+        refetchInterval: 10000,
         retry: false,
     });
 }
@@ -51,17 +93,41 @@ export function useUpdateAlertStatus() {
         mutationFn: ({
             case_id,
             status,
+            isAccept,
         }: {
             case_id: string;
             status: BackendInterventionStatus;
             sid?: string;
-        }) => updateAlertStatus(case_id, status),
+            isAccept?: boolean;
+        }) => {
+            if (isAccept) {
+                return acceptCase(case_id);
+            }
+            // Backend exposes one POST endpoint per transition rather than a
+            // single PATCH /status. Dispatch based on the requested target.
+            switch (status) {
+                case "supporting":
+                    return startSupporting(case_id);
+                case "resolved":
+                    return resolveCase(case_id);
+                default:
+                    throw new Error(
+                        `Không hỗ trợ chuyển trạng thái sang "${status}" từ UI.`,
+                    );
+            }
+        },
 
         // Optimistic Update logic
-        onMutate: async ({ case_id, status, sid }: {
+        onMutate: async ({
+            case_id,
+            status,
+            sid,
+            isAccept,
+        }: {
             case_id: string;
             status: BackendInterventionStatus;
             sid?: string;
+            isAccept?: boolean;
         }) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
             await queryClient.cancelQueries({
@@ -79,8 +145,18 @@ export function useUpdateAlertStatus() {
                 (old: any[] | undefined) => {
                     if (!old) return [];
                     return old.map((alert) =>
-                        alert.active_case_id === case_id || alert.sid === sid
-                            ? { ...alert, intervention_status: status }
+                        alert.case_id === case_id || alert.sid === sid
+                            ? {
+                                  ...alert,
+                                  intervention_status: status,
+                                  ...(isAccept
+                                      ? {
+                                            assigned_advisor_id: sid ?? case_id,
+                                            active_case_id:
+                                                alert.active_case_id ?? case_id,
+                                        }
+                                      : {}),
+                              }
                             : alert,
                     );
                 },
@@ -102,13 +178,24 @@ export function useUpdateAlertStatus() {
                 err instanceof Error && err.message
                     ? err.message
                     : "Vui lòng thử lại sau.";
-            const notFound = message.includes("[404]") || /not found/i.test(message);
-            toast.error("Không thể cập nhật trạng thái", {
-                description: notFound
-                    ? "Không tìm thấy case hợp lệ cho sinh viên này. Vui lòng tải lại danh sách."
-                    : message,
-            });
+            const notFound =
+                message.includes("[404]") || /not found/i.test(message);
+            const isAccept = variables.isAccept;
+
+            toast.error(
+                isAccept
+                    ? "Không thể nhận case"
+                    : "Không thể cập nhật trạng thái",
+                {
+                    description: notFound
+                        ? "Không tìm thấy case hợp lệ cho sinh viên này. Vui lòng tải lại danh sách."
+                        : message,
+                },
+            );
         },
+
+        // Show success feedback and refetch
+        onSuccess: () => {},
 
         // Always refetch after error or success to ensure we are in sync with the server
         onSettled: () => {
@@ -125,7 +212,9 @@ export function useUpdateAlertStatus() {
 export function useDraftStatus(case_id?: string | null) {
     const { isAuthenticated } = useAuth();
     return useQuery({
-        queryKey: case_id ? queryKeys.cases.draft(case_id) : ["cases", "draft", "none"],
+        queryKey: case_id
+            ? queryKeys.cases.draft(case_id)
+            : ["cases", "draft", "none"],
         queryFn: async () => {
             if (!case_id) return null;
             return await fetchDraftStatus(case_id);
@@ -138,7 +227,7 @@ export function useDraftStatus(case_id?: string | null) {
 
             // Stop polling if the fetch errored.
             if (state.error) return false;
-            
+
             // If we have data and it says NOT generating, we can stop.
             if (data && !data.is_generating) return false;
 

@@ -2,31 +2,20 @@
 
 import * as React from "react";
 import {
-    MoreHorizontal,
     Target,
     Clock,
     CalendarCheck,
     Handshake,
     CheckCircle2,
-    ArrowRight,
-    RotateCcw,
     Info,
     Loader2,
-    History,
-    Sparkles,
     Mail,
+    Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { cn } from "@/lib/utils";
 import { type StudentRow } from "@/lib/csv";
 import {
@@ -46,6 +35,7 @@ type KanbanCardProps = {
     onViewDetails: () => void;
     onEditEmail: () => void;
     onGenerateDraft: () => void;
+    onSendEmail: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     studentProfile?: StudentRow;
@@ -62,6 +52,7 @@ function KanbanCardInner({
     onViewDetails,
     onEditEmail,
     onGenerateDraft,
+    onSendEmail,
     onMove,
     onOpenGoals,
     studentProfile,
@@ -88,11 +79,16 @@ function KanbanCardInner({
             ? "bg-destructive/10 text-destructive ring-destructive/20"
             : "bg-warning/15 text-warning ring-warning/25";
 
+    const isEmailSent =
+        a.status === "accepted" && a.interventionStatus === "sent";
+
     return (
         <article
             className={cn(
                 "group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500",
                 isHighlighted && highlightTone,
+                isEmailSent &&
+                    "border-success/40 bg-success/5 dark:border-success/40 dark:bg-success/10",
             )}
         >
             <div className="flex items-start gap-3">
@@ -109,55 +105,7 @@ function KanbanCardInner({
                         {a.email || `MSSV ${a.mssv}`}
                     </p>
                 </div>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-9 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
-                            aria-label="Tuỳ chọn thẻ"
-                        >
-                            <MoreHorizontal className="size-5" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52 rounded-xl">
-                        <DropdownMenuLabel className="text-xs text-muted-foreground">
-                            Chuyển trạng thái
-                        </DropdownMenuLabel>
-                        {COLUMNS.filter((c) => c.id !== a.status).map((c) => {
-                            const Icon = c.icon;
-                            return (
-                                <DropdownMenuItem
-                                    key={c.id}
-                                    onClick={() =>
-                                        onMove(
-                                            c.id,
-                                            `Đã chuyển ${a.name} → ${c.title}`,
-                                        )
-                                    }
-                                    className="gap-2"
-                                >
-                                    <Icon className={cn("size-4", c.accent)} />
-                                    {c.title}
-                                </DropdownMenuItem>
-                            );
-                        })}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={onOpenGoals} className="gap-2">
-                            <Target className="size-4 text-primary" />
-                            {goalsTotal > 0 ? (
-                                <span>
-                                    Mục tiêu{" "}
-                                    <span className="font-mono text-muted-foreground">
-                                        ({goalsDone}/{goalsTotal})
-                                    </span>
-                                </span>
-                            ) : (
-                                "Đặt mục tiêu"
-                            )}
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -265,12 +213,13 @@ function KanbanCardInner({
                 onViewDetails={onViewDetails}
                 onEditEmail={onEditEmail}
                 onGenerateDraft={onGenerateDraft}
+                onSendEmail={onSendEmail}
                 onMove={onMove}
                 onOpenGoals={onOpenGoals}
                 studentProfile={studentProfile}
                 isAiDrafting={isAiDrafting}
-                isAiDraftReady={isAiDraftReady}
                 isAcceptingCase={isAcceptingCase}
+                isEmailSent={isEmailSent}
             />
         </article>
     );
@@ -283,27 +232,28 @@ function CardActions({
     onViewDetails,
     onEditEmail,
     onGenerateDraft,
+    onSendEmail,
     onMove,
     onOpenGoals,
     studentProfile,
     isAiDrafting,
-    isAiDraftReady,
     isAcceptingCase,
+    isEmailSent,
 }: {
     alert: Alert;
     onViewDetails: () => void;
     onEditEmail: () => void;
     onGenerateDraft: () => void;
+    onSendEmail: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     studentProfile?: StudentRow;
     isAiDrafting?: boolean;
-    isAiDraftReady?: boolean;
     isAcceptingCase?: boolean;
+    isEmailSent?: boolean;
 }) {
     const hasGoals = a.goals.length > 0;
     const isActuallyDrafting = isAiDrafting || a.isGenerating;
-    const isActuallyReady = isAiDraftReady || !!a.draftSubject;
 
     if (a.status === "new") {
         return (
@@ -322,7 +272,11 @@ function CardActions({
                     size="sm"
                     disabled={isAcceptingCase}
                     className="h-10 w-full rounded-lg text-sm font-medium"
-                    onClick={() => onMove("accepted", `Đã nhận ca của ${a.name}`)}
+                    onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn tiếp nhận ca của ${a.name}?`)) {
+                            onMove("accepted", `Đã nhận ca của ${a.name}`);
+                        }
+                    }}
                 >
                     {isAcceptingCase ? (
                         <>
@@ -344,82 +298,16 @@ function CardActions({
         );
     }
 
-    if (a.status === "contacted") {
-        return (
-            <div className="mt-3 flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() =>
-                        onMove("scheduled", `${a.name} đã chọn khung giờ họp`)
-                    }
-                >
-                    <CalendarCheck className="size-4" />
-                    Đã đặt hẹn
-                </Button>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-10 w-10 shrink-0 rounded-lg"
-                    onClick={() => onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)}
-                    aria-label="Chuyển sang Đang hỗ trợ"
-                >
-                    <ArrowRight className="size-4" />
-                </Button>
-            </div>
-        );
-    }
-
     if (a.status === "accepted") {
-        if (isActuallyDrafting && !isActuallyReady) {
-            return (
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3 h-10 w-full rounded-lg text-sm font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20"
-                    disabled
-                >
-                    <Loader2 className="size-4 animate-spin" />
-                    AI đang soạn thảo...
-                </Button>
-            );
-        }
-
-        if (isActuallyReady) {
-            return (
-                <div className="mt-3">
-                    <Button
-                        size="sm"
-                        className="h-10 w-full rounded-lg text-sm font-medium"
-                        onClick={onEditEmail}
-                    >
-                        <Mail className="size-4" />
-                        Nội dung Email
-                    </Button>
-                </div>
-            );
-        }
-
         return (
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3">
                 <Button
-                    variant="secondary"
                     size="sm"
-                    className="h-10 flex-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 transition-colors"
-                    onClick={onGenerateDraft}
+                    className="h-10 w-full rounded-lg text-sm font-medium"
+                    onClick={onEditEmail}
                 >
-                    <Sparkles className="size-4" />
-                    Tạo nội dung AI
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-10 w-10 shrink-0 rounded-lg"
-                    onClick={onViewDetails}
-                    aria-label="Xem hồ sơ"
-                >
-                    <Info className="size-4" />
+                    <Mail className="size-4" />
+                    Nội dung Email
                 </Button>
             </div>
         );
@@ -441,7 +329,11 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() => onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)}
+                    onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn bắt đầu hỗ trợ ${a.name}?`)) {
+                            onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`);
+                        }
+                    }}
                 >
                     <Handshake className="size-4" />
                     Bắt đầu hỗ trợ
@@ -465,7 +357,11 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() => onMove("resolved", `Đã đóng case của ${a.name}`)}
+                    onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn giải quyết và đóng ca của ${a.name}?`)) {
+                            onMove("resolved", `Đã đóng case của ${a.name}`);
+                        }
+                    }}
                 >
                     <CheckCircle2 className="size-4" />
                     Giải quyết
@@ -474,16 +370,10 @@ function CardActions({
         );
     }
 
-    // resolved
+    // resolved — terminal state, no actions
     return (
-        <Button
-            variant="outline"
-            size="sm"
-            className="mt-3 h-10 w-full rounded-lg text-sm font-medium"
-            onClick={() => onMove("in_progress", `Mở lại case của ${a.name}`)}
-        >
-            <RotateCcw className="size-4" />
-            Mở lại case
-        </Button>
+        <p className="mt-3 text-[12px] italic text-muted-foreground">
+            Case đã đóng · {relativeTime(a.movedAt)}
+        </p>
     );
 }

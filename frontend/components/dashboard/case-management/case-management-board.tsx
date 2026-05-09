@@ -1,18 +1,8 @@
 "use client";
 
 import * as React from "react";
-import {
-    AlertTriangle,
-    Eye,
-    Inbox,
-    Search,
-} from "lucide-react";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { AlertTriangle, Eye, Inbox, Search } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +29,7 @@ import { type TaskItem, type BackendInterventionStatus } from "@/lib/api";
 import { type StudentRow, type Problem } from "@/lib/csv";
 import { type Alert, getInitials, fromBackendStatus } from "@/lib/alerts";
 import { cn } from "@/lib/utils";
-import { StudentDetailDrawer } from "@/components/dashboard/alert-center/student-detail-drawer";
+import { StudentDetailModal } from "@/components/dashboard/alert-center/student-detail-modal";
 
 const INTERVENTION_LABEL: Record<BackendInterventionStatus, string> = {
     none: "Chưa khởi tạo",
@@ -57,8 +47,10 @@ const INTERVENTION_TONE: Record<BackendInterventionStatus, string> = {
     notified: "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-300",
     sent: "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-300",
     booked: "bg-green-500/10 text-green-700 ring-green-500/25 dark:text-green-300",
-    supporting: "bg-blue-500/10 text-blue-700 ring-blue-500/25 dark:text-blue-300",
-    resolved: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300",
+    supporting:
+        "bg-blue-500/10 text-blue-700 ring-blue-500/25 dark:text-blue-300",
+    resolved:
+        "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300",
     dismissed: "bg-muted/40 text-muted-foreground ring-border/60",
     expired: "bg-muted/40 text-muted-foreground ring-border/60",
 };
@@ -77,7 +69,9 @@ const RISK_LABEL_BY_KEY: Record<string, string> = {
     unknown: "Chưa rõ",
 };
 
-function riskKey(value: string): "critical" | "elevated" | "normal" | "unknown" {
+function riskKey(
+    value: string,
+): "critical" | "elevated" | "normal" | "unknown" {
     const v = value.toLowerCase();
     if (v.includes("critical")) return "critical";
     if (v.includes("elevated")) return "elevated";
@@ -88,7 +82,8 @@ function riskKey(value: string): "critical" | "elevated" | "normal" | "unknown" 
 function getProblemFromRisk(risk: string): Problem {
     const s = risk.toLowerCase();
     if (s.includes("final")) return "failed_final";
-    if (s.includes("midterm") || s.includes("critical")) return "failed_midterm";
+    if (s.includes("midterm") || s.includes("critical"))
+        return "failed_midterm";
     return "low_average";
 }
 
@@ -159,7 +154,9 @@ export function CaseManagementBoard() {
     const [riskFilter, setRiskFilter] = React.useState<
         "all" | "critical" | "elevated" | "normal" | "unknown"
     >("all");
-    const [selectedCaseId, setSelectedCaseId] = React.useState<string | null>(null);
+    const [selectedCaseId, setSelectedCaseId] = React.useState<string | null>(
+        null,
+    );
 
     const studentProfilesById = React.useMemo(() => {
         const map: Record<string, StudentRow | undefined> = {};
@@ -178,9 +175,11 @@ export function CaseManagementBoard() {
                 (r.email ?? "").toLowerCase().includes(q) ||
                 r.sid.toLowerCase().includes(q);
             const matchesStatus =
-                statusFilter === "all" || r.intervention_status === statusFilter;
+                statusFilter === "all" ||
+                r.intervention_status === statusFilter;
             const matchesRisk =
-                riskFilter === "all" || riskKey(r.current_risk_status) === riskFilter;
+                riskFilter === "all" ||
+                riskKey(r.current_risk_status) === riskFilter;
             return matchesQuery && matchesStatus && matchesRisk;
         });
     }, [rows, search, statusFilter, riskFilter]);
@@ -199,7 +198,7 @@ export function CaseManagementBoard() {
     const selectedRow = React.useMemo(
         () =>
             selectedCaseId
-                ? rows.find((r) => r.case_id === selectedCaseId) ?? null
+                ? (rows.find((r) => r.case_id === selectedCaseId) ?? null)
                 : null,
         [rows, selectedCaseId],
     );
@@ -211,7 +210,11 @@ export function CaseManagementBoard() {
     return (
         <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <StatCard label="Tổng số case" value={stats.total} tone="primary" />
+                <StatCard
+                    label="Tổng số case"
+                    value={stats.total}
+                    tone="primary"
+                />
                 <StatCard
                     label="Chưa phân công"
                     value={stats.unassigned}
@@ -264,7 +267,10 @@ export function CaseManagementBoard() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {INTERVENTION_FILTER_OPTIONS.map((o) => (
-                                        <SelectItem key={o.value} value={o.value}>
+                                        <SelectItem
+                                            key={o.value}
+                                            value={o.value}
+                                        >
                                             {o.label}
                                         </SelectItem>
                                     ))}
@@ -281,7 +287,10 @@ export function CaseManagementBoard() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {RISK_FILTER_OPTIONS.map((o) => (
-                                        <SelectItem key={o.value} value={o.value}>
+                                        <SelectItem
+                                            key={o.value}
+                                            value={o.value}
+                                        >
                                             {o.label}
                                         </SelectItem>
                                     ))}
@@ -352,12 +361,16 @@ export function CaseManagementBoard() {
                                 </TableRow>
                             ) : (
                                 filtered.map((row) => {
-                                    const rKey = riskKey(row.current_risk_status);
+                                    const rKey = riskKey(
+                                        row.current_risk_status,
+                                    );
                                     return (
                                         <TableRow
                                             key={row.case_id}
                                             className="cursor-pointer"
-                                            onClick={() => setSelectedCaseId(row.case_id)}
+                                            onClick={() =>
+                                                setSelectedCaseId(row.case_id)
+                                            }
                                         >
                                             <TableCell className="px-4 py-3 font-mono text-xs text-muted-foreground">
                                                 {row.case_id.slice(0, 8)}
@@ -366,12 +379,16 @@ export function CaseManagementBoard() {
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="size-9">
                                                         <AvatarFallback className="text-xs font-semibold">
-                                                            {getInitials(row.student_name ?? "")}
+                                                            {getInitials(
+                                                                row.student_name ??
+                                                                    "",
+                                                            )}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="flex flex-col">
                                                         <span className="font-medium">
-                                                            {row.student_name ?? "—"}
+                                                            {row.student_name ??
+                                                                "—"}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground">
                                                             {row.email ?? ""}
@@ -407,13 +424,15 @@ export function CaseManagementBoard() {
                                                     className={cn(
                                                         "ring-1",
                                                         INTERVENTION_TONE[
-                                                            row.intervention_status
+                                                            row
+                                                                .intervention_status
                                                         ],
                                                     )}
                                                 >
                                                     {
                                                         INTERVENTION_LABEL[
-                                                            row.intervention_status
+                                                            row
+                                                                .intervention_status
                                                         ]
                                                     }
                                                 </Badge>
@@ -424,7 +443,9 @@ export function CaseManagementBoard() {
                                                     size="sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setSelectedCaseId(row.case_id);
+                                                        setSelectedCaseId(
+                                                            row.case_id,
+                                                        );
                                                     }}
                                                 >
                                                     <Eye className="size-4" />
@@ -447,7 +468,9 @@ export function CaseManagementBoard() {
                 }}
                 alert={selectedAlert}
                 studentProfile={
-                    selectedRow ? studentProfilesById[selectedRow.sid] : undefined
+                    selectedRow
+                        ? studentProfilesById[selectedRow.sid]
+                        : undefined
                 }
             />
         </div>
@@ -469,7 +492,8 @@ function StatCard({
         primary: "bg-primary/10 text-primary ring-primary/20",
         warning: "bg-warning/15 text-warning ring-warning/25",
         destructive: "bg-destructive/10 text-destructive ring-destructive/20",
-        success: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300",
+        success:
+            "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300",
     }[tone];
 
     return (

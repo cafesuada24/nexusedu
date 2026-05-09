@@ -28,6 +28,7 @@ type KanbanColumnProps = {
   onViewDetails: (a: Alert) => void
   onEditEmail: (a: Alert) => void
   onGenerateDraft: (a: Alert) => void
+  onSendEmail: (a: Alert) => void
   onMove: (a: Alert, status: CaseStatus, message?: string) => void
   onOpenGoals: (id: string) => void
   studentProfilesById: Record<string, StudentRow | undefined>
@@ -50,6 +51,7 @@ export function KanbanColumn({
   onViewDetails,
   onEditEmail,
   onGenerateDraft,
+  onSendEmail,
   onMove,
   onOpenGoals,
   studentProfilesById,
@@ -163,6 +165,7 @@ export function KanbanColumn({
                       onViewDetails={() => onViewDetails(a)}
                       onEditEmail={() => onEditEmail(a)}
                       onGenerateDraft={() => onGenerateDraft(a)}
+                      onSendEmail={() => onSendEmail(a)}
                       onMove={(s, msg) => onMove(a, s, msg)}
                       onOpenGoals={() => onOpenGoals(a.id)}
                       studentProfile={studentProfilesById[a.id]}

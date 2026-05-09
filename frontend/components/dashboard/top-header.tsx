@@ -29,7 +29,11 @@ const labels: Record<string, string> = {
   dashboard: "Tổng quan",
   import: "Nhập CSV",
   alerts: "Trung tâm cảnh báo",
+  cases: "Quản lý case",
+  stories: "Câu chuyện thành công",
+  schedule: "Lịch làm việc",
   metrics: "Báo cáo BGH",
+  advisors: "Cố vấn",
   settings: "Cài đặt",
   support: "Hỗ trợ",
 }
