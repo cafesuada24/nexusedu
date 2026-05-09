@@ -30,6 +30,7 @@ dependencies = [
     "pydantic-settings>=2.14.0",
     "pydantic-extra-types>=2.11.1",
     "phonenumbers>=9.0.29",
+    "pyjwt>=2.12.1",
 ]
 # dependencies = []
 
