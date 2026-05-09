@@ -235,13 +235,6 @@ export const UserSettingsSchema = z.object({
 });
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
-export const AdvisorEngagementItemSchema = z.object({
-    faculty: z.string(),
-    sent: z.number(),
-    drafted: z.number(),
-});
-export type AdvisorEngagementItem = z.infer<typeof AdvisorEngagementItemSchema>;
-
 export const AdvisorPointsSchema = z.object({
     points: z.number().int(),
 });
