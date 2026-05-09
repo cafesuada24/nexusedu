@@ -12,6 +12,7 @@ import {
   Video,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useQueryClient } from "@tanstack/react-query"
 import {
   Card,
   CardContent,
@@ -35,23 +36,27 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule"
-import { useSocket } from "@/hooks/use-socket"
+import { useSocket, useSocketEvent } from "@/hooks/use-socket"
 import { confirmBooking } from "@/lib/api"
-
-// Deterministic "busy" generator so SSR/CSR match without extra state.
-function isBusy(date: Date, slot: string) {
-  const key = date.getDate() * 31 + parseInt(slot.replace(":", ""), 10)
-  return key % 7 === 0 || key % 11 === 0
-}
+import {
+  useAppointmentsQuery,
+  useCreateAppointment,
+} from "@/hooks/use-appointments-query"
+import { SlotTakenError } from "@/lib/appointments"
+import { queryKeys } from "@/lib/query-keys"
 
 type Mode = "video" | "inperson"
+
+const APPOINTMENTS_WINDOW_DAYS = 60
 
 export function BookingView({
   caseId,
   studentName,
+  advisorToken,
 }: {
   caseId: string
   studentName?: string
+  advisorToken: string
 }) {
   const today = startOfToday()
   const { schedule } = useScheduleQuery()
@@ -60,6 +65,35 @@ export function BookingView({
   const [mode, setMode] = React.useState<Mode>("video")
   const [stage, setStage] = React.useState<"pick" | "syncing" | "done">("pick")
   const socket = useSocket()
+  const queryClient = useQueryClient()
+
+  const windowFrom = React.useMemo(
+    () => format(today, "yyyy-MM-dd"),
+    [today],
+  )
+  const windowTo = React.useMemo(
+    () => format(addDays(today, APPOINTMENTS_WINDOW_DAYS), "yyyy-MM-dd"),
+    [today],
+  )
+
+  const { data: appointments = [] } = useAppointmentsQuery({
+    advisorToken,
+    from: windowFrom,
+    to: windowTo,
+  })
+  const createAppointment = useCreateAppointment()
+
+  const bookedSet = React.useMemo(
+    () => new Set(appointments.map((a) => `${a.date}|${a.slot}`)),
+    [appointments],
+  )
+
+  useSocketEvent<{ case_id: string; date: string; slot: string }>(
+    "new_appointment",
+    React.useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
+    }, [queryClient]),
+  )
 
   const slotsForDate = React.useMemo(
     () => (date ? generateSlotsForDate(date, schedule) : []),
@@ -70,40 +104,51 @@ export function BookingView({
     if (!date || !slot) return
     setStage("syncing")
 
-    try {
-      // 1. Confirm booking via public POST /cases/{case_id}/book (SENT → BOOKED)
-      await confirmBooking(caseId)
+    const dateStr = format(date, "yyyy-MM-dd")
 
-      // 2. Prepare payload for real-time notification
-      const payload = {
-        sid: caseId,
-        date: format(date, "yyyy-MM-dd"),
+    try {
+      await createAppointment.mutateAsync({
+        advisorToken,
+        caseId,
+        date: dateStr,
         slot,
         mode,
-      }
-
-      // 3. Emit real-time event to advisor dashboard
-      socket.emit("new_appointment", payload)
-
-      // Simulate a small delay for better UX
-      setTimeout(() => {
-        setStage("done")
-        toast.success("Đã đặt lịch thành công", {
-          description: `${format(date, "EEEE, d MMMM", { locale: vi })} · ${slot}`,
-        })
-      }, 800)
+      })
     } catch (error) {
       setStage("pick")
-      toast.error("Không thể xác nhận đặt lịch. Vui lòng thử lại sau.")
-      // eslint-disable-next-line no-console
-      console.error("[booking] Error confirming:", error)
+      if (error instanceof SlotTakenError) {
+        setSlot(null)
+        queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
+        toast.error("Khung giờ vừa được người khác đặt", {
+          description: "Vui lòng chọn khung giờ khác.",
+        })
+      } else {
+        toast.error("Không thể xác nhận đặt lịch. Vui lòng thử lại sau.")
+        // eslint-disable-next-line no-console
+        console.error("[booking] claim slot failed:", error)
+      }
+      return
     }
+
+    try {
+      await confirmBooking(caseId)
+    } catch (error) {
+      // Best-effort case-status sync; slot lock has already succeeded.
+      // eslint-disable-next-line no-console
+      console.warn("[booking] case status sync failed (non-fatal):", error)
+    }
+
+    const payload = { case_id: caseId, date: dateStr, slot, mode }
+    socket.emit("new_appointment", payload)
+
+    setTimeout(() => {
+      setStage("done")
+      toast.success("Đã đặt lịch thành công", {
+        description: `${format(date, "EEEE, d MMMM", { locale: vi })} · ${slot}`,
+      })
+    }, 800)
   }
 
-  const reset = () => {
-    setStage("pick")
-    setSlot(null)
-  }
 
   if (stage === "done" && date && slot) {
     return (
@@ -116,9 +161,6 @@ export function BookingView({
             <h2 className="font-serif text-2xl font-bold">
               Đã đặt lịch thành công
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Lời mời đã được đồng bộ đến Google Calendar của bạn và cố vấn.
-            </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge variant="outline" className="rounded-md">
                 <CalendarCheck2 className="size-3" />
@@ -137,14 +179,7 @@ export function BookingView({
                 {mode === "video" ? "Google Meet" : "Phòng B3.402"}
               </Badge>
             </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button className="rounded-xl" onClick={reset}>
-                Đặt lịch khác
-              </Button>
-              <Button variant="outline" className="rounded-xl">
-                Mở trong Calendar
-              </Button>
-            </div>
+
           </div>
         </CardContent>
       </Card>
@@ -209,7 +244,7 @@ export function BookingView({
             </RadioGroup>
           </div>
           <div className="rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">
-            Đồng bộ với Google Calendar · múi giờ (GMT+7) Hồ Chí Minh
+            Múi giờ (GMT+7) Hồ Chí Minh
           </div>
         </CardContent>
       </Card>
@@ -255,7 +290,9 @@ export function BookingView({
             ) : (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {slotsForDate.map((s) => {
-                  const busy = date ? isBusy(date, s) : false
+                  const busy = date
+                    ? bookedSet.has(`${format(date, "yyyy-MM-dd")}|${s}`)
+                    : false
                   const selected = s === slot
                   return (
                     <button
@@ -267,12 +304,12 @@ export function BookingView({
                       className={cn(
                         "h-10 rounded-xl border text-sm font-medium transition-all",
                         busy &&
-                          "cursor-not-allowed border-dashed border-border bg-muted/40 text-muted-foreground line-through",
+                        "cursor-not-allowed border-dashed border-border bg-muted/40 text-muted-foreground line-through",
                         !busy &&
-                          !selected &&
-                          "border-border hover:border-primary/50 hover:bg-primary/5",
+                        !selected &&
+                        "border-border hover:border-primary/50 hover:bg-primary/5",
                         selected &&
-                          "border-primary bg-primary text-primary-foreground shadow-sm",
+                        "border-primary bg-primary text-primary-foreground shadow-sm",
                       )}
                     >
                       {s}
