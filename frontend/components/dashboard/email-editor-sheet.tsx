@@ -6,6 +6,7 @@ import {
     Sparkles,
     Send,
     RotateCcw,
+    Loader2,
     CalendarDays,
     ExternalLink,
     Mail,
@@ -36,9 +37,11 @@ type Props = {
     alert: Alert | null;
     onClose: () => void;
     onSave: (a: Alert) => void;
+    onGenerateDraft: () => void;
+    isAiDrafting?: boolean;
 };
 
-export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
+export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAiDrafting }: Props) {
     // Only poll for draft status while there's an active case.
     const {
         data: draft,
@@ -77,6 +80,7 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
     };
 
     const isGenerating =
+        isAiDrafting ||
         alert?.isGenerating ||
         draft?.is_generating ||
         (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
@@ -180,10 +184,35 @@ export function EmailEditorSheet({ alert, onClose, onSave }: Props) {
                                 >
                                     Nội dung chi tiết
                                 </Label>
-                                <span className="text-[11px] text-muted-foreground">
-                                    {body.split(/\s+/).filter(Boolean).length}{" "}
-                                    từ
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={body ? "ghost" : "secondary"}
+                                        disabled={isGenerating}
+                                        onClick={onGenerateDraft}
+                                        className={cn(
+                                            "h-7 gap-1.5 px-2 text-[11px] font-medium",
+                                            !body && "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300",
+                                        )}
+                                    >
+                                        {isGenerating ? (
+                                            <>
+                                                <Loader2 className="size-3 animate-spin" />
+                                                AI đang soạn...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Sparkles className="size-3" />
+                                                {body ? "Tạo lại bằng AI" : "Tạo nội dung AI"}
+                                            </>
+                                        )}
+                                    </Button>
+                                    <span className="text-[11px] text-muted-foreground">
+                                        {body.split(/\s+/).filter(Boolean).length}{" "}
+                                        từ
+                                    </span>
+                                </div>
                             </div>
                             <Textarea
                                 id="body"
