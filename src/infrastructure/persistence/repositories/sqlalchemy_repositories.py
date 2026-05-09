@@ -337,17 +337,7 @@ class SqlAlchemyAdvisorRepository:
         name: str,
     ) -> None:
         """Link a user to an advisor profile, creating one if necessary."""
-        # 1. Check if an advisor with this user_id already exists
-        stmt = select(OrmAdvisor).where(OrmAdvisor.user_id == user_id)
-        result = await self.session.execute(stmt)
-        advisor = result.scalar_one_or_none()
-
-        if advisor:
-            advisor.email = email
-            advisor.name = name
-            return
-
-        # 2. Check if an advisor with this email already exists but is not linked
+        # 1. Check if an advisor with this email already exists but is not linked
         stmt = select(OrmAdvisor).where(
             OrmAdvisor.email == email,
             OrmAdvisor.user_id.is_(None),
@@ -360,14 +350,21 @@ class SqlAlchemyAdvisorRepository:
             advisor.name = name
             return
 
-        # 3. Create new advisor profile
-        new_advisor = OrmAdvisor(
+        # 2. Use native UPSERT for user_id to handle concurrency
+        insert_stmt = sqlite_insert(OrmAdvisor).values(
             advisor_id=uuid.uuid4(),
             user_id=user_id,
             email=email,
             name=name,
         )
-        self.session.add(new_advisor)
+        upsert_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=["user_id"],
+            set_={
+                "email": insert_stmt.excluded.email,
+                "name": insert_stmt.excluded.name,
+            },
+        )
+        await self.session.execute(upsert_stmt)
 
 
 class SqlAlchemyIdempotencyRepository:
@@ -404,17 +401,13 @@ class SqlAlchemyBadgeRepository:
         return list(result.scalars().all())
 
     async def award_badge(self, advisor_id: uuid.UUID, badge_id: str) -> bool:
-        stmt = select(AdvisorBadge).where(
-            AdvisorBadge.advisor_id == advisor_id,
-            AdvisorBadge.badge_id == badge_id,
+        stmt = (
+            sqlite_insert(AdvisorBadge)
+            .values(advisor_id=advisor_id, badge_id=badge_id)
+            .on_conflict_do_nothing(index_elements=["advisor_id", "badge_id"])
         )
-        existing = (await self.session.execute(stmt)).first()
-        if existing:
-            return False
-
-        entry = AdvisorBadge(advisor_id=advisor_id, badge_id=badge_id)
-        self.session.add(entry)
-        return True
+        result = await self.session.execute(stmt)
+        return result.rowcount > 0
 
     async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
         # Get total points and action count
