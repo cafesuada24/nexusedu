@@ -8,12 +8,18 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, 
 
 from src.application.commands.case_commands import (
     AcceptCaseCommand,
+    BookAppointmentCommand,
     CaseCommandHandler,
     SendEmailCommand,
     TriggerDraftCommand,
     UpdateEmailCommand,
 )
-from src.application.dtos.case_dtos import CaseDTO, QueryEmailDTO, TriggerDraftDTO
+from src.application.dtos.case_dtos import (
+    BookAppointmentDTO,
+    CaseDTO,
+    QueryEmailDTO,
+    TriggerDraftDTO,
+)
 from src.application.queries.case_queries import (
     CaseQueryHandler,
     GetAssignedQuery,
@@ -294,4 +300,23 @@ async def accept_task(
         ) from e
     except Exception as e:
         logger.error(f'Error in complete_task: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/{case_id}/book')
+async def book_appointment(
+    case_id: UUID,
+    command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
+) -> dict[str, str]:
+    """Allow a student to record that they have booked an appointment."""
+    try:
+        command = BookAppointmentCommand(case_id=case_id)
+        await command_handler.handle_book_appointment(command)
+        return {'status': 'success', 'message': 'Appointment booked successfully'}
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error in book_appointment: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
