@@ -462,8 +462,8 @@ export function AlertCenter() {
                 });
                 return;
             }
-            // Block send while AI is generating (may be stale — also caught below)
-            if (a.isGenerating) {
+            // Block only when generating AND no draftBody (draftBody set = AI done, data stale)
+            if (a.isGenerating && !a.draftBody) {
                 toast.error("AI đang soạn thảo", {
                     description:
                         "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
