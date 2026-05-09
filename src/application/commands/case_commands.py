@@ -8,6 +8,7 @@ from src.application.dtos.case_dtos import (
     BookAppointmentCommand,
     GenerateEmailDraftCommand,
     SendEmailCommand,
+    StartSupportingCommand,
     TriggerDraftCommand,
     TriggerDraftDTO,
     UpdateEmailCommand,
@@ -250,6 +251,24 @@ class CaseCommandHandler:
             raise CaseNotFoundError(command.case_id)
 
         case.record_booking()
+
+        await self.case_repo.save(case)
+
+        # Dispatch events via publisher
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
+
+    async def handle_start_supporting(self, command: StartSupportingCommand) -> None:
+        """Advisor starts supporting the student after they booked."""
+        advisor = await self.advisor_repo.find_by_user_id(command.user_id)
+        if advisor is None:
+            raise UserIsNotAnAdvisorError(command.user_id)
+
+        case = await self.case_repo.get_by_id(command.case_id)
+        if case.assigned_advisor_id != advisor.advisor_id:
+            raise CaseNotFoundError(case_id=case.case_id)
+
+        case.start_supporting()
 
         await self.case_repo.save(case)
 
