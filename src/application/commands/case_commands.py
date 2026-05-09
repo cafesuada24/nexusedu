@@ -17,6 +17,7 @@ from src.application.dtos.case_dtos import (
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.event_publisher import EventPublisher
+from src.core.config import config
 from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
@@ -130,12 +131,13 @@ class CaseCommandHandler:
         )
         await self.job_repo.add(new_job)
 
+        booking_link = f'{config.frontend_url}/le-ha?cid={case.case_id}'
         # 3. Queue the job
         await self.task_queue.enqueue(
             'run_email_draft_task',
             job_id=job_id,
             case_id=case.case_id,
-            booking_link=command.booking_link,
+            booking_link=booking_link,
             user_id=command.user_id,
         )
 
@@ -178,7 +180,6 @@ class CaseCommandHandler:
         await self.task_queue.enqueue(
             'run_dispatch_email_task',
             case_id=case.case_id,
-            body=command.body,
             target_email=recipient_email,
         )
         await self.job_repo.add(new_job)

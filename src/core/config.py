@@ -21,7 +21,6 @@ class Config(BaseSettings):
     redis_host: str = 'localhost'
     redis_port: Annotated[int, Field(ge=1, le=65535)] = 6379
     allowed_origins: str = ''
-    review_link_base_url: str = 'http://localhost:3000/'
 
     # SMTP Settings
     smtp_host: str = 'localhost'

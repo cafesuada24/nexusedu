@@ -43,7 +43,8 @@ class SISRecord(BaseModel):
     email: str = Field(..., description='Student email address.')
     major: str | None = Field('Unknown', description='Student major.')
     current_risk_status: str | None = Field(
-        'Normal', description='Current risk status.',
+        'Normal',
+        description='Current risk status.',
     )
     last_notified_timestamp: AwareDatetime | None = Field(
         description='Timestamp of last nudge.',
@@ -115,21 +116,8 @@ class StatusUpdate(BaseModel):
     status: str = Field(..., description='The new Kanban state.')
 
 
-class SendEmailRequest(BaseModel):
-    """Schema for sending a personalized nudge email."""
-
-    body: str = Field(..., description='The final email body to send.')
-
-
-class TriggerDraftRequest(BaseModel):
-    """Schema for triggering a background AI draft generation."""
-
-    booking_link: str | None = Field(None, description='Optional custom booking link.')
-
-
 class UpdateEmailRequest(BaseModel):
     """Schema for manually updating a draft email."""
 
     subject: str | None = Field(None, description='The updated email subject.')
     body: str | None = Field(None, description='The updated email body.')
-

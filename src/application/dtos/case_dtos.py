@@ -28,7 +28,6 @@ class TriggerDraftCommand:
 
     case_id: UUID
     user_id: UUID
-    booking_link: str | None = None
 
 
 @dataclass
@@ -46,7 +45,6 @@ class SendEmailCommand:
     """Command to record and send an intervention email."""
 
     case_id: UUID
-    body: str
     user_id: UUID
 
 
