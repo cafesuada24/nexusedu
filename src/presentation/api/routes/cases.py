@@ -50,7 +50,7 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
-from src.presentation.schemas.request import UpdateEmailRequest
+from src.presentation.schemas.request import BookAppointmentRequest, UpdateEmailRequest
 
 router = APIRouter(prefix='/cases', tags=['cases'])
 
@@ -304,11 +304,17 @@ async def accept_task(
 @router.post('/{case_id}/book')
 async def book_appointment(
     case_id: UUID,
+    request: BookAppointmentRequest,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
 ) -> ActionResponseDTO:
     """Allow a student to record that they have booked an appointment."""
     try:
-        command = BookAppointmentCommand(case_id=case_id)
+        command = BookAppointmentCommand(
+            case_id=case_id,
+            appointment_time=request.appointment_time,
+            meeting_method=request.meeting_method,
+            notes=request.notes,
+        )
         await command_handler.handle_book_appointment(command)
         return ActionResponseDTO(
             status='success',

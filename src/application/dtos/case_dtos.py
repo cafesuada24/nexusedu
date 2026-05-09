@@ -8,6 +8,7 @@ from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
     JobStatus,
+    MeetingMethod,
     RiskStatus,
 )
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
@@ -63,6 +64,9 @@ class BookAppointmentCommand:
     """Command to record a student booking an appointment."""
 
     case_id: UUID
+    appointment_time: datetime
+    meeting_method: MeetingMethod
+    notes: str | None = None
 
 
 @dataclass(frozen=True)

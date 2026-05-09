@@ -1,9 +1,10 @@
 """Request models for the Agent Assistant API."""
 
-from datetime import datetime
 from typing import Any
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
+from src.domain.value_objects.status import MeetingMethod
 
 
 class QueryRequest(BaseModel):
@@ -121,3 +122,11 @@ class UpdateEmailRequest(BaseModel):
 
     subject: str | None = Field(None, description='The updated email subject.')
     body: str | None = Field(None, description='The updated email body.')
+
+
+class BookAppointmentRequest(BaseModel):
+    """Schema for a student recording an appointment booking."""
+
+    appointment_time: AwareDatetime = Field(..., description='Scheduled time for the meeting.')
+    meeting_method: MeetingMethod = Field(..., description='Method of the meeting.')
+    notes: str | None = Field(None, description='Optional notes for the advisor.')

@@ -61,3 +61,10 @@ class OutboxStatus(StrEnum):
     PENDING = 'pending'
     PROCESSED = 'processed'
     FAILED = 'failed'
+
+
+class MeetingMethod(StrEnum):
+    """Meeting method for appointments."""
+
+    ONLINE = 'online'
+    IN_PERSON = 'in_person'

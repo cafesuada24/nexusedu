@@ -1,9 +1,11 @@
 """Case-related domain events."""
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from src.domain.events.base import DomainEvent
+from src.domain.value_objects.status import MeetingMethod
 
 
 @dataclass(frozen=True)
@@ -19,6 +21,9 @@ class StudentBookedEvent(DomainEvent):
     """Event triggered when a student books an appointment."""
 
     case_id: UUID
+    appointment_time: datetime
+    meeting_method: MeetingMethod
+    notes: str | None = None
 
 
 @dataclass(frozen=True)

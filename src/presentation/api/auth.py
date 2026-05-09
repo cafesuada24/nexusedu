@@ -16,7 +16,7 @@ from fastapi_users.authentication import (
     BearerTransport,
     JWTStrategy,
 )
-from fastapi_users.db import BaseUserDatabase, SQLAlchemyUserDatabase
+from fastapi_users_db_sqlalchemy import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import config

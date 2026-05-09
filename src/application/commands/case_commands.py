@@ -19,6 +19,7 @@ from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.event_publisher import EventPublisher
 from src.core.config import config
 from src.core.logger import logger
+from src.domain.entities.appointment import Appointment
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
 from src.domain.exceptions import (
@@ -30,6 +31,7 @@ from src.domain.exceptions import (
     UserIsNotAnAdvisorError,
 )
 from src.domain.repositories.advisor_repository import AdvisorRepository
+from src.domain.repositories.appointment_repository import AppointmentRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
@@ -47,6 +49,7 @@ class CaseCommandHandler:
         email_repo: EmailRepository,
         case_repo: CaseRepository,
         advisor_repo: AdvisorRepository,
+        appointment_repo: AppointmentRepository,
         job_repo: JobRepository,
         task_queue: BackgroundTaskQueue,
         event_publisher: EventPublisher,
@@ -57,6 +60,7 @@ class CaseCommandHandler:
         self.email_repo = email_repo
         self.case_repo = case_repo
         self.advisor_repo = advisor_repo
+        self.appointment_repo = appointment_repo
         self.job_repo = job_repo
         self.email_drafting_service = email_drafting_service
         self.task_queue = task_queue
@@ -72,14 +76,15 @@ class CaseCommandHandler:
 
         case.assign_advisor(advisor.advisor_id, command.accepted_at)
 
+        # Ensure email record is created before events are published
+        new_email = InterventionEmail(case_id=case.case_id)
+        await self.email_repo.add(new_email)
+
         await self.case_repo.save(case)
 
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
         case.clear_events()
-
-        new_email = InterventionEmail(case_id=case.case_id)
-        await self.email_repo.add(new_email)
 
     async def handle_trigger_draft(
         self,
@@ -254,7 +259,20 @@ class CaseCommandHandler:
         if not case:
             raise CaseNotFoundError(command.case_id)
 
-        case.record_booking()
+        case.record_booking(
+            appointment_time=command.appointment_time,
+            meeting_method=command.meeting_method,
+            notes=command.notes,
+        )
+
+        # Persist the appointment record
+        new_appointment = Appointment(
+            case_id=case.case_id,
+            appointment_time=command.appointment_time,
+            meeting_method=command.meeting_method,
+            notes=command.notes,
+        )
+        await self.appointment_repo.add(new_appointment)
 
         await self.case_repo.save(case)
 

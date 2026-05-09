@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from fastapi_users.db import SQLAlchemyBaseUserTableUUID
+from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -31,6 +31,7 @@ from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
     JobStatus,
+    MeetingMethod,
     OutboxStatus,
     RiskStatus,
 )
@@ -378,6 +379,39 @@ class InterventionEmail(Base):
     # Business rule: each intervention case has exactly one email record
     __table_args__ = (
         UniqueConstraint('case_id', name='uq_intervention_emails_case_id'),
+    )
+
+
+class Appointment(Base):
+    """Record of student-advisor appointments."""
+
+    __tablename__ = 'appointments'
+
+    appointment_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    case_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('cases.case_id', ondelete='CASCADE'),
+        nullable=False,
+    )
+    appointment_time: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    meeting_method: Mapped[MeetingMethod] = mapped_column(
+        Enum(MeetingMethod),
+        nullable=False,
+    )
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
+        server_default=func.now(),
+        index=True,
+    )
+
+    # Business rule: each intervention case has exactly one appointment record
+    __table_args__ = (
+        UniqueConstraint('case_id', name='uq_appointments_case_id'),
     )
 
 

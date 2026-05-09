@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
 from uuid import UUID, uuid4
 
 from src.domain.events.base import DomainEvent
@@ -14,7 +13,7 @@ from src.domain.events.case_events import (
     StudentBookedEvent,
 )
 from src.domain.exceptions import CaseAlreadyAssignedError, InvalidStateTransitionError
-from src.domain.value_objects.status import InterventionStatus
+from src.domain.value_objects.status import InterventionStatus, MeetingMethod
 
 _INTERVENTION_STATUS_TRANSITION = {
     InterventionStatus.NEW: [InterventionStatus.ACCEPTED, InterventionStatus.DISMISSED],
@@ -127,12 +126,20 @@ class Case:
         """The intervention email has been sent."""
         self._transition_to(InterventionStatus.SENT)
 
-    def record_booking(self) -> None:
+    def record_booking(
+        self,
+        appointment_time: datetime,
+        meeting_method: MeetingMethod,
+        notes: str | None = None,
+    ) -> None:
         """Student booked an appointment."""
         self._transition_to(InterventionStatus.BOOKED)
         self.register_event(
             StudentBookedEvent(
                 case_id=self.case_id,
+                appointment_time=appointment_time,
+                meeting_method=meeting_method,
+                notes=notes,
                 occurred_at=datetime.now(UTC),
             ),
         )
