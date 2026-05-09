@@ -3,6 +3,8 @@
 from typing import Any
 
 from src.domain.repositories.interfaces import MetadataRepository
+
+
 class AgentMetadataService:
     """Application service to bridge agent's metadata needs with repositories."""
 

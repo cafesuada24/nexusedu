@@ -101,16 +101,16 @@ class GamificationService:
 
         if fast_action_count >= 3:
             earned_badges.append('speed_demon')
-            
+
         if total_points >= 100:
             earned_badges.append('century_club')
-            
+
         if total_points >= 500:
             earned_badges.append('five_hundred')
-            
+
         if total_actions >= 5 and avg_response_hours < 4.0:
             earned_badges.append('fastest_avg_response')
-            
+
         if total_resolves >= 5 and recovery_rate > 0.8:
             earned_badges.append('highest_recovery_rate')
 

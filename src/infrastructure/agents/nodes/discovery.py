@@ -7,12 +7,12 @@ from langchain_core.runnables import RunnableConfig
 if TYPE_CHECKING:
     from src.infrastructure.database.manager import DatabaseManager
 
+from src.core.logger import logger
 from src.infrastructure.agents.state import (
     AgentState,
     DiscoveryRequest,
     RoutingMetadata,
 )
-from src.core.logger import logger
 
 MAX_DISCOVERY_CONTEXT_CHARS = 15_000
 
@@ -98,7 +98,7 @@ class DiscoveryNode:
 
             if res:
                 logger.debug(
-                    f'Discovery Task {index + 1} Result length: {len(str(res))}'
+                    f'Discovery Task {index + 1} Result length: {len(str(res))}',
                 )
                 return str(res)
         except Exception as e:

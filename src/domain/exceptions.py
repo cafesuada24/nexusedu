@@ -2,7 +2,6 @@
 
 from uuid import UUID
 
-
 _NOT_FOUND_MESSAGE_TEMPLATE = '{entity} with ID {id} not found.'
 
 
@@ -151,7 +150,7 @@ class AdvisorNotFoundError(AdvisorError):
     def __init__(self, advisor_id: UUID):
         super().__init__(
             _NOT_FOUND_MESSAGE_TEMPLATE.format(
-                entity='Email',
+                entity='Advisor',
                 id=advisor_id,
             ),
         )
@@ -162,7 +161,7 @@ class AdvisorProfileNotLinkedError(AdvisorError):
 
     def __init__(self, user_id: UUID) -> None:
         super().__init__(
-            f"account with ID '{user_id}' does not link to any advisor profile."
+            f"account with ID '{user_id}' does not link to any advisor profile.",
         )
 
 

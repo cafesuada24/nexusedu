@@ -1,10 +1,9 @@
 """Advisor metrics query service implementation."""
 
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.advisor_dtos import PersonalAdvisorMetricsDTO
@@ -32,7 +31,7 @@ class SqlAlchemyAdvisorMetricsQueryService:
                 func.coalesce(func.sum(PointLedger.points), 0).label('total_points'),
                 func.count(PointLedger.id).label('total_actions'),
                 func.count(
-                    func.case(
+                    case(
                         (PointLedger.action == 'resolve_case', 1),
                         else_=None,
                     ),

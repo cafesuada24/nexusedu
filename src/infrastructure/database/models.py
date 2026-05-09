@@ -76,13 +76,13 @@ class UTCDateTime(TypeDecorator[datetime]):
 
         if value.tzinfo is None:
             raise ValueError(
-                f'UTCDateTime requires timezone-aware datetimes. Received naive: {value}'
+                f'UTCDateTime requires timezone-aware datetimes. Received naive: {value}',
             )
 
         return value.astimezone(UTC)
 
     def process_result_value(
-        self, value: datetime | None, _: Dialect
+        self, value: datetime | None, _: Dialect,
     ) -> datetime | None:
         """Logic for receiving data FROM the database.
 
@@ -137,7 +137,7 @@ class UserSettings(Base):
     auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     user: Mapped[User] = relationship(
-        'User', back_populates='preferences', uselist=False
+        'User', back_populates='preferences', uselist=False,
     )
 
 

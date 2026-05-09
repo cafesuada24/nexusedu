@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING, Any
 import sqlglot
 from langchain_core.runnables import RunnableConfig
 
+from src.core.logger import logger
 from src.infrastructure.agents.state import SQLTask
 from src.infrastructure.agents.utils import mask_pii_sql, stringify_to_yaml
 from src.infrastructure.extern.baml_client import b
 from src.infrastructure.extern.baml_client.types import RequestTableSchema
-from src.core.logger import logger
 
 if TYPE_CHECKING:
     from src.application.services.agent_metadata import AgentMetadataService
@@ -23,7 +23,7 @@ class SQLWorkerNode:
     async def __call__(self, state: SQLTask, config: RunnableConfig) -> dict[str, Any]:
         """Execute the SQL worker node."""
         metadata_service: AgentMetadataService | None = config.get(
-            'configurable', {}
+            'configurable', {},
         ).get(
             'metadata_service',
         )

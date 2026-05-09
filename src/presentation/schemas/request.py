@@ -43,7 +43,7 @@ class SISRecord(BaseModel):
     email: str = Field(..., description='Student email address.')
     major: str | None = Field('Unknown', description='Student major.')
     current_risk_status: str | None = Field(
-        'Normal', description='Current risk status.'
+        'Normal', description='Current risk status.',
     )
     last_notified_timestamp: AwareDatetime | None = Field(
         description='Timestamp of last nudge.',

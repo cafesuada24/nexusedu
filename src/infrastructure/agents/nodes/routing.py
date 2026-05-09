@@ -4,12 +4,12 @@ from typing import Literal
 
 from langgraph.types import Send
 
+from src.core.logger import logger
 from src.infrastructure.agents.state import (
     MAX_DISCOVERY_DEPTH,
     AgentState,
     RoutingMetadata,
 )
-from src.core.logger import logger
 
 
 def route_after_sql(state: AgentState) -> Literal['email_agent', 'responder']:

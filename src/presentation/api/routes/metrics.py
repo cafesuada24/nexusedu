@@ -4,8 +4,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
-from src.presentation.api.auth import Scope, User, require_scope
 from src.application.queries.metrics_queries import MetricsQueryHandler
+from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import get_metrics_query_handler
 
 router = APIRouter(prefix='/metrics', tags=['metrics'])
