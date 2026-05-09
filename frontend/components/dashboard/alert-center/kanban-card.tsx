@@ -372,7 +372,7 @@ function CardActions({
     }
 
     if (a.status === "accepted") {
-        const canSendNow = isActuallyReady && !isActuallyDrafting;
+        const canSendNow = !!a.draftBody && !isActuallyDrafting;
         return (
             <div className="mt-3 flex items-center gap-2">
                 <Button

@@ -15,6 +15,7 @@ import {
     generateAiDraftForAlert,
     ingestData,
     sendNudge,
+    updateEmailDraft,
 } from "@/lib/api";
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
 import { useSocketEvent } from "@/hooks/use-socket";
@@ -446,7 +447,7 @@ export function AlertCenter() {
             return;
         }
 
-        // "contacted" transition uses POST /email/send (no generic PATCH /status endpoint)
+        // "contacted" transition: PATCH /email to ensure DRAFT status, then POST /email/send
         if (status === "contacted") {
             if (!caseId) {
                 toast.error("Không tìm thấy mã case", {
@@ -461,10 +462,23 @@ export function AlertCenter() {
                 });
                 return;
             }
-            try {
-                await sendNudge(caseId, {
-                    body: a.body || a.draftBody || "",
+            const emailBody = a.body || a.draftBody || "";
+            const emailSubject =
+                a.subject || a.draftSubject || "Hỗ trợ học tập";
+            if (!emailBody.trim()) {
+                toast.error("Chưa có nội dung email", {
+                    description:
+                        "Vui lòng tạo nội dung AI hoặc soạn thảo trong ô nội dung Email.",
                 });
+                return;
+            }
+            try {
+                // Ensure email record is in DRAFT status (UNAVAILABLE → DRAFT via PATCH)
+                await updateEmailDraft(caseId, {
+                    subject: emailSubject,
+                    body: emailBody,
+                });
+                await sendNudge(caseId, { body: emailBody });
                 markRecentlyMoved(a.id, status);
                 setEmailTargetId(null);
                 if (message) toast.success(message);

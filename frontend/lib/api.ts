@@ -836,6 +836,35 @@ export async function getJobStatus(job_id: string): Promise<JobResult> {
 }
 
 /**
+ * PATCH /cases/{case_id}/email — update draft subject/body (UNAVAILABLE or DRAFT → DRAFT).
+ * Must be called before sendNudge if no AI draft has been generated yet.
+ */
+export async function updateEmailDraft(
+    case_id: string,
+    payload: { subject?: string; body?: string },
+): Promise<void> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                endpoint(`/cases/${encodeURIComponent(case_id)}/email`),
+                {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        const message = errorBody.detail || res.statusText;
+        throw new Error(`Cập nhật nội dung email thất bại: ${message}`);
+    }
+}
+
+/**
  * Send finalized email body to student.
  */
 export async function sendNudge(
