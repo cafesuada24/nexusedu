@@ -173,6 +173,7 @@ export function AlertCenter() {
                     draftBody: r.draft_body || null,
                     isGenerating:
                         r.is_generating || r.draft_status === "generating",
+                    interventionStatus: r.intervention_status || null,
                     appointmentAt:
                         (r.intervention_status || "").toLowerCase() === "booked"
                             ? pickRandomAppointment()
@@ -187,7 +188,6 @@ export function AlertCenter() {
     >({
         new: false,
         accepted: false,
-        contacted: false,
         scheduled: false,
         in_progress: false,
         resolved: false,
@@ -201,7 +201,6 @@ export function AlertCenter() {
     >({
         new: false,
         accepted: false,
-        contacted: false,
         scheduled: false,
         in_progress: false,
         resolved: false,
@@ -229,7 +228,6 @@ export function AlertCenter() {
         const map: Record<CaseStatus, Alert[]> = {
             new: [],
             accepted: [],
-            contacted: [],
             scheduled: [],
             in_progress: [],
             resolved: [],
@@ -247,7 +245,6 @@ export function AlertCenter() {
         const map: Record<CaseStatus, number> = {
             new: 0,
             accepted: 0,
-            contacted: 0,
             scheduled: 0,
             in_progress: 0,
             resolved: 0,
@@ -334,9 +331,84 @@ export function AlertCenter() {
     };
 
     const handleSaveEmail = (a: Alert) => {
-        // When we save from the editor, we effectively "contact" the student
-        moveTo(a, "contacted", "Đã lưu bản thảo và sẵn sàng gửi");
-        setEmailTargetId(null);
+        // Saving from the editor sends the email but keeps the case in
+        // "Đã chấp nhận" — column will move to "Đã đặt hẹn" only when the
+        // student confirms a slot on the booking page.
+        handleSendEmail(a);
+    };
+
+    /**
+     * Send the nudge email to the student. Backend transitions case
+     * ACCEPTED → SENT; frontend keeps it in the "accepted" column with a
+     * sent-indicator on the card. Does NOT change the kanban column.
+     */
+    const handleSendEmail = async (a: Alert) => {
+        const caseId = resolveCaseIdForAlert(a);
+        if (!caseId) {
+            toast.error("Không tìm thấy mã case", {
+                description: "Vui lòng tải lại danh sách và thử lại.",
+                action: {
+                    label: "Tải lại",
+                    onClick: () =>
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.alerts.list(),
+                        }),
+                },
+            });
+            return;
+        }
+        const emailBody = a.body || a.draftBody || "";
+        const emailSubject =
+            a.subject || a.draftSubject || "Hỗ trợ học tập";
+        if (!emailBody.trim()) {
+            if (a.isGenerating) {
+                toast.error("AI đang soạn thảo", {
+                    description:
+                        "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
+                });
+            } else {
+                toast.error("Chưa có nội dung email", {
+                    description:
+                        "Vui lòng tạo nội dung AI hoặc soạn thảo trong ô nội dung Email.",
+                });
+            }
+            return;
+        }
+        try {
+            // If no AI draft yet (UNAVAILABLE), PATCH sets content + status to DRAFT.
+            // Skip PATCH when draftBody already exists (email is already DRAFT from AI).
+            if (!a.draftBody) {
+                try {
+                    await updateEmailDraft(caseId, {
+                        subject: emailSubject,
+                        body: emailBody,
+                    });
+                } catch (patchErr: any) {
+                    if (
+                        patchErr.message?.toLowerCase().includes("generating")
+                    ) {
+                        toast.error("AI đang soạn thảo", {
+                            description:
+                                "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
+                        });
+                        return;
+                    }
+                    throw patchErr;
+                }
+            }
+            await sendNudge(caseId, { body: emailBody });
+            setEmailTargetId(null);
+            toast.success(`Đã gửi email cho ${a.name}`, {
+                description: "Đang chờ sinh viên đặt lịch hẹn.",
+            });
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.alerts.list(),
+            });
+        } catch (err: any) {
+            toast.error("Không thể gửi email", {
+                description: err.message,
+            });
+        }
     };
 
     const moveTo = async (a: Alert, status: CaseStatus, message: string) => {
@@ -444,78 +516,6 @@ export function AlertCenter() {
                     },
                 },
             );
-            return;
-        }
-
-        // "contacted" transition: PATCH /email to ensure DRAFT status, then POST /email/send
-        if (status === "contacted") {
-            if (!caseId) {
-                toast.error("Không tìm thấy mã case", {
-                    description: "Vui lòng tải lại danh sách và thử lại.",
-                    action: {
-                        label: "Tải lại",
-                        onClick: () =>
-                            queryClient.invalidateQueries({
-                                queryKey: queryKeys.alerts.list(),
-                            }),
-                    },
-                });
-                return;
-            }
-            const emailBody = a.body || a.draftBody || "";
-            const emailSubject =
-                a.subject || a.draftSubject || "Hỗ trợ học tập";
-            if (!emailBody.trim()) {
-                if (a.isGenerating) {
-                    toast.error("AI đang soạn thảo", {
-                        description:
-                            "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
-                    });
-                } else {
-                    toast.error("Chưa có nội dung email", {
-                        description:
-                            "Vui lòng tạo nội dung AI hoặc soạn thảo trong ô nội dung Email.",
-                    });
-                }
-                return;
-            }
-            try {
-                // If no AI draft yet (UNAVAILABLE), PATCH sets content + status to DRAFT.
-                // Skip PATCH when draftBody already exists (email is already DRAFT from AI).
-                if (!a.draftBody) {
-                    try {
-                        await updateEmailDraft(caseId, {
-                            subject: emailSubject,
-                            body: emailBody,
-                        });
-                    } catch (patchErr: any) {
-                        // Email is GENERATING (race condition: alert data was stale)
-                        if (
-                            patchErr.message
-                                ?.toLowerCase()
-                                .includes("generating")
-                        ) {
-                            toast.error("AI đang soạn thảo", {
-                                description:
-                                    "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
-                            });
-                            return;
-                        }
-                        throw patchErr;
-                    }
-                }
-                await sendNudge(caseId, { body: emailBody });
-                markRecentlyMoved(a.id, status);
-                setEmailTargetId(null);
-                if (message) toast.success(message);
-                queryClient.invalidateQueries({
-                    queryKey: queryKeys.alerts.list(),
-                });
-            } catch (err: any) {
-                toast.error("Không thể gửi email", {
-                    description: err.message,
-                });
-            }
             return;
         }
 
@@ -721,6 +721,7 @@ export function AlertCenter() {
                                     onViewDetails={handleGetProfile}
                                     onEditEmail={(a) => setEmailTargetId(a.id)}
                                     onGenerateDraft={handleGenerateDraft}
+                                    onSendEmail={handleSendEmail}
                                     onMove={moveTo}
                                     onOpenGoals={(id) => setGoalsTargetId(id)}
                                     studentProfilesById={studentProfilesById}
