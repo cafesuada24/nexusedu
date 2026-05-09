@@ -1,9 +1,11 @@
 """Mappers between SQLAlchemy ORM models and Domain Entities."""
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from src.domain.entities.advisor import Advisor as DomainAdvisor
+from src.domain.entities.appointment import (
+    Appointment as DomainAppointment,
+)
 from src.domain.entities.case import Case as DomainCase
 from src.domain.entities.intervention_email import (
     InterventionEmail as DomainInterventionEmail,
@@ -22,6 +24,9 @@ from src.domain.value_objects.status import (
 )
 from src.infrastructure.database.models import (
     Advisor as OrmAdvisor,
+)
+from src.infrastructure.database.models import (
+    Appointment as OrmAppointment,
 )
 from src.infrastructure.database.models import (
     BackgroundJobTracker,
@@ -114,6 +119,30 @@ class DataMapper:
             created_at=orm_email.created_at,
             sent_at=orm_email.sent_at,
             version=orm_email.version,
+        )
+
+    @staticmethod
+    def to_domain_appointment(orm_appointment: OrmAppointment) -> DomainAppointment:
+        """Map ORM Appointment to Domain Appointment."""
+        return DomainAppointment(
+            appointment_id=orm_appointment.appointment_id,
+            case_id=orm_appointment.case_id,
+            appointment_time=orm_appointment.appointment_time,
+            meeting_method=MeetingMethod(orm_appointment.meeting_method),
+            notes=orm_appointment.notes,
+            created_at=orm_appointment.created_at,
+        )
+
+    @staticmethod
+    def to_orm_appointment(domain_appointment: DomainAppointment) -> OrmAppointment:
+        """Map Domain Appointment to ORM Appointment."""
+        return OrmAppointment(
+            appointment_id=domain_appointment.appointment_id,
+            case_id=domain_appointment.case_id,
+            appointment_time=domain_appointment.appointment_time,
+            meeting_method=domain_appointment.meeting_method,
+            notes=domain_appointment.notes,
+            created_at=domain_appointment.created_at,
         )
 
     @staticmethod
