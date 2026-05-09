@@ -13,8 +13,8 @@ import {
     Info,
     Loader2,
     History,
-    Sparkles,
     Mail,
+    Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -372,54 +372,27 @@ function CardActions({
     }
 
     if (a.status === "accepted") {
-        if (isActuallyDrafting && !isActuallyReady) {
-            return (
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3 h-10 w-full rounded-lg text-sm font-medium bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20"
-                    disabled
-                >
-                    <Loader2 className="size-4 animate-spin" />
-                    AI đang soạn thảo...
-                </Button>
-            );
-        }
-
-        if (isActuallyReady) {
-            return (
-                <div className="mt-3">
-                    <Button
-                        size="sm"
-                        className="h-10 w-full rounded-lg text-sm font-medium"
-                        onClick={onEditEmail}
-                    >
-                        <Mail className="size-4" />
-                        Nội dung Email
-                    </Button>
-                </div>
-            );
-        }
-
+        const canSendNow = isActuallyReady && !isActuallyDrafting;
         return (
             <div className="mt-3 flex items-center gap-2">
                 <Button
-                    variant="secondary"
                     size="sm"
-                    className="h-10 flex-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 transition-colors"
-                    onClick={onGenerateDraft}
+                    className="h-10 flex-1 rounded-lg text-sm font-medium"
+                    onClick={onEditEmail}
                 >
-                    <Sparkles className="size-4" />
-                    Tạo nội dung AI
+                    <Mail className="size-4" />
+                    Nội dung Email
                 </Button>
                 <Button
-                    variant="ghost"
                     size="sm"
+                    variant="outline"
+                    disabled={!canSendNow}
                     className="h-10 w-10 shrink-0 rounded-lg"
-                    onClick={onViewDetails}
-                    aria-label="Xem hồ sơ"
+                    onClick={() => onMove("contacted", `Đã gửi email cho ${a.name}`)}
+                    aria-label="Gửi email và chuyển sang Đã liên hệ"
+                    title={canSendNow ? "Gửi email" : "Cần tạo nội dung email trước khi gửi"}
                 >
-                    <Info className="size-4" />
+                    <Send className="size-4" />
                 </Button>
             </div>
         );
