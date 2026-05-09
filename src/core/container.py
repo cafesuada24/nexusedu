@@ -27,6 +27,7 @@ from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
+from src.domain.repositories.appointment_repository import AppointmentRepository
 from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
@@ -59,6 +60,7 @@ from src.infrastructure.persistence.query_services.point_ledger_query_service im
 from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
+    SqlAlchemyAppointmentRepository,
     SqlAlchemyBadgeRepository,
     SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
@@ -98,6 +100,10 @@ class Container:
     @cached_property
     def student_repo(self) -> StudentRepository:
         return SqlAlchemyStudentRepository(self.session)
+
+    @cached_property
+    def appointment_repo(self) -> AppointmentRepository:
+        return SqlAlchemyAppointmentRepository(self.session)
 
     @cached_property
     def advisor_repo(self) -> AdvisorRepository:
@@ -218,6 +224,7 @@ class Container:
             self.email_repo,
             self.case_repo,
             self.advisor_repo,
+            self.appointment_repo,
             self.job_repo,
             self.task_queue,
             self.event_publisher,
