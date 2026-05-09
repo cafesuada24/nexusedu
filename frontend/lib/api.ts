@@ -1265,6 +1265,46 @@ export async function acceptCase(case_id: string): Promise<void> {
     );
 }
 
+/**
+ * POST /cases/{case_id}/book — student confirms appointment booking.
+ * Public endpoint (no auth required) — called from /booking/[token] page.
+ */
+export async function confirmBooking(case_id: string): Promise<void> {
+    const trimmedCaseId = case_id.trim();
+    if (!z.string().uuid().safeParse(trimmedCaseId).success) {
+        throw new Error("Mã case không hợp lệ.");
+    }
+    const url = endpoint(`/cases/${encodeURIComponent(trimmedCaseId)}/book`);
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                url,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: "{}",
+                    suppressUnauthorizedEvent: true,
+                },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (res.ok) return;
+
+    const body = await res.text().catch(() => "");
+    let detail = res.statusText;
+    try {
+        const parsed = body ? JSON.parse(body) : {};
+        detail =
+            (typeof parsed?.detail === "string" ? parsed.detail : "") ||
+            (typeof parsed?.message === "string" ? parsed.message : "") ||
+            detail;
+    } catch {
+        if (body) detail = body;
+    }
+    throw new Error(`Xác nhận đặt lịch thất bại [${res.status}]: ${detail}`);
+}
+
 /** True when an `NEXT_PUBLIC_API_BASE_URL` was configured at build time or we're in the browser. */
 export function isApiConfigured(): boolean {
     // If we're in the browser, we assume the default /api/v1 rewrite works.
