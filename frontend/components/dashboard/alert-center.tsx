@@ -88,7 +88,7 @@ export function AlertCenter() {
     const { mutate: updateStatus } = useUpdateAlertStatus();
     const queryClient = useQueryClient();
 
-    useSocketEvent<{ sid: string; date: string; slot: string }>(
+    useSocketEvent<{ case_id: string; date: string; slot: string }>(
         "new_appointment",
         (data) => {
             queryClient.setQueryData(
@@ -96,14 +96,14 @@ export function AlertCenter() {
                 (old: any[] | undefined) => {
                     if (!old) return [];
                     return old.map((alert) =>
-                        alert.sid === data.sid
+                        alert.case_id === data.case_id
                             ? { ...alert, intervention_status: "booked" }
                             : alert,
                     );
                 },
             );
 
-            toast.success(`Sinh viên ${data.sid} vừa đặt lịch hẹn!`, {
+            toast.success("Sinh viên vừa đặt lịch hẹn!", {
                 description: `Thời gian: ${data.date} lúc ${data.slot}`,
             });
         },
