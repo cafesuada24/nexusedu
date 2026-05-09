@@ -14,6 +14,7 @@ import {
     fetchStudentCases,
     generateAiDraftForAlert,
     ingestData,
+    sendNudge,
 } from "@/lib/api";
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
 import { useSocketEvent } from "@/hooks/use-socket";
@@ -442,6 +443,39 @@ export function AlertCenter() {
                     },
                 },
             );
+            return;
+        }
+
+        // "contacted" transition uses POST /email/send (no generic PATCH /status endpoint)
+        if (status === "contacted") {
+            if (!caseId) {
+                toast.error("Không tìm thấy mã case", {
+                    description: "Vui lòng tải lại danh sách và thử lại.",
+                    action: {
+                        label: "Tải lại",
+                        onClick: () =>
+                            queryClient.invalidateQueries({
+                                queryKey: queryKeys.alerts.list(),
+                            }),
+                    },
+                });
+                return;
+            }
+            try {
+                await sendNudge(caseId, {
+                    body: a.body || a.draftBody || "",
+                });
+                markRecentlyMoved(a.id, status);
+                setEmailTargetId(null);
+                if (message) toast.success(message);
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.alerts.list(),
+                });
+            } catch (err: any) {
+                toast.error("Không thể gửi email", {
+                    description: err.message,
+                });
+            }
             return;
         }
 
