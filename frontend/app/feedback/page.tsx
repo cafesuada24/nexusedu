@@ -5,27 +5,37 @@ import { FeedbackView } from "@/components/feedback/feedback-view"
 import { PublicBookingHeader } from "@/components/booking/public-header"
 import Link from "next/link"
 
-const advisors: Record<string, { advisor: string; role: string }> = {
+const ADVISOR_META: Record<string, { advisor: string; role: string }> = {
   "le-ha": {
     advisor: "TS. Lê Hà",
     role: "Cố vấn học tập · Khoa CNTT",
   },
 }
 
+function decodeJwtPayload(
+  token: string,
+): { case_id?: string; advisor?: string } | null {
+  try {
+    const payload = token.split(".")[1]
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"))
+  } catch {
+    return null
+  }
+}
+
 export default async function PublicFeedbackPage({
-  params,
   searchParams,
 }: {
-  params: Promise<{ token: string }>
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const { token } = await params
-  const { cid } = await searchParams
+  const { token } = await searchParams
+  const raw = typeof token === "string" ? token : undefined
 
-  const meta = advisors[token] ?? { advisor: "Cố vấn học tập", role: "NexusEdu" }
-  const caseId = typeof cid === "string" ? cid : undefined
+  const claims = raw ? decodeJwtPayload(raw) : null
+  const meta =
+    ADVISOR_META[claims?.advisor ?? ""] ?? ADVISOR_META["le-ha"]
 
-  if (!caseId) {
+  if (!raw || !claims?.case_id) {
     return (
       <div className="flex min-h-screen flex-col bg-muted/30">
         <PublicBookingHeader />
@@ -34,10 +44,13 @@ export default async function PublicFeedbackPage({
             <div className="mx-auto grid size-12 place-items-center rounded-xl bg-destructive/10 text-destructive">
               <AlertCircle className="size-6" />
             </div>
-            <h1 className="text-xl font-bold text-destructive">Liên kết không hợp lệ</h1>
+            <h1 className="text-xl font-bold text-destructive">
+              Liên kết không hợp lệ
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Vui lòng sử dụng liên kết đánh giá được gửi trực tiếp đến email của bạn.
-              Nếu bạn cho rằng đây là lỗi, hãy liên hệ với cố vấn học tập.
+              Vui lòng sử dụng liên kết đánh giá được gửi trực tiếp đến email
+              của bạn. Nếu bạn cho rằng đây là lỗi, hãy liên hệ với cố vấn học
+              tập.
             </p>
             <Button asChild className="rounded-xl">
               <Link href="/">Quay lại trang chủ</Link>
@@ -65,16 +78,17 @@ export default async function PublicFeedbackPage({
               Bạn cảm thấy thế nào sau buổi hỗ trợ?
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground text-pretty md:text-base">
-              Phản hồi của bạn hoàn toàn bảo mật và giúp {meta.advisor} cải thiện
-              chất lượng hỗ trợ cho các sinh viên khác.
+              Phản hồi của bạn hoàn toàn bảo mật và giúp {meta.advisor} cải
+              thiện chất lượng hỗ trợ cho các sinh viên khác.
             </p>
           </div>
 
-          <FeedbackView caseId={caseId} />
+          <FeedbackView token={raw} />
 
           <p className="text-xs text-muted-foreground">
-            Nếu bạn không phải là người nhận được yêu cầu đánh giá này, bạn có thể
-            bỏ qua trang này. NexusEdu không chia sẻ dữ liệu của bạn với bên thứ ba.
+            Nếu bạn không phải là người nhận được yêu cầu đánh giá này, bạn có
+            thể bỏ qua trang này. NexusEdu không chia sẻ dữ liệu của bạn với
+            bên thứ ba.
           </p>
         </div>
       </main>
