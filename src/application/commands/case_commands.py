@@ -7,6 +7,7 @@ from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
     BookAppointmentCommand,
     GenerateEmailDraftCommand,
+    ResolveCaseCommand,
     SendEmailCommand,
     StartSupportingCommand,
     TriggerDraftCommand,
@@ -269,6 +270,24 @@ class CaseCommandHandler:
             raise CaseNotFoundError(case_id=case.case_id)
 
         case.start_supporting()
+
+        await self.case_repo.save(case)
+
+        # Dispatch events via publisher
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
+
+    async def handle_resolve_case(self, command: ResolveCaseCommand) -> None:
+        """Advisor marks the case as resolved."""
+        advisor = await self.advisor_repo.find_by_user_id(command.user_id)
+        if advisor is None:
+            raise UserIsNotAnAdvisorError(command.user_id)
+
+        case = await self.case_repo.get_by_id(command.case_id)
+        if case.assigned_advisor_id != advisor.advisor_id:
+            raise CaseNotFoundError(case_id=case.case_id)
+
+        case.resolve(datetime.now(UTC))
 
         await self.case_repo.save(case)
 

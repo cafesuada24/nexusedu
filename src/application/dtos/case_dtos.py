@@ -75,6 +75,14 @@ class StartSupportingCommand:
 
 
 @dataclass(frozen=True)
+class ResolveCaseCommand:
+    """Command for an advisor to resolve a case."""
+
+    case_id: UUID
+    user_id: UUID
+
+
+@dataclass(frozen=True)
 class GetAssignedQuery:
     """Query to retrieve advisor task list."""
 

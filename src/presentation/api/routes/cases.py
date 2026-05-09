@@ -18,6 +18,7 @@ from src.application.dtos.case_dtos import (
     ActionResponseDTO,
     CaseDTO,
     QueryEmailDTO,
+    ResolveCaseCommand,
     StartSupportingCommand,
     TriggerDraftDTO,
 )
@@ -348,4 +349,27 @@ async def start_supporting(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f'Error in start_supporting: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/{case_id}/resolve')
+async def resolve_case(
+    case_id: UUID,
+    command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+) -> ActionResponseDTO:
+    """Advisor marks the case as resolved."""
+    try:
+        command = ResolveCaseCommand(case_id=case_id, user_id=user.id)
+        await command_handler.handle_resolve_case(command)
+        return ActionResponseDTO(
+            status='success',
+            message='Case resolved successfully',
+        )
+    except (CaseNotFoundError, UserIsNotAnAdvisorError) as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error in resolve_case: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
