@@ -83,7 +83,7 @@ function KanbanCardInner({
     const isEmailSent =
         a.status === "accepted" && a.interventionStatus === "sent";
     const isAwaitingFeedback =
-        a.interventionStatus === "awaiting_feedback";
+        a.interventionStatus === "pending_review";
     const hasStudentConcern = isAwaitingFeedback && Boolean(a.studentConcern);
 
     return (

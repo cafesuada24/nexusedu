@@ -14,12 +14,10 @@ import {
     fetchStudentCases,
     generateAiDraftForAlert,
     ingestData,
-    resolveCase,
     sendNudge,
     updateEmailDraft,
 } from "@/lib/api";
 import {
-    clearAwaitingFeedback,
     clearStudentConcern,
     setStudentConcern,
 } from "@/lib/awaiting-feedback";
@@ -116,21 +114,17 @@ export function AlertCenter() {
         comment: string;
     }>("student_feedback", async (payload) => {
         if (payload.resolved) {
-            try {
-                await resolveCase(payload.case_id);
-                clearAwaitingFeedback(payload.case_id);
-                clearStudentConcern(payload.case_id);
-                queryClient.invalidateQueries({
-                    queryKey: queryKeys.alerts.list(),
-                });
-                toast.success(
-                    `Sinh viên xác nhận đã giải quyết · ${payload.rating}⭐`,
-                    { description: payload.comment || undefined },
-                );
-            } catch (err) {
-                console.error("[student_feedback] resolve failed", err);
-                toast.error("Không thể đóng case. Thử lại sau.");
-            }
+            // Student already submitted via POST /cases/review which
+            // finalizes the case on the backend. Just clear the FE-only
+            // concern marker and refetch to pick up the new status.
+            clearStudentConcern(payload.case_id);
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.alerts.list(),
+            });
+            toast.success(
+                `Sinh viên xác nhận đã giải quyết · ${payload.rating}⭐`,
+                { description: payload.comment || undefined },
+            );
         } else {
             setStudentConcern(
                 payload.case_id,
