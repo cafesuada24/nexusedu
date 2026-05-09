@@ -174,6 +174,7 @@ async def test_email_draft_no_pii_to_ai(
         job_repo=AsyncMock(),
         advisor_repo=advisor_repository,
         task_queue=mock_task_queue,
+        event_publisher=AsyncMock(),
         email_drafting_service=mock_email_drafting,
     )
 
