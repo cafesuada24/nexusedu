@@ -22,7 +22,6 @@ from sqlalchemy import (
     text,
     update,
 )
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
@@ -53,6 +52,7 @@ from src.infrastructure.database.models import (
 )
 from src.infrastructure.database.models import Advisor as OrmAdvisor
 from src.infrastructure.database.models import Case as OrmCase
+from src.infrastructure.database.utils import upsert_stmt
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.interfaces import ReflectedColumn
@@ -140,19 +140,16 @@ class SqlAlchemyStudentRepository:
 
         # Manual Chunking to avoid "too many variables" error (SQLite limit is ~999)
         # Configurable via DB_INGEST_CHUNK_SIZE env var.
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
         for i in range(0, len(records), self.chunk_size):
             batch = records[i : i + self.chunk_size]
 
-            # Dynamically choose insert implementation based on dialect
-            dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
-            if dialect == 'postgresql':
-                from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
-                    insert as pg_insert,
-                )
-
-                stmt = pg_insert(Student).values(batch).on_conflict_do_nothing()
-            else:
-                stmt = sqlite_insert(Student).values(batch).on_conflict_do_nothing()
+            stmt = upsert_stmt(
+                dialect_name=dialect,
+                table=Student,
+                records=batch,
+                index_elements=['sid'],
+            )
 
             await self.session.execute(stmt)
 
@@ -181,19 +178,16 @@ class SqlAlchemyActivityRepository:
 
         # Manual Chunking to avoid "too many variables" error (SQLite limit is ~999)
         # Configurable via DB_INGEST_CHUNK_SIZE env var.
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
         for i in range(0, len(records), self.chunk_size):
             batch = records[i : i + self.chunk_size]
 
-            # Dynamically choose insert implementation based on dialect
-            dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
-            if dialect == 'postgresql':
-                from sqlalchemy.dialects.postgresql import (  # noqa: PLC0415
-                    insert as pg_insert,
-                )
-
-                stmt = pg_insert(Activity).values(batch).on_conflict_do_nothing()
-            else:
-                stmt = sqlite_insert(Activity).values(batch).on_conflict_do_nothing()
+            stmt = upsert_stmt(
+                dialect_name=dialect,
+                table=Activity,
+                records=batch,
+                index_elements=['activity_id'],
+            )
 
             await self.session.execute(stmt)
 
@@ -351,20 +345,27 @@ class SqlAlchemyAdvisorRepository:
             return
 
         # 2. Use native UPSERT for user_id to handle concurrency
-        insert_stmt = sqlite_insert(OrmAdvisor).values(
-            advisor_id=uuid.uuid4(),
-            user_id=user_id,
-            email=email,
-            name=name,
-        )
-        upsert_stmt = insert_stmt.on_conflict_do_update(
-            index_elements=["user_id"],
-            set_={
-                "email": insert_stmt.excluded.email,
-                "name": insert_stmt.excluded.name,
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+        batch = [
+            {
+                'advisor_id': uuid.uuid4(),
+                'user_id': user_id,
+                'email': email,
+                'name': name,
+            },
+        ]
+
+        upsert_stmt_obj = upsert_stmt(
+            dialect_name=dialect,
+            table=OrmAdvisor,
+            records=batch,
+            index_elements=['user_id'],
+            update_mapping={
+                'email': email,
+                'name': name,
             },
         )
-        await self.session.execute(upsert_stmt)
+        await self.session.execute(upsert_stmt_obj)
 
 
 class SqlAlchemyIdempotencyRepository:
@@ -401,10 +402,12 @@ class SqlAlchemyBadgeRepository:
         return list(result.scalars().all())
 
     async def award_badge(self, advisor_id: uuid.UUID, badge_id: str) -> bool:
-        stmt = (
-            sqlite_insert(AdvisorBadge)
-            .values(advisor_id=advisor_id, badge_id=badge_id)
-            .on_conflict_do_nothing(index_elements=["advisor_id", "badge_id"])
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+        stmt = upsert_stmt(
+            dialect_name=dialect,
+            table=AdvisorBadge,
+            records=[{'advisor_id': advisor_id, 'badge_id': badge_id}],
+            index_elements=['advisor_id', 'badge_id'],
         )
         result = await self.session.execute(stmt)
         return result.rowcount > 0
@@ -939,28 +942,13 @@ class SqlAlchemyUserSettingsRepository:
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
         values = {'user_id': user_id, 'auto_draft_enabled': enabled}
 
-        if dialect == 'postgresql':
-            from sqlalchemy.dialects.postgresql import insert as pg_insert
-
-            stmt = (
-                pg_insert(UserSettings)
-                .values(**values)
-                .on_conflict_do_update(
-                    index_elements=['user_id'],
-                    set_={'auto_draft_enabled': enabled},
-                )
-            )
-        else:
-            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-
-            stmt = (
-                sqlite_insert(UserSettings)
-                .values(**values)
-                .on_conflict_do_update(
-                    index_elements=['user_id'],
-                    set_={'auto_draft_enabled': enabled},
-                )
-            )
+        stmt = upsert_stmt(
+            dialect_name=dialect,
+            table=UserSettings,
+            records=[values],
+            index_elements=['user_id'],
+            update_mapping={'auto_draft_enabled': enabled},
+        )
 
         await self.session.execute(stmt)
 
