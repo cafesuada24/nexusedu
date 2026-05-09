@@ -1334,23 +1334,23 @@ export async function resolveCase(case_id: string): Promise<void> {
     throw new Error(`Giải quyết case thất bại [${res.status}]: ${detail}`);
 }
 
+export type StudentSatisfaction =
+    | "very_bad"
+    | "bad"
+    | "normal"
+    | "good"
+    | "very_good";
+
 /**
- * POST /cases/{case_id}/feedback — student submits rating + comment.
- * Public endpoint (no auth required) — called from /feedback/[token] page.
+ * POST /cases/review?token=<JWT> — student submits satisfaction + comment.
+ * Public endpoint. Backend verifies JWT and extracts case_id from it.
  */
 export async function submitFeedback(
-    case_id: string,
-    rating: number,
+    token: string,
+    satisfaction: StudentSatisfaction,
     comment: string | null,
 ): Promise<void> {
-    const trimmed = case_id.trim();
-    if (!z.string().uuid().safeParse(trimmed).success) {
-        throw new Error("Mã case không hợp lệ.");
-    }
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-        throw new Error("Điểm đánh giá phải từ 1 đến 5.");
-    }
-    const url = endpoint(`/cases/${encodeURIComponent(trimmed)}/feedback`);
+    const url = `${endpoint("/cases/review")}?token=${encodeURIComponent(token)}`;
     const res = await withTimeout(
         (signal) =>
             authFetch(
@@ -1358,7 +1358,7 @@ export async function submitFeedback(
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rating, comment: comment || null }),
+                    body: JSON.stringify({ satisfaction, comment: comment || null }),
                     suppressUnauthorizedEvent: true,
                 },
                 signal,
