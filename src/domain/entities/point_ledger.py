@@ -1,7 +1,8 @@
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
-import uuid
+
 
 @dataclass(frozen=True)
 class PointLedgerEntry:
@@ -25,19 +26,19 @@ class PointLedger:
         case_id: UUID,
         action: str,
         points: int,
-        earned_at: datetime
+        earned_at: datetime,
     ) -> None:
         """Adds a new point award to the ledger."""
         if points <= 0:
             raise ValueError("Points must be positive.")
-        
+
         entry = PointLedgerEntry(
             id=uuid.uuid4(),
             advisor_id=self.advisor_id,
             case_id=case_id,
             action=action,
             points=points,
-            earned_at=earned_at
+            earned_at=earned_at,
         )
         self._pending_entries.append(entry)
         self.entries.append(entry)

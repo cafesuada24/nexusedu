@@ -106,7 +106,7 @@ class AdvisorQueryHandler:
         # Ensure advisor exists
         await self.__advisor_repo.get_by_id(advisor_id)
         return await self.__advisor_metrics_query_service.get_advisor_metrics(
-            advisor_id
+            advisor_id,
         )
 
     async def handle_get_advisor_badges(self, advisor_id: UUID) -> list[BadgeDTO]:

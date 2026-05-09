@@ -29,7 +29,7 @@ class AgentCommandHandler:
         self.idempotency_repo = idempotency_repo
 
     async def handle_run_agent_task(
-        self, command: RunAgentTaskCommand
+        self, command: RunAgentTaskCommand,
     ) -> AgentResponseDTO:
         """Execute the agent task command."""
         session_id = command.thread_id or uuid.uuid4()

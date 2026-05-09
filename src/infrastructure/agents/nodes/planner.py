@@ -4,6 +4,7 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
+from src.core.logger import logger
 from src.infrastructure.agents.state import (
     MAX_MESSAGES,
     MAX_RESULTS,
@@ -12,7 +13,6 @@ from src.infrastructure.agents.state import (
 )
 from src.infrastructure.agents.utils import MessageSerializer
 from src.infrastructure.extern.baml_client import b
-from src.core.logger import logger
 
 
 class PlannerNode:
@@ -37,7 +37,7 @@ class PlannerNode:
             logger.info('Planner: Incorporating discovery context.')
             message_yaml += f'\n\n<discovery_context>\n{state["discovery_context"]}\n</discovery_context>'
             logger.debug(
-                f'Discovery Context Length: {len(state["discovery_context"] or "")}'
+                f'Discovery Context Length: {len(state["discovery_context"] or "")}',
             )
 
         logger.debug('Planner: Invoking LLM...')

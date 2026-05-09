@@ -7,8 +7,8 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from src.domain.value_objects.status import RiskStatus
 from src.core.logger import logger
+from src.domain.value_objects.status import RiskStatus
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -48,11 +48,11 @@ class ZScore:
         logger.info('ZScore: Starting calculation...')
 
         new_history_records, risk_statuses = self._calculate_anomalies(
-            student_data, history_set
+            student_data, history_set,
         )
 
         logger.info(
-            f'ZScore: Calculation completed. Found {len(new_history_records)} new anomalies.'
+            f'ZScore: Calculation completed. Found {len(new_history_records)} new anomalies.',
         )
         return new_history_records, risk_statuses
 

@@ -7,13 +7,13 @@ from uuid import UUID
 from arq import ArqRedis
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
+from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
     get_arq_pool,
     get_idempotency_repository,
 )
-from src.core.logger import logger
 
 router = APIRouter(prefix='/query', tags=['query'])
 
@@ -24,7 +24,7 @@ async def submit_query(
     arq_pool: Annotated[ArqRedis | None, Depends(get_arq_pool)],
     user: Annotated[User, Depends(require_scope(Scope.QUERY_EXECUTE))],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
+        IdempotencyRepository, Depends(get_idempotency_repository),
     ],
     thread_id: str | None = Query(None, description='Existing thread identifier.'),
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
@@ -41,7 +41,7 @@ async def submit_query(
 
     if not arq_pool:
         raise HTTPException(
-            status_code=503, detail='Background processing unavailable (Redis down).'
+            status_code=503, detail='Background processing unavailable (Redis down).',
         )
 
     job_id = str(uuid.uuid4())

@@ -776,7 +776,7 @@ class SqlAlchemyMetricsRepository:
 
         # 2. Interventions
         int_stmt = select(func.count(distinct(OrmCase.sid))).where(
-            OrmCase.intervention_status != InterventionStatus.NEW
+            OrmCase.intervention_status != InterventionStatus.NEW,
         )
         int_res = await self.session.execute(int_stmt)
         int_count = int_res.scalar() or 0

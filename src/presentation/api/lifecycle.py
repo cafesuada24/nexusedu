@@ -18,9 +18,9 @@ from langgraph.graph.state import CompiledStateGraph
 from psycopg_pool import ConnectionPool
 
 from src.core.config import config
+from src.core.logger import logger
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.agents.state import AgentState
-from src.core.logger import logger
 
 
 @dataclass
@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info('API Lifecycle: ARQ Redis Pool initialized.')
     except Exception as e:
         logger.warning(
-            f'API Lifecycle: Could not connect to Redis: {e}. Background tasks will be disabled.'
+            f'API Lifecycle: Could not connect to Redis: {e}. Background tasks will be disabled.',
         )
         arq_pool = None
 

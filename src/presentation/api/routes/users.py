@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.presentation.api.auth import (
@@ -29,7 +30,6 @@ from src.presentation.schemas.auth import (
     UserSettingsUpdate,
     UserUpdate,
 )
-from src.core.logger import logger
 
 router = APIRouter(prefix='/users', tags=['users'])
 
@@ -46,7 +46,7 @@ async def get_me(
 async def get_my_settings(
     user: Annotated[User, Depends(current_active_user)],
     settings_repo: Annotated[
-        UserSettingsRepository, Depends(get_user_settings_repository)
+        UserSettingsRepository, Depends(get_user_settings_repository),
     ],
 ) -> UserSettingsRead:
     """Get the current authenticated user's settings."""
@@ -59,7 +59,7 @@ async def update_my_settings(
     update: UserSettingsUpdate,
     user: Annotated[User, Depends(current_active_user)],
     settings_repo: Annotated[
-        UserSettingsRepository, Depends(get_user_settings_repository)
+        UserSettingsRepository, Depends(get_user_settings_repository),
     ],
 ) -> UserSettingsRead:
     """Update the current authenticated user's settings."""
@@ -78,7 +78,7 @@ async def update_user(
     user_manager: Annotated[UserManager, Depends(get_user_manager)],
     _admin: Annotated[User, Depends(require_scope(Scope.USERS_WRITE))],
     idempotency_repo: Annotated[
-        IdempotencyRepository, Depends(get_idempotency_repository)
+        IdempotencyRepository, Depends(get_idempotency_repository),
     ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
 ) -> User:
