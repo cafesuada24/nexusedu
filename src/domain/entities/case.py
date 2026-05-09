@@ -6,7 +6,11 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from src.domain.events.base import DomainEvent
-from src.domain.events.case_events import CaseAcceptedEvent
+from src.domain.events.case_events import (
+    CaseAcceptedEvent,
+    CaseResolvedEvent,
+    StudentBookedEvent,
+)
 from src.domain.exceptions import CaseAlreadyAssignedError, InvalidStateTransitionError
 from src.domain.value_objects.status import InterventionStatus
 
@@ -119,6 +123,12 @@ class Case:
     def record_booking(self) -> None:
         """Student booked an appointment."""
         self._transition_to(InterventionStatus.BOOKED)
+        self.register_event(
+            StudentBookedEvent(
+                case_id=self.case_id,
+                occurred_at=datetime.now(UTC),
+            ),
+        )
 
     def start_supporting(self) -> None:
         """Advisor starts supporting the student after they booked."""
@@ -128,6 +138,13 @@ class Case:
         """Mark the case as resolved."""
         self._transition_to(InterventionStatus.RESOLVED)
         self.closed_at = occured_at
+        self.register_event(
+            CaseResolvedEvent(
+                case_id=self.case_id,
+                advisor_id=self.assigned_advisor_id,  # type: ignore
+                occurred_at=occured_at,
+            ),
+        )
 
     def _transition_to(self, next_status: InterventionStatus) -> None:
         """The 'Bouncer' that enforces the matrix."""
