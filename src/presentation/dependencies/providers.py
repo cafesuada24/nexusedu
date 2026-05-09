@@ -324,10 +324,6 @@ async def get_data_command_handler(
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     anomaly_engine: Annotated[AnomalyEngine, Depends(get_anomaly_engine)],
-    case_command_handler: Annotated[
-        CaseCommandHandler,
-        Depends(get_case_command_handler),
-    ],
 ) -> DataCommandHandler:
     """Dependency provider for the DataCommandHandler."""
     return DataCommandHandler(
@@ -337,7 +333,6 @@ async def get_data_command_handler(
         case_repo,
         job_repo,
         anomaly_engine,
-        case_command_handler,
     )
 
 

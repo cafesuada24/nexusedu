@@ -29,22 +29,15 @@ def mock_engine():
 
 
 @pytest.fixture
-def mock_case_handler():
-    return MagicMock()
-
-
-@pytest.fixture
-def handler(mock_repos, mock_engine, mock_case_handler):
+def handler(mock_repos, mock_engine):
     # Initialize all awaited methods as AsyncMock
     mock_repos['activity'].get_weekly_averages = AsyncMock()
     mock_repos['history'].get_all_history = AsyncMock()
     mock_repos['history'].batch_create_history = AsyncMock()
     mock_repos['student'].get_by_id = AsyncMock()
-    mock_repos['student'].update_risk_status = AsyncMock()
-    mock_repos['case'].create_case = AsyncMock()
+    mock_repos['student'].save = AsyncMock()
     mock_repos['case'].get_active_case = AsyncMock()
-
-    mock_case_handler.handle_trigger_draft = AsyncMock()
+    mock_repos['case'].add = AsyncMock()
 
     return DataCommandHandler(
         student_repo=mock_repos['student'],
@@ -53,7 +46,6 @@ def handler(mock_repos, mock_engine, mock_case_handler):
         case_repo=mock_repos['case'],
         job_repo=mock_repos['job'],
         anomaly_engine=mock_engine,
-        case_command_handler=mock_case_handler,
     )
 
 
@@ -87,11 +79,8 @@ async def test_run_anomaly_detection_orchestration(handler, mock_repos, mock_eng
 
     # Mock student for transition
     mock_student = MagicMock()
-    mock_student.intervention_status = InterventionStatus.NONE
     mock_repos['student'].get_by_id.return_value = mock_student
-
-    # Mock settings return
-    mock_repos['settings'].get_auto_draft_enabled = AsyncMock(return_value=True)
+    mock_repos['case'].get_active_case.return_value = None
 
     # Execute
     new_at_risk = await handler._run_anomaly_detection()
@@ -99,11 +88,13 @@ async def test_run_anomaly_detection_orchestration(handler, mock_repos, mock_eng
     # Verify
     assert sid in (s[0] for s in new_at_risk)
     mock_repos['history'].batch_create_history.assert_called_once_with(new_records)
-    mock_repos['student'].update_risk_status.assert_called_with(
-        sid,
-        risk_status=RiskStatus.CRITICAL,
-        intervention_status=InterventionStatus.NOTIFIED,
-    )
+    
+    # Verify student update
+    mock_student.update_risk.assert_called_with(RiskStatus.CRITICAL)
+    mock_repos['student'].save.assert_called_with(mock_student)
+    
+    # Verify case creation
+    mock_repos['case'].add.assert_called_once()
 
     # Verify engine was called with grouped data
     args, _ = mock_engine.run.call_args
