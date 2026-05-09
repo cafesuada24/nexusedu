@@ -355,32 +355,15 @@ function CardActions({
     }
 
     if (a.status === "accepted") {
-        const canSendNow = !!a.draftBody && !isActuallyDrafting && !isEmailSent;
-        const sendTitle = isEmailSent
-            ? "Email đã gửi · đang chờ sinh viên đặt lịch"
-            : canSendNow
-              ? "Gửi email"
-              : "Cần tạo nội dung email trước khi gửi";
         return (
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3">
                 <Button
                     size="sm"
-                    className="h-10 flex-1 rounded-lg text-sm font-medium"
+                    className="h-10 w-full rounded-lg text-sm font-medium"
                     onClick={onEditEmail}
                 >
                     <Mail className="size-4" />
                     Nội dung Email
-                </Button>
-                <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!canSendNow}
-                    className="h-10 w-10 shrink-0 rounded-lg"
-                    onClick={onSendEmail}
-                    aria-label="Gửi email cho sinh viên"
-                    title={sendTitle}
-                >
-                    <Send className="size-4" />
                 </Button>
             </div>
         );
