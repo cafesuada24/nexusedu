@@ -91,7 +91,7 @@ async def test_run_dispatch_email_task_points(test_db_session, setup_data, monke
     monkeypatch.setattr("src.worker.get_async_session", mock_get_async_session)
 
     # Act
-    await run_dispatch_email_task({}, case_id, "Hello", "student@test.com")
+    await run_dispatch_email_task({}, case_id, "student@test.com")
 
     # Assert: 10 base * 1.0 risk * 1.5 SLA = 15 points
     stmt = select(PointLedger).where(PointLedger.case_id == case_id, PointLedger.action == "send_email")
@@ -147,7 +147,8 @@ async def test_run_case_resolved_task_points(test_db_session, setup_data, monkey
     monkeypatch.setattr("src.worker.get_async_session", mock_get_async_session)
 
     # Act
-    await run_case_resolved_task({}, case_id, advisor_id, datetime.now(UTC))
+    from src.domain.value_objects.student_satisfaction import StudentSatisfaction
+    await run_case_resolved_task({}, case_id, advisor_id, datetime.now(UTC), StudentSatisfaction.NORMAL)
 
     # Assert: 100 base * 1.0 risk * 1.2 SLA = 120 points
     stmt = select(PointLedger).where(PointLedger.case_id == case_id, PointLedger.action == "resolve_case")

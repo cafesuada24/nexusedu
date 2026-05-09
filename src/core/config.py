@@ -22,13 +22,17 @@ class Config(BaseSettings):
     redis_port: Annotated[int, Field(ge=1, le=65535)] = 6379
     allowed_origins: str = ''
 
+
+    booking_url_template: str = 'http://localhost:3000/booking/advisor?cid={cid}'
+    review_url_template: str = 'http://localhost:3000/review?token={token}'
+
     # SMTP Settings
     smtp_host: str = 'localhost'
     smtp_port: int = 1025  # Default for Mailhog
     smtp_user: str | None = None
     smtp_password: str | None = None
     smtp_from_email: str = 'noreply@example.com'
-    frontend_url: str = 'http://localhost:3000'
+
 
     model_config = SettingsConfigDict(
         env_file='.env',

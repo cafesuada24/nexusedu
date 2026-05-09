@@ -113,6 +113,7 @@ class DataMapper:
             status=EmailStatus(orm_email.status),
             created_at=orm_email.created_at,
             sent_at=orm_email.sent_at,
+            version=orm_email.version,
         )
 
     @staticmethod
