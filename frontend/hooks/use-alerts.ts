@@ -20,6 +20,7 @@ import React from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
     getAwaitingFeedbackSet,
+    getAllStudentConcerns,
     markAwaitingFeedback,
 } from "@/lib/awaiting-feedback";
 
@@ -55,6 +56,7 @@ export function useAlerts() {
                 // are displayed in "Đang hỗ trợ" with the awaiting badge,
                 // regardless of the backend's current intervention_status.
                 const awaitingSet = getAwaitingFeedbackSet();
+                const concerns = getAllStudentConcerns();
 
                 // Map cases to the unified alert shape expected by the UI
                 const enriched = allItems.map((c) => ({
@@ -65,6 +67,7 @@ export function useAlerts() {
                     intervention_status: awaitingSet.has(c.case_id)
                         ? "awaiting_feedback"
                         : c.intervention_status,
+                    student_concern: concerns[c.case_id] ?? null,
                     active_case_id: c.case_id,
                     case_id: c.case_id,
                     assigned_advisor_id: c.assigned_advisor_id,
