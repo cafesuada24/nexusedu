@@ -1,0 +1,101 @@
+sid,student_name,email,major,current_risk_status,last_notified_timestamp,last_notified_satisfaction
+5ad8c8bd-455c-447e-9860-7b9a29ca6e56,Student 0,student_0@university.edu,Mathematics,Normal,,0
+efbef178-8ed3-475b-9114-eeacf596aecb,Student 1,student_1@university.edu,Data Science,Normal,,0
+c61aac91-c079-4d6b-8dd7-99b3060dee3b,Student 2,student_2@university.edu,Mathematics,Normal,,0
+59569b05-3edd-40eb-8f43-01ff12f39235,Student 3,student_3@university.edu,Computer Science,Normal,,0
+1ebe64a4-c850-4ee7-a6f5-11e828c76e38,Student 4,student_4@university.edu,Data Science,Normal,,0
+4b5641b5-33fb-4e5f-8686-5623cbf25f21,Student 5,student_5@university.edu,Physics,Normal,,0
+2ca0cf7a-c4c7-453c-b676-b4009614ebbb,Student 6,student_6@university.edu,Computer Science,Normal,,0
+b0d18f85-93c9-4a67-91b5-aa0a7533cbf9,Student 7,student_7@university.edu,Mathematics,Normal,,0
+cb49ea58-d634-416d-8735-91f69b17d824,Student 8,student_8@university.edu,Software Engineering,Normal,,0
+5eb85daf-54b2-4354-a0fa-09b39e9885c7,Student 9,student_9@university.edu,Software Engineering,Normal,,0
+c7a84d37-3c64-44d1-ae03-40f5b8e8becd,Student 10,student_10@university.edu,Physics,Normal,,0
+f84568ba-8817-4f81-9d6f-43efe711e285,Student 11,student_11@university.edu,Data Science,Normal,,0
+eb90fabb-3740-4a8f-809c-a2dd5b99969d,Student 12,student_12@university.edu,Mathematics,Normal,,0
+d6e3f8ea-155d-45a1-ab04-b3a0b0160657,Student 13,student_13@university.edu,Data Science,Normal,,0
+bd46c55e-5925-4a33-9096-2c065dc592d9,Student 14,student_14@university.edu,Data Science,Normal,,0
+01be3002-125a-4ff4-a518-217aeed1ead0,Student 15,student_15@university.edu,Physics,Normal,,0
+95e35faf-5013-432c-8c90-8ea17e1942bd,Student 16,student_16@university.edu,Physics,Normal,,0
+b3dde011-8ba9-4715-82ee-12e3e607502f,Student 17,student_17@university.edu,Data Science,Normal,,0
+700f6b3f-67ad-4f43-8ecd-0d600e237a2c,Student 18,student_18@university.edu,Software Engineering,Normal,,0
+3c5ca8c2-0de5-4de6-90c2-97c07395a891,Student 19,student_19@university.edu,Computer Science,Normal,,0
+758286e0-9acd-4153-84ec-110949ca1f15,Student 20,student_20@university.edu,Computer Science,Normal,,0
+2a9ce38a-f576-4db2-8a2e-d480e831d1fb,Student 21,student_21@university.edu,Computer Science,Normal,,0
+7c14d3a1-e3a9-4287-8d4d-337d224682eb,Student 22,student_22@university.edu,Data Science,Normal,,0
+3ebea87f-6b48-4934-aa12-f3f56986932f,Student 23,student_23@university.edu,Software Engineering,Normal,,0
+6e095706-170f-4c15-a1b1-74b7019a1e7e,Student 24,student_24@university.edu,Data Science,Normal,,0
+63ac4ae4-1aa3-4ceb-9e7b-407426d738b0,Student 25,student_25@university.edu,Data Science,Normal,,0
+63b74b95-f1ff-4742-9017-6e781d00ac99,Student 26,student_26@university.edu,Software Engineering,Normal,,0
+80571b31-db78-43e1-a83f-b390fe1209e1,Student 27,student_27@university.edu,Software Engineering,Normal,,0
+690a0894-7de1-4ff1-9fba-401b8bda1ddc,Student 28,student_28@university.edu,Software Engineering,Normal,,0
+642bd4aa-7b01-4ccb-a695-c063959fd057,Student 29,student_29@university.edu,Software Engineering,Normal,,0
+e8f3c1de-e393-48fa-abc9-1724c4b8fb29,Student 30,student_30@university.edu,Mathematics,Normal,,0
+d4487188-2797-4c55-948a-b2c9f6c4cb29,Student 31,student_31@university.edu,Data Science,Normal,,0
+6be53e44-950f-4034-9607-c4a19ca7542c,Student 32,student_32@university.edu,Computer Science,Normal,,0
+adf94ab9-80ea-4eee-9de1-5b69d75afae7,Student 33,student_33@university.edu,Physics,Normal,,0
+8cb7f4ed-6d53-4bec-9412-6c05405de121,Student 34,student_34@university.edu,Physics,Normal,,0
+6abf2601-2eb1-4324-9c4e-f50f13977c5c,Student 35,student_35@university.edu,Data Science,Normal,,0
+b23a9626-dae3-4671-af1d-43cfb175d2bc,Student 36,student_36@university.edu,Software Engineering,Normal,,0
+b05e8619-ccfa-4712-8616-88f346243ffd,Student 37,student_37@university.edu,Software Engineering,Normal,,0
+f9b0508c-3afb-4f1d-b2db-acdde31a1ba9,Student 38,student_38@university.edu,Mathematics,Normal,,0
+6839bcbd-9acb-4666-9625-de3162b7ffe3,Student 39,student_39@university.edu,Computer Science,Normal,,0
+76d6fdbc-0ce0-4bfc-a5f7-b37aac6c9fa9,Student 40,student_40@university.edu,Computer Science,Normal,,0
+c7aa09cb-e48a-4c70-a7cb-70e0b42e3ee0,Student 41,student_41@university.edu,Data Science,Normal,,0
+11456b3f-d48e-4e14-8869-c0687aadd81f,Student 42,student_42@university.edu,Data Science,Normal,,0
+7a9944b8-bd8b-4cce-a06f-e8807f1df899,Student 43,student_43@university.edu,Data Science,Normal,,0
+bad5d70c-939f-4564-930f-f000ad4eea4b,Student 44,student_44@university.edu,Physics,Normal,,0
+029cf699-1ca7-4900-b17e-f57e6c89a5fe,Student 45,student_45@university.edu,Computer Science,Normal,,0
+e393f08c-2990-42d8-bf28-007cb81f21ee,Student 46,student_46@university.edu,Mathematics,Normal,,0
+b88a701b-fd67-47d7-ba60-41bc15584ec4,Student 47,student_47@university.edu,Software Engineering,Normal,,0
+8e35479d-c0a5-4d5d-b341-bc62dcc30205,Student 48,student_48@university.edu,Computer Science,Normal,,0
+2e1d6c06-8831-4ace-833a-0164ccfda388,Student 49,student_49@university.edu,Computer Science,Normal,,0
+b2d90fdf-6de3-4624-ac21-26b85945e4d6,Student 50,student_50@university.edu,Software Engineering,Normal,,0
+e18d1497-73b6-4dcb-8eb3-e18801b09a5a,Student 51,student_51@university.edu,Mathematics,Normal,,0
+60e2b1df-5925-465c-8edd-22007bcb9743,Student 52,student_52@university.edu,Computer Science,Normal,,0
+e52bb557-4a3f-40a2-9ecb-6bde6a043ee9,Student 53,student_53@university.edu,Data Science,Normal,,0
+bde9c41a-a039-45b6-bbf2-3fe0884207d6,Student 54,student_54@university.edu,Physics,Normal,,0
+1691276f-46a9-4b8b-abc3-ce3d238c0a0e,Student 55,student_55@university.edu,Data Science,Normal,,0
+b1825986-e03c-47b6-b3a3-ae18750cc8ea,Student 56,student_56@university.edu,Physics,Normal,,0
+86f4c2fe-55f2-4db4-b881-a8bd977f23cd,Student 57,student_57@university.edu,Physics,Normal,,0
+aa2562e3-ee90-4426-a9c2-3036954d7916,Student 58,student_58@university.edu,Data Science,Normal,,0
+6aad947f-0080-4f08-ae07-ff7909136423,Student 59,student_59@university.edu,Physics,Normal,,0
+2ee7fc81-fc62-4315-a2f7-1859a762bcdd,Student 60,student_60@university.edu,Data Science,Normal,,0
+3cf68b51-85af-4fdf-9817-e6937a2bdf16,Student 61,student_61@university.edu,Mathematics,Normal,,0
+be089c3b-ac26-4541-af04-d8af1dee207c,Student 62,student_62@university.edu,Computer Science,Normal,,0
+0c095349-b05c-4aaf-a3df-cc40d32f1de3,Student 63,student_63@university.edu,Computer Science,Normal,,0
+8eb9ddee-2551-470a-9031-ef3d5f472f63,Student 64,student_64@university.edu,Software Engineering,Normal,,0
+af8c855c-ce8a-4657-ac5d-42c8699e402e,Student 65,student_65@university.edu,Data Science,Normal,,0
+c1463b99-a0f0-4ca5-afd0-a80b129a3614,Student 66,student_66@university.edu,Physics,Normal,,0
+434ac4fa-35ef-4a1c-8f52-8d79b21ffc03,Student 67,student_67@university.edu,Software Engineering,Normal,,0
+cc78c2ee-3db8-41e2-9fa5-31006c6d4f9a,Student 68,student_68@university.edu,Software Engineering,Normal,,0
+8f737e7d-8383-49b6-91d7-07117e1b3023,Student 69,student_69@university.edu,Mathematics,Normal,,0
+f0765fc8-980d-4f15-ab34-e1704a86a98d,Student 70,student_70@university.edu,Mathematics,Normal,,0
+ba8bc86a-1200-4e5b-898a-bebb93016206,Student 71,student_71@university.edu,Software Engineering,Normal,,0
+60e0f1c9-73ec-4f87-ad96-ee5b137eaee1,Student 72,student_72@university.edu,Software Engineering,Normal,,0
+dd567048-8d0b-4b6b-8745-92319c741252,Student 73,student_73@university.edu,Computer Science,Normal,,0
+fc78b7f6-c29e-4be1-bf98-3c9c1074df64,Student 74,student_74@university.edu,Computer Science,Normal,,0
+fa3cb0f5-8a4d-43c5-b2e0-16076d20af50,Student 75,student_75@university.edu,Software Engineering,Normal,,0
+470943ee-cac0-468b-9d4a-30f79847e9c3,Student 76,student_76@university.edu,Physics,Normal,,0
+bccaf32b-40a7-457b-a207-086e8afaf364,Student 77,student_77@university.edu,Mathematics,Normal,,0
+046a03cf-e97e-44a9-8e32-dc0f78bf91a1,Student 78,student_78@university.edu,Mathematics,Normal,,0
+e5adc5c1-6eda-480f-8d8e-0e2f79e09bed,Student 79,student_79@university.edu,Mathematics,Normal,,0
+ae2eb18f-281b-42c6-b58d-93538387469b,Student 80,student_80@university.edu,Mathematics,Normal,,0
+408380ce-854c-4ae1-9ca0-122a21b035cc,Student 81,student_81@university.edu,Computer Science,Normal,,0
+e0689d6c-d029-4a6e-b34a-76fd034c4b1c,Student 82,student_82@university.edu,Data Science,Normal,,0
+d75ea019-08a0-4b6e-8ce1-a417a2a13c1c,Student 83,student_83@university.edu,Data Science,Normal,,0
+a188b9cd-f94a-47ab-8d5e-c41ea9b5bf20,Student 84,student_84@university.edu,Software Engineering,Normal,,0
+733484ae-6554-478e-b6e4-05992b95253c,Student 85,student_85@university.edu,Software Engineering,Normal,,0
+fac71179-521d-4848-beac-515e2d749fdc,Student 86,student_86@university.edu,Mathematics,Normal,,0
+bb7539c0-4db5-4197-a388-c66bdd662edf,Student 87,student_87@university.edu,Software Engineering,Normal,,0
+e668a84e-cabb-4285-96b4-1c6ff44744b6,Student 88,student_88@university.edu,Mathematics,Normal,,0
+395ac75c-e58f-4d01-84e0-2e0861f4032a,Student 89,student_89@university.edu,Mathematics,Normal,,0
+00585f85-69fd-4928-b82a-e41f5820b6f9,Student 90,student_90@university.edu,Mathematics,Normal,,0
+87f7b23e-a4dc-4334-9644-5fe5417b0db3,Student 91,student_91@university.edu,Mathematics,Normal,,0
+abc42007-3d55-4d09-b615-431514c8a320,Student 92,student_92@university.edu,Computer Science,Normal,,0
+8c966438-cf3f-481b-b9f0-96e6619a056f,Student 93,student_93@university.edu,Physics,Normal,,0
+d0647ca8-6417-42b5-839a-693bca4de861,Student 94,student_94@university.edu,Mathematics,Normal,,0
+bf05d2e6-331f-4731-a1e5-f13915d492b7,Student 95,student_95@university.edu,Computer Science,Normal,,0
+0101b0ce-b764-41e7-a74c-f4582a0e1825,Student 96,student_96@university.edu,Mathematics,Normal,,0
+1dac65d2-4c61-4d0e-9fd2-96053a8e9c0a,Student 97,student_97@university.edu,Software Engineering,Normal,,0
+7d56f37c-1a8f-44cf-abfc-14f71fe73484,Student 98,student_98@university.edu,Data Science,Normal,,0
+b947988e-dcab-4277-a7a7-969c34b901f0,Student 99,student_99@university.edu,Physics,Normal,,0

@@ -89,21 +89,42 @@ export async function fetchAlerts(): Promise<BackendAlert[]> {
     return [];
 }
 
-export const TaskItemSchema = z.object({
+export const TaskItemBaseSchema = z.object({
     case_id: z.string(),
     created_at: z.string(),
     sid: z.string(),
     assigned_advisor_id: z.string().nullable().optional(),
     assigned_to: z.string().nullable().optional(),
     student_name: z.string().nullable().optional(),
-    email: z.string().nullable().optional(),
     major: z.string().nullable().optional(),
     current_risk_status: z.string().nullable().optional(),
     intervention_status: z.string().nullable().optional(),
-    draft_subject: z.string().nullable().optional(),
-    draft_body: z.string().nullable().optional(),
-    draft_status: z.string().nullable().optional(),
-    points_reward: z.number().optional().default(0),
+    email: z.any().nullable().optional(),
+});
+
+export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
+    let emailStr = "";
+    let draft_subject = null;
+    let draft_body = null;
+    let draft_status = null;
+    
+    if (data.email && typeof data.email === "object") {
+        emailStr = data.email.recipent || data.email.recipient || "";
+        draft_subject = data.email.subject || null;
+        draft_body = data.email.body || null;
+        draft_status = data.email.status || null;
+    } else if (typeof data.email === "string") {
+        emailStr = data.email;
+    }
+
+    return {
+        ...data,
+        email: emailStr,
+        draft_subject,
+        draft_body,
+        draft_status,
+        points_reward: 0,
+    };
 });
 export type TaskItem = z.infer<typeof TaskItemSchema>;
 
