@@ -213,6 +213,43 @@ async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None
         return
 
 
+async def run_case_accepted_task(
+    _: dict[str, Any],
+    case_id: UUID,
+    advisor_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    """Worker task to handle CaseAcceptedEvent."""
+    logger.info(f'Worker: Handling CaseAcceptedEvent for case {case_id}')
+
+    async for session in get_async_session():
+        case_repo = SqlAlchemyCaseRepository(session)
+        student_repo = SqlAlchemyStudentRepository(session)
+        point_ledger_repo = SqlAlchemyPointLedgerRepository(session)
+
+        case = await case_repo.get_by_id(case_id)
+        student = await student_repo.get_by_id(case.sid)
+
+        gamification_service = GamificationService()
+        points = gamification_service.calculate_points(
+            GamificationService.Action.ACCEPT_TASK,
+            occurred_at,
+            student.current_risk_status,
+        )
+
+        ledger = await point_ledger_repo.get_by_advisor_id(advisor_id)
+        ledger.award_points(
+            case_id=case_id,
+            action='accept_case',
+            points=points,
+            earned_at=occurred_at,
+        )
+        await point_ledger_repo.save(ledger)
+        await session.commit()
+
+    logger.info(f'Worker: Finished CaseAcceptedEvent for case {case_id}')
+
+
 class WorkerSettings:
     """ARQ Worker configuration."""
 
@@ -221,6 +258,7 @@ class WorkerSettings:
         run_agent_task,
         run_dispatch_email_task,
         run_evaluate_badges_task,
+        run_case_accepted_task,
     ]
     redis_settings = RedisSettings(
         host=config.redis_host,

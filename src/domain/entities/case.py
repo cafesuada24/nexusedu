@@ -2,8 +2,11 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
+from src.domain.events.base import DomainEvent
+from src.domain.events.case_events import CaseAcceptedEvent
 from src.domain.exceptions import CaseAlreadyAssignedError, InvalidStateTransitionError
 from src.domain.value_objects.status import InterventionStatus
 
@@ -45,6 +48,20 @@ class Case:
     closed_at: datetime | None = None
     assigned_advisor_id: UUID | None = None
     version: int = field(default=0)
+    _domain_events: list[DomainEvent] = field(default_factory=list, init=False)
+
+    @property
+    def domain_events(self) -> list[DomainEvent]:
+        """Return registered domain events."""
+        return self._domain_events
+
+    def clear_events(self) -> None:
+        """Clear all registered domain events."""
+        self._domain_events.clear()
+
+    def register_event(self, event: DomainEvent) -> None:
+        """Register a new domain event."""
+        self._domain_events.append(event)
 
     @property
     def time_to_resolve(self) -> timedelta | None:
@@ -86,6 +103,14 @@ class Case:
         self.assigned_advisor_id = advisor_id
         self.assigned_at = occurred_at
         self._transition_to(InterventionStatus.ACCEPTED)
+
+        self.register_event(
+            CaseAcceptedEvent(
+                case_id=self.case_id,
+                advisor_id=advisor_id,
+                occurred_at=occurred_at,
+            ),
+        )
 
     def mark_as_sent(self) -> None:
         """The intervention email has been sent."""

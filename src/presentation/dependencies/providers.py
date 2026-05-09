@@ -247,16 +247,7 @@ async def get_case_command_handler(
     case_repo: Annotated[CaseRepository, Depends(get_case_repository)],
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
-    gamification_service: Annotated[
-        GamificationService,
-        Depends(get_gamification_service),
-    ],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
-    badge_repo: Annotated[BadgeRepository, Depends(get_badge_repository)],
-    point_ledger_repo: Annotated[
-        PointLedgerRepository,
-        Depends(get_point_ledger_repository),
-    ],
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
     task_queue = ArqTaskQueueAdapter(arq_pool)
@@ -266,11 +257,8 @@ async def get_case_command_handler(
         case_repo,
         advisor_repo,
         job_repo,
-        gamification_service,
         task_queue,
         email_drafting_service=BamlEmailDraftingService(),
-        badge_repo=badge_repo,
-        point_ledger_repo=point_ledger_repo,
     )
 
 
