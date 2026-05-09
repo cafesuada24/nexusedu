@@ -706,45 +706,6 @@ export async function fetchAssignedCases(
 }
 
 /**
- * Pushes a status transition for a single student.
- */
-export async function updateAlertStatus(
-    case_id: string,
-    status: BackendInterventionStatus,
-): Promise<void> {
-    const requestBody = JSON.stringify({ status });
-    const url = endpoint(`/cases/${encodeURIComponent(case_id)}/status`);
-    const response = await withTimeout(
-        (signal) =>
-            authFetch(
-                url,
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: requestBody,
-                },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-
-    if (response.ok) return;
-
-    const errorText = await response.text().catch(() => "");
-    let errorBody = {};
-    try {
-        errorBody = JSON.parse(errorText);
-    } catch {
-        // It might be a plain text error
-    }
-
-    const detail = errorBody.detail || errorText || response.statusText;
-    throw new Error(
-        `Cập nhật trạng thái thất bại [${response.status}] (${url}): ${detail}`,
-    );
-}
-
-/**
  * POST /cases/{case_id}/email/draft — trigger AI draft generation for one alert.
  */
 export async function generateAiDraftForAlert(
@@ -1303,6 +1264,74 @@ export async function confirmBooking(case_id: string): Promise<void> {
         if (body) detail = body;
     }
     throw new Error(`Xác nhận đặt lịch thất bại [${res.status}]: ${detail}`);
+}
+
+/**
+ * POST /cases/{case_id}/supporting — advisor starts the supporting session
+ * (BOOKED → SUPPORTING). Requires advisor auth.
+ */
+export async function startSupporting(case_id: string): Promise<void> {
+    const trimmed = case_id.trim();
+    if (!z.string().uuid().safeParse(trimmed).success) {
+        throw new Error("Mã case không hợp lệ.");
+    }
+    const url = endpoint(`/cases/${encodeURIComponent(trimmed)}/supporting`);
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                url,
+                { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (res.ok) return;
+    const body = await res.text().catch(() => "");
+    let detail = res.statusText;
+    try {
+        const parsed = body ? JSON.parse(body) : {};
+        detail =
+            (typeof parsed?.detail === "string" ? parsed.detail : "") ||
+            (typeof parsed?.message === "string" ? parsed.message : "") ||
+            detail;
+    } catch {
+        if (body) detail = body;
+    }
+    throw new Error(`Bắt đầu hỗ trợ thất bại [${res.status}]: ${detail}`);
+}
+
+/**
+ * POST /cases/{case_id}/resolve — advisor closes the case
+ * (SUPPORTING → RESOLVED). Requires advisor auth.
+ */
+export async function resolveCase(case_id: string): Promise<void> {
+    const trimmed = case_id.trim();
+    if (!z.string().uuid().safeParse(trimmed).success) {
+        throw new Error("Mã case không hợp lệ.");
+    }
+    const url = endpoint(`/cases/${encodeURIComponent(trimmed)}/resolve`);
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                url,
+                { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (res.ok) return;
+    const body = await res.text().catch(() => "");
+    let detail = res.statusText;
+    try {
+        const parsed = body ? JSON.parse(body) : {};
+        detail =
+            (typeof parsed?.detail === "string" ? parsed.detail : "") ||
+            (typeof parsed?.message === "string" ? parsed.message : "") ||
+            detail;
+    } catch {
+        if (body) detail = body;
+    }
+    throw new Error(`Giải quyết case thất bại [${res.status}]: ${detail}`);
 }
 
 /** True when an `NEXT_PUBLIC_API_BASE_URL` was configured at build time or we're in the browser. */
