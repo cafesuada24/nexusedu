@@ -80,6 +80,15 @@ export type BackendAlertPagedResponse = z.infer<
     typeof BackendAlertPagedResponseSchema
 >;
 
+/**
+ * Pulls the authoritative list of at-risk students from the backend.
+ * @deprecated Use fetchOpenCases and fetchAssignedCases instead.
+ * Returns an empty array directly since /alerts is deprecated/removed in the backend.
+ */
+export async function fetchAlerts(): Promise<BackendAlert[]> {
+    return [];
+}
+
 export const TaskItemSchema = z.object({
     case_id: z.string(),
     created_at: z.string(),
@@ -601,35 +610,6 @@ export async function ingestRows(rows: BackendIngestRow[]): Promise<void> {
             records: rows,
         },
     ]);
-}
-
-/**
- * Pulls the current authoritative list of at-risk students from the backend.
- * Returns an empty array on failure or malformed response (keeps UI usable).
- */
-export async function fetchAlerts(): Promise<BackendAlert[]> {
-    const res = await withTimeout(
-        (signal) => authFetch(endpoint("/alerts"), { method: "GET" }, signal),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể lấy danh sách cảnh báo: ${message}`);
-    }
-    const data = await res.json();
-
-    // The backend returns { items: AlertStudent[], metadata: ... }
-    if (data && typeof data === "object" && Array.isArray(data.items)) {
-        return BackendAlertPagedResponseSchema.parse(data).items;
-    }
-
-    // Fallback for older array responses if they still exist
-    if (Array.isArray(data)) {
-        return z.array(BackendAlertSchema).parse(data);
-    }
-
-    return [];
 }
 
 /**

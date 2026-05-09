@@ -9,7 +9,6 @@ import {
     fetchCaseDetails,
     fetchCaseEmail,
     fetchTasks,
-    fetchAlerts,
     acceptCase,
     fetchOpenCases,
     fetchAssignedCases,
@@ -37,66 +36,41 @@ export function useAlerts() {
         queryKey: queryKeys.alerts.list(),
         queryFn: async () => {
             console.log(
-                "[useAlerts] Fetching all alerts and zipping case IDs...",
+                "[useAlerts] Fetching open and assigned cases...",
             );
             try {
-                // 1. Fetch alerts (these have the students we care about)
-                const alerts = await fetchAlerts();
-
-                // 2. Fetch open and assigned cases to find their case_ids
-                // We fetch a larger limit to ensure we catch most active cases
+                // Fetch open and assigned cases
                 const [openRes, assignedRes] = await Promise.all([
                     fetchOpenCases(100, 0),
                     fetchAssignedCases(100, 0),
                 ]);
 
-                // 3. Build a map of sid -> case details
-                const caseMap: Record<
-                    string,
-                    {
-                        case_id: string;
-                        assigned_advisor_id?: string | null;
-                        draft_subject?: string | null;
-                        draft_body?: string | null;
-                        draft_status?: string | null;
-                    }
-                > = {};
-                [...openRes.items, ...assignedRes.items].forEach((c) => {
-                    if (c.sid) {
-                        caseMap[c.sid] = {
-                            case_id: c.case_id,
-                            assigned_advisor_id: c.assigned_advisor_id,
-                            draft_subject: c.draft_subject,
-                            draft_body: c.draft_body,
-                            draft_status: c.draft_status,
-                        };
-                    }
-                });
+                const allItems = [...openRes.items, ...assignedRes.items];
 
-                // 4. Zip the data
-                const enriched = alerts.map((a) => {
-                    const c = caseMap[a.sid];
-                    return {
-                        ...a,
-                        active_case_id: a.active_case_id || c?.case_id || null,
-                        assigned_advisor_id:
-                            a.assigned_advisor_id ||
-                            c?.assigned_advisor_id ||
-                            null,
-                        draft_subject:
-                            a.draft_subject || c?.draft_subject || null,
-                        draft_body: a.draft_body || c?.draft_body || null,
-                        draft_status: a.draft_status || c?.draft_status || null,
-                    };
-                });
+                // Map cases to the unified alert shape expected by the UI
+                const enriched = allItems.map((c) => ({
+                    sid: c.sid,
+                    student_name: c.student_name,
+                    email: c.email || "",
+                    current_risk_status: c.current_risk_status,
+                    intervention_status: c.intervention_status,
+                    active_case_id: c.case_id,
+                    case_id: c.case_id,
+                    assigned_advisor_id: c.assigned_advisor_id,
+                    assigned_to: c.assigned_to,
+                    draft_subject: c.email?.subject || null,
+                    draft_body: c.email?.body || null,
+                    draft_status: c.email?.status || null,
+                    is_generating: c.email?.status === "generating",
+                }));
 
                 console.log(
-                    "[useAlerts] Enriched alerts with case IDs:",
+                    "[useAlerts] Unified alerts from cases:",
                     enriched.length,
                 );
                 return enriched;
             } catch (err) {
-                console.error("[useAlerts] Enrichment error:", err);
+                console.error("[useAlerts] Fetch error:", err);
                 throw err;
             }
         },
