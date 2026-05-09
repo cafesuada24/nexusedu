@@ -14,9 +14,15 @@ import {
     fetchStudentCases,
     generateAiDraftForAlert,
     ingestData,
+    resolveCase,
     sendNudge,
     updateEmailDraft,
 } from "@/lib/api";
+import {
+    clearAwaitingFeedback,
+    clearStudentConcern,
+    setStudentConcern,
+} from "@/lib/awaiting-feedback";
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
 import { useSocketEvent } from "@/hooks/use-socket";
 import { useQueryClient } from "@tanstack/react-query";
@@ -103,6 +109,44 @@ export function AlertCenter() {
         },
     );
 
+    useSocketEvent<{
+        case_id: string;
+        resolved: boolean;
+        rating: number;
+        comment: string;
+    }>("student_feedback", async (payload) => {
+        if (payload.resolved) {
+            try {
+                await resolveCase(payload.case_id);
+                clearAwaitingFeedback(payload.case_id);
+                clearStudentConcern(payload.case_id);
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.alerts.list(),
+                });
+                toast.success(
+                    `Sinh viên xác nhận đã giải quyết · ${payload.rating}⭐`,
+                    { description: payload.comment || undefined },
+                );
+            } catch (err) {
+                console.error("[student_feedback] resolve failed", err);
+                toast.error("Không thể đóng case. Thử lại sau.");
+            }
+        } else {
+            setStudentConcern(
+                payload.case_id,
+                payload.comment || "(Sinh viên không nêu lý do)",
+            );
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.alerts.list(),
+            });
+            toast.warning("Sinh viên báo chưa giải quyết xong", {
+                description:
+                    payload.comment || "Cần liên hệ lại với sinh viên.",
+                duration: 8000,
+            });
+        }
+    });
+
     const [localAlertState, setLocalAlertState] = React.useState<
         Record<string, { goals: Goal[] }>
     >({});
@@ -179,6 +223,12 @@ export function AlertCenter() {
                             ? pickRandomAppointment()
                             : null,
                     goals: localAlertState[r.sid]?.goals || [],
+                    studentConcern: r.student_concern
+                        ? {
+                              comment: r.student_concern.comment,
+                              submittedAt: r.student_concern.submitted_at,
+                          }
+                        : null,
                 };
             });
     }, [remoteAlerts, localAlertState, hiddenAlerts]);
