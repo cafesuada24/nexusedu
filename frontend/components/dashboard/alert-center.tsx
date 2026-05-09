@@ -462,6 +462,14 @@ export function AlertCenter() {
                 });
                 return;
             }
+            // Block send while AI is generating (may be stale — also caught below)
+            if (a.isGenerating) {
+                toast.error("AI đang soạn thảo", {
+                    description:
+                        "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
+                });
+                return;
+            }
             const emailBody = a.body || a.draftBody || "";
             const emailSubject =
                 a.subject || a.draftSubject || "Hỗ trợ học tập";
@@ -476,10 +484,26 @@ export function AlertCenter() {
                 // If no AI draft yet (UNAVAILABLE), PATCH sets content + status to DRAFT.
                 // Skip PATCH when draftBody already exists (email is already DRAFT from AI).
                 if (!a.draftBody) {
-                    await updateEmailDraft(caseId, {
-                        subject: emailSubject,
-                        body: emailBody,
-                    });
+                    try {
+                        await updateEmailDraft(caseId, {
+                            subject: emailSubject,
+                            body: emailBody,
+                        });
+                    } catch (patchErr: any) {
+                        // Email is GENERATING (race condition: alert data was stale)
+                        if (
+                            patchErr.message
+                                ?.toLowerCase()
+                                .includes("generating")
+                        ) {
+                            toast.error("AI đang soạn thảo", {
+                                description:
+                                    "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
+                            });
+                            return;
+                        }
+                        throw patchErr;
+                    }
                 }
                 await sendNudge(caseId, { body: emailBody });
                 markRecentlyMoved(a.id, status);
