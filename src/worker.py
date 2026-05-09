@@ -7,31 +7,13 @@ from uuid import UUID
 from arq.connections import RedisSettings
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.application.commands.agent_commands import AgentCommandHandler
-from src.application.commands.case_commands import (
-    CaseCommandHandler,
-    GenerateEmailDraftCommand,
-)
+from src.application.commands.case_commands import GenerateEmailDraftCommand
 from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
-from src.application.services.agent_metadata import AgentMetadataService
 from src.core.config import config
+from src.core.container import Container
 from src.core.logger import logger
-from src.domain.services.gamification import GamificationService
 from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker, get_async_session
-from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
-from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
-    SqlAlchemyAdvisorRepository,
-    SqlAlchemyBadgeRepository,
-    SqlAlchemyCaseRepository,
-    SqlAlchemyEmailRepository,
-    SqlAlchemyIdempotencyRepository,
-    SqlAlchemyJobRepository,
-    SqlAlchemyMetadataRepository,
-    SqlAlchemyPointLedgerRepository,
-    SqlAlchemyStudentRepository,
-)
-from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 
 
 async def run_email_draft_task(
@@ -46,38 +28,16 @@ async def run_email_draft_task(
     logger.info(f'Worker: Starting email draft task for {case_id}')
 
     async for session in get_async_session():
-        job_repo = SqlAlchemyJobRepository(session)
+        container = Container(session=session, redis_pool=ctx.get('redis'))
+        job_repo = container.job_repo
         job = await job_repo.get_by_id(job_id)
         try:
             job.start(start_time)
             await job_repo.save(job)
             await session.commit()
 
-            student_repo = SqlAlchemyStudentRepository(session)
-            advisor_repo = SqlAlchemyAdvisorRepository(session)
-            case_repo = SqlAlchemyCaseRepository(session)
-            email_repo = SqlAlchemyEmailRepository(session)
-            point_ledger_repo = SqlAlchemyPointLedgerRepository(session)
-
-            # Domain Service
-            gamification_service = GamificationService()
-
-            # Task Queue (Adapter for worker context)
-
-            task_queue = ArqTaskQueueAdapter(ctx['redis'])
-
-            # Command Handler
-            handler = CaseCommandHandler(
-                student_repo=student_repo,
-                email_repo=email_repo,
-                case_repo=case_repo,
-                advisor_repo=advisor_repo,
-                job_repo=job_repo,
-                gamification_service=gamification_service,
-                task_queue=task_queue,
-                email_drafting_service=BamlEmailDraftingService(),
-                point_ledger_repo=point_ledger_repo,
-            )
+            # Command Handler via Container
+            handler = container.get_case_command_handler()
 
             command = GenerateEmailDraftCommand(
                 case_id=case_id,
@@ -115,11 +75,9 @@ async def run_agent_task(
     agent = create_graph(checkpointer=checkpointer)
 
     async with async_session_maker() as session:
-        metadata_repo = SqlAlchemyMetadataRepository(session)
-        metadata_service = AgentMetadataService(metadata_repo)
-        idempotency_repo = SqlAlchemyIdempotencyRepository(session)
+        container = Container(session=session, agent=agent)
+        handler = container.get_agent_command_handler()
 
-        handler = AgentCommandHandler(agent, metadata_service, idempotency_repo)
         command = RunAgentTaskCommand(
             job_id=UUID(job_id),
             query=query,
@@ -140,12 +98,14 @@ async def run_dispatch_email_task(
     logger.info(f'Worker: Dispatching email for case {case_id} to {target_email}')
     # Placeholder for actual external email service integration (e.g. SendGrid, AWS SES)
     logger.info(f'Email body preview: {body[:50]}...')
+
     async for session in get_async_session():
-        case_repo = SqlAlchemyCaseRepository(session)
-        student_repo = SqlAlchemyStudentRepository(session)
-        email_repo = SqlAlchemyEmailRepository(session)
-        point_ledger_repo = SqlAlchemyPointLedgerRepository(session)
-        gamification_service = GamificationService()
+        container = Container(session=session)
+        case_repo = container.case_repo
+        student_repo = container.student_repo
+        email_repo = container.email_repo
+        point_ledger_repo = container.point_ledger_repo
+        gamification_service = container.gamification_service
 
         case = await case_repo.get_by_id(case_id=case_id)
         assert case.assigned_advisor_id is not None
@@ -162,7 +122,7 @@ async def run_dispatch_email_task(
         await case_repo.save(case)
 
         points = gamification_service.calculate_points(
-            GamificationService.Action.SEND_EMAIL,
+            gamification_service.Action.SEND_EMAIL,
             case.assigned_at,
             student.current_risk_status,
         )
@@ -174,7 +134,7 @@ async def run_dispatch_email_task(
             earned_at=datetime.now(UTC),
         )
         await point_ledger_repo.save(ledger)
-    # Mock success
+        await session.commit()
 
 
 async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None:
@@ -183,10 +143,11 @@ async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None
 
     async for session in get_async_session():
         try:
-            badge_repo = SqlAlchemyBadgeRepository(session)
+            container = Container(session=session, redis_pool=ctx.get('redis'))
+            badge_repo = container.badge_repo
             stats = await badge_repo.get_advisor_stats(UUID(advisor_id))
 
-            gamification = GamificationService()
+            gamification = container.gamification_service
             eligible_badges = gamification.check_badges(stats)
             existing_badges = await badge_repo.get_advisor_badges(UUID(advisor_id))
 
@@ -214,7 +175,7 @@ async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None
 
 
 async def run_case_accepted_task(
-    _: dict[str, Any],
+    _: dict[Any, Any],
     case_id: UUID,
     advisor_id: UUID,
     occurred_at: datetime,
@@ -223,16 +184,17 @@ async def run_case_accepted_task(
     logger.info(f'Worker: Handling CaseAcceptedEvent for case {case_id}')
 
     async for session in get_async_session():
-        case_repo = SqlAlchemyCaseRepository(session)
-        student_repo = SqlAlchemyStudentRepository(session)
-        point_ledger_repo = SqlAlchemyPointLedgerRepository(session)
+        container = Container(session=session)
+        case_repo = container.case_repo
+        student_repo = container.student_repo
+        point_ledger_repo = container.point_ledger_repo
 
         case = await case_repo.get_by_id(case_id)
         student = await student_repo.get_by_id(case.sid)
 
-        gamification_service = GamificationService()
+        gamification_service = container.gamification_service
         points = gamification_service.calculate_points(
-            GamificationService.Action.ACCEPT_TASK,
+            gamification_service.Action.ACCEPT_TASK,
             occurred_at,
             student.current_risk_status,
         )
