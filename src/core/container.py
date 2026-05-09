@@ -13,6 +13,7 @@ from src.application.commands.data_commands import DataCommandHandler
 from src.application.interfaces.advisor_metrics_query_service import (
     AdvisorMetricsQueryService,
 )
+from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
@@ -71,6 +72,8 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
     SqlAlchemyUserSettingsRepository,
 )
 from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
+from src.infrastructure.queue.outbox_adapter import TransactionalOutboxAdapter
+from src.infrastructure.queue.outbox_processor import OutboxProcessor
 
 
 class Container:
@@ -164,10 +167,21 @@ class Container:
         return ZScore()
 
     @cached_property
-    def task_queue(self) -> ArqTaskQueueAdapter:
+    def direct_task_queue(self) -> ArqTaskQueueAdapter:
+        """Real background queue for immediate dispatching (used by poller)."""
         if self.redis_pool is None:
             raise ValueError('Redis pool is required for task queue operations.')
         return ArqTaskQueueAdapter(self.redis_pool)
+
+    @cached_property
+    def task_queue(self) -> BackgroundTaskQueue:
+        """Primary queue that ensures transactional consistency via Outbox."""
+        return TransactionalOutboxAdapter(self.session)
+
+    @cached_property
+    def outbox_processor(self) -> OutboxProcessor:
+        """Processor to forward outbox events to the real background queue."""
+        return OutboxProcessor(self.session, self.direct_task_queue)
 
     @cached_property
     def event_publisher(self) -> TaskQueueEventPublisher:
