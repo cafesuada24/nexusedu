@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-    MoreHorizontal,
     Target,
     Clock,
     CalendarCheck,
@@ -16,14 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { cn } from "@/lib/utils";
 import { type StudentRow } from "@/lib/csv";
 import {
@@ -113,55 +105,7 @@ function KanbanCardInner({
                         {a.email || `MSSV ${a.mssv}`}
                     </p>
                 </div>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-9 shrink-0 rounded-lg text-muted-foreground hover:text-foreground"
-                            aria-label="Tuỳ chọn thẻ"
-                        >
-                            <MoreHorizontal className="size-5" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52 rounded-xl">
-                        <DropdownMenuLabel className="text-xs text-muted-foreground">
-                            Chuyển trạng thái
-                        </DropdownMenuLabel>
-                        {COLUMNS.filter((c) => c.id !== a.status).map((c) => {
-                            const Icon = c.icon;
-                            return (
-                                <DropdownMenuItem
-                                    key={c.id}
-                                    onClick={() =>
-                                        onMove(
-                                            c.id,
-                                            `Đã chuyển ${a.name} → ${c.title}`,
-                                        )
-                                    }
-                                    className="gap-2"
-                                >
-                                    <Icon className={cn("size-4", c.accent)} />
-                                    {c.title}
-                                </DropdownMenuItem>
-                            );
-                        })}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={onOpenGoals} className="gap-2">
-                            <Target className="size-4 text-primary" />
-                            {goalsTotal > 0 ? (
-                                <span>
-                                    Mục tiêu{" "}
-                                    <span className="font-mono text-muted-foreground">
-                                        ({goalsDone}/{goalsTotal})
-                                    </span>
-                                </span>
-                            ) : (
-                                "Đặt mục tiêu"
-                            )}
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
