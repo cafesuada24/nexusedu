@@ -235,13 +235,6 @@ export const UserSettingsSchema = z.object({
 });
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
-export const AdvisorEngagementItemSchema = z.object({
-    faculty: z.string(),
-    sent: z.number(),
-    drafted: z.number(),
-});
-export type AdvisorEngagementItem = z.infer<typeof AdvisorEngagementItemSchema>;
-
 export const AdvisorPointsSchema = z.object({
     points: z.number().int(),
 });
@@ -922,30 +915,6 @@ export async function fetchAdvisorsLeaderboard(
     }
     const data = await res.json();
     return AdvisorLeaderboardSchema.parse(data);
-}
-
-/**
- * GET /advisors/engagement — returns engagement metrics by faculty/major.
- */
-export async function fetchAdvisorsEngagement(): Promise<
-    AdvisorEngagementItem[]
-> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint("/advisors/engagement"),
-                { method: "GET" },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể lấy dữ liệu tương tác: ${message}`);
-    }
-    const data = await res.json();
-    return z.array(AdvisorEngagementItemSchema).parse(data);
 }
 
 /**
