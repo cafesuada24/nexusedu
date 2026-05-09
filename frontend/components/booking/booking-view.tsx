@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils"
 import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule"
 import { useSocket } from "@/hooks/use-socket"
-import { updateAlertStatus } from "@/lib/api"
+import { confirmBooking } from "@/lib/api"
 
 // Deterministic "busy" generator so SSR/CSR match without extra state.
 function isBusy(date: Date, slot: string) {
@@ -71,8 +71,8 @@ export function BookingView({
     setStage("syncing")
 
     try {
-      // 1. Update backend status from 'sent' to 'booked' (Contacted -> Scheduled)
-      await updateAlertStatus(caseId, "booked")
+      // 1. Confirm booking via public POST /cases/{case_id}/book (SENT → BOOKED)
+      await confirmBooking(caseId)
 
       // 2. Prepare payload for real-time notification
       const payload = {
