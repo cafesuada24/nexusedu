@@ -195,7 +195,7 @@ async def run_case_accepted_task(
         gamification_service = container.gamification_service
         points = gamification_service.calculate_points(
             gamification_service.Action.ACCEPT_TASK,
-            occurred_at,
+            case.created_at,
             student.current_risk_status,
         )
 
@@ -212,6 +212,84 @@ async def run_case_accepted_task(
     logger.info(f'Worker: Finished CaseAcceptedEvent for case {case_id}')
 
 
+async def run_student_booked_task(
+    _: dict[Any, Any],
+    case_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    """Worker task to handle StudentBookedEvent."""
+    logger.info(f'Worker: Handling StudentBookedEvent for case {case_id}')
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        case_repo = container.case_repo
+        student_repo = container.student_repo
+        point_ledger_repo = container.point_ledger_repo
+
+        case = await case_repo.get_by_id(case_id)
+        assert case.assigned_advisor_id is not None
+        student = await student_repo.get_by_id(case.sid)
+
+        gamification_service = container.gamification_service
+        # For student booking, we bypass action time extra points as requested
+        points = gamification_service.calculate_points(
+            gamification_service.Action.STUDENT_BOOK,
+            None,
+            student.current_risk_status,
+        )
+
+        ledger = await point_ledger_repo.get_by_advisor_id(case.assigned_advisor_id)
+        ledger.award_points(
+            case_id=case_id,
+            action='student_booked',
+            points=points,
+            earned_at=occurred_at,
+        )
+        await point_ledger_repo.save(ledger)
+        await session.commit()
+
+    logger.info(f'Worker: Finished StudentBookedEvent for case {case_id}')
+
+
+async def run_case_resolved_task(
+    _: dict[Any, Any],
+    case_id: UUID,
+    advisor_id: UUID,
+    occurred_at: datetime,
+) -> None:
+    """Worker task to handle CaseResolvedEvent."""
+    logger.info(f'Worker: Handling CaseResolvedEvent for case {case_id}')
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        case_repo = container.case_repo
+        student_repo = container.student_repo
+        point_ledger_repo = container.point_ledger_repo
+
+        case = await case_repo.get_by_id(case_id)
+        student = await student_repo.get_by_id(case.sid)
+
+        gamification_service = container.gamification_service
+        # For resolution, we measure from assignment time
+        points = gamification_service.calculate_points(
+            gamification_service.Action.RESOLVE_CASE,
+            case.assigned_at,
+            student.current_risk_status,
+        )
+
+        ledger = await point_ledger_repo.get_by_advisor_id(advisor_id)
+        ledger.award_points(
+            case_id=case_id,
+            action='resolve_case',
+            points=points,
+            earned_at=occurred_at,
+        )
+        await point_ledger_repo.save(ledger)
+        await session.commit()
+
+    logger.info(f'Worker: Finished CaseResolvedEvent for case {case_id}')
+
+
 class WorkerSettings:
     """ARQ Worker configuration."""
 
@@ -221,6 +299,8 @@ class WorkerSettings:
         run_dispatch_email_task,
         run_evaluate_badges_task,
         run_case_accepted_task,
+        run_student_booked_task,
+        run_case_resolved_task,
     ]
     redis_settings = RedisSettings(
         host=config.redis_host,

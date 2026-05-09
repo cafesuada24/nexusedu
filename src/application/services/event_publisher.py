@@ -5,7 +5,11 @@ from collections.abc import Sequence
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.event_publisher import EventPublisher
 from src.domain.events.base import DomainEvent
-from src.domain.events.case_events import CaseAcceptedEvent
+from src.domain.events.case_events import (
+    CaseAcceptedEvent,
+    CaseResolvedEvent,
+    StudentBookedEvent,
+)
 
 
 class TaskQueueEventPublisher(EventPublisher):
@@ -25,4 +29,16 @@ class TaskQueueEventPublisher(EventPublisher):
                     advisor_id=event.advisor_id,
                     occurred_at=event.occurred_at,
                 )
-            # Add future events here (e.g., CaseClosedEvent)
+            elif isinstance(event, StudentBookedEvent):
+                await self.task_queue.enqueue(
+                    'run_student_booked_task',
+                    case_id=event.case_id,
+                    occurred_at=event.occurred_at,
+                )
+            elif isinstance(event, CaseResolvedEvent):
+                await self.task_queue.enqueue(
+                    'run_case_resolved_task',
+                    case_id=event.case_id,
+                    advisor_id=event.advisor_id,
+                    occurred_at=event.occurred_at,
+                )
