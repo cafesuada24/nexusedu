@@ -8,15 +8,17 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, 
 
 from src.application.commands.case_commands import (
     AcceptCaseCommand,
+    BookAppointmentCommand,
     CaseCommandHandler,
     SendEmailCommand,
     TriggerDraftCommand,
     UpdateEmailCommand,
 )
 from src.application.dtos.case_dtos import (
-    BookAppointmentCommand,
+    ActionResponseDTO,
     CaseDTO,
     QueryEmailDTO,
+    StartSupportingCommand,
     TriggerDraftDTO,
 )
 from src.application.queries.case_queries import (
@@ -306,16 +308,44 @@ async def accept_task(
 async def book_appointment(
     case_id: UUID,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
-) -> dict[str, str]:
+) -> ActionResponseDTO:
     """Allow a student to record that they have booked an appointment."""
     try:
         command = BookAppointmentCommand(case_id=case_id)
         await command_handler.handle_book_appointment(command)
-        return {'status': 'success', 'message': 'Appointment booked successfully'}
+        return ActionResponseDTO(
+            status='success',
+            message='Appointment booked successfully',
+        )
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f'Error in book_appointment: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post('/{case_id}/supporting')
+async def start_supporting(
+    case_id: UUID,
+    command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
+) -> ActionResponseDTO:
+    """Advisor starts supporting the student after they booked."""
+    try:
+        command = StartSupportingCommand(case_id=case_id, user_id=user.id)
+        await command_handler.handle_start_supporting(command)
+        return ActionResponseDTO(
+            status='success',
+            message='Support session started successfully',
+        )
+    except UserIsNotAnAdvisorError as e:
+        raise HTTPException(status_code=403, detail=str(e)) from e
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error in start_supporting: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
