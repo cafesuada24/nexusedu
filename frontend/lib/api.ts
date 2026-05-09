@@ -285,14 +285,25 @@ export const RetentionTrendItemSchema = z.object({
 });
 export type RetentionTrendItem = z.infer<typeof RetentionTrendItemSchema>;
 
-export const DraftStatusResponseSchema = z.object({
-    sid: z.string(),
-    is_generating: z.boolean(),
-    progress: z.number().optional(),
-    subject: z.string().nullable(),
-    body: z.string().nullable(),
-    active_case_id: z.string().nullable().optional(),
+// Backend GET /cases/{case_id}/email returns QueryEmailDTO shape
+const _QueryEmailDTOSchema = z.object({
+    email_id: z.string(),
+    recipent: z.string().optional(),
+    subject: z.string().nullable().optional(),
+    body: z.string().nullable().optional(),
+    status: z.string(),
+    created_at: z.string().optional(),
+    sent_at: z.string().nullable().optional(),
 });
+
+export const DraftStatusResponseSchema = _QueryEmailDTOSchema.transform(
+    (d) => ({
+        subject: d.subject ?? null,
+        body: d.body ?? null,
+        is_generating: d.status === "generating",
+        status: d.status,
+    }),
+);
 export type DraftStatusResponse = z.infer<typeof DraftStatusResponseSchema>;
 
 /* ----------------------------------------------------------------------- */
@@ -1115,7 +1126,7 @@ export async function fetchCaseEmail(
 }
 
 /**
- * GET /cases/{case_id}/email/draft — returns current draft status and content.
+ * GET /cases/{case_id}/email — returns current draft status and content.
  */
 export async function fetchDraftStatus(
     case_id: string,
@@ -1123,7 +1134,7 @@ export async function fetchDraftStatus(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint(`/cases/${encodeURIComponent(case_id)}/email/draft`),
+                endpoint(`/cases/${encodeURIComponent(case_id)}/email`),
                 { method: "GET" },
                 signal,
             ),

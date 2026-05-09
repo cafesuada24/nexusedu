@@ -311,9 +311,9 @@ export function AlertCenter() {
         try {
             await generateAiDraftForAlert(a.id, caseId);
             setRequestedDraftById((prev) => ({ ...prev, [a.id]: true }));
-            setAiDraftReadyById((prev) => ({ ...prev, [a.id]: true }));
-            toast.success("Bản nháp đã sẵn sàng", {
-                description: "AI đã soạn xong nội dung email hỗ trợ.",
+            // Restart the 5s draft poll — it may have stopped while email was UNAVAILABLE.
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.cases.draft(caseId),
             });
         } catch (err: any) {
             const draftError = String(err?.message || err || "");
@@ -462,22 +462,21 @@ export function AlertCenter() {
                 });
                 return;
             }
-            // Block only when generating AND no draftBody (draftBody set = AI done, data stale)
-            if (a.isGenerating && !a.draftBody) {
-                toast.error("AI đang soạn thảo", {
-                    description:
-                        "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
-                });
-                return;
-            }
             const emailBody = a.body || a.draftBody || "";
             const emailSubject =
                 a.subject || a.draftSubject || "Hỗ trợ học tập";
             if (!emailBody.trim()) {
-                toast.error("Chưa có nội dung email", {
-                    description:
-                        "Vui lòng tạo nội dung AI hoặc soạn thảo trong ô nội dung Email.",
-                });
+                if (a.isGenerating) {
+                    toast.error("AI đang soạn thảo", {
+                        description:
+                            "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
+                    });
+                } else {
+                    toast.error("Chưa có nội dung email", {
+                        description:
+                            "Vui lòng tạo nội dung AI hoặc soạn thảo trong ô nội dung Email.",
+                    });
+                }
                 return;
             }
             try {

@@ -58,10 +58,10 @@ export function useAlerts() {
                     case_id: c.case_id,
                     assigned_advisor_id: c.assigned_advisor_id,
                     assigned_to: c.assigned_to,
-                    draft_subject: c.email?.subject || null,
-                    draft_body: c.email?.body || null,
-                    draft_status: c.email?.status || null,
-                    is_generating: c.email?.status === "generating",
+                    draft_subject: c.draft_subject || null,
+                    draft_body: c.draft_body || null,
+                    draft_status: c.draft_status || null,
+                    is_generating: c.draft_status === "generating",
                 }));
 
                 console.log(
