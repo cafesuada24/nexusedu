@@ -10,7 +10,6 @@ import {
     fetchTasks,
     acceptCase,
     startSupporting,
-    resolveCase,
     fetchOpenCases,
     fetchAssignedCases,
 } from "@/lib/api";
@@ -19,6 +18,10 @@ import { toast } from "sonner";
 import React from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import {
+    getAwaitingFeedbackSet,
+    markAwaitingFeedback,
+} from "@/lib/awaiting-feedback";
 
 /**
  * Hook to fetch the list of alerts (at-risk students).
@@ -48,13 +51,20 @@ export function useAlerts() {
 
                 const allItems = [...openRes.items, ...assignedRes.items];
 
+                // Frontend override: cases marked locally as awaiting feedback
+                // are displayed in "Đang hỗ trợ" with the awaiting badge,
+                // regardless of the backend's current intervention_status.
+                const awaitingSet = getAwaitingFeedbackSet();
+
                 // Map cases to the unified alert shape expected by the UI
                 const enriched = allItems.map((c) => ({
                     sid: c.sid,
                     student_name: c.student_name,
                     email: c.email || "",
                     current_risk_status: c.current_risk_status,
-                    intervention_status: c.intervention_status,
+                    intervention_status: awaitingSet.has(c.case_id)
+                        ? "awaiting_feedback"
+                        : c.intervention_status,
                     active_case_id: c.case_id,
                     case_id: c.case_id,
                     assigned_advisor_id: c.assigned_advisor_id,
@@ -109,7 +119,13 @@ export function useUpdateAlertStatus() {
                 case "supporting":
                     return startSupporting(case_id);
                 case "resolved":
-                    return resolveCase(case_id);
+                    // Frontend-only flow until backend supports
+                    // AWAITING_FEEDBACK: don't call resolveCase (which would
+                    // immediately set RESOLVED). Just persist the local
+                    // override; student submitting feedback will trigger the
+                    // real resolve when backend is ready.
+                    markAwaitingFeedback(case_id);
+                    return Promise.resolve();
                 default:
                     throw new Error(
                         `Không hỗ trợ chuyển trạng thái sang "${status}" từ UI.`,
