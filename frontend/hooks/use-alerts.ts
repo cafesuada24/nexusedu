@@ -10,6 +10,7 @@ import {
     fetchTasks,
     acceptCase,
     startSupporting,
+    resolveCase,
     fetchOpenCases,
     fetchAssignedCases,
 } from "@/lib/api";
@@ -18,11 +19,7 @@ import { toast } from "sonner";
 import React from "react";
 
 import { useAuth } from "@/hooks/use-auth";
-import {
-    getAwaitingFeedbackSet,
-    getAllStudentConcerns,
-    markAwaitingFeedback,
-} from "@/lib/awaiting-feedback";
+import { getAllStudentConcerns } from "@/lib/awaiting-feedback";
 import type { Appointment } from "@/lib/appointments";
 
 const PRE_BOOKED_STATUSES = new Set(["new", "accepted", "sent"]);
@@ -66,10 +63,6 @@ export function useAlerts() {
 
                 const allItems = [...openRes.items, ...assignedRes.items];
 
-                // Frontend override: cases marked locally as awaiting feedback
-                // are displayed in "Đang hỗ trợ" with the awaiting badge,
-                // regardless of the backend's current intervention_status.
-                const awaitingSet = getAwaitingFeedbackSet();
                 const concerns = getAllStudentConcerns();
                 const bookedCaseIds = new Set(
                     appointments.map((a) => a.caseId),
@@ -82,8 +75,8 @@ export function useAlerts() {
                     ).toLowerCase();
                     // If the student has booked a slot via /api/appointments,
                     // surface the case as "booked" — but only when the backend
-                    // hasn't already moved past BOOKED (supporting / resolved
-                    // / awaiting_feedback take precedence).
+                    // hasn't already moved past BOOKED (supporting /
+                    // pending_review / resolved take precedence).
                     const appointmentOverride =
                         bookedCaseIds.has(c.case_id) &&
                         PRE_BOOKED_STATUSES.has(backendStatus)
@@ -95,9 +88,8 @@ export function useAlerts() {
                         student_name: c.student_name,
                         email: c.email || "",
                         current_risk_status: c.current_risk_status,
-                        intervention_status: awaitingSet.has(c.case_id)
-                            ? "awaiting_feedback"
-                            : (appointmentOverride ?? c.intervention_status),
+                        intervention_status:
+                            appointmentOverride ?? c.intervention_status,
                         student_concern: concerns[c.case_id] ?? null,
                         active_case_id: c.case_id,
                         case_id: c.case_id,
@@ -154,13 +146,11 @@ export function useUpdateAlertStatus() {
                 case "supporting":
                     return startSupporting(case_id);
                 case "resolved":
-                    // Frontend-only flow until backend supports
-                    // AWAITING_FEEDBACK: don't call resolveCase (which would
-                    // immediately set RESOLVED). Just persist the local
-                    // override; student submitting feedback will trigger the
-                    // real resolve when backend is ready.
-                    markAwaitingFeedback(case_id);
-                    return Promise.resolve();
+                    // BE transitions SUPPORTING → PENDING_REVIEW and triggers
+                    // the worker to dispatch a feedback-request email. The
+                    // case is finalized to RESOLVED|FAILED only after the
+                    // student submits via POST /cases/review.
+                    return resolveCase(case_id);
                 default:
                     throw new Error(
                         `Không hỗ trợ chuyển trạng thái sang "${status}" từ UI.`,
@@ -190,11 +180,11 @@ export function useUpdateAlertStatus() {
                 queryKeys.alerts.list(),
             );
 
-            // Optimistically update to the new value.
-            // "resolved" click triggers the feedback-request flow — card stays
-            // in "Đang hỗ trợ" and shows "Chờ sinh viên đánh giá" badge.
+            // Optimistically update to the new value. "resolved" click
+            // triggers the BE review-request flow → status becomes
+            // pending_review until the student submits feedback.
             const optimisticStatus =
-                status === "resolved" ? "awaiting_feedback" : status;
+                status === "resolved" ? "pending_review" : status;
             queryClient.setQueryData(
                 queryKeys.alerts.list(),
                 (old: any[] | undefined) => {
