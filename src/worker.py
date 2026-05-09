@@ -98,8 +98,6 @@ async def run_dispatch_email_task(
     case_id: UUID,
 ) -> None:
     """Worker task to send an email to the student."""
-    logger.info(f'Worker: Dispatching intervention email for case {case_id} to {target_email}')
-
     async for session in get_async_session():
         container = Container(session=session)
         case_repo = container.case_repo
@@ -113,12 +111,15 @@ async def run_dispatch_email_task(
         assert case.assigned_advisor_id is not None
         email = await email_repo.get_by_case(case_id)
         student = await student_repo.get_by_id(case.sid)
+        logger.info(
+            f'Worker: Dispatching intervention email for case {case_id} to {student.email}',
+        )
 
         # Send actual email
         await email_sending_service.send_email(
             to_email=student.email,
-            subject=email.subject,
-            body=email.body,
+            subject=email.subject,  # pyright: ignore
+            body=email.body,  # pyright: ignore
         )
 
         student.last_notified_timestamp = datetime.now(UTC)
@@ -154,7 +155,9 @@ async def run_dispatch_review_email_task(
     target_email: str,
 ) -> None:
     """Worker task to send a review email to the student."""
-    logger.info(f'Worker: Dispatching review email for case {case_id} to {target_email}')
+    logger.info(
+        f'Worker: Dispatching review email for case {case_id} to {target_email}',
+    )
 
     async for session in get_async_session():
         container = Container(session=session)
