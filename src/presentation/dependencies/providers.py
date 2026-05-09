@@ -22,6 +22,7 @@ from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
+from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.badge_repository import BadgeRepository
@@ -241,6 +242,14 @@ async def get_case_query_service(
     )
 
 
+async def get_event_publisher(
+    arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+) -> TaskQueueEventPublisher:
+    """Dependency provider for the EventPublisher."""
+    task_queue = ArqTaskQueueAdapter(arq_pool)
+    return TaskQueueEventPublisher(task_queue)
+
+
 async def get_case_command_handler(
     student_repo: Annotated[StudentRepository, Depends(get_student_repository)],
     email_repo: Annotated[EmailRepository, Depends(get_email_repository)],
@@ -248,6 +257,7 @@ async def get_case_command_handler(
     advisor_repo: Annotated[AdvisorRepository, Depends(get_advisor_repository)],
     job_repo: Annotated[JobRepository, Depends(get_job_repository)],
     arq_pool: Annotated[ArqRedis, Depends(get_arq_pool)],
+    event_publisher: Annotated[TaskQueueEventPublisher, Depends(get_event_publisher)],
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
     task_queue = ArqTaskQueueAdapter(arq_pool)
@@ -258,6 +268,7 @@ async def get_case_command_handler(
         advisor_repo,
         job_repo,
         task_queue,
+        event_publisher,
         email_drafting_service=BamlEmailDraftingService(),
     )
 
