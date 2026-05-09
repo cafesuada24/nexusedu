@@ -8,11 +8,8 @@ import {
     CalendarCheck,
     Handshake,
     CheckCircle2,
-    ArrowRight,
-    RotateCcw,
     Info,
     Loader2,
-    History,
     Mail,
     Send,
 } from "lucide-react";
@@ -46,6 +43,7 @@ type KanbanCardProps = {
     onViewDetails: () => void;
     onEditEmail: () => void;
     onGenerateDraft: () => void;
+    onSendEmail: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     studentProfile?: StudentRow;
@@ -62,6 +60,7 @@ function KanbanCardInner({
     onViewDetails,
     onEditEmail,
     onGenerateDraft,
+    onSendEmail,
     onMove,
     onOpenGoals,
     studentProfile,
@@ -88,11 +87,16 @@ function KanbanCardInner({
             ? "bg-destructive/10 text-destructive ring-destructive/20"
             : "bg-warning/15 text-warning ring-warning/25";
 
+    const isEmailSent =
+        a.status === "accepted" && a.interventionStatus === "sent";
+
     return (
         <article
             className={cn(
                 "group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500",
                 isHighlighted && highlightTone,
+                isEmailSent &&
+                    "border-success/40 bg-success/5 dark:border-success/40 dark:bg-success/10",
             )}
         >
             <div className="flex items-start gap-3">
@@ -265,12 +269,13 @@ function KanbanCardInner({
                 onViewDetails={onViewDetails}
                 onEditEmail={onEditEmail}
                 onGenerateDraft={onGenerateDraft}
+                onSendEmail={onSendEmail}
                 onMove={onMove}
                 onOpenGoals={onOpenGoals}
                 studentProfile={studentProfile}
                 isAiDrafting={isAiDrafting}
-                isAiDraftReady={isAiDraftReady}
                 isAcceptingCase={isAcceptingCase}
+                isEmailSent={isEmailSent}
             />
         </article>
     );
@@ -283,27 +288,28 @@ function CardActions({
     onViewDetails,
     onEditEmail,
     onGenerateDraft,
+    onSendEmail,
     onMove,
     onOpenGoals,
     studentProfile,
     isAiDrafting,
-    isAiDraftReady,
     isAcceptingCase,
+    isEmailSent,
 }: {
     alert: Alert;
     onViewDetails: () => void;
     onEditEmail: () => void;
     onGenerateDraft: () => void;
+    onSendEmail: () => void;
     onMove: (status: CaseStatus, message?: string) => void;
     onOpenGoals: () => void;
     studentProfile?: StudentRow;
     isAiDrafting?: boolean;
-    isAiDraftReady?: boolean;
     isAcceptingCase?: boolean;
+    isEmailSent?: boolean;
 }) {
     const hasGoals = a.goals.length > 0;
     const isActuallyDrafting = isAiDrafting || a.isGenerating;
-    const isActuallyReady = isAiDraftReady || !!a.draftSubject;
 
     if (a.status === "new") {
         return (
@@ -344,35 +350,13 @@ function CardActions({
         );
     }
 
-    if (a.status === "contacted") {
-        return (
-            <div className="mt-3 flex items-center gap-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() =>
-                        onMove("scheduled", `${a.name} đã chọn khung giờ họp`)
-                    }
-                >
-                    <CalendarCheck className="size-4" />
-                    Đã đặt hẹn
-                </Button>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-10 w-10 shrink-0 rounded-lg"
-                    onClick={() => onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`)}
-                    aria-label="Chuyển sang Đang hỗ trợ"
-                >
-                    <ArrowRight className="size-4" />
-                </Button>
-            </div>
-        );
-    }
-
     if (a.status === "accepted") {
-        const canSendNow = !!a.draftBody && !isActuallyDrafting;
+        const canSendNow = !!a.draftBody && !isActuallyDrafting && !isEmailSent;
+        const sendTitle = isEmailSent
+            ? "Email đã gửi · đang chờ sinh viên đặt lịch"
+            : canSendNow
+              ? "Gửi email"
+              : "Cần tạo nội dung email trước khi gửi";
         return (
             <div className="mt-3 flex items-center gap-2">
                 <Button
@@ -388,9 +372,9 @@ function CardActions({
                     variant="outline"
                     disabled={!canSendNow}
                     className="h-10 w-10 shrink-0 rounded-lg"
-                    onClick={() => onMove("contacted", `Đã gửi email cho ${a.name}`)}
-                    aria-label="Gửi email và chuyển sang Đã liên hệ"
-                    title={canSendNow ? "Gửi email" : "Cần tạo nội dung email trước khi gửi"}
+                    onClick={onSendEmail}
+                    aria-label="Gửi email cho sinh viên"
+                    title={sendTitle}
                 >
                     <Send className="size-4" />
                 </Button>
@@ -447,16 +431,10 @@ function CardActions({
         );
     }
 
-    // resolved
+    // resolved — terminal state, no actions
     return (
-        <Button
-            variant="outline"
-            size="sm"
-            className="mt-3 h-10 w-full rounded-lg text-sm font-medium"
-            onClick={() => onMove("in_progress", `Mở lại case của ${a.name}`)}
-        >
-            <RotateCcw className="size-4" />
-            Mở lại case
-        </Button>
+        <p className="mt-3 text-[12px] italic text-muted-foreground">
+            Case đã đóng · {relativeTime(a.movedAt)}
+        </p>
     );
 }
