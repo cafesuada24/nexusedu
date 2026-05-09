@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime  # noqa: TC003
+from datetime import UTC, datetime
 
 from fastapi_users.db import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
@@ -32,6 +32,7 @@ from src.domain.value_objects.status import (
     InterventionStatus,
     JobStatus,
     OutboxStatus,
+    RiskStatus,
 )
 
 
@@ -84,7 +85,9 @@ class UTCDateTime(TypeDecorator[datetime]):
         return value.astimezone(UTC)
 
     def process_result_value(
-        self, value: datetime | None, _: Dialect,
+        self,
+        value: datetime | None,
+        _: Dialect,
     ) -> datetime | None:
         """Logic for receiving data FROM the database.
 
@@ -111,20 +114,15 @@ class Base(DeclarativeBase):
 class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table, integrating with FastAPI-Users."""
 
-    role: Mapped[str] = mapped_column(String, default='viewer')
+    role: Mapped[str] = mapped_column(String, default='viewer', nullable=False)
 
     preferences: Mapped[UserSettings] = relationship(
         'UserSettings',
         back_populates='user',
         uselist=False,
         lazy='selectin',
+        cascade='all, delete-orphan',
     )
-    # advisor_profile: Mapped[Advisor | None] = relationship(
-    #     'Advisor',
-    #     back_populates='user',
-    #     uselist=False,
-    #     lazy='selectin',
-    # )
 
 
 class UserSettings(Base):
@@ -133,13 +131,19 @@ class UserSettings(Base):
     __tablename__ = 'user_settings'
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey('user.id'),
+        ForeignKey('user.id', ondelete='CASCADE'),
         primary_key=True,
     )
-    auto_draft_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    auto_draft_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
 
     user: Mapped[User] = relationship(
-        'User', back_populates='preferences', uselist=False,
+        'User',
+        back_populates='preferences',
+        uselist=False,
     )
 
 
@@ -149,10 +153,20 @@ class Student(Base):
     __tablename__ = 'students'
 
     sid: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    student_name: Mapped[str] = mapped_column(String)
-    email: Mapped[str] = mapped_column(String)
+    student_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        unique=True,
+        index=True,
+    )
     major: Mapped[str] = mapped_column(String, default='Unknown')
-    current_risk_status: Mapped[str] = mapped_column(String, default='Normal')
+    current_risk_status: Mapped[RiskStatus] = mapped_column(
+        Enum(RiskStatus),
+        default=RiskStatus.NORMAL,
+        nullable=False,
+        index=True,
+    )
     last_notified_timestamp: Mapped[datetime | None] = mapped_column(UTCDateTime)
     last_notified_satisfaction: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -160,10 +174,12 @@ class Student(Base):
     activities: Mapped[list[Activity]] = relationship(
         'Activity',
         back_populates='student',
+        cascade='all, delete-orphan',
     )
     status_history: Mapped[list[StudentStatusHistory]] = relationship(
         'StudentStatusHistory',
         back_populates='student',
+        cascade='all, delete-orphan',
     )
 
 
@@ -177,12 +193,17 @@ class Activity(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    sid: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('students.sid', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
     course_id: Mapped[str | None] = mapped_column(String)
     course_name: Mapped[str | None] = mapped_column(String)
     test_type: Mapped[str | None] = mapped_column(String)
-    score: Mapped[float | None] = mapped_column(Double)
-    timestamp: Mapped[float | None] = mapped_column(UTCDateTime)
+    score: Mapped[float | None] = mapped_column(Double, index=True)
+    timestamp: Mapped[datetime | None] = mapped_column(UTCDateTime, index=True)
     academic_year: Mapped[int | None] = mapped_column(Integer)
     semester: Mapped[int | None] = mapped_column(Integer)
     week: Mapped[int | None] = mapped_column(Integer)
@@ -205,7 +226,12 @@ class StudentStatusHistory(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    sid: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('students.sid', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
     academic_year: Mapped[int | None] = mapped_column(Integer)
     semester: Mapped[int | None] = mapped_column(Integer)
     week: Mapped[int | None] = mapped_column(Integer)
@@ -213,9 +239,10 @@ class StudentStatusHistory(Base):
     baseline_std: Mapped[float | None] = mapped_column(Double)
     current_score_avg: Mapped[float | None] = mapped_column(Double)
     z_score: Mapped[float | None] = mapped_column(Double)
-    anomaly_flag: Mapped[str | None] = mapped_column(String)
+    anomaly_flag: Mapped[str | None] = mapped_column(String, index=True)
     status_recorded_at: Mapped[datetime] = mapped_column(
         server_default=func.now(),
+        index=True,
     )
 
     # Relationships
@@ -241,8 +268,13 @@ class Advisor(Base):
         unique=True,
         nullable=True,
     )
-    name: Mapped[str] = mapped_column(String)
-    email: Mapped[str] = mapped_column(String)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        unique=True,
+        index=True,
+    )
     title: Mapped[str | None] = mapped_column(String)
     phone: Mapped[str | None] = mapped_column(String)
     faculty: Mapped[str | None] = mapped_column(String)
@@ -266,17 +298,22 @@ class PointLedger(Base):
     )
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
-        ForeignKey('advisors.advisor_id'),
+        ForeignKey('advisors.advisor_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
     )
     case_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
-        ForeignKey('cases.case_id'),
+        ForeignKey('cases.case_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
     )
-    action: Mapped[str] = mapped_column(String)
-    points: Mapped[int] = mapped_column(Integer)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    points: Mapped[int] = mapped_column(Integer, nullable=False)
     earned_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
+        index=True,
     )
 
 
@@ -295,12 +332,15 @@ class AdvisorBadge(Base):
     )
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
-        ForeignKey('advisors.advisor_id'),
+        ForeignKey('advisors.advisor_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
     )
-    badge_id: Mapped[str] = mapped_column(String)
+    badge_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     awarded_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
+        index=True,
     )
 
 
@@ -316,15 +356,21 @@ class InterventionEmail(Base):
     )
     case_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
-        ForeignKey('cases.case_id'),
-        nullable=True,
+        ForeignKey('cases.case_id', ondelete='CASCADE'),
+        nullable=False,
     )
     subject: Mapped[str | None] = mapped_column(String)
     body: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[EmailStatus] = mapped_column(Enum(EmailStatus), default=EmailStatus.UNAVAILABLE)  # 'draft', 'sent'
+    status: Mapped[EmailStatus] = mapped_column(
+        Enum(EmailStatus),
+        default=EmailStatus.UNAVAILABLE,
+        nullable=False,
+        index=True,
+    )  # 'draft', 'sent'
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
+        index=True,
     )
     sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     version: Mapped[int] = mapped_column(Integer, default=0)
@@ -345,28 +391,38 @@ class Case(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    sid: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey('students.sid'))
+    sid: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('students.sid', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
     intervention_status: Mapped[InterventionStatus] = mapped_column(
         Enum(InterventionStatus),
         default=InterventionStatus.NEW,
+        nullable=False,
+        index=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
+        index=True,
     )
     assigned_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     version: Mapped[int] = mapped_column(Integer, default=0)
     assigned_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
-        ForeignKey('advisors.advisor_id'),
+        ForeignKey('advisors.advisor_id', ondelete='SET NULL'),
         nullable=True,
         default=None,
+        index=True,
     )
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         default=func.now(),
         onupdate=func.now(),
+        index=True,
     )
 
     # Relationships
@@ -414,6 +470,7 @@ class IdempotencyKey(Base):
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
+        index=True,
     )
 
 
@@ -427,14 +484,19 @@ class BackgroundJobTracker(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.PENDING)
-    correlation_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(JobStatus),
+        default=JobStatus.PENDING,
+        index=True,
+    )
+    correlation_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
     correlation_type: Mapped[str] = mapped_column(String)
 
     # Observability
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
+        index=True,
     )
     started_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
@@ -452,20 +514,23 @@ class OutboxEvent(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    task_name: Mapped[str] = mapped_column(String, nullable=False)
+    task_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     status: Mapped[OutboxStatus] = mapped_column(
         Enum(OutboxStatus),
         default=OutboxStatus.PENDING,
         nullable=False,
+        index=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
         nullable=False,
+        index=True,
     )
     processed_at: Mapped[datetime | None] = mapped_column(
         UTCDateTime,
         nullable=True,
+        index=True,
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
