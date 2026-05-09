@@ -652,6 +652,8 @@ class SqlAlchemyCaseRepository:
             .values(
                 assigned_advisor_id=case.assigned_advisor_id,
                 intervention_status=case.intervention_status,
+                assigned_at=case.assigned_at,
+                closed_at=case.closed_at,
                 version=case.version + 1,
             )
         )
