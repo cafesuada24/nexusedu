@@ -96,6 +96,7 @@ async def run_agent_task(
 async def run_dispatch_email_task(
     _: dict[str, Any],
     case_id: UUID,
+    header: str,
     body: str,
     target_email: str,
 ) -> None:
@@ -121,7 +122,7 @@ async def run_dispatch_email_task(
         # Send actual email
         await email_sending_service.send_email(
             to_email=target_email,
-            subject=email.subject,
+            subject=header,
             body=body,
         )
 
@@ -379,6 +380,7 @@ async def run_case_review_requested_task(
         await container.task_queue.enqueue(
             'run_dispatch_email_task',
             case_id=case_id,
+            header='Review support',
             body=email_body,
             target_email=student.email,
         )
