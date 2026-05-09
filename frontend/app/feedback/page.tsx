@@ -1,40 +1,41 @@
-import { Sparkles, AlertCircle } from "lucide-react"
+import { AlertCircle, Star } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { BookingView } from "@/components/booking/booking-view"
-import { PublicBookingHeader } from "@/components/booking/public-header"
 import { Button } from "@/components/ui/button"
+import { FeedbackView } from "@/components/feedback/feedback-view"
+import { PublicBookingHeader } from "@/components/booking/public-header"
 import Link from "next/link"
 
-const advisors: Record<
-  string,
-  { advisor: string; role: string; student?: string }
-> = {
+const ADVISOR_META: Record<string, { advisor: string; role: string }> = {
   "le-ha": {
     advisor: "TS. Lê Hà",
     role: "Cố vấn học tập · Khoa CNTT",
   },
 }
 
-export default async function PublicBookingPage({
-  params,
+function decodeJwtPayload(
+  token: string,
+): { case_id?: string; advisor?: string } | null {
+  try {
+    const payload = token.split(".")[1]
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"))
+  } catch {
+    return null
+  }
+}
+
+export default async function PublicFeedbackPage({
   searchParams,
 }: {
-  params: Promise<{ token: string }>
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const { token } = await params
-  const { cid } = await searchParams
+  const { token } = await searchParams
+  const raw = typeof token === "string" ? token : undefined
 
-  const meta = advisors[token] ?? {
-    advisor: "Cố vấn học tập",
-    role: "NexusEdu",
-  }
+  const claims = raw ? decodeJwtPayload(raw) : null
+  const meta =
+    ADVISOR_META[claims?.advisor ?? ""] ?? ADVISOR_META["le-ha"]
 
-  const caseId = typeof cid === "string" ? cid : undefined
-  const studentName = undefined // Mock student lookup by SID is deprecated here
-
-
-  if (!caseId) {
+  if (!raw || !claims?.case_id) {
     return (
       <div className="flex min-h-screen flex-col bg-muted/30">
         <PublicBookingHeader />
@@ -47,7 +48,7 @@ export default async function PublicBookingPage({
               Liên kết không hợp lệ
             </h1>
             <p className="text-sm text-muted-foreground">
-              Vui lòng sử dụng liên kết đặt lịch được gửi trực tiếp đến email
+              Vui lòng sử dụng liên kết đánh giá được gửi trực tiếp đến email
               của bạn. Nếu bạn cho rằng đây là lỗi, hãy liên hệ với cố vấn học
               tập.
             </p>
@@ -64,35 +65,30 @@ export default async function PublicBookingPage({
     <div className="flex min-h-screen flex-col bg-muted/30">
       <PublicBookingHeader />
       <main className="flex-1">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-12">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 md:px-6 md:py-12">
           <div className="flex flex-col gap-3">
             <Badge
               variant="secondary"
               className="w-fit rounded-md bg-primary/10 text-primary hover:bg-primary/10"
             >
-              <Sparkles className="size-3" />
-              Lời mời cá nhân từ cố vấn của bạn
+              <Star className="size-3" />
+              Đánh giá quá trình hỗ trợ từ {meta.advisor}
             </Badge>
             <h1 className="font-serif text-3xl font-bold tracking-tight text-balance md:text-4xl">
-              Chào {studentName || "bạn"}, hãy chọn một khung giờ phù hợp với{" "}
-              {meta.advisor}
+              Bạn cảm thấy thế nào sau buổi hỗ trợ?
             </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground text-pretty md:text-base">
-              Buổi gặp kéo dài khoảng 30 phút — hoàn toàn tự nguyện, riêng tư,
-              và không có gì đáng lo.
+            <p className="max-w-xl text-sm text-muted-foreground text-pretty md:text-base">
+              Phản hồi của bạn hoàn toàn bảo mật và giúp {meta.advisor} cải
+              thiện chất lượng hỗ trợ cho các sinh viên khác.
             </p>
           </div>
 
-          <BookingView
-            caseId={caseId}
-            studentName={studentName}
-            advisorToken={token}
-          />
+          <FeedbackView token={raw} />
 
           <p className="text-xs text-muted-foreground">
-            Nếu bạn không phải là người được mời qua email này, bạn có thể bỏ
-            qua trang này. NexusEdu không chia sẻ dữ liệu của bạn với bên thứ
-            ba.
+            Nếu bạn không phải là người nhận được yêu cầu đánh giá này, bạn có
+            thể bỏ qua trang này. NexusEdu không chia sẻ dữ liệu của bạn với
+            bên thứ ba.
           </p>
         </div>
       </main>

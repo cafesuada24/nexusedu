@@ -10,7 +10,6 @@ import {
     fetchTasks,
     acceptCase,
     startSupporting,
-    resolveCase,
     fetchOpenCases,
     fetchAssignedCases,
 } from "@/lib/api";
@@ -19,6 +18,24 @@ import { toast } from "sonner";
 import React from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import {
+    getAwaitingFeedbackSet,
+    getAllStudentConcerns,
+    markAwaitingFeedback,
+} from "@/lib/awaiting-feedback";
+import type { Appointment } from "@/lib/appointments";
+
+const PRE_BOOKED_STATUSES = new Set(["new", "accepted", "sent"]);
+
+async function fetchAppointments(): Promise<Appointment[]> {
+    try {
+        const res = await fetch("/api/appointments", { cache: "no-store" });
+        if (!res.ok) return [];
+        return (await res.json()) as Appointment[];
+    } catch {
+        return [];
+    }
+}
 
 /**
  * Hook to fetch the list of alerts (at-risk students).
@@ -40,30 +57,58 @@ export function useAlerts() {
                 "[useAlerts] Fetching open and assigned cases...",
             );
             try {
-                // Fetch open and assigned cases
-                const [openRes, assignedRes] = await Promise.all([
+                // Fetch open and assigned cases + appointments in parallel
+                const [openRes, assignedRes, appointments] = await Promise.all([
                     fetchOpenCases(100, 0),
                     fetchAssignedCases(100, 0),
+                    fetchAppointments(),
                 ]);
 
                 const allItems = [...openRes.items, ...assignedRes.items];
 
+                // Frontend override: cases marked locally as awaiting feedback
+                // are displayed in "Đang hỗ trợ" with the awaiting badge,
+                // regardless of the backend's current intervention_status.
+                const awaitingSet = getAwaitingFeedbackSet();
+                const concerns = getAllStudentConcerns();
+                const bookedCaseIds = new Set(
+                    appointments.map((a) => a.caseId),
+                );
+
                 // Map cases to the unified alert shape expected by the UI
-                const enriched = allItems.map((c) => ({
-                    sid: c.sid,
-                    student_name: c.student_name,
-                    email: c.email || "",
-                    current_risk_status: c.current_risk_status,
-                    intervention_status: c.intervention_status,
-                    active_case_id: c.case_id,
-                    case_id: c.case_id,
-                    assigned_advisor_id: c.assigned_advisor_id,
-                    assigned_to: c.assigned_to,
-                    draft_subject: c.draft_subject || null,
-                    draft_body: c.draft_body || null,
-                    draft_status: c.draft_status || null,
-                    is_generating: c.draft_status === "generating",
-                }));
+                const enriched = allItems.map((c) => {
+                    const backendStatus = (
+                        c.intervention_status || ""
+                    ).toLowerCase();
+                    // If the student has booked a slot via /api/appointments,
+                    // surface the case as "booked" — but only when the backend
+                    // hasn't already moved past BOOKED (supporting / resolved
+                    // / awaiting_feedback take precedence).
+                    const appointmentOverride =
+                        bookedCaseIds.has(c.case_id) &&
+                        PRE_BOOKED_STATUSES.has(backendStatus)
+                            ? "booked"
+                            : null;
+
+                    return {
+                        sid: c.sid,
+                        student_name: c.student_name,
+                        email: c.email || "",
+                        current_risk_status: c.current_risk_status,
+                        intervention_status: awaitingSet.has(c.case_id)
+                            ? "awaiting_feedback"
+                            : (appointmentOverride ?? c.intervention_status),
+                        student_concern: concerns[c.case_id] ?? null,
+                        active_case_id: c.case_id,
+                        case_id: c.case_id,
+                        assigned_advisor_id: c.assigned_advisor_id,
+                        assigned_to: c.assigned_to,
+                        draft_subject: c.draft_subject || null,
+                        draft_body: c.draft_body || null,
+                        draft_status: c.draft_status || null,
+                        is_generating: c.draft_status === "generating",
+                    };
+                });
 
                 console.log(
                     "[useAlerts] Unified alerts from cases:",
@@ -109,7 +154,13 @@ export function useUpdateAlertStatus() {
                 case "supporting":
                     return startSupporting(case_id);
                 case "resolved":
-                    return resolveCase(case_id);
+                    // Frontend-only flow until backend supports
+                    // AWAITING_FEEDBACK: don't call resolveCase (which would
+                    // immediately set RESOLVED). Just persist the local
+                    // override; student submitting feedback will trigger the
+                    // real resolve when backend is ready.
+                    markAwaitingFeedback(case_id);
+                    return Promise.resolve();
                 default:
                     throw new Error(
                         `Không hỗ trợ chuyển trạng thái sang "${status}" từ UI.`,
@@ -139,7 +190,11 @@ export function useUpdateAlertStatus() {
                 queryKeys.alerts.list(),
             );
 
-            // Optimistically update to the new value
+            // Optimistically update to the new value.
+            // "resolved" click triggers the feedback-request flow — card stays
+            // in "Đang hỗ trợ" and shows "Chờ sinh viên đánh giá" badge.
+            const optimisticStatus =
+                status === "resolved" ? "awaiting_feedback" : status;
             queryClient.setQueryData(
                 queryKeys.alerts.list(),
                 (old: any[] | undefined) => {
@@ -148,7 +203,7 @@ export function useUpdateAlertStatus() {
                         alert.case_id === case_id || alert.sid === sid
                             ? {
                                   ...alert,
-                                  intervention_status: status,
+                                  intervention_status: optimisticStatus,
                                   ...(isAccept
                                       ? {
                                             assigned_advisor_id: sid ?? case_id,

@@ -1334,6 +1334,52 @@ export async function resolveCase(case_id: string): Promise<void> {
     throw new Error(`Giải quyết case thất bại [${res.status}]: ${detail}`);
 }
 
+/**
+ * POST /cases/{case_id}/feedback — student submits rating + comment.
+ * Public endpoint (no auth required) — called from /feedback/[token] page.
+ */
+export async function submitFeedback(
+    case_id: string,
+    rating: number,
+    comment: string | null,
+): Promise<void> {
+    const trimmed = case_id.trim();
+    if (!z.string().uuid().safeParse(trimmed).success) {
+        throw new Error("Mã case không hợp lệ.");
+    }
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+        throw new Error("Điểm đánh giá phải từ 1 đến 5.");
+    }
+    const url = endpoint(`/cases/${encodeURIComponent(trimmed)}/feedback`);
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                url,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rating, comment: comment || null }),
+                    suppressUnauthorizedEvent: true,
+                },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (res.ok) return;
+    const body = await res.text().catch(() => "");
+    let detail = res.statusText;
+    try {
+        const parsed = body ? JSON.parse(body) : {};
+        detail =
+            (typeof parsed?.detail === "string" ? parsed.detail : "") ||
+            (typeof parsed?.message === "string" ? parsed.message : "") ||
+            detail;
+    } catch {
+        if (body) detail = body;
+    }
+    throw new Error(`Gửi đánh giá thất bại [${res.status}]: ${detail}`);
+}
+
 /** True when an `NEXT_PUBLIC_API_BASE_URL` was configured at build time or we're in the browser. */
 export function isApiConfigured(): boolean {
     // If we're in the browser, we assume the default /api/v1 rewrite works.

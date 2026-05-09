@@ -20,6 +20,11 @@ export const queryKeys = {
   schedule: {
     all: ["schedule"] as const,
   },
+  appointments: {
+    all: ["appointments"] as const,
+    list: (advisorToken: string, from: string, to: string) =>
+      ["appointments", "list", advisorToken, from, to] as const,
+  },
   metrics: {
     stats: ["metrics", "stats"] as const,
     retention: ["metrics", "retention"] as const,

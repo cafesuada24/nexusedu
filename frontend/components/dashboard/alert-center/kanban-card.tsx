@@ -11,6 +11,7 @@ import {
     Loader2,
     Mail,
     Send,
+    AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +82,9 @@ function KanbanCardInner({
 
     const isEmailSent =
         a.status === "accepted" && a.interventionStatus === "sent";
+    const isAwaitingFeedback =
+        a.interventionStatus === "awaiting_feedback";
+    const hasStudentConcern = isAwaitingFeedback && Boolean(a.studentConcern);
 
     return (
         <article
@@ -89,6 +93,11 @@ function KanbanCardInner({
                 isHighlighted && highlightTone,
                 isEmailSent &&
                     "border-success/40 bg-success/5 dark:border-success/40 dark:bg-success/10",
+                isAwaitingFeedback &&
+                    !hasStudentConcern &&
+                    "border-amber-300/60 bg-amber-50/40 dark:border-amber-400/40 dark:bg-amber-500/10",
+                hasStudentConcern &&
+                    "border-destructive/40 bg-destructive/5 dark:border-destructive/40 dark:bg-destructive/10",
             )}
         >
             <div className="flex items-start gap-3">
@@ -220,6 +229,7 @@ function KanbanCardInner({
                 isAiDrafting={isAiDrafting}
                 isAcceptingCase={isAcceptingCase}
                 isEmailSent={isEmailSent}
+                isAwaitingFeedback={isAwaitingFeedback}
             />
         </article>
     );
@@ -239,6 +249,7 @@ function CardActions({
     isAiDrafting,
     isAcceptingCase,
     isEmailSent,
+    isAwaitingFeedback,
 }: {
     alert: Alert;
     onViewDetails: () => void;
@@ -251,6 +262,7 @@ function CardActions({
     isAiDrafting?: boolean;
     isAcceptingCase?: boolean;
     isEmailSent?: boolean;
+    isAwaitingFeedback?: boolean;
 }) {
     const hasGoals = a.goals.length > 0;
     const isActuallyDrafting = isAiDrafting || a.isGenerating;
@@ -370,10 +382,48 @@ function CardActions({
         );
     }
 
-    // resolved — terminal state, no actions
+    // resolved column — 2 sub-states (awaiting student confirmation vs confirmed)
+    if (isAwaitingFeedback) {
+        const concern = a.studentConcern;
+        if (concern) {
+            return (
+                <div className="mt-3">
+                    <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 dark:border-destructive/40 dark:bg-destructive/10">
+                        <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-medium text-destructive">
+                                Sinh viên báo chưa giải quyết
+                            </p>
+                            <p className="mt-0.5 line-clamp-2 text-[12px] text-destructive/85">
+                                “{concern.comment}”
+                            </p>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                {relativeTime(concern.submittedAt)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        return (
+            <div className="mt-3">
+                <div className="flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 px-3 py-2.5 dark:border-amber-400/40 dark:bg-amber-500/10">
+                    <Clock className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-amber-800 dark:text-amber-300">
+                            Chờ sinh viên xác nhận
+                        </p>
+                        <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70">
+                            Đã chuyển · {relativeTime(a.movedAt)}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
     return (
-        <p className="mt-3 text-[12px] italic text-muted-foreground">
-            Case đã đóng · {relativeTime(a.movedAt)}
+        <p className="mt-3 text-[12px] italic text-success">
+            ✓ Đã giải quyết xong · {relativeTime(a.movedAt)}
         </p>
     );
 }
