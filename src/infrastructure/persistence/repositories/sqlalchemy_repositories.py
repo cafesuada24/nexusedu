@@ -16,7 +16,6 @@ from sqlalchemy import (
     inspect,
     literal,
     literal_column,
-    or_,
     quoted_name,
     select,
     text,
@@ -42,6 +41,7 @@ from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
     AdvisorBadge,
+    Appointment,
     BackgroundJobTracker,
     IdempotencyKey,
     InterventionEmail,
@@ -68,7 +68,7 @@ if TYPE_CHECKING:
     from src.domain.entities.point_ledger import PointLedger as DomainLedger
     from src.domain.entities.student import Student as DomainStudent
     from src.domain.repositories.metadata_repository import DBDescription
-    from src.domain.repositories.point_ledger_repository import PointLedgerRepository
+    from src.domain.entities.appointment import Appointment as DomainAppointment
 
 
 class SqlAlchemyStudentRepository:
@@ -603,6 +603,56 @@ class SqlAlchemyEmailRepository:
         result = await self.session.execute(stmt)
         email = result.scalar_one_or_none()
         return DataMapper.to_domain_email(email) if email else None
+
+
+class SqlAlchemyAppointmentRepository:
+    """SQLAlchemy implementation of the AppointmentRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+
+    async def add(self, appointment: DomainAppointment) -> None:
+        """Add a new appointment."""
+        new_appointment = Appointment(
+            appointment_id=appointment.appointment_id,
+            case_id=appointment.case_id,
+            appointment_time=appointment.appointment_time,
+            meeting_method=appointment.meeting_method,
+            notes=appointment.notes,
+            created_at=appointment.created_at,
+        )
+        self.session.add(new_appointment)
+
+    async def save(self, appointment: DomainAppointment) -> None:
+        """Update an existing appointment."""
+        stmt = (
+            update(Appointment)
+            .where(Appointment.appointment_id == appointment.appointment_id)
+            .values(
+                appointment_time=appointment.appointment_time,
+                meeting_method=appointment.meeting_method,
+                notes=appointment.notes,
+            )
+        )
+        result = await self.session.execute(stmt)
+
+        if result.rowcount == 0:  # type: ignore
+            raise ConcurrencyError('Appointment not found or modified.')
+
+    async def get_by_case(self, case_id: uuid.UUID) -> DomainAppointment:
+        """Find the appointment associated with a specific case."""
+        appointment = await self.find_by_case(case_id=case_id)
+        if appointment is None:
+            raise CaseNotFoundError(case_id)  # Or AppointmentNotFoundError if it existed
+        return appointment
+
+    async def find_by_case(self, case_id: uuid.UUID) -> DomainAppointment | None:
+        """Retrieve the appointment associated with a specific case."""
+        stmt = select(Appointment).where(Appointment.case_id == case_id).limit(1)
+        result = await self.session.execute(stmt)
+        appointment = result.scalar_one_or_none()
+        return DataMapper.to_domain_appointment(appointment) if appointment else None
 
 
 class SqlAlchemyCaseRepository:
