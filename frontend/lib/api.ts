@@ -859,23 +859,22 @@ export async function sendNudge(
 
 /**
  * POST /query — ask the async AI agent for analysis.
+ *
+ * Backend reads `query` and `thread_id` as query string parameters
+ * (FastAPI Query() bindings), not as a JSON body.
  */
 export async function queryAgent(
     query: string,
     opts?: { thread_id?: string },
 ): Promise<DraftJobResponse> {
-    const payload: Record<string, any> = { query };
-    if (opts?.thread_id) payload.thread_id = opts.thread_id;
+    const params = new URLSearchParams({ query });
+    if (opts?.thread_id) params.set("thread_id", opts.thread_id);
 
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint("/query"),
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                },
+                endpoint(`/query?${params.toString()}`),
+                { method: "POST" },
                 signal,
             ),
         DEFAULT_TIMEOUT_MS,
