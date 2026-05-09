@@ -11,6 +11,7 @@ import {
     Loader2,
     Mail,
     Send,
+    AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +85,7 @@ function KanbanCardInner({
     const isAwaitingFeedback =
         a.status === "in_progress" &&
         a.interventionStatus === "awaiting_feedback";
+    const hasStudentConcern = isAwaitingFeedback && Boolean(a.studentConcern);
 
     return (
         <article
@@ -93,7 +95,10 @@ function KanbanCardInner({
                 isEmailSent &&
                     "border-success/40 bg-success/5 dark:border-success/40 dark:bg-success/10",
                 isAwaitingFeedback &&
+                    !hasStudentConcern &&
                     "border-amber-300/60 bg-amber-50/40 dark:border-amber-400/40 dark:bg-amber-500/10",
+                hasStudentConcern &&
+                    "border-destructive/40 bg-destructive/5 dark:border-destructive/40 dark:bg-destructive/10",
             )}
         >
             <div className="flex items-start gap-3">
@@ -352,6 +357,27 @@ function CardActions({
 
     if (a.status === "in_progress") {
         if (isAwaitingFeedback) {
+            const concern = a.studentConcern;
+            if (concern) {
+                return (
+                    <div className="mt-3 flex flex-col gap-2">
+                        <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 dark:border-destructive/40 dark:bg-destructive/10">
+                            <AlertCircle className="size-4 shrink-0 text-destructive mt-0.5" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[13px] font-medium text-destructive">
+                                    Sinh viên báo chưa giải quyết
+                                </p>
+                                <p className="mt-0.5 line-clamp-2 text-[12px] text-destructive/85">
+                                    “{concern.comment}”
+                                </p>
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                    {relativeTime(concern.submittedAt)}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
             return (
                 <div className="mt-3 flex flex-col gap-2">
                     <div className="flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50/60 px-3 py-2.5 dark:border-amber-400/40 dark:bg-amber-500/10">
