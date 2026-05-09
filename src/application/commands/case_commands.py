@@ -180,7 +180,6 @@ class CaseCommandHandler:
         await self.task_queue.enqueue(
             'run_dispatch_email_task',
             case_id=case.case_id,
-            target_email=recipient_email,
         )
         await self.job_repo.add(new_job)
 
