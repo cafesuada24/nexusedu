@@ -19,10 +19,22 @@ function log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+function shutdown_apps() {
+    log_info "Stopping API and Worker processes..."
+    # Using SIGTERM for graceful shutdown
+    pkill -f "uvicorn src.presentation.api.main:app" 2>/dev/null
+    pkill -f "arq src.worker.WorkerSettings" 2>/dev/null
+}
+
+function shutdown_infra() {
+    log_info "Stopping infrastructure containers..."
+    docker stop arppool007 mailpit007 2>/dev/null
+}
+
 function stop_all() {
-    log_info "Stopping application..."
-    # Kill process groups to ensure all children (uvicorn/arq) die
-    pkill -P $$ 2>/dev/null
+    echo ""
+    shutdown_apps
+    shutdown_infra
     log_success "Application stopped."
     exit 0
 }
@@ -73,10 +85,7 @@ case "$1" in
         ;;
     
     stop)
-        log_info "Searching for running API/Worker processes..."
-        pkill -f "uvicorn src.presentation.api.main:app"
-        pkill -f "arq src.worker.WorkerSettings"
-        log_success "Shutdown command sent."
+        stop_all
         ;;
 
     *)
