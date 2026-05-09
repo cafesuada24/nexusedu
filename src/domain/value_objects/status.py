@@ -20,7 +20,9 @@ class InterventionStatus(StrEnum):
     SENT = 'sent'
     BOOKED = 'booked'
     SUPPORTING = 'supporting'
+    PENDING_REVIEW = 'pending_review'
     RESOLVED = 'resolved'
+    FAILED = 'failed'
     DISMISSED = 'dismissed'
     EXPIRED = 'expired'
 
