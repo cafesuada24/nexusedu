@@ -918,13 +918,37 @@ export async function fetchAdvisorsLeaderboard(
 }
 
 /**
- * GET /advisors/me/profile — returns current user's advisor profile.
+ * GET /advisors/engagement — returns engagement metrics by faculty/major.
+ */
+export async function fetchAdvisorsEngagement(): Promise<
+    AdvisorEngagementItem[]
+> {
+    const res = await withTimeout(
+        (signal) =>
+            authFetch(
+                endpoint("/advisors/engagement"),
+                { method: "GET" },
+                signal,
+            ),
+        DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+        const errorBody = await res.json().catch(() => ({}));
+        const message = errorBody.detail || res.statusText;
+        throw new Error(`Không thể lấy dữ liệu tương tác: ${message}`);
+    }
+    const data = await res.json();
+    return z.array(AdvisorEngagementItemSchema).parse(data);
+}
+
+/**
+ * GET /advisors/profile — returns current user's advisor profile.
  */
 export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint("/advisors/me/profile"),
+                endpoint("/advisors/profile"),
                 { method: "GET" },
                 signal,
             ),
@@ -962,7 +986,7 @@ export async function fetchAdvisorPoints(): Promise<AdvisorPoints> {
 }
 
 /**
- * PATCH /advisors/me/profile — updates current user's advisor profile.
+ * PATCH /advisors/profile — updates current user's advisor profile.
  */
 export async function updateAdvisorProfile(
     payload: AdvisorProfileUpdate,
@@ -970,7 +994,7 @@ export async function updateAdvisorProfile(
     const res = await withTimeout(
         (signal) =>
             authFetch(
-                endpoint("/advisors/me/profile"),
+                endpoint("/advisors/profile"),
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -1303,23 +1327,23 @@ export async function resolveCase(case_id: string): Promise<void> {
     throw new Error(`Giải quyết case thất bại [${res.status}]: ${detail}`);
 }
 
+export type StudentSatisfaction =
+    | "very_bad"
+    | "bad"
+    | "normal"
+    | "good"
+    | "very_good";
+
 /**
- * POST /cases/{case_id}/feedback — student submits rating + comment.
- * Public endpoint (no auth required) — called from /feedback/[token] page.
+ * POST /cases/review?token=<JWT> — student submits satisfaction + comment.
+ * Public endpoint. Backend verifies JWT and extracts case_id from it.
  */
 export async function submitFeedback(
-    case_id: string,
-    rating: number,
+    token: string,
+    satisfaction: StudentSatisfaction,
     comment: string | null,
 ): Promise<void> {
-    const trimmed = case_id.trim();
-    if (!z.string().uuid().safeParse(trimmed).success) {
-        throw new Error("Mã case không hợp lệ.");
-    }
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-        throw new Error("Điểm đánh giá phải từ 1 đến 5.");
-    }
-    const url = endpoint(`/cases/${encodeURIComponent(trimmed)}/feedback`);
+    const url = `${endpoint("/cases/review")}?token=${encodeURIComponent(token)}`;
     const res = await withTimeout(
         (signal) =>
             authFetch(
@@ -1327,7 +1351,7 @@ export async function submitFeedback(
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rating, comment: comment || null }),
+                    body: JSON.stringify({ satisfaction, comment: comment || null }),
                     suppressUnauthorizedEvent: true,
                 },
                 signal,
