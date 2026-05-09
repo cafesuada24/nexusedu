@@ -325,6 +325,7 @@ class InterventionEmail(Base):
         server_default=func.now(),
     )
     sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    version: Mapped[int] = mapped_column(Integer, default=0)
 
     # Business rule: each intervention case has exactly one email record
     __table_args__ = (

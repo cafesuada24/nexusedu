@@ -563,6 +563,7 @@ class SqlAlchemyEmailRepository:
             subject=email.subject,
             created_at=email.created_at,
             sent_at=email.sent_at,
+            version=email.version,
         )
         self.session.add(new_mail)
 
@@ -570,15 +571,24 @@ class SqlAlchemyEmailRepository:
         """Update the content and status of an existing case email."""
         stmt = (
             update(InterventionEmail)
-            .where(InterventionEmail.case_id == email.case_id)
+            .where(
+                InterventionEmail.case_id == email.case_id,
+                InterventionEmail.version == email.version,
+            )
             .values(
                 status=email.status,
                 body=email.body,
                 subject=email.subject,
                 sent_at=email.sent_at,
+                version=email.version + 1,
             )
         )
-        await self.session.execute(stmt)
+        result = await self.session.execute(stmt)
+
+        if result.rowcount == 0:  # type: ignore
+            raise ConcurrencyError('Data was modified by another process.')
+
+        email.version += 1
 
     async def get_by_case(self, case_id: uuid.UUID) -> DomainInterventionEmail:
         """Find the email associated with a specific case."""

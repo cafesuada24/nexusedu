@@ -24,6 +24,7 @@ class InterventionEmail:
     subject: str | None = None
     body: str | None = None
     sent_at: datetime | None = None
+    version: int = 0
 
     @property
     def is_generating(self) -> bool:
