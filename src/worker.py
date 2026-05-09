@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 import jwt
+from arq import cron
 from arq.connections import RedisSettings
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -385,7 +386,9 @@ async def run_case_review_requested_task(
             'iat': datetime.now(UTC),
         }
         token = jwt.encode(
-            payload, config.jwt_secret or 'insecure_default', algorithm='HS256'
+            payload,
+            config.jwt_secret or 'insecure_default',
+            algorithm='HS256',
         )
 
         # 2. Dispatch email (Using existing email dispatch logic as base)
@@ -439,8 +442,16 @@ async def run_auto_resolve_case_task(
             await session.commit()
         else:
             logger.info(
-                f'Worker: Case {case_id} already finalized, skipping auto-resolve.'
+                f'Worker: Case {case_id} already finalized, skipping auto-resolve.',
             )
+
+
+async def run_outbox_poller_task(ctx: dict[str, Any]) -> None:
+    """Cron task to poll the transactional outbox and dispatch to ARQ."""
+    async for session in get_async_session():
+        container = Container(session=session, redis_pool=ctx.get('redis'))
+        await container.outbox_processor.process_pending_events()
+        # session.commit() is automatically handled by get_async_session()
 
 
 class WorkerSettings:
@@ -458,6 +469,10 @@ class WorkerSettings:
         run_case_failed_task,
         run_case_review_requested_task,
         run_auto_resolve_case_task,
+        run_outbox_poller_task,
+    ]
+    cron_jobs = [
+        cron(run_outbox_poller_task, second=set(range(0, 60, 5))),
     ]
     redis_settings = RedisSettings(
         host=config.redis_host,
