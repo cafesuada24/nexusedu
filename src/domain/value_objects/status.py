@@ -53,3 +53,11 @@ class TaskStatus(StrEnum):
     BLOCKED = 'blocked'
     FAILED = 'failed'
     DONE = 'done'
+
+
+class OutboxStatus(StrEnum):
+    """Status of an outbox event."""
+
+    PENDING = 'pending'
+    PROCESSED = 'processed'
+    FAILED = 'failed'
