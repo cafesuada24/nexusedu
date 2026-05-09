@@ -744,6 +744,15 @@ export function AlertCenter() {
                 }
                 onClose={() => setEmailTargetId(null)}
                 onSave={handleSaveEmail}
+                onGenerateDraft={() => {
+                    const a = emailTargetId
+                        ? alerts.find((al) => al.id === emailTargetId) ?? null
+                        : null;
+                    if (a) handleGenerateDraft(a);
+                }}
+                isAiDrafting={
+                    emailTargetId ? !!aiDraftingById[emailTargetId] : false
+                }
             />
 
             <GoalsDialog
