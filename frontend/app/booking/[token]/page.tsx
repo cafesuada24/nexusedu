@@ -79,12 +79,15 @@ export default async function PublicBookingPage({
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground text-pretty md:text-base">
               Buổi gặp kéo dài khoảng 30 phút — hoàn toàn tự nguyện, riêng tư,
-              và không có gì đáng lo. Bạn có thể đổi giờ hoặc huỷ bất cứ lúc
-              nào.
+              và không có gì đáng lo.
             </p>
           </div>
 
-          <BookingView caseId={caseId} studentName={studentName} />
+          <BookingView
+            caseId={caseId}
+            studentName={studentName}
+            advisorToken={token}
+          />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người được mời qua email này, bạn có thể bỏ
