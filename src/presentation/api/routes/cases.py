@@ -8,14 +8,13 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, 
 
 from src.application.commands.case_commands import (
     AcceptCaseCommand,
-    BookAppointmentCommand,
     CaseCommandHandler,
     SendEmailCommand,
     TriggerDraftCommand,
     UpdateEmailCommand,
 )
 from src.application.dtos.case_dtos import (
-    BookAppointmentDTO,
+    BookAppointmentCommand,
     CaseDTO,
     QueryEmailDTO,
     TriggerDraftDTO,
