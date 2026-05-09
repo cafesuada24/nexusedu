@@ -139,7 +139,11 @@ export function useUpdateAlertStatus() {
                 queryKeys.alerts.list(),
             );
 
-            // Optimistically update to the new value
+            // Optimistically update to the new value.
+            // "resolved" click triggers the feedback-request flow — card stays
+            // in "Đang hỗ trợ" and shows "Chờ sinh viên đánh giá" badge.
+            const optimisticStatus =
+                status === "resolved" ? "awaiting_feedback" : status;
             queryClient.setQueryData(
                 queryKeys.alerts.list(),
                 (old: any[] | undefined) => {
@@ -148,7 +152,7 @@ export function useUpdateAlertStatus() {
                         alert.case_id === case_id || alert.sid === sid
                             ? {
                                   ...alert,
-                                  intervention_status: status,
+                                  intervention_status: optimisticStatus,
                                   ...(isAccept
                                       ? {
                                             assigned_advisor_id: sid ?? case_id,
