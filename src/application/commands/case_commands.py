@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
+    BookAppointmentCommand,
     GenerateEmailDraftCommand,
     SendEmailCommand,
     TriggerDraftCommand,
@@ -241,3 +242,17 @@ class CaseCommandHandler:
             personalized_body,
         )
         await self.email_repo.save(email)
+
+    async def handle_book_appointment(self, command: BookAppointmentCommand) -> None:
+        """Record that a student has booked an appointment for their case."""
+        case = await self.case_repo.get_by_id(command.case_id)
+        if not case:
+            raise CaseNotFoundError(command.case_id)
+
+        case.record_booking()
+
+        await self.case_repo.save(case)
+
+        # Dispatch events via publisher
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
