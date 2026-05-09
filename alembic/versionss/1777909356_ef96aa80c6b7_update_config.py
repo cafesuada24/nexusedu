@@ -1,8 +1,8 @@
-"""reinitialize
+"""update_config
 
-Revision ID: 49284953cffc
+Revision ID: ef96aa80c6b7
 Revises:
-Create Date: 2026-05-08 10:01:40.283657
+Create Date: 2026-05-04 22:42:36.155857
 
 """
 
@@ -12,11 +12,10 @@ from typing import Union
 import fastapi_users_db_sqlalchemy
 import sqlalchemy as sa
 
-import src
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '49284953cffc'
+revision: str = 'ef96aa80c6b7'
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -28,31 +27,20 @@ def upgrade() -> None:
     op.create_table(
         'background_job_tracker',
         sa.Column('job_id', sa.Uuid(), nullable=False),
-        sa.Column(
-            'status',
-            sa.Enum(
-                'PENDING', 'RUNNING', 'SUCCESS', 'ERROR', 'CANCELLED', name='jobstatus'
-            ),
-            nullable=False,
-        ),
-        sa.Column('correlation_id', sa.Uuid(), nullable=False),
-        sa.Column('correlation_type', sa.String(), nullable=False),
+        sa.Column('job_type', sa.String(), nullable=False),
+        sa.Column('status', sa.String(), nullable=False),
         sa.Column(
             'created_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
+            sa.TIMESTAMP(),
             server_default=sa.text('(CURRENT_TIMESTAMP)'),
             nullable=False,
         ),
-        sa.Column(
-            'started_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=True,
-        ),
-        sa.Column(
-            'completed_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=True,
-        ),
+        sa.Column('started_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('completed_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('error_message', sa.Text(), nullable=True),
+        sa.Column('progress', sa.Integer(), nullable=False),
+        sa.Column('correlation_id', sa.Uuid(), nullable=True),
+        sa.Column('correlation_type', sa.String(), nullable=True),
         sa.PrimaryKeyConstraint('job_id', name=op.f('pk__background_job_tracker')),
     )
     op.create_table(
@@ -60,7 +48,7 @@ def upgrade() -> None:
         sa.Column('key', sa.Uuid(), nullable=False),
         sa.Column(
             'created_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
+            sa.TIMESTAMP(),
             server_default=sa.text('(CURRENT_TIMESTAMP)'),
             nullable=False,
         ),
@@ -69,15 +57,12 @@ def upgrade() -> None:
     op.create_table(
         'students',
         sa.Column('sid', sa.Uuid(), nullable=False),
-        sa.Column('student_name', sa.String(), nullable=False),
+        sa.Column('student_name', sa.String(), nullable=True),
         sa.Column('email', sa.String(), nullable=True),
         sa.Column('major', sa.String(), nullable=False),
         sa.Column('current_risk_status', sa.String(), nullable=False),
-        sa.Column(
-            'last_notified_timestamp',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=True,
-        ),
+        sa.Column('intervention_status', sa.String(), nullable=False),
+        sa.Column('last_notified_timestamp', sa.Double(), nullable=False),
         sa.Column('last_notified_satisfaction', sa.Integer(), nullable=False),
         sa.PrimaryKeyConstraint('sid', name=op.f('pk__students')),
     )
@@ -103,11 +88,7 @@ def upgrade() -> None:
         sa.Column('course_name', sa.String(), nullable=True),
         sa.Column('test_type', sa.String(), nullable=True),
         sa.Column('score', sa.Double(), nullable=True),
-        sa.Column(
-            'timestamp',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=True,
-        ),
+        sa.Column('timestamp', sa.Double(), nullable=True),
         sa.Column('academic_year', sa.Integer(), nullable=True),
         sa.Column('semester', sa.Integer(), nullable=True),
         sa.Column('week', sa.Integer(), nullable=True),
@@ -122,13 +103,8 @@ def upgrade() -> None:
         sa.Column(
             'user_id', fastapi_users_db_sqlalchemy.generics.GUID(), nullable=True
         ),
-        sa.Column('name', sa.String(), nullable=False),
-        sa.Column('email', sa.String(), nullable=False),
-        sa.Column('title', sa.String(), nullable=True),
-        sa.Column('phone', sa.String(), nullable=True),
-        sa.Column('faculty', sa.String(), nullable=True),
-        sa.Column('office', sa.String(), nullable=True),
-        sa.Column('bio', sa.Text(), nullable=True),
+        sa.Column('name', sa.String(), nullable=True),
+        sa.Column('email', sa.String(), nullable=True),
         sa.ForeignKeyConstraint(
             ['user_id'], ['user.id'], name=op.f('fk__advisors__user_id__user')
         ),
@@ -149,7 +125,7 @@ def upgrade() -> None:
         sa.Column('anomaly_flag', sa.String(), nullable=True),
         sa.Column(
             'status_recorded_at',
-            sa.DateTime(),
+            sa.TIMESTAMP(),
             server_default=sa.text('(CURRENT_TIMESTAMP)'),
             nullable=False,
         ),
@@ -178,7 +154,7 @@ def upgrade() -> None:
         sa.Column('badge_id', sa.String(), nullable=False),
         sa.Column(
             'awarded_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
+            sa.TIMESTAMP(),
             server_default=sa.text('(CURRENT_TIMESTAMP)'),
             nullable=False,
         ),
@@ -194,44 +170,15 @@ def upgrade() -> None:
         'cases',
         sa.Column('case_id', sa.Uuid(), nullable=False),
         sa.Column('sid', sa.Uuid(), nullable=False),
-        sa.Column(
-            'intervention_status',
-            sa.Enum(
-                'NEW',
-                'ACCEPTED',
-                'SENT',
-                'BOOKED',
-                'SUPPORTING',
-                'RESOLVED',
-                'DISMISSED',
-                'EXPIRED',
-                name='interventionstatus',
-            ),
-            nullable=False,
-        ),
+        sa.Column('status', sa.String(), nullable=False),
         sa.Column(
             'created_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
+            sa.TIMESTAMP(),
             server_default=sa.text('(CURRENT_TIMESTAMP)'),
             nullable=False,
         ),
-        sa.Column(
-            'assigned_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=True,
-        ),
-        sa.Column(
-            'closed_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=True,
-        ),
-        sa.Column('version', sa.Integer(), nullable=False),
+        sa.Column('resolved_at', sa.TIMESTAMP(), nullable=True),
         sa.Column('assigned_advisor_id', sa.Uuid(), nullable=True),
-        sa.Column(
-            'updated_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=False,
-        ),
         sa.ForeignKeyConstraint(
             ['assigned_advisor_id'],
             ['advisors.advisor_id'],
@@ -245,43 +192,71 @@ def upgrade() -> None:
     op.create_table(
         'intervention_emails',
         sa.Column('email_id', sa.Uuid(), nullable=False),
+        sa.Column('sid', sa.Uuid(), nullable=False),
         sa.Column('case_id', sa.Uuid(), nullable=True),
+        sa.Column('advisor_id', sa.Uuid(), nullable=True),
         sa.Column('subject', sa.String(), nullable=True),
         sa.Column('body', sa.Text(), nullable=True),
-        sa.Column(
-            'status',
-            sa.Enum('UNAVAILABLE', 'GENERATING', 'DRAFT', 'SENT', name='emailstatus'),
-            nullable=False,
-        ),
+        sa.Column('status', sa.String(), nullable=True),
         sa.Column(
             'created_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
+            sa.TIMESTAMP(),
             server_default=sa.text('(CURRENT_TIMESTAMP)'),
             nullable=False,
         ),
-        sa.Column(
-            'sent_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
-            nullable=True,
+        sa.Column('sent_at', sa.TIMESTAMP(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ['advisor_id'],
+            ['advisors.advisor_id'],
+            name=op.f('fk__intervention_emails__advisor_id__advisors'),
         ),
         sa.ForeignKeyConstraint(
             ['case_id'],
             ['cases.case_id'],
             name=op.f('fk__intervention_emails__case_id__cases'),
         ),
+        sa.ForeignKeyConstraint(
+            ['sid'],
+            ['students.sid'],
+            name=op.f('fk__intervention_emails__sid__students'),
+        ),
         sa.PrimaryKeyConstraint('email_id', name=op.f('pk__intervention_emails')),
         sa.UniqueConstraint('case_id', name='uq_intervention_emails_case_id'),
     )
     op.create_table(
+        'tasks',
+        sa.Column('task_id', sa.Uuid(), nullable=False),
+        sa.Column('case_id', sa.Uuid(), nullable=False),
+        sa.Column('action_type', sa.String(), nullable=False),
+        sa.Column('status', sa.String(), nullable=False),
+        sa.Column('points_reward', sa.Integer(), nullable=False),
+        sa.Column(
+            'created_at',
+            sa.TIMESTAMP(),
+            server_default=sa.text('(CURRENT_TIMESTAMP)'),
+            nullable=False,
+        ),
+        sa.Column('completed_at', sa.TIMESTAMP(), nullable=True),
+        sa.Column('completed_by_advisor_id', sa.Uuid(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ['case_id'], ['cases.case_id'], name=op.f('fk__tasks__case_id__cases')
+        ),
+        sa.ForeignKeyConstraint(
+            ['completed_by_advisor_id'],
+            ['advisors.advisor_id'],
+            name=op.f('fk__tasks__completed_by_advisor_id__advisors'),
+        ),
+        sa.PrimaryKeyConstraint('task_id', name=op.f('pk__tasks')),
+    )
+    op.create_table(
         'point_ledger',
         sa.Column('id', sa.Uuid(), nullable=False),
-        sa.Column('advisor_id', sa.Uuid(), nullable=False),
-        sa.Column('case_id', sa.Uuid(), nullable=False),
-        sa.Column('action', sa.String(), nullable=False),
-        sa.Column('points', sa.Integer(), nullable=False),
+        sa.Column('advisor_id', sa.Uuid(), nullable=True),
+        sa.Column('task_id', sa.Uuid(), nullable=True),
+        sa.Column('points', sa.Integer(), nullable=True),
         sa.Column(
-            'earned_at',
-            src.infrastructure.database.models.UTCDateTime(timezone=True),
+            'timestamp',
+            sa.TIMESTAMP(),
             server_default=sa.text('(CURRENT_TIMESTAMP)'),
             nullable=False,
         ),
@@ -291,15 +266,15 @@ def upgrade() -> None:
             name=op.f('fk__point_ledger__advisor_id__advisors'),
         ),
         sa.ForeignKeyConstraint(
-            ['case_id'],
-            ['cases.case_id'],
-            name=op.f('fk__point_ledger__case_id__cases'),
+            ['task_id'],
+            ['tasks.task_id'],
+            name=op.f('fk__point_ledger__task_id__tasks'),
         ),
         sa.PrimaryKeyConstraint('id', name=op.f('pk__point_ledger')),
     )
     with op.batch_alter_table('point_ledger', schema=None) as batch_op:
         batch_op.create_index(
-            'ix_ledger_advisor_case', ['advisor_id', 'case_id'], unique=False
+            'ix_ledger_advisor_task', ['advisor_id', 'task_id'], unique=False
         )
 
     # ### end Alembic commands ###
@@ -309,9 +284,10 @@ def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     with op.batch_alter_table('point_ledger', schema=None) as batch_op:
-        batch_op.drop_index('ix_ledger_advisor_case')
+        batch_op.drop_index('ix_ledger_advisor_task')
 
     op.drop_table('point_ledger')
+    op.drop_table('tasks')
     op.drop_table('intervention_emails')
     op.drop_table('cases')
     op.drop_table('advisor_badges')
