@@ -50,11 +50,7 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
-from src.presentation.schemas.request import (
-    SendEmailRequest,
-    TriggerDraftRequest,
-    UpdateEmailRequest,
-)
+from src.presentation.schemas.request import UpdateEmailRequest
 
 router = APIRouter(prefix='/cases', tags=['cases'])
 
@@ -138,7 +134,6 @@ async def get_case_details(
 @router.post('/{case_id}/email/draft')
 async def trigger_draft(
     case_id: UUID,
-    request: TriggerDraftRequest,
     response: Response,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     idempotency_repo: Annotated[
@@ -163,7 +158,6 @@ async def trigger_draft(
         command = TriggerDraftCommand(
             case_id=case_id,
             user_id=user.id,
-            booking_link=request.booking_link,
         )
         result = await command_handler.handle_trigger_draft(command)
 
@@ -233,7 +227,6 @@ async def update_email_draft(
 @router.post('/{case_id}/email/send')
 async def send_nudge_email(
     case_id: UUID,
-    request: SendEmailRequest,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
     idempotency_repo: Annotated[
@@ -253,11 +246,7 @@ async def send_nudge_email(
             }
 
         # 2. Database Write: Record state and get email address
-        command = SendEmailCommand(
-            case_id=case_id,
-            body=request.body,
-            user_id=user.id,
-        )
+        command = SendEmailCommand(case_id=case_id, user_id=user.id)
         target_email = await command_handler.handle_send_email(command)
 
         if idemp_key:
@@ -265,13 +254,15 @@ async def send_nudge_email(
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
         logger.info(
-            f'DISPATCHING EMAIL for case {case_id} to {target_email}: {request.body[:50]}...',
+            f'DISPATCHING EMAIL for case {case_id} to {target_email}...',
         )
 
         return {'status': 'success', 'message': f'Email sent to {target_email}'}
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logger.error(f'Error in send_nudge_email: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -292,6 +283,7 @@ async def accept_task(
         )
         await command_handler.handle_accept_case(command)
         return {'status': 'success', 'task_id': str(case_id)}
+
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except UserIsNotAnAdvisorError as e:
