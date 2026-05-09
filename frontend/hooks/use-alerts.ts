@@ -2,7 +2,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-    updateAlertStatus,
     type BackendInterventionStatus,
     fetchDraftStatus,
     fetchStudentCases,
@@ -10,6 +9,8 @@ import {
     fetchCaseEmail,
     fetchTasks,
     acceptCase,
+    startSupporting,
+    resolveCase,
     fetchOpenCases,
     fetchAssignedCases,
 } from "@/lib/api";
@@ -102,7 +103,18 @@ export function useUpdateAlertStatus() {
             if (isAccept) {
                 return acceptCase(case_id);
             }
-            return updateAlertStatus(case_id, status);
+            // Backend exposes one POST endpoint per transition rather than a
+            // single PATCH /status. Dispatch based on the requested target.
+            switch (status) {
+                case "supporting":
+                    return startSupporting(case_id);
+                case "resolved":
+                    return resolveCase(case_id);
+                default:
+                    throw new Error(
+                        `Không hỗ trợ chuyển trạng thái sang "${status}" từ UI.`,
+                    );
+            }
         },
 
         // Optimistic Update logic
