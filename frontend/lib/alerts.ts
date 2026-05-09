@@ -48,6 +48,8 @@ export type Alert = {
     appointmentAt: number | null;
     /** Danh sách mục tiêu can thiệp. */
     goals: Goal[];
+    /** Khi sinh viên click "Chưa giải quyết xong" — comment được lưu lại. */
+    studentConcern?: { comment: string; submittedAt: number } | null;
 };
 
 export const problemMeta: Record<
