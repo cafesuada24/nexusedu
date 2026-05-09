@@ -258,13 +258,13 @@ export function fromBackendStatus(s: BackendInterventionStatus | string | null |
             return "scheduled";
         case "supporting":
             return "in_progress";
-        case "awaiting_feedback":
-            // Sau khi advisor click "Giải quyết", card chuyển ngay sang column
-            // "Đã hoàn thành" với indicator "Chờ sinh viên xác nhận"; khi
-            // sinh viên feedback xong, override được clear và BE chính thức
-            // báo "resolved" → card chuyển sang trạng thái xanh.
+        case "pending_review":
+            // Backend đã gửi email feedback cho sinh viên; card hiển thị ở
+            // column "Đã hoàn thành" với indicator "Chờ sinh viên xác nhận".
+            // Khi sinh viên submit review, BE chuyển sang resolved/failed.
             return "resolved";
         case "resolved":
+        case "failed":
             return "resolved";
         case "notified":
         case "none":
