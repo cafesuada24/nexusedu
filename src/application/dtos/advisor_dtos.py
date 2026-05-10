@@ -1,10 +1,12 @@
 """DTOs for advisor-related operations."""
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
 from pydantic import (
+    AwareDatetime,
     BaseModel,
     EmailStr,
     Field,
@@ -25,6 +27,13 @@ class GetUsersAdvisorProfileQuery:
 class GetAdvisorProfileQuery:
     advisor_id: UUID
     include_metrics: bool
+
+
+@dataclass(frozen=True)
+class GetAdvisorAvailabilityQuery:
+    advisor_id: UUID
+    start_date: date
+    end_date: date
 
 
 class PersonalAdvisorMetricsDTO(BaseModel):
@@ -53,6 +62,13 @@ class AdvisorProfileDTO(BaseModel):
     bio: str | None = None
 
     personal_metrics: PersonalAdvisorMetricsDTO | None = None
+
+
+class AvailabilitySlotDTO(BaseModel):
+    """DTO for an available appointment slot."""
+
+    start_time: AwareDatetime
+    end_time: AwareDatetime
 
 
 @dataclass(frozen=True)

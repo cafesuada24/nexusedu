@@ -19,7 +19,6 @@ from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.event_publisher import EventPublisher
 from src.core.config import config
 from src.core.logger import logger
-from src.domain.entities.appointment import Appointment
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
 from src.domain.exceptions import (
@@ -28,15 +27,15 @@ from src.domain.exceptions import (
     EmailUnavailableError,
     InvalidActionError,
     JobNotFoundError,
-    SlotAlreadyTakenError,
+    TimeSlotUnavailableError,
     UserIsNotAnAdvisorError,
 )
 from src.domain.repositories.advisor_repository import AdvisorRepository
-from src.domain.repositories.appointment_repository import AppointmentRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
+from src.domain.services.availability import AdvisorAvailabilityService
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
@@ -50,10 +49,10 @@ class CaseCommandHandler:
         email_repo: EmailRepository,
         case_repo: CaseRepository,
         advisor_repo: AdvisorRepository,
-        appointment_repo: AppointmentRepository,
         job_repo: JobRepository,
         task_queue: BackgroundTaskQueue,
         event_publisher: EventPublisher,
+        availability_service: AdvisorAvailabilityService,
         email_drafting_service: EmailDraftingService,
     ) -> None:
         """Initialize the handler with required dependencies."""
@@ -61,9 +60,9 @@ class CaseCommandHandler:
         self.email_repo = email_repo
         self.case_repo = case_repo
         self.advisor_repo = advisor_repo
-        self.appointment_repo = appointment_repo
         self.job_repo = job_repo
         self.email_drafting_service = email_drafting_service
+        self.availability_service = availability_service
         self.task_queue = task_queue
         self.event_publisher = event_publisher
 
@@ -257,17 +256,15 @@ class CaseCommandHandler:
     async def handle_book_appointment(self, command: BookAppointmentCommand) -> None:
         """Record that a student has booked an appointment for their case."""
         case = await self.case_repo.get_by_id(command.case_id)
-        if not case:
-            raise CaseNotFoundError(command.case_id)
 
+        # Enforce advisor availability if assigned
         if case.assigned_advisor_id is not None:
-            conflicts = await self.appointment_repo.list_by_advisor_and_range(
-                advisor_id=case.assigned_advisor_id,
-                from_dt=command.appointment_time,
-                to_dt=command.appointment_time + timedelta(seconds=1),
+            is_available = await self.availability_service.is_slot_available(
+                case.assigned_advisor_id,
+                command.appointment_time,
             )
-            if conflicts:
-                raise SlotAlreadyTakenError(
+            if not is_available:
+                raise TimeSlotUnavailableError(
                     case.assigned_advisor_id,
                     command.appointment_time,
                 )
@@ -277,15 +274,6 @@ class CaseCommandHandler:
             meeting_method=command.meeting_method,
             notes=command.notes,
         )
-
-        # Persist the appointment record
-        new_appointment = Appointment(
-            case_id=case.case_id,
-            appointment_time=command.appointment_time,
-            meeting_method=command.meeting_method,
-            notes=command.notes,
-        )
-        await self.appointment_repo.add(new_appointment)
 
         await self.case_repo.save(case)
 

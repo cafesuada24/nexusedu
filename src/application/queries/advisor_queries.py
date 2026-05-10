@@ -1,12 +1,15 @@
 """Query handlers for advisor-related operations."""
 
+from datetime import timedelta
 from uuid import UUID
 
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
 from src.application.dtos.advisor_dtos import (
     AdvisorProfileDTO,
+    AvailabilitySlotDTO,
     BadgeDTO,
+    GetAdvisorAvailabilityQuery,
     GetAdvisorProfileQuery,
     PersonalAdvisorMetricsDTO,
 )
@@ -17,6 +20,9 @@ from src.application.dtos.gamification_dtos import (
 from src.application.dtos.pagination import PagedResponse
 from src.application.interfaces.advisor_metrics_query_service import (
     AdvisorMetricsQueryService,
+)
+from src.application.interfaces.availability_query_service import (
+    AdvisorAvailabilityQueryService,
 )
 from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
@@ -34,12 +40,14 @@ class AdvisorQueryHandler:
         point_ledger_query_service: PointLedgerQueryService,
         gamification_query_service: GamificationQueryService,
         advisor_metrics_query_service: AdvisorMetricsQueryService,
+        availability_query_service: AdvisorAvailabilityQueryService,
     ) -> None:
         """Initialize with required repositories and services."""
         self.__advisor_repo = advisor_repo
         self.__point_ledger_query_service = point_ledger_query_service
         self.__gamification_query_service = gamification_query_service
         self.__advisor_metrics_query_service = advisor_metrics_query_service
+        self.__availability_query_service = availability_query_service
 
     async def handle_get_user_advisor_profile(
         self,
@@ -113,3 +121,21 @@ class AdvisorQueryHandler:
         """Execute the get advisor badges query with caching."""
         _ = advisor_id
         return []
+
+    async def handle_get_advisor_availability(
+        self,
+        query: GetAdvisorAvailabilityQuery,
+    ) -> list[AvailabilitySlotDTO]:
+        """Execute the get advisor availability query."""
+        slots = await self.__availability_query_service.get_available_slots(
+            query.advisor_id,
+            query.start_date,
+            query.end_date,
+        )
+        return [
+            AvailabilitySlotDTO(
+                start_time=slot,
+                end_time=slot + timedelta(minutes=30),
+            )
+            for slot in slots
+        ]
