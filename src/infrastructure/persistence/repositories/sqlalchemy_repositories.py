@@ -55,6 +55,8 @@ from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.utils import upsert_stmt
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import Session
@@ -653,6 +655,27 @@ class SqlAlchemyAppointmentRepository:
         result = await self.session.execute(stmt)
         appointment = result.scalar_one_or_none()
         return DataMapper.to_domain_appointment(appointment) if appointment else None
+
+    async def list_by_advisor_and_range(
+        self,
+        advisor_id: uuid.UUID,
+        from_dt: datetime,
+        to_dt: datetime,
+    ) -> list[DomainAppointment]:
+        """List appointments for an advisor within [from_dt, to_dt)."""
+        stmt = (
+            select(Appointment)
+            .join(OrmCase, OrmCase.case_id == Appointment.case_id)
+            .where(
+                OrmCase.assigned_advisor_id == advisor_id,
+                Appointment.appointment_time >= from_dt,
+                Appointment.appointment_time < to_dt,
+            )
+        )
+        result = await self.session.execute(stmt)
+        return [
+            DataMapper.to_domain_appointment(a) for a in result.scalars().all()
+        ]
 
 
 class SqlAlchemyCaseRepository:
