@@ -161,7 +161,8 @@ bearer_transport = BearerTransport(tokenUrl='api/v1/auth/jwt/login')
 
 def get_jwt_strategy() -> JWTStrategy:
     """Strategy for generating and validating JWT tokens."""
-    return JWTStrategy(secret=config.jwt_secret, lifetime_seconds=3600)
+    # matches frontend cookie maxAge in app/actions/auth.ts
+    return JWTStrategy(secret=config.jwt_secret, lifetime_seconds=28800)
 
 
 auth_backend = AuthenticationBackend(
