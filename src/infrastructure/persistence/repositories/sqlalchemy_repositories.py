@@ -51,26 +51,34 @@ from src.infrastructure.database.models import (
     UserSettings,
 )
 from src.infrastructure.database.models import Advisor as OrmAdvisor
+from src.infrastructure.database.models import (
+    AdvisorDayOff as OrmDayOff,
+)
+from src.infrastructure.database.models import (
+    AdvisorWorkingHours as OrmWorkingHours,
+)
 from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.utils import upsert_stmt
 
 if TYPE_CHECKING:
-    from datetime import datetime
+    from datetime import date, datetime
 
     from sqlalchemy.engine.interfaces import ReflectedColumn
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import Session
 
     from src.domain.entities.advisor import Advisor as DomainAdvisor
+    from src.domain.entities.appointment import Appointment as DomainAppointment
     from src.domain.entities.case import Case as DomainCase
     from src.domain.entities.intervention_email import (
         InterventionEmail as DomainInterventionEmail,
     )
     from src.domain.entities.job import Job
     from src.domain.entities.point_ledger import PointLedger as DomainLedger
+    from src.domain.entities.schedule import DayOff as DomainDayOff
+    from src.domain.entities.schedule import WorkingHours as DomainWorkingHours
     from src.domain.entities.student import Student as DomainStudent
     from src.domain.repositories.metadata_repository import DBDescription
-    from src.domain.entities.appointment import Appointment as DomainAppointment
 
 
 class SqlAlchemyStudentRepository:
@@ -607,77 +615,6 @@ class SqlAlchemyEmailRepository:
         return DataMapper.to_domain_email(email) if email else None
 
 
-class SqlAlchemyAppointmentRepository:
-    """SQLAlchemy implementation of the AppointmentRepository."""
-
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize with a SQLAlchemy async session."""
-        self.session = session
-
-    async def add(self, appointment: DomainAppointment) -> None:
-        """Add a new appointment."""
-        new_appointment = Appointment(
-            appointment_id=appointment.appointment_id,
-            case_id=appointment.case_id,
-            appointment_time=appointment.appointment_time,
-            meeting_method=appointment.meeting_method,
-            notes=appointment.notes,
-            created_at=appointment.created_at,
-        )
-        self.session.add(new_appointment)
-
-    async def save(self, appointment: DomainAppointment) -> None:
-        """Update an existing appointment."""
-        stmt = (
-            update(Appointment)
-            .where(Appointment.appointment_id == appointment.appointment_id)
-            .values(
-                appointment_time=appointment.appointment_time,
-                meeting_method=appointment.meeting_method,
-                notes=appointment.notes,
-            )
-        )
-        result = await self.session.execute(stmt)
-
-        if result.rowcount == 0:  # type: ignore
-            raise ConcurrencyError('Appointment not found or modified.')
-
-    async def get_by_case(self, case_id: uuid.UUID) -> DomainAppointment:
-        """Find the appointment associated with a specific case."""
-        appointment = await self.find_by_case(case_id=case_id)
-        if appointment is None:
-            raise CaseNotFoundError(case_id)  # Or AppointmentNotFoundError if it existed
-        return appointment
-
-    async def find_by_case(self, case_id: uuid.UUID) -> DomainAppointment | None:
-        """Retrieve the appointment associated with a specific case."""
-        stmt = select(Appointment).where(Appointment.case_id == case_id).limit(1)
-        result = await self.session.execute(stmt)
-        appointment = result.scalar_one_or_none()
-        return DataMapper.to_domain_appointment(appointment) if appointment else None
-
-    async def list_by_advisor_and_range(
-        self,
-        advisor_id: uuid.UUID,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> list[DomainAppointment]:
-        """List appointments for an advisor within [from_dt, to_dt)."""
-        stmt = (
-            select(Appointment)
-            .join(OrmCase, OrmCase.case_id == Appointment.case_id)
-            .where(
-                OrmCase.assigned_advisor_id == advisor_id,
-                Appointment.appointment_time >= from_dt,
-                Appointment.appointment_time < to_dt,
-            )
-        )
-        result = await self.session.execute(stmt)
-        return [
-            DataMapper.to_domain_appointment(a) for a in result.scalars().all()
-        ]
-
-
 class SqlAlchemyCaseRepository:
     """SQLAlchemy implementation of the CaseRepository."""
 
@@ -740,6 +677,31 @@ class SqlAlchemyCaseRepository:
 
         if result.rowcount == 0:  # type: ignore
             raise ConcurrencyError('Data was modified by another process.')
+
+        # Handle child appointment
+        if case.appointment:
+            orm_appointment = DataMapper.to_orm_appointment(case.appointment)
+            await self.session.merge(orm_appointment)
+
+        case.version += 1
+
+    async def has_overlapping_appointment(
+        self,
+        advisor_id: uuid.UUID,
+        appointment_time: datetime,
+    ) -> bool:
+        """Check if an advisor already has an appointment at the given time."""
+        stmt = (
+            select(Appointment)
+            .join(OrmCase, OrmCase.case_id == Appointment.case_id)
+            .where(
+                OrmCase.assigned_advisor_id == advisor_id,
+                Appointment.appointment_time == appointment_time,
+            )
+            .limit(1)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none() is not None
 
     async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> bool:
         """Assign an advisor to a case."""
@@ -1061,3 +1023,54 @@ class SqlAlchemyPointLedgerRepository:
             self.session.add(orm_entry)
 
         ledger.clear_pending_entries()
+
+
+class SqlAlchemyScheduleRepository:
+    """SQLAlchemy implementation of the ScheduleRepository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+
+    async def get_working_hours(self, advisor_id: uuid.UUID) -> list[DomainWorkingHours]:
+        """Fetch all recurring working hour blocks for an advisor."""
+        stmt = (
+            select(OrmWorkingHours)
+            .where(OrmWorkingHours.advisor_id == advisor_id)
+            .order_by(OrmWorkingHours.day_of_week.asc(), OrmWorkingHours.start_time.asc())
+        )
+        result = await self.session.execute(stmt)
+        return [
+            DataMapper.to_domain_working_hours(wh) for wh in result.scalars().all()
+        ]
+
+    async def get_days_off(
+        self,
+        advisor_id: uuid.UUID,
+        start_date: date,
+        end_date: date,
+    ) -> list[DomainDayOff]:
+        """Fetch specific days off for an advisor within a date range."""
+        stmt = (
+            select(OrmDayOff)
+            .where(
+                OrmDayOff.advisor_id == advisor_id,
+                OrmDayOff.date >= start_date,
+                OrmDayOff.date <= end_date,
+            )
+            .order_by(OrmDayOff.date.asc())
+        )
+        result = await self.session.execute(stmt)
+        return [
+            DataMapper.to_domain_day_off(do) for do in result.scalars().all()
+        ]
+
+    async def add_working_hours(self, working_hours: DomainWorkingHours) -> None:
+        """Add a new working hour block."""
+        orm_wh = DataMapper.to_orm_working_hours(working_hours)
+        self.session.add(orm_wh)
+
+    async def add_day_off(self, day_off: DomainDayOff) -> None:
+        """Add a new day off."""
+        orm_do = DataMapper.to_orm_day_off(day_off)
+        self.session.add(orm_do)
