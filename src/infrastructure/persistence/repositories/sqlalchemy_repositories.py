@@ -339,7 +339,7 @@ class SqlAlchemyAdvisorRepository:
         user_id: uuid.UUID,
         email: str,
         name: str,
-    ) -> None:
+    ) -> tuple[uuid.UUID, bool]:
         """Link a user to an advisor profile, creating one if necessary."""
         # 1. Check if an advisor with this email already exists but is not linked
         stmt = select(OrmAdvisor).where(
@@ -352,13 +352,14 @@ class SqlAlchemyAdvisorRepository:
         if advisor:
             advisor.user_id = user_id
             advisor.name = name
-            return
+            return advisor.advisor_id, False
 
         # 2. Use native UPSERT for user_id to handle concurrency
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+        advisor_id = uuid.uuid4()
         batch = [
             {
-                'advisor_id': uuid.uuid4(),
+                'advisor_id': advisor_id,
                 'user_id': user_id,
                 'email': email,
                 'name': name,
@@ -376,6 +377,12 @@ class SqlAlchemyAdvisorRepository:
             },
         )
         await self.session.execute(upsert_stmt_obj)
+
+        stmt = select(OrmAdvisor.advisor_id).where(OrmAdvisor.user_id == user_id)
+        res = await self.session.execute(stmt)
+        final_id = res.scalar_one()
+
+        return final_id, True
 
 
 class SqlAlchemyIdempotencyRepository:
@@ -1032,17 +1039,19 @@ class SqlAlchemyScheduleRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def get_working_hours(self, advisor_id: uuid.UUID) -> list[DomainWorkingHours]:
+    async def get_working_hours(
+        self, advisor_id: uuid.UUID
+    ) -> list[DomainWorkingHours]:
         """Fetch all recurring working hour blocks for an advisor."""
         stmt = (
             select(OrmWorkingHours)
             .where(OrmWorkingHours.advisor_id == advisor_id)
-            .order_by(OrmWorkingHours.day_of_week.asc(), OrmWorkingHours.start_time.asc())
+            .order_by(
+                OrmWorkingHours.day_of_week.asc(), OrmWorkingHours.start_time.asc()
+            )
         )
         result = await self.session.execute(stmt)
-        return [
-            DataMapper.to_domain_working_hours(wh) for wh in result.scalars().all()
-        ]
+        return [DataMapper.to_domain_working_hours(wh) for wh in result.scalars().all()]
 
     async def get_working_hours_by_id(self, wh_id: uuid.UUID) -> DomainWorkingHours:
         """Fetch a specific working hour block. Raises WorkingHoursNotFoundError if not found."""
@@ -1070,9 +1079,7 @@ class SqlAlchemyScheduleRepository:
             .order_by(OrmDayOff.date.asc())
         )
         result = await self.session.execute(stmt)
-        return [
-            DataMapper.to_domain_day_off(do) for do in result.scalars().all()
-        ]
+        return [DataMapper.to_domain_day_off(do) for do in result.scalars().all()]
 
     async def add_working_hours(self, working_hours: DomainWorkingHours) -> None:
         """Add a new working hour block."""
