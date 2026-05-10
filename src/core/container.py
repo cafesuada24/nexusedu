@@ -23,9 +23,11 @@ from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
 )
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
+from src.application.interfaces.student_query_service import StudentQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
+from src.application.queries.student_queries import StudentQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
 from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.config import config
@@ -61,6 +63,9 @@ from src.infrastructure.persistence.query_services.gamification_query_service im
 )
 from src.infrastructure.persistence.query_services.point_ledger_query_service import (
     SqlAlchemyPointLedgerQueryService,
+)
+from src.infrastructure.persistence.query_services.student_query_service import (
+    SqlAlchemyStudentQueryService,
 )
 from src.infrastructure.persistence.query_services.sqlalchemy_availability_query_service import (
     SqlAlchemyAdvisorAvailabilityQueryService,
@@ -237,6 +242,10 @@ class Container:
             gamification_service=self.gamification_service,
         )
 
+    @cached_property
+    def student_query_service(self) -> StudentQueryService:
+        return SqlAlchemyStudentQueryService(self.session)
+
     # Command Handlers
     def get_case_command_handler(self) -> CaseCommandHandler:
         return CaseCommandHandler(
@@ -294,3 +303,6 @@ class Container:
 
     def get_metrics_query_handler(self) -> MetricsQueryHandler:
         return MetricsQueryHandler(self.metrics_repo)
+
+    def get_student_query_handler(self) -> StudentQueryHandler:
+        return StudentQueryHandler(self.student_query_service)
