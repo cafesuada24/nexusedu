@@ -107,9 +107,19 @@ function KanbanCardInner({
                     </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold leading-tight">
-                        {a.name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className="truncate text-base font-semibold leading-tight">
+                            {a.name}
+                        </p>
+                        {isEmailSent && (
+                            <div 
+                                className="flex size-5 shrink-0 items-center justify-center rounded-full bg-success/20 text-success"
+                                title="Đã gửi email"
+                            >
+                                <CheckCircle2 className="size-3.5" />
+                            </div>
+                        )}
+                    </div>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                         {a.email || `MSSV ${a.mssv}`}
                     </p>
