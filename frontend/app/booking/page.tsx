@@ -4,19 +4,18 @@ import { BookingView } from "@/components/booking/booking-view"
 import { PublicBookingHeader } from "@/components/booking/public-header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ADVISOR_META, DEFAULT_ADVISOR_META } from "@/lib/static-content"
+import { ADVISOR_META } from "@/lib/static-content"
 
 export default async function PublicBookingPage({
-  params,
   searchParams,
 }: {
-  params: Promise<{ token: string }>
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const { token } = await params
   const { cid } = await searchParams
 
-  const meta = ADVISOR_META[token] ?? DEFAULT_ADVISOR_META
+  // Single-advisor MVP. When onboarding advisor #2, fetch from
+  // GET /cases/{cid} (which already exposes assigned_advisor_id).
+  const meta = ADVISOR_META["le-ha"]
 
   const caseId = typeof cid === "string" ? cid : undefined
 
@@ -69,10 +68,7 @@ export default async function PublicBookingPage({
             </p>
           </div>
 
-          <BookingView
-            caseId={caseId}
-            advisorToken={token}
-          />
+          <BookingView caseId={caseId} />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người được mời qua email này, bạn có thể bỏ

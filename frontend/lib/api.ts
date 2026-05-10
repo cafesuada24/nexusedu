@@ -1111,7 +1111,7 @@ export type ConfirmBookingPayload = {
 
 /**
  * POST /cases/{case_id}/book — student confirms appointment booking.
- * Public endpoint (no auth required) — called from /booking/[token] page.
+ * Public endpoint (no auth required) — called from /booking page.
  */
 export async function confirmBooking(
     case_id: string,
