@@ -1,56 +1,107 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
-import { GraduationCap } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 type LogoProps = {
   className?: string
-  size?: "sm" | "md" | "lg"
+  size?: "sm" | "md" | "lg" | "xl" | "xxl"
   href?: string | null
-  showMark?: boolean
+  priority?: boolean
+  showText?: boolean
 }
 
 const sizeMap = {
-  sm: { text: "text-lg", mark: "size-7", icon: "size-4" },
-  md: { text: "text-xl", mark: "size-9", icon: "size-5" },
-  lg: { text: "text-3xl", mark: "size-11", icon: "size-6" },
+  sm: "h-10 md:h-14", // 40px -> 56px
+  md: "h-12 md:h-16", // 48px -> 64px
+  lg: "h-14 md:h-16", // 56px -> 64px
+  xl: "h-16 md:h-20", // 64px -> 80px
+  xxl: "h-20 md:h-24", // 80px -> 96px
+}
+
+const textMap = {
+  sm: "text-lg md:text-xl",
+  md: "text-xl md:text-2xl",
+  lg: "text-xl md:text-2xl",
+  xl: "text-2xl md:text-3xl",
+  xxl: "text-3xl md:text-4xl",
 }
 
 export function Logo({
   className,
   size = "md",
   href = "/",
-  showMark = true,
+  priority = false,
+  showText = true,
   onClick,
 }: LogoProps & { onClick?: () => void }) {
-  const s = sizeMap[size]
-  const content = (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
-      {showMark && (
+  const heightClass = sizeMap[size]
+  const textSizeClass = textMap[size]
+  
+  const innerContent = (
+    <div 
+      className="flex flex-none flex-nowrap items-center justify-start w-fit p-0 m-0 overflow-hidden"
+      style={{ gap: '4px' }}
+    >
+      <Image
+        src="/logos/logo.png"
+        alt="NexusEdu Logo"
+        width={300}
+        height={100}
+        priority={priority}
+        className={cn(
+          heightClass,
+          "w-auto flex-none object-contain transition-all duration-300",
+          size === "sm" && "group-data-[collapsible=icon]:h-8"
+        )}
+      />
+      {showText && (
         <span
           className={cn(
-            "grid place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20",
-            s.mark,
+            "font-sans font-bold tracking-tighter transition-all duration-300 flex-none m-0 p-0 leading-none group-data-[collapsible=icon]:hidden whitespace-nowrap",
+            textSizeClass
           )}
-          aria-hidden="true"
+          style={{
+            backgroundImage: 'linear-gradient(to right, #2563eb, #f97316)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            display: 'inline-block'
+          }}
         >
-          <GraduationCap className={s.icon} />
+          NexusEdu
         </span>
       )}
-      <span
-        className={cn(
-          "font-serif font-black tracking-tight text-foreground transition-all duration-300",
-          s.text,
-          "group-data-[collapsible=icon]:hidden",
-        )}
-      >
-        NexusEdu
-      </span>
-    </span>
+    </div>
   )
 
-  if (!href) return content
+  if (href === null) {
+    return (
+      <div className={cn("flex flex-none items-center justify-start w-fit p-0", className)}>
+        {innerContent}
+      </div>
+    )
+  }
+  
+  const containerClasses = cn(
+    "flex flex-none items-center justify-start w-fit p-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer",
+    className
+  )
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        onClick={onClick}
+        className={containerClasses}
+        aria-label="NexusEdu, trang chủ"
+      >
+        {innerContent}
+      </Link>
+    )
+  }
+
   return (
     <button
       onClick={(e) => {
@@ -59,10 +110,10 @@ export function Logo({
           onClick()
         }
       }}
-      className="inline-flex items-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+      className={containerClasses}
       aria-label="NexusEdu, trang chủ"
     >
-      {content}
+      {innerContent}
     </button>
   )
 }
