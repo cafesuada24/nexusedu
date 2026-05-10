@@ -61,7 +61,7 @@ export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
     let draft_subject = null;
     let draft_body = null;
     let draft_status = null;
-    
+
     if (data.email && typeof data.email === "object") {
         emailStr = data.email.recipent || data.email.recipient || "";
         draft_subject = data.email.subject || null;
@@ -770,6 +770,9 @@ export async function updateEmailDraft(
     );
 
     if (!res.ok) {
+        if (res.status === 400) {
+            throw new Error("Nội dung và Tiêu đề Email không được để trống!");
+        }
         const errorBody = await res.json().catch(() => ({}));
         const message = errorBody.detail || res.statusText;
         throw new Error(`Cập nhật nội dung email thất bại: ${message}`);
@@ -837,11 +840,7 @@ export async function fetchAdvisorsLeaderboard(
 export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
     const res = await withTimeout(
         (signal) =>
-            authFetch(
-                endpoint("/advisors/profile"),
-                { method: "GET" },
-                signal,
-            ),
+            authFetch(endpoint("/advisors/profile"), { method: "GET" }, signal),
         DEFAULT_TIMEOUT_MS,
     );
     if (!res.ok) {
@@ -1125,8 +1124,9 @@ export async function confirmBooking(
     const requestBody = JSON.stringify({
         appointment_time: payload.appointmentTime,
         meeting_method: payload.meetingMethod,
-        notes: payload.notes ?? null,
+        notes: payload.notes ?? "null",
     });
+    console.log(requestBody);
     const res = await withTimeout(
         (signal) =>
             authFetch(
@@ -1175,7 +1175,11 @@ export async function startSupporting(case_id: string): Promise<void> {
         (signal) =>
             authFetch(
                 url,
-                { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: "{}",
+                },
                 signal,
             ),
         DEFAULT_TIMEOUT_MS,
@@ -1209,7 +1213,11 @@ export async function resolveCase(case_id: string): Promise<void> {
         (signal) =>
             authFetch(
                 url,
-                { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: "{}",
+                },
                 signal,
             ),
         DEFAULT_TIMEOUT_MS,
@@ -1253,7 +1261,10 @@ export async function submitFeedback(
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ satisfaction, comment: comment || null }),
+                    body: JSON.stringify({
+                        satisfaction,
+                        comment: comment || null,
+                    }),
                     suppressUnauthorizedEvent: true,
                 },
                 signal,
