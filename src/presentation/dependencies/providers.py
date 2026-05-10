@@ -19,9 +19,11 @@ from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
 )
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
+from src.application.interfaces.student_query_service import StudentQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
+from src.application.queries.student_queries import StudentQueryHandler
 from src.application.services.agent_metadata import AgentMetadataService
 from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.container import Container
@@ -194,6 +196,13 @@ async def get_case_query_service(
     return container.case_query_service
 
 
+async def get_student_query_service(
+    container: Annotated[Container, Depends(get_container)],
+) -> StudentQueryService:
+    """Dependency provider for the StudentQueryService."""
+    return container.student_query_service
+
+
 async def get_event_publisher(
     container: Annotated[Container, Depends(get_container)],
 ) -> TaskQueueEventPublisher:
@@ -241,6 +250,13 @@ async def get_metrics_query_handler(
 ) -> MetricsQueryHandler:
     """Dependency provider for the MetricsQueryHandler."""
     return container.get_metrics_query_handler()
+
+
+async def get_student_query_handler(
+    container: Annotated[Container, Depends(get_container)],
+) -> StudentQueryHandler:
+    """Dependency provider for the StudentQueryHandler."""
+    return container.get_student_query_handler()
 
 
 async def get_agent_metadata_service(

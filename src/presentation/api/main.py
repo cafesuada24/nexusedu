@@ -24,6 +24,7 @@ from src.presentation.api.routes import (
     jobs,
     metrics,
     query,
+    students,
     users,
 )
 from src.presentation.schemas.auth import UserCreate, UserRead
@@ -150,6 +151,7 @@ api_v1_router.include_router(data.router)
 api_v1_router.include_router(cases.router)
 api_v1_router.include_router(advisors.router)
 api_v1_router.include_router(metrics.router)
+api_v1_router.include_router(students.router)
 
 app.include_router(api_v1_router)
 
