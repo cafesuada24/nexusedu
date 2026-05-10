@@ -812,38 +812,6 @@ export async function sendNudge(
 }
 
 /**
- * POST /query — ask the async AI agent for analysis.
- *
- * Backend reads `query` and `thread_id` as query string parameters
- * (FastAPI Query() bindings), not as a JSON body.
- */
-export async function queryAgent(
-    query: string,
-    opts?: { thread_id?: string },
-): Promise<DraftJobResponse> {
-    const params = new URLSearchParams({ query });
-    if (opts?.thread_id) params.set("thread_id", opts.thread_id);
-
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/query?${params.toString()}`),
-                { method: "POST" },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Truy vấn AI thất bại: ${message}`);
-    }
-    const data = await res.json();
-    return DraftJobResponseSchema.parse(data);
-}
-
-/**
  * GET /advisors/leaderboard[?time_window=...] — returns advisor leaderboard.
  */
 export async function fetchAdvisorsLeaderboard(
