@@ -461,7 +461,7 @@ export function CaseManagementBoard() {
                 </CardContent>
             </Card>
 
-            <StudentDetailDrawer
+            <StudentDetailModal
                 open={selectedCaseId !== null}
                 onOpenChange={(open) => {
                     if (!open) setSelectedCaseId(null);
