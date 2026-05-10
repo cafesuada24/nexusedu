@@ -31,8 +31,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useDraftStatus } from "@/hooks/use-alerts";
-import { useDebounce } from "@/hooks/use-debounce";
 import { updateEmailDraft } from "@/lib/api";
+import debounce from "lodash.debounce";
 
 import { type Alert } from "@/lib/alerts";
 
@@ -44,137 +44,135 @@ type Props = {
     isAiDrafting?: boolean;
 };
 
-export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAiDrafting }: Props) {
-    // Poll draft status using caseId (activeCaseId is not populated in alert mapping).
-    const {
-        data: draft,
-        isFetching,
-        isError,
-    } = useDraftStatus(alert?.caseId);
+export function EmailEditorSheet({
+    alert,
+    onClose,
+    onSave,
+    onGenerateDraft,
+    isAiDrafting,
+}: Props) {
+    const { data: draft, isFetching, isError } = useDraftStatus(alert?.caseId);
+
+    // --- 1. State ---
     const [subject, setSubject] = React.useState("");
     const [body, setBody] = React.useState("");
     const [currentAlertId, setCurrentAlertId] = React.useState<string | null>(null);
-    const [lastIncomingBody, setLastIncomingBody] = React.useState<string | null>(null);
     const [isSaving, setIsSaving] = React.useState(false);
     const [showSavedStatus, setShowSavedStatus] = React.useState(false);
     const [localSent, setLocalSent] = React.useState(false);
+    const [isDirty, setIsDirty] = React.useState(false);
+
+    // --- 2. Refs for Stability & Session ---
+    const activeSessionId = React.useRef<string | null>(null);
+    const wasGenerating = React.useRef(false);
+    // Keep refs of current values to avoid stale closures in debounced save
+    const subjectRef = React.useRef(subject);
+    const bodyRef = React.useRef(body);
+
+    React.useEffect(() => {
+        subjectRef.current = subject;
+        bodyRef.current = body;
+    }, [subject, body]);
 
     const isSent = alert?.interventionStatus === "sent" || localSent;
 
-    // Initial load or background completion
+    // --- 3. Prefer derived generation state ---
+    const isGenerating =
+        isAiDrafting ||
+        (draft !== undefined
+            ? !!draft?.is_generating
+            : !!alert?.isGenerating) ||
+        (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
+
+    // --- 4. Synchronization Logic (Modal Open & AI Completion Only) ---
     React.useEffect(() => {
         if (!alert) {
-            if (currentAlertId !== null) {
-                setCurrentAlertId(null);
-                setLastIncomingBody(null);
-                setLocalSent(false);
-            }
+            setCurrentAlertId(null);
+            setLocalSent(false);
+            setIsDirty(false);
+            activeSessionId.current = null;
             return;
         }
 
-        const incomingSubject = alert.draftSubject || draft?.subject || alert.subject || "";
+        const incomingSubject =
+            alert.draftSubject || draft?.subject || alert.subject || "";
         const incomingBody = alert.draftBody || draft?.body || alert.body || "";
 
+        // SCENARIO A: Switching to a new case (Isolated State)
         if (alert.id !== currentAlertId) {
-            // New student opened - force override state with their specific data
+            // Cancel any pending effects from previous session
+            activeSessionId.current = Math.random().toString(36).slice(2);
+
             setSubject(incomingSubject);
             setBody(incomingBody);
             setCurrentAlertId(alert.id);
-            setLastIncomingBody(incomingBody);
-        } else {
-            // Same student.
-            // If a new AI draft just arrived, force overwrite manual input.
-            if (incomingBody && incomingBody !== lastIncomingBody) {
-                setSubject(incomingSubject);
-                setBody(incomingBody);
-                setLastIncomingBody(incomingBody);
-            } else {
-                // Otherwise, only fill in if fields are currently empty
-                if (!subject && incomingSubject) setSubject(incomingSubject);
-                if (!body && incomingBody) setBody(incomingBody);
-            }
+            setLocalSent(false);
+            setIsDirty(false);
+            wasGenerating.current = isGenerating;
+            return;
         }
-    }, [alert, draft, subject, body, currentAlertId, lastIncomingBody]);
 
-    // Auto-save logic
-    const debouncedSubject = useDebounce(subject, 1000);
-    const debouncedBody = useDebounce(body, 1000);
+        // SCENARIO B: AI Generation just finished (Smart Sync)
+        if (wasGenerating.current && !isGenerating) {
+            setSubject(incomingSubject);
+            setBody(incomingBody);
+            setIsDirty(false);
+        }
 
-    React.useEffect(() => {
-        const performAutoSave = async () => {
-            if (!alert?.caseId || isSent || localSent) return;
+        wasGenerating.current = isGenerating;
+    }, [alert, draft, isGenerating, currentAlertId]);
 
-            // Only save if content has actually changed from what we last received/saved
-            // and we aren't currently generating
-            if (isGenerating) return;
-
-            // Don't auto-save if content is exactly what we got from the server initially
-            const incomingSubject = alert.draftSubject || draft?.subject || alert.subject || "";
-            const incomingBody = alert.draftBody || draft?.body || alert.body || "";
+    // --- 5. Action-Based Debounced Auto-Save (One-Way / Send-Only) ---
+    const debouncedSave = React.useMemo(() => {
+        return debounce(async (caseId: string, s: string, b: string, sessionId: string | null) => {
+            if (!caseId || !sessionId) return;
             
-            if (debouncedSubject === incomingSubject && debouncedBody === incomingBody) {
-                return;
-            }
-
-            // Guard: Backend rejects empty drafts
-            if (!debouncedSubject.trim() || !debouncedBody.trim()) {
-                return;
-            }
-
             try {
                 setIsSaving(true);
                 setShowSavedStatus(false);
 
-                // Final check before API call to minimize race condition with "Send" button
-                if (localSent || alert?.interventionStatus === "sent") {
-                    setIsSaving(false);
-                    return;
-                }
+                await updateEmailDraft(caseId, { subject: s, body: b });
 
-                await updateEmailDraft(alert.caseId, {
-                    subject: debouncedSubject,
-                    body: debouncedBody,
-                });
-                setShowSavedStatus(true);
-                setTimeout(() => setShowSavedStatus(false), 2000);
-            } catch (err: any) {
-                // If it's a "sent" error, it means we hit a race condition with the final send.
-                // We can ignore this as the final content was already sent by handleSendEmail.
-                if (err.message?.includes("is sent")) {
-                    return;
+                // Only update visual status if we are still on the same session
+                if (activeSessionId.current === sessionId) {
+                    setIsDirty(false);
+                    setShowSavedStatus(true);
+                    setTimeout(() => {
+                        if (activeSessionId.current === sessionId)
+                            setShowSavedStatus(false);
+                    }, 2000);
                 }
+            } catch (err: any) {
+                if (err.message?.includes("is sent")) return;
+                if (err.message?.toLowerCase().includes("too many requests")) return;
                 console.error("[EmailEditor] Auto-save failed:", err);
             } finally {
-                setIsSaving(false);
+                if (activeSessionId.current === sessionId) setIsSaving(false);
             }
-        };
+        }, 3000);
+    }, []);
 
-        performAutoSave();
-    }, [debouncedSubject, debouncedBody, alert?.caseId, isSent]);
+    // Cleanup debounce on unmount
+    React.useEffect(() => {
+        return () => debouncedSave.cancel();
+    }, [debouncedSave]);
 
     const reset = () => {
-        if (draft?.body) {
-            setSubject(draft.subject || "");
-            setBody(draft.body);
-        } else if (alert) {
-            setSubject(alert.draftSubject || "");
-            setBody(alert.draftBody || "");
-        }
+        debouncedSave.cancel();
+        const incomingSubject =
+            draft?.subject || alert?.draftSubject || alert?.subject || "";
+        const incomingBody =
+            draft?.body || alert?.draftBody || alert?.body || "";
+        setSubject(incomingSubject);
+        setBody(incomingBody);
+        setIsDirty(false);
     };
-
-    // Prefer the 5s draft poll over the stale 10s alert poll for generating state.
-    const isGenerating =
-        isAiDrafting ||
-        (draft !== undefined ? !!draft?.is_generating : !!alert?.isGenerating) ||
-        (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
     const isDev = process.env.NODE_ENV === "development";
     const baseDomain = isDev ? "localhost:3000" : "nexusedu.app";
     const protocol = isDev ? "http" : "https";
 
-    const bookingUrl = alert
-        ? `/booking?cid=${alert.caseId}`
-        : "/booking";
+    const bookingUrl = alert ? `/booking?cid=${alert.caseId}` : "/booking";
     const displayUrl = alert
         ? `${baseDomain}/booking?cid=${alert.caseId}`
         : `${baseDomain}/booking`;
@@ -190,30 +188,23 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                             </div>
                             <div>
                                 <SheetTitle className="font-serif text-xl">
-                                    {isSent ? "Nội dung Email (Chỉ đọc)" : "Soạn thảo Email"}
+                                    {isSent
+                                        ? "Nội dung Email (Chỉ đọc)"
+                                        : "Soạn thảo Email"}
                                 </SheetTitle>
                                 <SheetDescription>
-                                    {isSent ? "Email đã được gửi cho sinh viên" : "Gửi thông điệp hỗ trợ tới sinh viên"}
+                                    {isSent
+                                        ? "Email đã được gửi cho sinh viên"
+                                        : "Gửi thông điệp hỗ trợ tới sinh viên"}
                                 </SheetDescription>
                             </div>
                         </div>
                         <div className="flex items-center gap-3">
-                            {isSaving ? (
-                                <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground animate-in fade-in duration-300">
-                                    <Loader2 className="size-3 animate-spin" />
-                                    Đang lưu...
-                                </span>
-                            ) : showSavedStatus ? (
-                                <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 animate-in fade-in duration-300">
-                                    <Check className="size-3" />
-                                    Đã lưu
-                                </span>
-                            ) : null}
                             <Badge
                                 variant="secondary"
                                 className={cn(
                                     "rounded-md px-2.5 py-0.5 text-xs font-medium",
-                                    isSent 
+                                    isSent
                                         ? "bg-success/15 text-success"
                                         : isGenerating
                                           ? "bg-primary/15 text-primary"
@@ -225,7 +216,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 {isSent ? (
                                     <>
                                         <Send className="mr-1 size-3" />
-                                        Đã gửi
+                                        Đã được gửi
                                     </>
                                 ) : (
                                     <>
@@ -281,35 +272,60 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                             <Input
                                 id="subject"
                                 value={subject}
-                                onChange={(e) => setSubject(e.target.value)}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSubject(val);
+                                    setIsDirty(true);
+                                    setShowSavedStatus(false);
+                                    if (alert?.caseId) {
+                                        debouncedSave(alert.caseId, val, bodyRef.current, activeSessionId.current);
+                                    }
+                                }}
                                 readOnly={isSent}
                                 placeholder="VD: Trao đổi về tình hình học tập học kỳ này"
                                 className={cn(
                                     "h-11 rounded-xl border-border/60 focus-visible:ring-primary/20",
-                                    isSent && "cursor-default focus-visible:ring-0"
+                                    isSent &&
+                                        "cursor-default focus-visible:ring-0",
                                 )}
                             />
                         </div>
 
                         <div className="grid gap-3">
                             <div className="flex items-center justify-between">
-                                <Label
-                                    htmlFor="body"
-                                    className="text-sm font-semibold text-foreground/70"
-                                >
-                                    Nội dung chi tiết
-                                </Label>
+                                <div className="flex items-center gap-3">
+                                    <Label
+                                        htmlFor="body"
+                                        className="text-sm font-semibold text-foreground/70"
+                                    >
+                                        Nội dung chi tiết
+                                    </Label>
+                                    {isSaving ? (
+                                        <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground animate-in fade-in duration-300">
+                                            <Loader2 className="size-3 animate-spin" />
+                                            Đang lưu...
+                                        </span>
+                                    ) : showSavedStatus ? (
+                                        <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 animate-in fade-in duration-300">
+                                            <Check className="size-3" />
+                                            Đã lưu
+                                        </span>
+                                    ) : null}
+                                </div>
                                 <div className="flex items-center gap-2">
                                     {!isSent && (
                                         <Button
                                             type="button"
                                             size="sm"
-                                            variant={body ? "ghost" : "secondary"}
+                                            variant={
+                                                body ? "ghost" : "secondary"
+                                            }
                                             disabled={isGenerating}
                                             onClick={onGenerateDraft}
                                             className={cn(
                                                 "h-7 gap-1.5 px-2 text-[11px] font-medium",
-                                                !body && "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300",
+                                                !body &&
+                                                    "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300",
                                             )}
                                         >
                                             {isGenerating ? (
@@ -320,13 +336,18 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                             ) : (
                                                 <>
                                                     <Sparkles className="size-3" />
-                                                    {body ? "Tạo lại bằng AI" : "Tạo nội dung AI"}
+                                                    {body
+                                                        ? "Tạo lại bằng AI"
+                                                        : "Tạo nội dung AI"}
                                                 </>
                                             )}
                                         </Button>
                                     )}
                                     <span className="text-[11px] text-muted-foreground">
-                                        {body.split(/\s+/).filter(Boolean).length}{" "}
+                                        {
+                                            body.split(/\s+/).filter(Boolean)
+                                                .length
+                                        }{" "}
                                         từ
                                     </span>
                                 </div>
@@ -334,7 +355,15 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                             <Textarea
                                 id="body"
                                 value={body}
-                                onChange={(e) => setBody(e.target.value)}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setBody(val);
+                                    setIsDirty(true);
+                                    setShowSavedStatus(false);
+                                    if (alert?.caseId) {
+                                        debouncedSave(alert.caseId, subjectRef.current, val, activeSessionId.current);
+                                    }
+                                }}
                                 readOnly={isSent}
                                 placeholder={
                                     isGenerating
@@ -343,14 +372,16 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 }
                                 className={cn(
                                     "min-h-[400px] resize-none rounded-2xl border-border/60 p-4 font-sans text-base leading-relaxed focus-visible:ring-primary/20",
-                                    isSent && "cursor-default focus-visible:ring-0"
+                                    isSent &&
+                                        "cursor-default focus-visible:ring-0",
                                 )}
                             />
                             {!isSent && (
                                 <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
                                     <p className="text-[11px] text-muted-foreground italic">
                                         Mẹo: Nên bắt đầu bằng lời hỏi thăm chân
-                                        thành trước khi đề cập đến kết quả học tập.
+                                        thành trước khi đề cập đến kết quả học
+                                        tập.
                                     </p>
                                     <Button
                                         variant="ghost"
@@ -410,9 +441,9 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                         disabled={isSent || isGenerating || !body.trim()}
                         className={cn(
                             "h-11 rounded-xl px-8 font-semibold shadow-lg transition-all",
-                            isSent 
-                                ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none" 
-                                : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
+                            isSent
+                                ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none"
+                                : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90",
                         )}
                         onClick={() => {
                             if (!alert) return;
