@@ -1,9 +1,8 @@
 """Pydantic schemas for Advisor profiles."""
 
 import uuid
-from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AdvisorProfileRead(BaseModel):
@@ -18,8 +17,7 @@ class AdvisorProfileRead(BaseModel):
     office: str | None = None
     bio: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdvisorProfileUpdate(BaseModel):
