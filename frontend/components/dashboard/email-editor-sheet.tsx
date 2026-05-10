@@ -101,11 +101,11 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
         (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
     const bookingUrl = alert
-        ? `/booking/le-ha?cid=${alert.caseId}`
-        : "/booking/le-ha";
+        ? `/booking?cid=${alert.caseId}`
+        : "/booking";
     const displayUrl = alert
-        ? `nexusedu.app/booking/le-ha?cid=${alert.caseId}`
-        : "nexusedu.app/booking/le-ha";
+        ? `nexusedu.app/booking?cid=${alert.caseId}`
+        : "nexusedu.app/booking";
 
     return (
         <Sheet open={!!alert} onOpenChange={(o) => !o && onClose()}>
@@ -162,7 +162,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                 </div>
 
                 <ScrollArea className="flex-1 overflow-y-auto px-6">
-                    <div className={cn("grid gap-6 py-6", isSent && "opacity-80")}>
+                    <div className="grid gap-6 py-6">
                         {/* Student Info Summary */}
                         <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border/60 bg-muted/30 p-4">
                             <div className="flex items-center gap-2">
@@ -197,11 +197,11 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 id="subject"
                                 value={subject}
                                 onChange={(e) => setSubject(e.target.value)}
-                                disabled={isSent}
+                                readOnly={isSent}
                                 placeholder="VD: Trao đổi về tình hình học tập học kỳ này"
                                 className={cn(
                                     "h-11 rounded-xl border-border/60 focus-visible:ring-primary/20",
-                                    isSent && "bg-muted/50 cursor-not-allowed opacity-70"
+                                    isSent && "cursor-default focus-visible:ring-0"
                                 )}
                             />
                         </div>
@@ -250,7 +250,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 id="body"
                                 value={body}
                                 onChange={(e) => setBody(e.target.value)}
-                                disabled={isSent}
+                                readOnly={isSent}
                                 placeholder={
                                     isGenerating
                                         ? "Hệ thống đang phân tích kết quả học tập để soạn thư hỗ trợ phù hợp..."
@@ -258,7 +258,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 }
                                 className={cn(
                                     "min-h-[400px] resize-none rounded-2xl border-border/60 p-4 font-sans text-base leading-relaxed focus-visible:ring-primary/20",
-                                    isSent && "bg-muted/50 cursor-not-allowed opacity-70"
+                                    isSent && "cursor-default focus-visible:ring-0"
                                 )}
                             />
                             {!isSent && (
