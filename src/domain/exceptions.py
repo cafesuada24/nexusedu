@@ -1,5 +1,6 @@
 """Base exceptions for the domain layer."""
 
+from datetime import datetime
 from uuid import UUID
 
 _NOT_FOUND_MESSAGE_TEMPLATE = '{entity} with ID {id} not found.'
@@ -57,14 +58,6 @@ class CaseAlreadyClosedError(CaseError):
 
     def __init__(self, case_id: UUID) -> None:
         super().__init__(f"Case with with id '{case_id}' is closed.")
-
-class SlotAlreadyTakenError(CaseError):
-    """Raised when a student tries to book a slot already taken by another appointment."""
-
-    def __init__(self, advisor_id: UUID, appointment_time: object) -> None:
-        super().__init__(
-            f"Slot at {appointment_time} for advisor '{advisor_id}' is already taken.",
-        )
 
 class EmailUnavailableError(DomainError):
     """Raised when an advisor tries to send an unavailable email."""
@@ -140,6 +133,24 @@ class TaskUavailableError(TaskError):
     def __init__(self, task_id: UUID, current_status: str) -> None:
         super().__init__(
             f"task with id '{task_id}' is unavailable, current status: {current_status}",
+        )
+
+
+# =============================
+# ======== Appointment ========
+# =============================
+
+
+class AppointmentError(DomainError):
+    """Base error for appointment."""
+
+
+class TimeSlotUnavailableError(AppointmentError):
+    """Raised when a requested time slot is not available for booking."""
+
+    def __init__(self, advisor_id: UUID, requested_time: datetime) -> None:
+        super().__init__(
+            f"Advisor {advisor_id} is not available at {requested_time}.",
         )
 
 

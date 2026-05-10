@@ -1,5 +1,6 @@
 """Case repository interface."""
 
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -35,4 +36,12 @@ class CaseRepository(Protocol):
 
     async def save(self, case: Case) -> None:
         """Update a case."""
+        ...
+
+    async def has_overlapping_appointment(
+        self,
+        advisor_id: UUID,
+        appointment_time: datetime,
+    ) -> bool:
+        """Check if an advisor already has an appointment at the given time."""
         ...
