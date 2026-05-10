@@ -1,8 +1,8 @@
 """Tests for the ZScore pure domain service."""
 
+import uuid
 from collections import defaultdict
 from typing import Any
-import uuid
 
 import pytest
 
@@ -58,9 +58,9 @@ def test_zscore_critical_drop_ratio(zscore):
         {'sid': sid, 'avg_score': 60.0, 'academic_year': 1, 'semester': 1, 'week': 3}, # 0.6 < 0.7 ratio
     ]
     student_data = {sid: weekly_avgs}
-    
+
     new_records, risk_statuses = zscore.run(student_data, set())
-    
+
     assert risk_statuses[sid] == RiskStatus.CRITICAL
     week3_record = next(r for r in new_records if r['week'] == 3)
     assert week3_record['anomaly_flag'] == RiskStatus.CRITICAL.value
@@ -75,11 +75,11 @@ def test_zscore_avoid_duplicate_history(zscore):
     ]
     student_data = {sid: weekly_avgs}
     existing_history = {
-        (sid, 1, 1, 2)
+        (sid, 1, 1, 2),
     }
 
     new_records, risk_statuses = zscore.run(student_data, existing_history)
-    
+
     # Should be empty since W2 exists and W1 is baseline
     assert len(new_records) == 0
     assert risk_statuses[sid] == RiskStatus.NORMAL
@@ -90,12 +90,12 @@ def test_zscore_exact_boundary_deviation(zscore):
     sid = uuid.uuid4()
 
     # Baseline average is 100.
-    # Exactly 80 is a 20% drop. 
+    # Exactly 80 is a 20% drop.
     # Current implementation:
     # 1. Calculate Z-score
     # 2. If current_avg < baseline_avg * 0.7 -> CRITICAL
     # 3. Else if z_score < threshold (-1.5) -> ELEVATED
-    
+
     # We need a stable baseline with some variance to get a meaningful Z-score
     weekly_avgs = [
         {'sid': sid, 'avg_score': 100.0, 'academic_year': 1, 'semester': 1, 'week': 1},

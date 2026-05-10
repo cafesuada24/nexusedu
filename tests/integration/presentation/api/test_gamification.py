@@ -15,6 +15,8 @@ from src.infrastructure.database.models import (
     PointLedger,
     StudentStatusHistory,
     Task,
+)
+from src.infrastructure.database.models import (
     Case as OrmCase,
 )
 from src.presentation.api.auth import Scope, User
@@ -22,10 +24,10 @@ from src.presentation.api.auth import Scope, User
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
     from sqlalchemy.ext.asyncio import AsyncSession
-    from src.presentation.api.auth import User
 
     from src.domain.repositories.case_repository import CaseRepository
     from src.domain.repositories.student_repository import StudentRepository
+    from src.presentation.api.auth import User
 
 
 @pytest.fixture(autouse=True)
@@ -37,7 +39,7 @@ async def seed_advisor(test_db_session: AsyncSession, mock_user: User) -> None:
             user_id=mock_user.id,
             name='Test Advisor',
             email=mock_user.email,
-        )
+        ),
     )
     await test_db_session.commit()
 
@@ -55,9 +57,11 @@ async def test_draft_review_points(
     cid = uuid4()
 
     # Seed Advisor profile safely
-    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    from src.infrastructure.repositories.sqlalchemy_repositories import (
+        SqlAlchemyAdvisorRepository,
+    )
     await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
-        mock_user.id, mock_user.email, "Mock Advisor"
+        mock_user.id, mock_user.email, "Mock Advisor",
     )
 
     await student_repository.ingest_students(
@@ -68,7 +72,7 @@ async def test_draft_review_points(
                 'email': 'g1@ex.com',
                 'current_risk_status': 'Critical',
             },
-        ]
+        ],
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     test_db_session.add(
@@ -114,14 +118,16 @@ async def test_idempotency_prevents_duplicate_review_points(
     idemp_key = str(uuid4())
 
     # Seed Advisor profile safely
-    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    from src.infrastructure.repositories.sqlalchemy_repositories import (
+        SqlAlchemyAdvisorRepository,
+    )
     await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
-        mock_user.id, mock_user.email, "Mock Advisor"
+        mock_user.id, mock_user.email, "Mock Advisor",
     )
     # Arrange
     await student_repository.ingest_students(
 
-        [{'sid': sid, 'student_name': 'Idemp', 'email': 'i@ex.com'}]
+        [{'sid': sid, 'student_name': 'Idemp', 'email': 'i@ex.com'}],
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
@@ -161,9 +167,11 @@ async def test_duplicate_action_guard_prevents_double_points(
     cid = uuid4()
 
     # Seed Advisor profile safely
-    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    from src.infrastructure.repositories.sqlalchemy_repositories import (
+        SqlAlchemyAdvisorRepository,
+    )
     await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
-        mock_user.id, mock_user.email, "Mock Advisor"
+        mock_user.id, mock_user.email, "Mock Advisor",
     )
     await student_repository.ingest_students(
 
@@ -174,7 +182,7 @@ async def test_duplicate_action_guard_prevents_double_points(
                 'email': 'dg@ex.com',
                 'current_risk_status': 'Critical',
             },
-        ]
+        ],
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
@@ -207,9 +215,11 @@ async def test_email_sent_points(
     cid = uuid4()
 
     # Seed Advisor profile safely
-    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    from src.infrastructure.repositories.sqlalchemy_repositories import (
+        SqlAlchemyAdvisorRepository,
+    )
     await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
-        mock_user.id, mock_user.email, "Mock Advisor"
+        mock_user.id, mock_user.email, "Mock Advisor",
     )
     await student_repository.ingest_students(
 
@@ -220,7 +230,7 @@ async def test_email_sent_points(
                 'email': 'g2@ex.com',
                 'current_risk_status': 'Critical',
             },
-        ]
+        ],
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
 
@@ -235,7 +245,7 @@ async def test_email_sent_points(
             subject='S',
             body='B',
             status='draft',
-        )
+        ),
     )
     await test_db_session.commit()
 
@@ -270,9 +280,11 @@ async def test_status_change_points(
     cid = uuid4()
 
     # Seed Advisor profile safely
-    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    from src.infrastructure.repositories.sqlalchemy_repositories import (
+        SqlAlchemyAdvisorRepository,
+    )
     await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
-        mock_user.id, mock_user.email, "Mock Advisor"
+        mock_user.id, mock_user.email, "Mock Advisor",
     )
     await student_repository.ingest_students(
 
@@ -283,7 +295,7 @@ async def test_status_change_points(
                 'email': 'g3@ex.com',
                 'current_risk_status': RiskStatus.CRITICAL.value,
             },
-        ]
+        ],
     )
     await case_repository.create_case(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
@@ -319,9 +331,11 @@ async def test_response_time_bonus(
     sid_penalty = uuid4()
 
     # Seed Advisor profile safely
-    from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyAdvisorRepository
+    from src.infrastructure.repositories.sqlalchemy_repositories import (
+        SqlAlchemyAdvisorRepository,
+    )
     await SqlAlchemyAdvisorRepository(test_db_session).upsert_advisor_for_user(
-        mock_user.id, mock_user.email, "Mock Advisor"
+        mock_user.id, mock_user.email, "Mock Advisor",
     )
     cid_fast = uuid4()
 
@@ -355,7 +369,7 @@ async def test_response_time_bonus(
                 'email': 'p@ex.com',
                 'current_risk_status': 'Critical',
             },
-        ]
+        ],
     )
     await case_repository.create_case(Case(case_id=cid_fast, sid=sid_fast))
     await case_repository.create_case(Case(case_id=cid_mid, sid=sid_mid))
@@ -403,7 +417,7 @@ async def test_response_time_bonus(
                 semester=2,
                 week=1,
             ),
-        ]
+        ],
     )
     await test_db_session.commit()
 
@@ -488,7 +502,7 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
                 points=10,
                 earned_at=datetime.now(UTC) - timedelta(days=10),
             ),
-        ]
+        ],
     )
     await test_db_session.commit()
 
@@ -520,7 +534,7 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
 
 @pytest.mark.asyncio
 async def test_engagement_metrics(
-    client: TestClient, student_repository: StudentRepository
+    client: TestClient, student_repository: StudentRepository,
 ) -> None:
     """Verify the engagement metrics API aggregates by major correctly."""
     # Seed students with different majors and statuses
@@ -554,7 +568,7 @@ async def test_engagement_metrics(
                 'major': 'Math',
                 'intervention_status': InterventionStatus.NOTIFIED.value,
             },
-        ]
+        ],
     )
     await student_repository.session.commit()
 

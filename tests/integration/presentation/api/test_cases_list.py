@@ -5,11 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.testclient import TestClient
 
 from src.domain.entities.case import Case
+from src.domain.repositories.case_repository import CaseRepository
+from src.domain.repositories.student_repository import StudentRepository
 from src.domain.value_objects.status import CaseStatus
 from src.infrastructure.database.models import Advisor
 from src.presentation.api.auth import User
-from src.domain.repositories.case_repository import CaseRepository
-from src.domain.repositories.student_repository import StudentRepository
+
 
 @pytest.fixture(autouse=True)
 async def seed_advisor(test_db_session: AsyncSession, mock_user: User) -> None:
@@ -20,7 +21,7 @@ async def seed_advisor(test_db_session: AsyncSession, mock_user: User) -> None:
             user_id=mock_user.id,
             name='Test Advisor',
             email=mock_user.email,
-        )
+        ),
     )
     await test_db_session.commit()
 
@@ -48,12 +49,12 @@ async def test_get_task_list(
                 'intervention_status': 'notified',
                 'major': 'CS',
             },
-        ]
+        ],
     )
 
     # 2. Create a case
     await case_repository.create_case(
-        Case(case_id=cid, sid=sid, status=CaseStatus.OPEN)
+        Case(case_id=cid, sid=sid, status=CaseStatus.OPEN),
     )
     # Assign the case to an advisor
     await case_repository.assign_case(cid, adv_id)
@@ -69,7 +70,7 @@ async def test_get_task_list(
             subject='Draft Subj',
             body='Draft Body',
             status='draft',
-        )
+        ),
     )
     await test_db_session.commit()
 
@@ -120,7 +121,7 @@ async def test_assign_case_idempotency(
 
     # 1. Create a case
     await case_repository.create_case(
-        Case(case_id=cid, sid=sid, status=CaseStatus.OPEN)
+        Case(case_id=cid, sid=sid, status=CaseStatus.OPEN),
     )
 
     # 2. First assignment should succeed

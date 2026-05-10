@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 @pytest.mark.asyncio
 async def test_kpi_stats(
-    client: TestClient, student_repository: StudentRepository
+    client: TestClient, student_repository: StudentRepository,
 ) -> None:
     """Verify the KPI stats API returns correct aggregations."""
     # Seed students
@@ -38,7 +38,7 @@ async def test_kpi_stats(
                 'current_risk_status': 'Significant Drop',
                 'intervention_status': 'sent',
             },
-        ]
+        ],
     )
 
     resp = client.get('/api/v1/metrics/stats')
@@ -63,7 +63,7 @@ async def test_retention_trend(
         [
             {'sid': (s1 := uuid4()), 'student_name': 'S1', 'email': 's1@ex.com'},
             {'sid': (s2 := uuid4()), 'student_name': 'S2', 'email': 's2@ex.com'},
-        ]
+        ],
     )
 
     # Seed history
@@ -85,7 +85,7 @@ async def test_retention_trend(
                 'week': 1,
                 'anomaly_flag': 'anomaly',
             },
-        ]
+        ],
     )
 
     resp = client.get('/api/v1/metrics/retention')

@@ -7,10 +7,14 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
+from src.infrastructure.repositories.sqlalchemy_repositories import (
+    SqlAlchemyBadgeRepository,
+)
 
-from src.infrastructure.database.models import AdvisorBadge, PointLedger, Case as OrmCase, Task as OrmTask
-from src.infrastructure.repositories.sqlalchemy_repositories import SqlAlchemyBadgeRepository
 from src.domain.value_objects.badges import BADGE_MAP
+from src.infrastructure.database.models import AdvisorBadge, PointLedger
+from src.infrastructure.database.models import Case as OrmCase
+from src.infrastructure.database.models import Task as OrmTask
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -34,15 +38,15 @@ async def test_get_advisor_badges_with_data(
     """Test fetching badges for an advisor with earned badges."""
     advisor_id = uuid4()
     badge_id = "century_club"
-    
+
     test_db_session.add(
         AdvisorBadge(
             advisor_id=advisor_id,
-            badge_id=badge_id
-        )
+            badge_id=badge_id,
+        ),
     )
     await test_db_session.commit()
-    
+
     response = client.get(f"/api/v1/advisors/{advisor_id}/badges")
     assert response.status_code == 200
     data = response.json()
@@ -59,7 +63,7 @@ async def test_badge_repository_stats_calculation(
     repo = SqlAlchemyBadgeRepository(test_db_session)
     advisor_id = uuid4()
     sid = uuid4()
-    
+
     # 1. Create a case created 10 hours ago
     case_id = uuid4()
     created_at = datetime.now(UTC) - timedelta(hours=10)
@@ -69,8 +73,8 @@ async def test_badge_repository_stats_calculation(
             sid=sid,
             assigned_advisor_id=advisor_id,
             created_at=created_at,
-            status="open"
-        )
+            status="open",
+        ),
     )
 
     # 2. Add an action (points ledger) for that case
@@ -84,8 +88,8 @@ async def test_badge_repository_stats_calculation(
             points_reward=10,
             created_at=created_at,
             completed_at=datetime.now(UTC),
-            completed_by_advisor_id=advisor_id
-        )
+            completed_by_advisor_id=advisor_id,
+        ),
     )
     test_db_session.add(
         PointLedger(
@@ -93,14 +97,14 @@ async def test_badge_repository_stats_calculation(
             advisor_id=advisor_id,
             task_id=task_id,
             points=10,
-            earned_at=datetime.now(UTC)
-        )
+            earned_at=datetime.now(UTC),
+        ),
     )
     await test_db_session.commit()
-    
+
     # 3. Get stats
     stats = await repo.get_advisor_stats(advisor_id)
-    
+
     # We expect avg_response_hours to be approx 10.0
     assert stats["avg_response_hours"] > 0
     assert 9.0 < stats["avg_response_hours"] < 11.0

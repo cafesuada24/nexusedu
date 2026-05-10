@@ -88,11 +88,11 @@ async def test_run_anomaly_detection_orchestration(handler, mock_repos, mock_eng
     # Verify
     assert sid in (s[0] for s in new_at_risk)
     mock_repos['history'].batch_create_history.assert_called_once_with(new_records)
-    
+
     # Verify student update
     mock_student.update_risk.assert_called_with(RiskStatus.CRITICAL)
     mock_repos['student'].save.assert_called_with(mock_student)
-    
+
     # Verify case creation
     mock_repos['case'].add.assert_called_once()
 

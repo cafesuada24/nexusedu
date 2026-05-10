@@ -11,6 +11,7 @@ from src.domain.value_objects.status import InterventionStatus
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
+
     from src.domain.repositories.student_repository import StudentRepository
 
 
@@ -34,7 +35,7 @@ async def test_get_alerts(
                 'email': 'n@ex.com',
                 'intervention_status': InterventionStatus.NONE.value,
             },
-        ]
+        ],
     )
     await student_repository.session.commit()
 

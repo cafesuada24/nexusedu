@@ -103,18 +103,18 @@ def test_auth_rbac_forbidden(raw_client: TestClient) -> None:
 
 @pytest.mark.asyncio
 async def test_auth_rbac_advisor_vs_viewer(
-    raw_client: TestClient, test_db_session: AsyncSession
+    raw_client: TestClient, test_db_session: AsyncSession,
 ) -> None:
     """Verify advisor can write but viewer cannot."""
     # 1. Register a viewer and an advisor
     viewer_email = f'viewer_{uuid.uuid4().hex[:8]}@example.com'
     raw_client.post(
-        '/api/v1/auth/register', json={'email': viewer_email, 'password': 'password'}
+        '/api/v1/auth/register', json={'email': viewer_email, 'password': 'password'},
     )
 
     advisor_email = f'advisor_{uuid.uuid4().hex[:8]}@example.com'
     raw_client.post(
-        '/api/v1/auth/register', json={'email': advisor_email, 'password': 'password'}
+        '/api/v1/auth/register', json={'email': advisor_email, 'password': 'password'},
     )
 
     # Elevate to advisor
@@ -157,7 +157,7 @@ async def test_auth_rbac_advisor_vs_viewer(
 
 @pytest.mark.asyncio
 async def test_auth_rbac_success(
-    raw_client: TestClient, test_db_session: AsyncSession
+    raw_client: TestClient, test_db_session: AsyncSession,
 ) -> None:
     """Verify admin can access admin endpoints."""
     # 1. Register
