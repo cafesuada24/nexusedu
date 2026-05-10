@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.commands.agent_commands import AgentCommandHandler
 from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
+from src.application.commands.schedule_commands import ScheduleCommandHandler
 from src.application.interfaces.advisor_metrics_query_service import (
     AdvisorMetricsQueryService,
 )
@@ -250,6 +251,9 @@ class Container:
             email_drafting_service=BamlEmailDraftingService(),
         )
 
+    def get_schedule_command_handler(self) -> ScheduleCommandHandler:
+        return ScheduleCommandHandler(self.schedule_repo)
+
     def get_data_command_handler(self) -> DataCommandHandler:
         return DataCommandHandler(
             self.student_repo,
@@ -273,6 +277,7 @@ class Container:
     def get_advisor_query_handler(self) -> AdvisorQueryHandler:
         return AdvisorQueryHandler(
             advisor_repo=self.advisor_repo,
+            schedule_repo=self.schedule_repo,
             point_ledger_query_service=self.point_ledger_query_service,
             gamification_query_service=self.gamification_query_service,
             advisor_metrics_query_service=self.advisor_metrics_query_service,
