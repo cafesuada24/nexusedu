@@ -26,7 +26,7 @@ class Config(BaseSettings):
     allowed_origins: str = ''
 
 
-    booking_url_template: str = 'http://localhost:3000/booking/advisor?cid={cid}'
+    booking_url_template: str = 'http://localhost:3000/booking?cid={cid}'
     review_url_template: str = 'http://localhost:3000/review?token={token}'
 
     # SMTP Settings
