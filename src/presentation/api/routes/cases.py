@@ -19,12 +19,14 @@ from src.application.commands.case_commands import (
 from src.application.dtos.case_dtos import (
     ActionResponseDTO,
     CaseDTO,
+    GetAllCasesQuery,
     QueryEmailDTO,
     ResolveCaseCommand,
     ReviewCaseDTO,
     StartSupportingCommand,
     TriggerDraftDTO,
 )
+from src.application.dtos.pagination import PagedResponse
 from src.application.queries.case_queries import (
     CaseQueryHandler,
     GetAssignedQuery,
@@ -50,10 +52,25 @@ from src.presentation.dependencies.providers import (
     get_case_query_handler,
     get_idempotency_repository,
 )
-from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 from src.presentation.schemas.request import BookAppointmentRequest, UpdateEmailRequest
 
 router = APIRouter(prefix='/cases', tags=['cases'])
+
+
+@router.get('/')
+async def get_all_cases(
+    query_handler: Annotated[CaseQueryHandler, Depends(get_case_query_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.CASE_READ_ALL))],
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> PagedResponse[CaseDTO]:
+    """Retrieve all cases in the system (Admin only)."""
+    try:
+        query = GetAllCasesQuery(user_id=user.id, limit=limit, offset=offset)
+        return await query_handler.handle_get_all_cases(query)
+    except Exception as e:
+        logger.error(f'Error in get_all_cases: {str(e)}', exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get('/open')
@@ -70,17 +87,7 @@ async def get_open_cases_list(
     """
     try:
         query = GetUnassignedQuery(limit=limit, offset=offset)
-        cases, total_count = await query_handler.handle_get_open_cases(query)
-
-        return PagedResponse[CaseDTO](
-            items=cases,
-            metadata=PaginationMetadata(
-                total_count=total_count,
-                limit=limit,
-                offset=offset,
-                has_next=offset + len(cases) < total_count,
-            ),
-        )
+        return await query_handler.handle_get_open_cases(query)
     except Exception as e:
         logger.error(f'Error in get_case_list: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -100,17 +107,7 @@ async def get_assigned_cases_list(
     """
     try:
         query = GetAssignedQuery(user_id=user.id, limit=limit, offset=offset)
-        cases, total_count = await query_handler.handle_get_assigned_cases(query)
-
-        return PagedResponse[CaseDTO](
-            items=cases,
-            metadata=PaginationMetadata(
-                total_count=total_count,
-                limit=limit,
-                offset=offset,
-                has_next=offset + len(cases) < total_count,
-            ),
-        )
+        return await query_handler.handle_get_assigned_cases(query)
     except Exception as e:
         logger.error(f'Error in get_case_list: {str(e)}', exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

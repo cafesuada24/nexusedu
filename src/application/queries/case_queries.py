@@ -4,12 +4,17 @@ from uuid import UUID
 
 from src.application.dtos.case_dtos import (
     CaseDTO,
+    GetAllCasesQuery,
     GetAssignedQuery,
     GetUnassignedQuery,
     QueryEmailDTO,
 )
+from src.application.dtos.pagination import PagedResponse
 from src.application.interfaces.case_query_service import CaseQueryService
-from src.domain.exceptions import CaseNotFoundError, UserIsNotAnAdvisorError
+from src.domain.exceptions import (
+    CaseNotFoundError,
+    UserIsNotAnAdvisorError,
+)
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
@@ -36,7 +41,7 @@ class CaseQueryHandler:
     async def handle_get_assigned_cases(
         self,
         query: GetAssignedQuery,
-    ) -> tuple[list[CaseDTO], int]:
+    ) -> PagedResponse[CaseDTO]:
         """Execute the get task list query."""
         advisor = await self._advisor_repo.find_by_user_id(query.user_id)
         if advisor is None:
@@ -51,10 +56,20 @@ class CaseQueryHandler:
     async def handle_get_open_cases(
         self,
         query: GetUnassignedQuery,
-    ) -> tuple[list[CaseDTO], int]:
+    ) -> PagedResponse[CaseDTO]:
         """Execute the get task list query."""
         return await self._case_query_service.find_assigned_to(
             advisor_id=None,
+            limit=query.limit,
+            offset=query.offset,
+        )
+
+    async def handle_get_all_cases(
+        self,
+        query: GetAllCasesQuery,
+    ) -> PagedResponse[CaseDTO]:
+        """Execute the get all cases query (Admin only)."""
+        return await self._case_query_service.find_all(
             limit=query.limit,
             offset=query.offset,
         )

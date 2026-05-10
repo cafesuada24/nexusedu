@@ -111,6 +111,15 @@ class GetUnassignedQuery:
     offset: int = 0
 
 
+@dataclass(frozen=True)
+class GetAllCasesQuery:
+    """Query to retrieve all cases (Admin only)."""
+
+    user_id: UUID
+    limit: int = 20
+    offset: int = 0
+
+
 # ==========================
 # ========== DTOs ==========
 # ==========================
