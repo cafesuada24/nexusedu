@@ -31,6 +31,7 @@ from src.domain.exceptions import (
     JobNotFoundError,
     StudentNotFoundError,
     UserIsNotAnAdvisorError,
+    WorkingHoursNotFoundError,
 )
 from src.domain.value_objects.status import (
     InterventionStatus,
@@ -1042,6 +1043,15 @@ class SqlAlchemyScheduleRepository:
         return [
             DataMapper.to_domain_working_hours(wh) for wh in result.scalars().all()
         ]
+
+    async def get_working_hours_by_id(self, wh_id: uuid.UUID) -> DomainWorkingHours:
+        """Fetch a specific working hour block. Raises WorkingHoursNotFoundError if not found."""
+        stmt = select(OrmWorkingHours).where(OrmWorkingHours.id == wh_id)
+        result = await self.session.execute(stmt)
+        wh = result.scalar_one_or_none()
+        if not wh:
+            raise WorkingHoursNotFoundError(wh_id)
+        return DataMapper.to_domain_working_hours(wh)
 
     async def get_days_off(
         self,
