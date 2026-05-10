@@ -30,3 +30,15 @@ class ScheduleRepository(Protocol):
     async def add_day_off(self, day_off: DayOff) -> None:
         """Add a new day off."""
         ...
+
+    async def update_working_hours(self, working_hours: WorkingHours) -> None:
+        """Update an existing working hour block."""
+        ...
+
+    async def delete_working_hours(self, wh_id: UUID) -> None:
+        """Delete a working hour block."""
+        ...
+
+    async def delete_day_off(self, do_id: UUID) -> None:
+        """Delete a day off."""
+        ...
