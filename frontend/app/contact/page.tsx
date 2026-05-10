@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { ArrowLeft, Mail, Clock, Send, Copy, Check } from "lucide-react";
+import { ArrowLeft, Mail, Clock, Copy, Check } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
 
@@ -77,47 +77,19 @@ export default function ContactPage() {
             </div>
           </section>
 
-          {/* Section 2: Contact Form */}
+          {/* Section 2: Send email */}
           <section className="bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm">
-            <h2 className="text-xl font-bold mb-8 text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-4">Gửi tin nhắn nhanh</h2>
-            <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label htmlFor="name" className="text-sm font-bold text-slate-500 dark:text-slate-400 ml-1">Họ tên</label>
-                  <input 
-                    type="text" 
-                    id="name"
-                    placeholder="Nguyễn Văn A"
-                    className="w-full px-4 py-3 rounded-xl bg-transparent border border-slate-200 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 font-medium"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-bold text-slate-500 dark:text-slate-400 ml-1">Email công việc</label>
-                  <input 
-                    type="email" 
-                    id="email"
-                    placeholder="name@university.edu"
-                    className="w-full px-4 py-3 rounded-xl bg-transparent border border-slate-200 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 font-medium"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="message" className="text-sm font-bold text-slate-500 dark:text-slate-400 ml-1">Nội dung tin nhắn</label>
-                <textarea 
-                  id="message"
-                  rows={4}
-                  placeholder="Hãy cho chúng tôi biết bạn đang cần hỗ trợ điều gì..."
-                  className="w-full px-4 py-3 rounded-xl bg-transparent border border-slate-200 dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600 font-medium resize-none"
-                />
-              </div>
-              <button 
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 group"
-              >
-                Gửi tin nhắn
-                <Send size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-              </button>
-            </form>
+            <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-4">Gửi email cho chúng tôi</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">
+              Soạn email trực tiếp trong ứng dụng mail của bạn — chúng tôi sẽ phản hồi trong vòng 1 ngày làm việc.
+            </p>
+            <a
+              href="mailto:contact@nexusedu.io?subject=Liên hệ hỗ trợ NexusEdu"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-2xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+            >
+              <Mail size={18} />
+              Mở ứng dụng email
+            </a>
           </section>
         </div>
       </div>
