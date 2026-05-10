@@ -1,7 +1,7 @@
 """DTOs for advisor-related operations."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, time
 from typing import Annotated
 from uuid import UUID
 
@@ -34,6 +34,15 @@ class GetAdvisorAvailabilityQuery:
     advisor_id: UUID
     start_date: date
     end_date: date
+
+
+@dataclass(frozen=True)
+class GetAdvisorScheduleQuery:
+    advisor_id: UUID
+
+@dataclass(frozen=True)
+class GetUserAdvisorScheduleQuery:
+    user_id: UUID
 
 
 class PersonalAdvisorMetricsDTO(BaseModel):
@@ -71,6 +80,31 @@ class AvailabilitySlotDTO(BaseModel):
     end_time: AwareDatetime
 
 
+class WorkingHoursDTO(BaseModel):
+    """DTO for a working hour block."""
+
+    id: UUID
+    day_of_week: int
+    start_time: time
+    end_time: time
+    timezone: str
+
+
+class DayOffDTO(BaseModel):
+    """DTO for a day off."""
+
+    id: UUID
+    date: date
+    reason: str | None = None
+
+
+class AdvisorScheduleDTO(BaseModel):
+    """DTO for a combined advisor schedule."""
+
+    working_hours: list[WorkingHoursDTO]
+    days_off: list[DayOffDTO]
+
+
 @dataclass(frozen=True)
 class BadgeDTO:
     """DTO for an achievement badge."""
@@ -79,3 +113,41 @@ class BadgeDTO:
     name: str
     description: str
     icon: str
+
+
+# ========== COMMAND =========
+
+
+@dataclass(frozen=True)
+class AddWorkingHoursCommand:
+    advisor_id: UUID
+    day_of_week: int
+    start_time: time
+    end_time: time
+    timezone: str = 'UTC'
+
+
+@dataclass(frozen=True)
+class UpdateWorkingHoursCommand:
+    working_hours_id: UUID
+    day_of_week: int
+    start_time: time
+    end_time: time
+    timezone: str
+
+
+@dataclass(frozen=True)
+class DeleteWorkingHoursCommand:
+    working_hours_id: UUID
+
+
+@dataclass(frozen=True)
+class AddDayOffCommand:
+    advisor_id: UUID
+    date: date
+    reason: str | None = None
+
+
+@dataclass(frozen=True)
+class DeleteDayOffCommand:
+    day_off_id: UUID
