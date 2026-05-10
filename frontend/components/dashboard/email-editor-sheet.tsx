@@ -13,6 +13,7 @@ import {
     User,
     BookOpen,
     Check,
+    AlertCircle,
 } from "lucide-react";
 import {
     Sheet,
@@ -56,9 +57,13 @@ export function EmailEditorSheet({
     // --- 1. State ---
     const [subject, setSubject] = React.useState("");
     const [body, setBody] = React.useState("");
-    const [currentAlertId, setCurrentAlertId] = React.useState<string | null>(null);
+    const [currentAlertId, setCurrentAlertId] = React.useState<string | null>(
+        null,
+    );
     const [isSaving, setIsSaving] = React.useState(false);
-    const [showSavedStatus, setShowSavedStatus] = React.useState(false);
+    const [saveStatus, setSaveStatus] = React.useState<
+        "saved" | "error_empty" | null
+    >(null);
     const [localSent, setLocalSent] = React.useState(false);
     const [isDirty, setIsDirty] = React.useState(false);
 
@@ -90,6 +95,8 @@ export function EmailEditorSheet({
             setCurrentAlertId(null);
             setLocalSent(false);
             setIsDirty(false);
+            setIsSaving(false);
+            setSaveStatus(null);
             activeSessionId.current = null;
             return;
         }
@@ -108,6 +115,8 @@ export function EmailEditorSheet({
             setCurrentAlertId(alert.id);
             setLocalSent(false);
             setIsDirty(false);
+            setIsSaving(false);
+            setSaveStatus(null);
             wasGenerating.current = isGenerating;
             return;
         }
@@ -124,32 +133,57 @@ export function EmailEditorSheet({
 
     // --- 5. Action-Based Debounced Auto-Save (One-Way / Send-Only) ---
     const debouncedSave = React.useMemo(() => {
-        return debounce(async (caseId: string, s: string, b: string, sessionId: string | null) => {
-            if (!caseId || !sessionId) return;
-            
-            try {
-                setIsSaving(true);
-                setShowSavedStatus(false);
+        return debounce(
+            async (
+                caseId: string,
+                s: string,
+                b: string,
+                sessionId: string | null,
+            ) => {
+                if (!caseId || !sessionId) return;
 
-                await updateEmailDraft(caseId, { subject: s, body: b });
+                try {
+                    if (activeSessionId.current === sessionId) {
+                        setIsSaving(true);
+                        setSaveStatus(null);
+                    }
 
-                // Only update visual status if we are still on the same session
-                if (activeSessionId.current === sessionId) {
-                    setIsDirty(false);
-                    setShowSavedStatus(true);
-                    setTimeout(() => {
-                        if (activeSessionId.current === sessionId)
-                            setShowSavedStatus(false);
-                    }, 2000);
+                    await updateEmailDraft(caseId, { subject: s, body: b });
+
+                    // Only update visual status if we are still on the same session
+                    if (activeSessionId.current === sessionId) {
+                        setIsDirty(false);
+                        setSaveStatus("saved");
+                        setTimeout(() => {
+                            if (activeSessionId.current === sessionId)
+                                setSaveStatus(null);
+                        }, 2000);
+                    }
+                } catch (err: any) {
+                    if (err.message?.includes("is sent")) return;
+                    if (
+                        err.message?.toLowerCase().includes("too many requests")
+                    )
+                        return;
+
+                    if (err.message?.includes("Nội dung và Tiêu đề Email")) {
+                        if (activeSessionId.current === sessionId) {
+                            setSaveStatus("error_empty");
+                            setTimeout(() => {
+                                if (activeSessionId.current === sessionId)
+                                    setSaveStatus(null);
+                            }, 3000);
+                        }
+                    } else {
+                        console.error("[EmailEditor] Auto-save failed:", err);
+                    }
+                } finally {
+                    if (activeSessionId.current === sessionId)
+                        setIsSaving(false);
                 }
-            } catch (err: any) {
-                if (err.message?.includes("is sent")) return;
-                if (err.message?.toLowerCase().includes("too many requests")) return;
-                console.error("[EmailEditor] Auto-save failed:", err);
-            } finally {
-                if (activeSessionId.current === sessionId) setIsSaving(false);
-            }
-        }, 3000);
+            },
+            1000,
+        );
     }, []);
 
     // Cleanup debounce on unmount
@@ -276,9 +310,14 @@ export function EmailEditorSheet({
                                     const val = e.target.value;
                                     setSubject(val);
                                     setIsDirty(true);
-                                    setShowSavedStatus(false);
+                                    setSaveStatus(null);
                                     if (alert?.caseId) {
-                                        debouncedSave(alert.caseId, val, bodyRef.current, activeSessionId.current);
+                                        debouncedSave(
+                                            alert.caseId,
+                                            val,
+                                            bodyRef.current,
+                                            activeSessionId.current,
+                                        );
                                     }
                                 }}
                                 readOnly={isSent}
@@ -305,10 +344,16 @@ export function EmailEditorSheet({
                                             <Loader2 className="size-3 animate-spin" />
                                             Đang lưu...
                                         </span>
-                                    ) : showSavedStatus ? (
+                                    ) : saveStatus === "saved" ? (
                                         <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 animate-in fade-in duration-300">
                                             <Check className="size-3" />
                                             Đã lưu
+                                        </span>
+                                    ) : saveStatus === "error_empty" ? (
+                                        <span className="flex items-center gap-1.5 text-[11px] font-medium text-red-500 animate-in fade-in duration-300">
+                                            <AlertCircle className="size-3" />
+                                            Nội dung và Tiêu đề Email không được
+                                            để trống!
                                         </span>
                                     ) : null}
                                 </div>
@@ -359,9 +404,14 @@ export function EmailEditorSheet({
                                     const val = e.target.value;
                                     setBody(val);
                                     setIsDirty(true);
-                                    setShowSavedStatus(false);
+                                    setSaveStatus(null);
                                     if (alert?.caseId) {
-                                        debouncedSave(alert.caseId, subjectRef.current, val, activeSessionId.current);
+                                        debouncedSave(
+                                            alert.caseId,
+                                            subjectRef.current,
+                                            val,
+                                            activeSessionId.current,
+                                        );
                                     }
                                 }}
                                 readOnly={isSent}
