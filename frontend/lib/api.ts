@@ -1033,15 +1033,6 @@ export async function fetchDraftStatus(
 }
 
 /**
- * GET /cases/student/{sid} — returns historical cases for a student.
- */
-export async function fetchStudentCases(sid: string): Promise<CaseResponse[]> {
-    // The backend does not currently implement /cases/student/{sid}.
-    // To prevent 404 network errors in the console, we return an empty array directly.
-    return [];
-}
-
-/**
  * GET /cases/{case_id} — returns full details for a case.
  */
 export async function fetchCaseDetails(
