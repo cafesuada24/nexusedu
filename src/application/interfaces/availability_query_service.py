@@ -4,6 +4,8 @@ from datetime import date, datetime
 from typing import Protocol
 from uuid import UUID
 
+from src.application.dtos.advisor_dtos import AdvisorScheduleDTO
+
 
 class AdvisorAvailabilityQueryService(Protocol):
     """Service to directly query the database for advisor availability slots."""
@@ -16,4 +18,8 @@ class AdvisorAvailabilityQueryService(Protocol):
         slot_duration_minutes: int = 30,
     ) -> list[datetime]:
         """Directly calculate available UTC timeslots without domain entities."""
+        ...
+
+    async def get_advisor_schedule(self, advisor_id: UUID) -> AdvisorScheduleDTO:
+        """Fetch the full schedule directly from the database."""
         ...

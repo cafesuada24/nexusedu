@@ -29,21 +29,23 @@ class ScheduleCommandHandler:
         await self.schedule_repo.add_working_hours(working_hours)
 
     async def handle_update_working_hours(
-        self,
-        command: UpdateWorkingHoursCommand,
+        self, command: UpdateWorkingHoursCommand,
     ) -> None:
         """Update an existing working hour block."""
-        # Note: We create a domain entity to reuse validation logic
-        # though the ID is passed explicitly for the repository update.
-        # For a full DDD approach, we might fetch the advisor aggregate first.
-        working_hours = WorkingHours(
-            id=command.working_hours_id,
-            advisor_id=None,  # Not needed for repository update by ID
+        # 1. Fetch existing entity
+        working_hours = await self.schedule_repo.get_working_hours_by_id(
+            command.working_hours_id,
+        )
+
+        # 2. Perform update via domain entity method
+        working_hours.update(
             day_of_week=command.day_of_week,
             start_time=command.start_time,
             end_time=command.end_time,
             timezone=command.timezone,
         )
+
+        # 3. Save
         await self.schedule_repo.update_working_hours(working_hours)
 
     async def handle_delete_working_hours(

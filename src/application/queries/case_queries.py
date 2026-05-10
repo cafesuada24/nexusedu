@@ -1,7 +1,5 @@
 """Query handlers for case-related operations."""
 
-from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
 from src.application.dtos.case_dtos import (
