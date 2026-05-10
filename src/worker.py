@@ -1,6 +1,6 @@
 """ARQ Worker for background job processing."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +13,7 @@ from src.application.commands.case_commands import (
     GenerateEmailDraftCommand,
     SubmitCaseReviewCommand,
 )
+from src.application.commands.schedule_commands import AddWorkingHoursCommand
 from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
 from src.core.config import config
 from src.core.container import Container
@@ -454,6 +455,40 @@ async def run_outbox_poller_task(ctx: dict[str, Any]) -> None:
         # session.commit() is automatically handled by get_async_session()
 
 
+async def run_advisor_created_task(
+    _: dict[Any, Any],
+    advisor_id: UUID,
+    email: str,
+    name: str,
+    occurred_at: datetime,
+) -> None:
+    """Worker task to set default working hours for a new advisor."""
+    logger.info(f'Worker: Handling AdvisorCreatedEvent for advisor {advisor_id}')
+
+    async for session in get_async_session():
+        container = Container(session=session)
+        schedule_handler = container.get_schedule_command_handler()
+
+        # Monday (0) to Friday (4)
+        for day in range(5):
+            command = AddWorkingHoursCommand(
+                advisor_id=advisor_id,
+                day_of_week=day,
+                start_time=time(9, 0),
+                end_time=time(11, 0),
+                timezone='UTC',
+            )
+            try:
+                await schedule_handler.handle_add_working_hours(command)
+                logger.debug(f'Worker: Added default hours for advisor {advisor_id} on day {day}')
+            except Exception as e:
+                logger.error(f'Worker: Failed to add default hours for advisor {advisor_id} on day {day}: {e}')
+
+        await session.commit()
+
+    logger.info(f'Worker: Finished setting default hours for advisor {advisor_id}')
+
+
 class WorkerSettings:
     """ARQ Worker configuration."""
 
@@ -470,6 +505,7 @@ class WorkerSettings:
         run_case_review_requested_task,
         run_auto_resolve_case_task,
         run_outbox_poller_task,
+        run_advisor_created_task,
     ]
     cron_jobs = [
         cron(run_outbox_poller_task, second=set(range(0, 60, 5))),
