@@ -43,54 +43,6 @@ export type BackendInterventionStatus = z.infer<
     typeof BackendInterventionStatusSchema
 >;
 
-export const BackendRiskStatusSchema = z.enum([
-    "Normal",
-    "Elevated",
-    "Critical",
-    "Unknown",
-]);
-export type BackendRiskStatus = z.infer<typeof BackendRiskStatusSchema>;
-
-export const BackendAlertSchema = z.object({
-    sid: z.string().uuid(),
-    student_name: z.string().nullable().optional(),
-    email: z.string().email().nullable().optional().or(z.literal("")),
-    current_risk_status: z.string().nullable().optional(),
-    intervention_status: z.string().nullable().optional(),
-    is_generating: z.boolean().nullable().optional(),
-    active_case_id: z.string().uuid().nullable().optional(),
-
-    // Optional fallback fields for compatibility with other usages like AlertCenter
-    case_id: z.string().uuid().nullable().optional(),
-    assigned_advisor_id: z.string().uuid().nullable().optional(),
-    assigned_to: z.string().nullable().optional(),
-    draft_subject: z.string().nullable().optional(),
-    draft_body: z.string().nullable().optional(),
-});
-export type BackendAlert = z.infer<typeof BackendAlertSchema>;
-
-export const BackendAlertPagedResponseSchema = z.object({
-    items: z.array(BackendAlertSchema),
-    metadata: z.object({
-        total_count: z.number().nonnegative(),
-        limit: z.number().nonnegative(),
-        offset: z.number().nonnegative(),
-        has_next: z.boolean(),
-    }),
-});
-export type BackendAlertPagedResponse = z.infer<
-    typeof BackendAlertPagedResponseSchema
->;
-
-/**
- * Pulls the authoritative list of at-risk students from the backend.
- * @deprecated Use fetchOpenCases and fetchAssignedCases instead.
- * Returns an empty array directly since /alerts is deprecated/removed in the backend.
- */
-export async function fetchAlerts(): Promise<BackendAlert[]> {
-    return [];
-}
-
 export const TaskItemBaseSchema = z.object({
     case_id: z.string(),
     created_at: z.string(),
@@ -860,38 +812,6 @@ export async function sendNudge(
 }
 
 /**
- * POST /query — ask the async AI agent for analysis.
- *
- * Backend reads `query` and `thread_id` as query string parameters
- * (FastAPI Query() bindings), not as a JSON body.
- */
-export async function queryAgent(
-    query: string,
-    opts?: { thread_id?: string },
-): Promise<DraftJobResponse> {
-    const params = new URLSearchParams({ query });
-    if (opts?.thread_id) params.set("thread_id", opts.thread_id);
-
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint(`/query?${params.toString()}`),
-                { method: "POST" },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Truy vấn AI thất bại: ${message}`);
-    }
-    const data = await res.json();
-    return DraftJobResponseSchema.parse(data);
-}
-
-/**
  * GET /advisors/leaderboard[?time_window=...] — returns advisor leaderboard.
  */
 export async function fetchAdvisorsLeaderboard(
@@ -916,30 +836,6 @@ export async function fetchAdvisorsLeaderboard(
     }
     const data = await res.json();
     return AdvisorLeaderboardSchema.parse(data);
-}
-
-/**
- * GET /advisors/engagement — returns engagement metrics by faculty/major.
- */
-export async function fetchAdvisorsEngagement(): Promise<
-    AdvisorEngagementItem[]
-> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint("/advisors/engagement"),
-                { method: "GET" },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể lấy dữ liệu tương tác: ${message}`);
-    }
-    const data = await res.json();
-    return z.array(AdvisorEngagementItemSchema).parse(data);
 }
 
 /**
@@ -1102,15 +998,6 @@ export async function fetchDraftStatus(
     }
     const data = await res.json();
     return DraftStatusResponseSchema.parse(data);
-}
-
-/**
- * GET /cases/student/{sid} — returns historical cases for a student.
- */
-export async function fetchStudentCases(sid: string): Promise<CaseResponse[]> {
-    // The backend does not currently implement /cases/student/{sid}.
-    // To prevent 404 network errors in the console, we return an empty array directly.
-    return [];
 }
 
 /**

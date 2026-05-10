@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     type BackendInterventionStatus,
     fetchDraftStatus,
-    fetchStudentCases,
     fetchCaseDetails,
     fetchCaseEmail,
     fetchTasks,
@@ -248,18 +247,6 @@ export function useDraftStatus(case_id?: string | null) {
         staleTime: 0,
         retry: 2,
         retryDelay: 3000,
-    });
-}
-
-/**
- * Hook to fetch all historical cases for a student.
- */
-export function useStudentCases(sid: string) {
-    const { isAuthenticated } = useAuth();
-    return useQuery({
-        queryKey: queryKeys.cases.student(sid),
-        queryFn: () => fetchStudentCases(sid),
-        enabled: isAuthenticated && !!sid,
     });
 }
 

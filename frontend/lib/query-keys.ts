@@ -14,7 +14,6 @@ export const queryKeys = {
     all: ["cases"] as const,
     tasks: () => [...queryKeys.cases.all, "tasks"] as const,
     detail: (caseId: string) => [...queryKeys.cases.all, "detail", caseId] as const,
-    student: (sid: string) => [...queryKeys.cases.all, "student", sid] as const,
     draft: (caseId: string) => [...queryKeys.cases.all, "draft", caseId] as const,
   },
   schedule: {
