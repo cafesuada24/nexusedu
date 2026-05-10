@@ -764,13 +764,6 @@ export async function generateAiDraftForAlert(
         };
     }
 
-    if (result.response.status === 500) {
-        console.warn(
-            `Bypassing 500 Error on AI Draft generation for alert ${alert_id}.`,
-        );
-        return { status: "success", job_id: "mock-job-id" };
-    }
-
     throw new Error(
         `Không thể tạo nội dung email [${result.response.status}] (${primaryUrl}): ${result.detail}`,
     );
