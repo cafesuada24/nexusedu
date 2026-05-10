@@ -36,7 +36,6 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule"
-import { useSocket, useSocketEvent } from "@/hooks/use-socket"
 import { confirmBooking } from "@/lib/api"
 import { useAppointmentsQuery } from "@/hooks/use-appointments-query"
 import { SlotTakenError } from "@/lib/appointments"
@@ -61,7 +60,6 @@ export function BookingView({
   const [slot, setSlot] = React.useState<string | null>(null)
   const [mode, setMode] = React.useState<Mode>("video")
   const [stage, setStage] = React.useState<"pick" | "syncing" | "done">("pick")
-  const socket = useSocket()
   const queryClient = useQueryClient()
 
   const windowFrom = React.useMemo(
@@ -82,13 +80,6 @@ export function BookingView({
   const bookedSet = React.useMemo(
     () => new Set(appointments.map((a) => `${a.date}|${a.slot}`)),
     [appointments],
-  )
-
-  useSocketEvent<{ case_id: string; date: string; slot: string }>(
-    "new_appointment",
-    React.useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
-    }, [queryClient]),
   )
 
   const slotsForDate = React.useMemo(
@@ -127,7 +118,6 @@ export function BookingView({
     }
 
     queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
-    socket.emit("new_appointment", { case_id: caseId, date: dateStr, slot, mode })
 
     setTimeout(() => {
       setStage("done")
