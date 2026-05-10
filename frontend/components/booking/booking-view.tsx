@@ -38,10 +38,7 @@ import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule"
 import { useSocket, useSocketEvent } from "@/hooks/use-socket"
 import { confirmBooking } from "@/lib/api"
-import {
-  useAppointmentsQuery,
-  useCreateAppointment,
-} from "@/hooks/use-appointments-query"
+import { useAppointmentsQuery } from "@/hooks/use-appointments-query"
 import { SlotTakenError } from "@/lib/appointments"
 import { queryKeys } from "@/lib/query-keys"
 
@@ -77,11 +74,10 @@ export function BookingView({
   )
 
   const { data: appointments = [] } = useAppointmentsQuery({
-    advisorToken,
+    caseId,
     from: windowFrom,
     to: windowTo,
   })
-  const createAppointment = useCreateAppointment()
 
   const bookedSet = React.useMemo(
     () => new Set(appointments.map((a) => `${a.date}|${a.slot}`)),
@@ -105,14 +101,14 @@ export function BookingView({
     setStage("syncing")
 
     const dateStr = format(date, "yyyy-MM-dd")
+    // UI hiển thị "Múi giờ (GMT+7) Hồ Chí Minh" — gắn explicit offset để
+    // backend nhận đúng instant bất kể browser của student đang ở đâu.
+    const appointmentTime = `${dateStr}T${slot}:00+07:00`
 
     try {
-      await createAppointment.mutateAsync({
-        advisorToken,
-        caseId,
-        date: dateStr,
-        slot,
-        mode,
+      await confirmBooking(caseId, {
+        appointmentTime,
+        meetingMethod: mode === "video" ? "online" : "in_person",
       })
     } catch (error) {
       setStage("pick")
@@ -125,27 +121,13 @@ export function BookingView({
       } else {
         toast.error("Không thể xác nhận đặt lịch. Vui lòng thử lại sau.")
         // eslint-disable-next-line no-console
-        console.error("[booking] claim slot failed:", error)
+        console.error("[booking] confirm failed:", error)
       }
       return
     }
 
-    try {
-      // UI hiển thị "Múi giờ (GMT+7) Hồ Chí Minh" — gắn explicit offset để
-      // backend nhận đúng instant bất kể browser của student đang ở đâu.
-      const appointmentTime = `${dateStr}T${slot}:00+07:00`
-      await confirmBooking(caseId, {
-        appointmentTime,
-        meetingMethod: mode === "video" ? "online" : "in_person",
-      })
-    } catch (error) {
-      // Best-effort case-status sync; slot lock has already succeeded.
-      // eslint-disable-next-line no-console
-      console.warn("[booking] case status sync failed (non-fatal):", error)
-    }
-
-    const payload = { case_id: caseId, date: dateStr, slot, mode }
-    socket.emit("new_appointment", payload)
+    queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all })
+    socket.emit("new_appointment", { case_id: caseId, date: dateStr, slot, mode })
 
     setTimeout(() => {
       setStage("done")
