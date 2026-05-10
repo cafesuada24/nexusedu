@@ -51,6 +51,7 @@ async def test_handle_add_working_hours(handler, schedule_repo):
 @pytest.mark.asyncio
 async def test_handle_update_working_hours(handler, schedule_repo):
     wh_id = uuid4()
+    advisor_id = uuid4()
     command = UpdateWorkingHoursCommand(
         working_hours_id=wh_id,
         day_of_week=1,
@@ -58,15 +59,27 @@ async def test_handle_update_working_hours(handler, schedule_repo):
         end_time=time(15, 0),
         timezone="EST"
     )
-    
+
+    # Mock return value as a real entity
+    existing_wh = WorkingHours(
+        id=wh_id,
+        advisor_id=advisor_id,
+        day_of_week=0,
+        start_time=time(9, 0),
+        end_time=time(17, 0),
+        timezone="UTC"
+    )
+    schedule_repo.get_working_hours_by_id.return_value = existing_wh
+
     await handler.handle_update_working_hours(command)
-    
+
+    schedule_repo.get_working_hours_by_id.assert_called_once_with(wh_id)
     schedule_repo.update_working_hours.assert_called_once()
     wh = schedule_repo.update_working_hours.call_args[0][0]
     assert wh.id == wh_id
     assert wh.day_of_week == 1
     assert wh.timezone == "EST"
-
+    assert wh.advisor_id == advisor_id
 
 @pytest.mark.asyncio
 async def test_handle_delete_working_hours(handler, schedule_repo):
