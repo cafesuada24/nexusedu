@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""
-Submit .ai-log/session.jsonl to grading server.
+"""Submit .ai-log/session.jsonl to grading server.
 Called by git pre-push hook or manually.
 """
 import json
 import os
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 try:

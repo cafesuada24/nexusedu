@@ -19,8 +19,10 @@ from fastapi_users.authentication import (
 from fastapi_users_db_sqlalchemy import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.application.interfaces.event_publisher import EventPublisher
 from src.core.config import config
 from src.core.logger import logger
+from src.domain.events.advisor_events import AdvisorCreatedEvent
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.infrastructure.database.models import User
@@ -31,6 +33,7 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
 )
 from src.presentation.dependencies.providers import (
     get_advisor_repository,
+    get_event_publisher,
     get_user_settings_repository,
 )
 
@@ -107,16 +110,18 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         user_db: BaseUserDatabase[User, uuid.UUID],
         user_settings_db: UserSettingsRepository,
         advisor_repo: AdvisorRepository,
+        event_publisher: EventPublisher,
     ):
         super().__init__(user_db)
         self._user_setting_db = user_settings_db
         self._advisor_repo = advisor_repo
+        self._event_publisher = event_publisher
 
     @override
     async def on_after_register(
         self,
         user: User,
-        _request: Request | None = None,
+        _: Request | None = None,
     ) -> None:
         """Callback triggered after a user successfully registers."""
         logger.info(f'User {user.id} has registered.')
@@ -125,7 +130,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         if user.role == UserRole.ADVISOR.value:
             # Ensure an advisor profile exists and is linked
             name = user.email.split('@')[0].capitalize()
-            await self._advisor_repo.upsert_advisor_for_user(user.id, user.email, name)
+            advisor_id, created = await self._advisor_repo.upsert_advisor_for_user(
+                user.id, user.email, name,
+            )
+            if created:
+                await self._event_publisher.publish(
+                    [
+                        AdvisorCreatedEvent(
+                            advisor_id=advisor_id, email=user.email, name=name,
+                        ),
+                    ],
+                )
 
     @override
     async def on_after_update(
@@ -138,7 +153,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         if user.role == UserRole.ADVISOR.value:
             # Ensure an advisor profile exists and is linked
             name = user.email.split('@')[0].capitalize()
-            await self._advisor_repo.upsert_advisor_for_user(user.id, user.email, name)
+            advisor_id, created = await self._advisor_repo.upsert_advisor_for_user(
+                user.id, user.email, name,
+            )
+            if created:
+                await self._event_publisher.publish(
+                    [
+                        AdvisorCreatedEvent(
+                            advisor_id=advisor_id, email=user.email, name=name,
+                        ),
+                    ],
+                )
 
 
 async def get_user_manager(
@@ -151,9 +176,13 @@ async def get_user_manager(
         SqlAlchemyAdvisorRepository,
         Depends(get_advisor_repository),
     ],
+    event_publisher: Annotated[
+        EventPublisher,
+        Depends(get_event_publisher),
+    ],
 ) -> AsyncGenerator[UserManager, None]:
     """Dependency for getting the user manager instance."""
-    yield UserManager(user_db, user_settings_db, advisor_repo)
+    yield UserManager(user_db, user_settings_db, advisor_repo, event_publisher)
 
 
 # Authentication Backend

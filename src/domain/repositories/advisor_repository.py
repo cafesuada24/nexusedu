@@ -14,8 +14,12 @@ class AdvisorRepository(Protocol):
         user_id: UUID,
         email: str,
         name: str,
-    ) -> None:
-        """Link a user to an advisor profile, creating one if necessary."""
+    ) -> tuple[UUID, bool]:
+        """Link a user to an advisor profile, creating one if necessary.
+
+        Returns:
+            A tuple of (advisor_id, created_flag).
+        """
         ...
 
     async def get_by_id(self, advisor_id: UUID) -> Advisor:
@@ -37,4 +41,3 @@ class AdvisorRepository(Protocol):
     async def save(self, advisor: Advisor) -> None:
         """Update an existing advisor."""
         ...
-

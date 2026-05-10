@@ -48,7 +48,7 @@ def generate_mock_data():
         sid = uuid.uuid4()
         name = f'Student {i}'
         profile = random.choices(
-            ['steady', 'improving', 'degrading'], weights=[0.6, 0.2, 0.2]
+            ['steady', 'improving', 'degrading'], weights=[0.6, 0.2, 0.2],
         )[0]
         students.append(
             {
@@ -60,7 +60,7 @@ def generate_mock_data():
                 'last_notified_timestamp': None,
                 'last_notified_satisfaction': 0,
                 'profile': profile,  # Temporary for score generation
-            }
+            },
         )
 
     # 2. Generate Activities (LMS data)

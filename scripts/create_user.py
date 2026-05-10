@@ -5,12 +5,14 @@ import asyncio
 
 from dotenv import load_dotenv
 
+from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import async_session_maker
 from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyAdvisorRepository,
     SqlAlchemyUserSettingsRepository,
 )
+from src.infrastructure.queue.outbox_adapter import TransactionalOutboxAdapter
 from src.presentation.api.auth import (
     SQLAlchemyUserDatabase,
     UserManager,
@@ -27,7 +29,12 @@ async def create_user(email: str, password: str, role: str) -> None:
         user_db = SQLAlchemyUserDatabase(session, User)
         settings_repo = SqlAlchemyUserSettingsRepository(session)
         advisor_repo = SqlAlchemyAdvisorRepository(session)
-        user_manager = UserManager(user_db, settings_repo, advisor_repo)
+
+        # Instantiate EventPublisher via Outbox for transactional consistency
+        outbox_queue = TransactionalOutboxAdapter(session)
+        event_publisher = TaskQueueEventPublisher(outbox_queue)
+
+        user_manager = UserManager(user_db, settings_repo, advisor_repo, event_publisher)
 
         # 1. Create user
         user_create = UserCreate(email=email, password=password)
