@@ -106,6 +106,18 @@ class StudentNotFoundError(StudentError):
             ),
         )
 
+class MissingPerformanceDataError(StudentError):
+    """Raised when a student lacks recent performance data for email generation."""
+
+    def __init__(self, student_id: UUID):
+        super().__init__(f"Student {student_id} has no recent performance data.")
+
+class StudentNameMissingError(StudentError):
+    """Raised when a student name is missing."""
+
+    def __init__(self, student_id: UUID):
+        super().__init__(f"Student {student_id} is missing a name.")
+
 # ==========================
 # ========== TASK ==========
 # ==========================
