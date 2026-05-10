@@ -62,6 +62,7 @@ class Scope(StrEnum):
 
     CASE_ACCEPT = 'case:accept'
     CASE_READ = 'case:read'
+    CASE_READ_ALL = 'case:read'
 
 
 class UserRole(StrEnum):

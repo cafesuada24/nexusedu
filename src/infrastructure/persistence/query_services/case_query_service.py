@@ -1,10 +1,12 @@
 """Case query service implementation."""
+
 from uuid import UUID
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import Select, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.case_dtos import CaseDTO, QueryEmailDTO
+from src.application.dtos.pagination import PagedResponse, PaginationMetadata
 from src.domain.services.gamification import GamificationService
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
 from src.infrastructure.database.models import Advisor as OrmAdvisor
@@ -30,9 +32,35 @@ class SqlAlchemyCaseQueryService:
         advisor_id: UUID | None,
         limit: int,
         offset: int,
-    ) -> tuple[list[CaseDTO], int]:
+    ) -> PagedResponse[CaseDTO]:
         """Find cases that have been assigned to an advisor."""
-        stmt = (
+        stmt = self._get_base_query()
+
+        if advisor_id is None:
+            stmt = stmt.where(
+                OrmCase.assigned_advisor_id.is_(None),
+                OrmCase.intervention_status == InterventionStatus.NEW,
+            )
+        else:
+            stmt = stmt.where(
+                OrmCase.assigned_advisor_id == advisor_id,
+                OrmCase.intervention_status != InterventionStatus.NEW,
+            )
+
+        return await self._execute_and_map(stmt, limit, offset)
+
+    async def find_all(
+        self,
+        limit: int,
+        offset: int,
+    ) -> PagedResponse[CaseDTO]:
+        """Find all cases."""
+        stmt = self._get_base_query()
+        return await self._execute_and_map(stmt, limit, offset)
+
+    def _get_base_query(self) -> Select[tuple[OrmCase, OrmAdvisor, OrmEmail]]:
+        """Build the base select statement for cases."""
+        return (
             select(
                 OrmCase.case_id,
                 OrmCase.sid,
@@ -56,17 +84,13 @@ class SqlAlchemyCaseQueryService:
             .order_by(desc(OrmCase.created_at))
         )
 
-        if advisor_id is None:
-            stmt = stmt.where(
-                OrmCase.assigned_advisor_id.is_(None),
-                OrmCase.intervention_status == InterventionStatus.NEW,
-            )
-        else:
-            stmt = stmt.where(
-                OrmCase.assigned_advisor_id == advisor_id,
-                OrmCase.intervention_status != InterventionStatus.NEW,
-            )
-
+    async def _execute_and_map(
+        self,
+        stmt: Select[tuple[OrmCase, OrmAdvisor, OrmEmail]],
+        limit: int,
+        offset: int,
+    ) -> PagedResponse[CaseDTO]:
+        """Execute the query and map results to CaseDTOs."""
         count_stmt = select(func.count()).select_from(stmt.subquery())
         count_result = await self.session.execute(count_stmt)
         total_count = count_result.scalar() or 0
@@ -101,7 +125,7 @@ class SqlAlchemyCaseQueryService:
                     case_id=row['case_id'],
                     sid=row['sid'],
                     created_at=row['created_at'],
-                    assigned_advisor_id=advisor_id,
+                    assigned_advisor_id=row['assigned_advisor_id'],
                     assigned_to=row['assigned_to'],
                     student_name=row['student_name'],
                     major=row['major'] or 'Unknown',
@@ -114,7 +138,17 @@ class SqlAlchemyCaseQueryService:
                         body=row['draft_body'],
                         status=row['draft_status'],
                         created_at=row['created_at'],
-                    ) if row['email_id'] else None,
+                    )
+                    if row['email_id']
+                    else None,
                 ),
             )
-        return tasks, total_count
+        return PagedResponse(
+            items=tasks,
+            metadata=PaginationMetadata(
+                total_count=total_count,
+                limit=limit,
+                offset=offset,
+                has_next=offset + len(tasks) < total_count,
+            ),
+        )
