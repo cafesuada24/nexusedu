@@ -43,12 +43,15 @@ export function SiteHeader() {
                     : "border-b border-transparent bg-transparent shadow-none backdrop-blur-0",
             )}
         >
-            <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 md:px-6">
-                <Logo
-                    onClick={() =>
-                        window.scrollTo({ top: 0, behavior: "smooth" })
-                    }
-                />
+            <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between px-4 md:px-6">
+                <div className="w-fit flex-none">
+                    <Logo
+                        priority
+                        onClick={() =>
+                            window.scrollTo({ top: 0, behavior: "smooth" })
+                        }
+                    />
+                </div>
 
                 <nav
                     className="hidden items-center gap-1 md:flex"
