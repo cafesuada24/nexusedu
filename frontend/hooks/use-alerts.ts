@@ -45,7 +45,17 @@ export function useAlerts() {
                     fetchAssignedCases(100, 0),
                 ]);
 
-                const allItems = [...openRes.items, ...assignedRes.items];
+                // Deduplicate by case_id to prevent duplicate keys if results overlap
+                const seenCaseIds = new Set<string>();
+                const allItems: any[] = [];
+                
+                for (const item of [...openRes.items, ...assignedRes.items]) {
+                    if (!seenCaseIds.has(item.case_id)) {
+                        seenCaseIds.add(item.case_id);
+                        allItems.push(item);
+                    }
+                }
+
                 const concerns = getAllStudentConcerns();
 
                 const enriched = allItems.map((c) => ({

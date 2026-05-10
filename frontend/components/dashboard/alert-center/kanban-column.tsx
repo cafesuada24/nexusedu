@@ -150,9 +150,9 @@ export function KanbanColumn({
               <AnimatePresence initial={false}>
                 {(isExpanded ? items : items.slice(0, PAGE_SIZE)).map((a) => (
                   <motion.div
-                    key={a.id}
+                    key={`${a.caseId || ""}-${a.id}`}
                     layout
-                    layoutId={`alert-card-${a.id}`}
+                    layoutId={`alert-card-${a.caseId || a.id}`}
                     initial={{ opacity: 0.7, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}

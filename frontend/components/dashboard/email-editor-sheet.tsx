@@ -12,6 +12,7 @@ import {
     Mail,
     User,
     BookOpen,
+    Check,
 } from "lucide-react";
 import {
     Sheet,
@@ -30,6 +31,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useDraftStatus } from "@/hooks/use-alerts";
+import { useDebounce } from "@/hooks/use-debounce";
+import { updateEmailDraft } from "@/lib/api";
 
 import { type Alert } from "@/lib/alerts";
 
@@ -51,38 +54,103 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
     const [subject, setSubject] = React.useState("");
     const [body, setBody] = React.useState("");
     const [currentAlertId, setCurrentAlertId] = React.useState<string | null>(null);
+    const [lastIncomingBody, setLastIncomingBody] = React.useState<string | null>(null);
+    const [isSaving, setIsSaving] = React.useState(false);
+    const [showSavedStatus, setShowSavedStatus] = React.useState(false);
+    const [localSent, setLocalSent] = React.useState(false);
 
-    const isSent = alert?.interventionStatus === "sent";
+    const isSent = alert?.interventionStatus === "sent" || localSent;
 
     // Initial load or background completion
     React.useEffect(() => {
         if (!alert) {
-            if (currentAlertId !== null) setCurrentAlertId(null);
+            if (currentAlertId !== null) {
+                setCurrentAlertId(null);
+                setLastIncomingBody(null);
+                setLocalSent(false);
+            }
             return;
         }
 
+        const incomingSubject = alert.draftSubject || draft?.subject || alert.subject || "";
+        const incomingBody = alert.draftBody || draft?.body || alert.body || "";
+
         if (alert.id !== currentAlertId) {
             // New student opened - force override state with their specific data
-            const newSubject = alert.subject || alert.draftSubject || draft?.subject || "";
-            const newBody = alert.body || alert.draftBody || draft?.body || "";
-            setSubject(newSubject);
-            setBody(newBody);
+            setSubject(incomingSubject);
+            setBody(incomingBody);
             setCurrentAlertId(alert.id);
+            setLastIncomingBody(incomingBody);
         } else {
-            // Same student - only fill in if fields are currently empty (e.g. background AI draft finished)
-            const currentSubject =
-                subject ||
-                alert.subject ||
-                alert.draftSubject ||
-                draft?.subject ||
-                "";
-            const currentBody =
-                body || alert.body || alert.draftBody || draft?.body || "";
-
-            if (!subject && currentSubject) setSubject(currentSubject);
-            if (!body && currentBody) setBody(currentBody);
+            // Same student.
+            // If a new AI draft just arrived, force overwrite manual input.
+            if (incomingBody && incomingBody !== lastIncomingBody) {
+                setSubject(incomingSubject);
+                setBody(incomingBody);
+                setLastIncomingBody(incomingBody);
+            } else {
+                // Otherwise, only fill in if fields are currently empty
+                if (!subject && incomingSubject) setSubject(incomingSubject);
+                if (!body && incomingBody) setBody(incomingBody);
+            }
         }
-    }, [alert, draft, subject, body, currentAlertId]);
+    }, [alert, draft, subject, body, currentAlertId, lastIncomingBody]);
+
+    // Auto-save logic
+    const debouncedSubject = useDebounce(subject, 1000);
+    const debouncedBody = useDebounce(body, 1000);
+
+    React.useEffect(() => {
+        const performAutoSave = async () => {
+            if (!alert?.caseId || isSent || localSent) return;
+
+            // Only save if content has actually changed from what we last received/saved
+            // and we aren't currently generating
+            if (isGenerating) return;
+
+            // Don't auto-save if content is exactly what we got from the server initially
+            const incomingSubject = alert.draftSubject || draft?.subject || alert.subject || "";
+            const incomingBody = alert.draftBody || draft?.body || alert.body || "";
+            
+            if (debouncedSubject === incomingSubject && debouncedBody === incomingBody) {
+                return;
+            }
+
+            // Guard: Backend rejects empty drafts
+            if (!debouncedSubject.trim() || !debouncedBody.trim()) {
+                return;
+            }
+
+            try {
+                setIsSaving(true);
+                setShowSavedStatus(false);
+
+                // Final check before API call to minimize race condition with "Send" button
+                if (localSent || alert?.interventionStatus === "sent") {
+                    setIsSaving(false);
+                    return;
+                }
+
+                await updateEmailDraft(alert.caseId, {
+                    subject: debouncedSubject,
+                    body: debouncedBody,
+                });
+                setShowSavedStatus(true);
+                setTimeout(() => setShowSavedStatus(false), 2000);
+            } catch (err: any) {
+                // If it's a "sent" error, it means we hit a race condition with the final send.
+                // We can ignore this as the final content was already sent by handleSendEmail.
+                if (err.message?.includes("is sent")) {
+                    return;
+                }
+                console.error("[EmailEditor] Auto-save failed:", err);
+            } finally {
+                setIsSaving(false);
+            }
+        };
+
+        performAutoSave();
+    }, [debouncedSubject, debouncedBody, alert?.caseId, isSent]);
 
     const reset = () => {
         if (draft?.body) {
@@ -100,12 +168,16 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
         (draft !== undefined ? !!draft?.is_generating : !!alert?.isGenerating) ||
         (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
+    const isDev = process.env.NODE_ENV === "development";
+    const baseDomain = isDev ? "localhost:3000" : "nexusedu.app";
+    const protocol = isDev ? "http" : "https";
+
     const bookingUrl = alert
         ? `/booking?cid=${alert.caseId}`
         : "/booking";
     const displayUrl = alert
-        ? `nexusedu.app/booking?cid=${alert.caseId}`
-        : "nexusedu.app/booking";
+        ? `${baseDomain}/booking?cid=${alert.caseId}`
+        : `${baseDomain}/booking`;
 
     return (
         <Sheet open={!!alert} onOpenChange={(o) => !o && onClose()}>
@@ -125,35 +197,48 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 </SheetDescription>
                             </div>
                         </div>
-                        <Badge
-                            variant="secondary"
-                            className={cn(
-                                "rounded-md px-2.5 py-0.5 text-xs font-medium",
-                                isSent 
-                                    ? "bg-success/15 text-success"
-                                    : isGenerating
-                                      ? "bg-primary/15 text-primary"
-                                      : body
+                        <div className="flex items-center gap-3">
+                            {isSaving ? (
+                                <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground animate-in fade-in duration-300">
+                                    <Loader2 className="size-3 animate-spin" />
+                                    Đang lưu...
+                                </span>
+                            ) : showSavedStatus ? (
+                                <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 animate-in fade-in duration-300">
+                                    <Check className="size-3" />
+                                    Đã lưu
+                                </span>
+                            ) : null}
+                            <Badge
+                                variant="secondary"
+                                className={cn(
+                                    "rounded-md px-2.5 py-0.5 text-xs font-medium",
+                                    isSent 
                                         ? "bg-success/15 text-success"
-                                        : "bg-muted text-muted-foreground",
-                            )}
-                        >
-                            {isSent ? (
-                                <>
-                                    <Send className="mr-1 size-3" />
-                                    Đã gửi
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles className="mr-1 size-3" />
-                                    {isGenerating
-                                        ? "AI đang soạn..."
-                                        : body
-                                          ? "Bản nháp đã sẵn sàng"
-                                          : "Chưa có bản nháp"}
-                                </>
-                            )}
-                        </Badge>
+                                        : isGenerating
+                                          ? "bg-primary/15 text-primary"
+                                          : body
+                                            ? "bg-success/15 text-success"
+                                            : "bg-muted text-muted-foreground",
+                                )}
+                            >
+                                {isSent ? (
+                                    <>
+                                        <Send className="mr-1 size-3" />
+                                        Đã gửi
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="mr-1 size-3" />
+                                        {isGenerating
+                                            ? "AI đang soạn..."
+                                            : body
+                                              ? "Bản nháp đã sẵn sàng"
+                                              : "Chưa có bản nháp"}
+                                    </>
+                                )}
+                            </Badge>
+                        </div>
                     </div>
                 </SheetHeader>
 
@@ -331,7 +416,8 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                         )}
                         onClick={() => {
                             if (!alert) return;
-                            const fullUrl = `https://${displayUrl}`;
+                            setLocalSent(true);
+                            const fullUrl = `${protocol}://${displayUrl}`;
                             const finalBody = body.includes(displayUrl)
                                 ? body
                                 : `${body}\n\n---\nBạn có thể đặt lịch hẹn tư vấn tại đây: ${fullUrl}`;
@@ -341,7 +427,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                         {isSent ? (
                             <>
                                 <Send className="mr-2 size-4" />
-                                Đã sẵn sàng gửi
+                                Đã được gửi
                             </>
                         ) : (
                             <>
