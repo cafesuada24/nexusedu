@@ -6,11 +6,20 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from src.application.commands.schedule_commands import ScheduleCommandHandler
 from src.application.dtos.advisor_dtos import (
+    AddDayOffCommand,
+    AddWorkingHoursCommand,
     AdvisorProfileDTO,
+    AdvisorScheduleDTO,
     AvailabilitySlotDTO,
+    DeleteDayOffCommand,
+    DeleteWorkingHoursCommand,
     GetAdvisorAvailabilityQuery,
     GetAdvisorProfileQuery,
+    GetAdvisorScheduleQuery,
+    GetUserAdvisorScheduleQuery,
+    UpdateWorkingHoursCommand,
 )
 from src.application.dtos.gamification_dtos import (
     GetLeaderboardQuery,
@@ -28,8 +37,15 @@ from src.presentation.api.auth import Scope, User, current_active_user, require_
 from src.presentation.dependencies.providers import (
     get_advisor_query_handler,
     get_advisor_repository,
+    get_schedule_command_handler,
 )
-from src.presentation.schemas.advisor import AdvisorProfileUpdate
+from src.presentation.schemas.advisor import (
+    AdvisorProfileUpdate,
+    AdvisorScheduleRead,
+    DayOffCreate,
+    WorkingHoursCreate,
+    WorkingHoursUpdate,
+)
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 
@@ -214,6 +230,118 @@ async def get_my_points(
 #         ) from e
 
 
+# Self-service aliases
+@router.get('/me/schedule', response_model=AdvisorScheduleRead)
+async def get_my_schedule(
+    query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+) -> AdvisorScheduleDTO:
+    """Get the current advisor's schedule."""
+    query = GetUserAdvisorScheduleQuery(user_id=user.id)
+    return await query_handler.handle_get_user_advisor_schedule(query)
+
+
+@router.get('/{advisor_id}/schedule', response_model=AdvisorScheduleRead)
+async def get_advisor_schedule(
+    advisor_id: UUID,
+    query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+) -> AdvisorScheduleDTO:
+    """Retrieve the full schedule (working hours and days off) for an advisor."""
+    query = GetAdvisorScheduleQuery(advisor_id=advisor_id)
+    return await query_handler.handle_get_advisor_schedule(query)
+
+
+@router.post('/{advisor_id}/working-hours')
+async def add_working_hours(
+    advisor_id: UUID,
+    request: WorkingHoursCreate,
+    command_handler: Annotated[
+        ScheduleCommandHandler,
+        Depends(get_schedule_command_handler),
+    ],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_WRITE))],
+) -> dict[str, str]:
+    """Add a recurring working hour block."""
+    command = AddWorkingHoursCommand(
+        advisor_id=advisor_id,
+        day_of_week=request.day_of_week,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        timezone=request.timezone,
+    )
+    await command_handler.handle_add_working_hours(command)
+    return {'status': 'success', 'message': 'Working hours added'}
+
+
+@router.put('/working-hours/{wh_id}')
+async def update_working_hours(
+    wh_id: UUID,
+    request: WorkingHoursUpdate,
+    command_handler: Annotated[
+        ScheduleCommandHandler, Depends(get_schedule_command_handler),
+    ],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_WRITE))],
+) -> dict[str, str]:
+    """Update an existing working hour block."""
+    command = UpdateWorkingHoursCommand(
+        working_hours_id=wh_id,
+        day_of_week=request.day_of_week,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        timezone=request.timezone,
+    )
+    await command_handler.handle_update_working_hours(command)
+    return {'status': 'success', 'message': 'Working hours updated'}
+
+
+@router.delete('/working-hours/{wh_id}')
+async def delete_working_hours(
+    wh_id: UUID,
+    command_handler: Annotated[
+        ScheduleCommandHandler, Depends(get_schedule_command_handler),
+    ],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_WRITE))],
+) -> dict[str, str]:
+    """Delete a working hour block."""
+    command = DeleteWorkingHoursCommand(working_hours_id=wh_id)
+    await command_handler.handle_delete_working_hours(command)
+    return {'status': 'success', 'message': 'Working hours deleted'}
+
+
+@router.post('/{advisor_id}/days-off')
+async def add_day_off(
+    advisor_id: UUID,
+    request: DayOffCreate,
+    command_handler: Annotated[
+        ScheduleCommandHandler, Depends(get_schedule_command_handler),
+    ],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_WRITE))],
+) -> dict[str, str]:
+    """Add a specific day off."""
+    command = AddDayOffCommand(
+        advisor_id=advisor_id,
+        date=request.date,
+        reason=request.reason,
+    )
+    await command_handler.handle_add_day_off(command)
+    return {'status': 'success', 'message': 'Day off added'}
+
+
+@router.delete('/days-off/{do_id}')
+async def delete_day_off(
+    do_id: UUID,
+    command_handler: Annotated[
+        ScheduleCommandHandler, Depends(get_schedule_command_handler)
+    ],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_WRITE))],
+) -> dict[str, str]:
+    """Delete a day off."""
+    command = DeleteDayOffCommand(day_off_id=do_id)
+    await command_handler.handle_delete_day_off(command)
+    return {'status': 'success', 'message': 'Day off deleted'}
+
+
 @router.get('/leaderboard')
 async def get_leaderboard(
     query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
@@ -221,12 +349,11 @@ async def get_leaderboard(
     time_window: Annotated[
         RankingType,
         Query(
-            'all_time',
             pattern='^(weekly|monthly|semester|all_time)$',
         ),
-    ],
-    limit: Annotated[int, Query(10, ge=1, le=50)],
-    offset: Annotated[int, Query(0, ge=0)],
+    ] = RankingType.ALL_TIME,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PagedResponse[LeaderboardEntryDTO]:
     """Retrieve the advisor leaderboard based on gamification points."""
     try:

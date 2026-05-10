@@ -191,6 +191,15 @@ class UserIsNotAnAdvisorError(AdvisorError):
         super().__init__(f"account with ID '{user_id}' is not an advisor.")
 
 
+class WorkingHoursNotFoundError(AdvisorError):
+    """Raised when a working hours record is not found."""
+
+    def __init__(self, wh_id: UUID) -> None:
+        super().__init__(
+            _NOT_FOUND_MESSAGE_TEMPLATE.format(entity='WorkingHours', id=wh_id)
+        )
+
+
 class ValidationError(DomainError):
     """Raised when a domain invariant is violated."""
 

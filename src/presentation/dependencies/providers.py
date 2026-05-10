@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.commands.agent_commands import AgentCommandHandler
 from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
+from src.application.commands.schedule_commands import ScheduleCommandHandler
 from src.application.interfaces.advisor_metrics_query_service import (
     AdvisorMetricsQueryService,
 )
@@ -205,6 +206,13 @@ async def get_case_command_handler(
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
     return container.get_case_command_handler()
+
+
+async def get_schedule_command_handler(
+    container: Annotated[Container, Depends(get_container)],
+) -> ScheduleCommandHandler:
+    """Dependency provider for the ScheduleCommandHandler."""
+    return container.get_schedule_command_handler()
 
 
 async def get_advisor_query_handler(

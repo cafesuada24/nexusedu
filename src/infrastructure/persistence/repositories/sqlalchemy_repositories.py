@@ -10,6 +10,7 @@ from sqlalchemy import (
     String,
     case,
     cast,
+    delete,
     desc,
     distinct,
     func,
@@ -18,7 +19,6 @@ from sqlalchemy import (
     literal_column,
     quoted_name,
     select,
-    text,
     update,
 )
 
@@ -31,6 +31,7 @@ from src.domain.exceptions import (
     JobNotFoundError,
     StudentNotFoundError,
     UserIsNotAnAdvisorError,
+    WorkingHoursNotFoundError,
 )
 from src.domain.value_objects.status import (
     InterventionStatus,
@@ -68,7 +69,6 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from src.domain.entities.advisor import Advisor as DomainAdvisor
-    from src.domain.entities.appointment import Appointment as DomainAppointment
     from src.domain.entities.case import Case as DomainCase
     from src.domain.entities.intervention_email import (
         InterventionEmail as DomainInterventionEmail,
@@ -1044,6 +1044,15 @@ class SqlAlchemyScheduleRepository:
             DataMapper.to_domain_working_hours(wh) for wh in result.scalars().all()
         ]
 
+    async def get_working_hours_by_id(self, wh_id: uuid.UUID) -> DomainWorkingHours:
+        """Fetch a specific working hour block. Raises WorkingHoursNotFoundError if not found."""
+        stmt = select(OrmWorkingHours).where(OrmWorkingHours.id == wh_id)
+        result = await self.session.execute(stmt)
+        wh = result.scalar_one_or_none()
+        if not wh:
+            raise WorkingHoursNotFoundError(wh_id)
+        return DataMapper.to_domain_working_hours(wh)
+
     async def get_days_off(
         self,
         advisor_id: uuid.UUID,
@@ -1074,3 +1083,27 @@ class SqlAlchemyScheduleRepository:
         """Add a new day off."""
         orm_do = DataMapper.to_orm_day_off(day_off)
         self.session.add(orm_do)
+
+    async def update_working_hours(self, working_hours: DomainWorkingHours) -> None:
+        """Update an existing working hour block."""
+        stmt = (
+            update(OrmWorkingHours)
+            .where(OrmWorkingHours.id == working_hours.id)
+            .values(
+                day_of_week=working_hours.day_of_week,
+                start_time=working_hours.start_time,
+                end_time=working_hours.end_time,
+                timezone=working_hours.timezone,
+            )
+        )
+        await self.session.execute(stmt)
+
+    async def delete_working_hours(self, wh_id: uuid.UUID) -> None:
+        """Delete a working hour block."""
+        stmt = delete(OrmWorkingHours).where(OrmWorkingHours.id == wh_id)
+        await self.session.execute(stmt)
+
+    async def delete_day_off(self, do_id: uuid.UUID) -> None:
+        """Delete a day off."""
+        stmt = delete(OrmDayOff).where(OrmDayOff.id == do_id)
+        await self.session.execute(stmt)

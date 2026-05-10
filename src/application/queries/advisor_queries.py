@@ -7,10 +7,13 @@ from pydantic_extra_types.phone_numbers import PhoneNumber
 
 from src.application.dtos.advisor_dtos import (
     AdvisorProfileDTO,
+    AdvisorScheduleDTO,
     AvailabilitySlotDTO,
     BadgeDTO,
     GetAdvisorAvailabilityQuery,
     GetAdvisorProfileQuery,
+    GetAdvisorScheduleQuery,
+    GetUserAdvisorScheduleQuery,
     PersonalAdvisorMetricsDTO,
 )
 from src.application.dtos.gamification_dtos import (
@@ -28,6 +31,7 @@ from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
 )
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
+from src.domain.exceptions import UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
 
 
@@ -139,3 +143,25 @@ class AdvisorQueryHandler:
             )
             for slot in slots
         ]
+
+    async def handle_get_user_advisor_schedule(
+        self,
+        query: GetUserAdvisorScheduleQuery,
+    ) -> AdvisorScheduleDTO:
+        """Execute the get advisor schedule query."""
+        advisor = await self.__advisor_repo.find_by_user_id(query.user_id)
+        if advisor is None:
+            raise UserIsNotAnAdvisorError(query.user_id)
+
+        transfer_query = GetAdvisorScheduleQuery(advisor_id=advisor.advisor_id)
+        return await self.handle_get_advisor_schedule(transfer_query)
+
+    async def handle_get_advisor_schedule(
+        self,
+        query: GetAdvisorScheduleQuery,
+    ) -> AdvisorScheduleDTO:
+        """Execute the get advisor schedule query."""
+        return await self.__availability_query_service.get_advisor_schedule(
+            query.advisor_id
+        )
+
