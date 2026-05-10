@@ -919,30 +919,6 @@ export async function fetchAdvisorsLeaderboard(
 }
 
 /**
- * GET /advisors/engagement — returns engagement metrics by faculty/major.
- */
-export async function fetchAdvisorsEngagement(): Promise<
-    AdvisorEngagementItem[]
-> {
-    const res = await withTimeout(
-        (signal) =>
-            authFetch(
-                endpoint("/advisors/engagement"),
-                { method: "GET" },
-                signal,
-            ),
-        DEFAULT_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-        const errorBody = await res.json().catch(() => ({}));
-        const message = errorBody.detail || res.statusText;
-        throw new Error(`Không thể lấy dữ liệu tương tác: ${message}`);
-    }
-    const data = await res.json();
-    return z.array(AdvisorEngagementItemSchema).parse(data);
-}
-
-/**
  * GET /advisors/profile — returns current user's advisor profile.
  */
 export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
