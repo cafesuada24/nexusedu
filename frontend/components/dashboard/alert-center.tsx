@@ -22,7 +22,6 @@ import {
     setStudentConcern,
 } from "@/lib/awaiting-feedback";
 import { useAlerts, useUpdateAlertStatus } from "@/hooks/use-alerts";
-import { useSocketEvent } from "@/hooks/use-socket";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { useDataset } from "@/hooks/use-dataset";
@@ -85,61 +84,6 @@ export function AlertCenter() {
     const { data: remoteAlerts = [], isLoading } = useAlerts();
     const { mutate: updateStatus } = useUpdateAlertStatus();
     const queryClient = useQueryClient();
-
-    useSocketEvent<{ case_id: string; date: string; slot: string }>(
-        "new_appointment",
-        (data) => {
-            queryClient.setQueryData(
-                queryKeys.alerts.list(),
-                (old: any[] | undefined) => {
-                    if (!old) return [];
-                    return old.map((alert) =>
-                        alert.case_id === data.case_id
-                            ? { ...alert, intervention_status: "booked" }
-                            : alert,
-                    );
-                },
-            );
-
-            toast.success("Sinh viên vừa đặt lịch hẹn!", {
-                description: `Thời gian: ${data.date} lúc ${data.slot}`,
-            });
-        },
-    );
-
-    useSocketEvent<{
-        case_id: string;
-        resolved: boolean;
-        rating: number;
-        comment: string;
-    }>("student_feedback", async (payload) => {
-        if (payload.resolved) {
-            // Student already submitted via POST /cases/review which
-            // finalizes the case on the backend. Just clear the FE-only
-            // concern marker and refetch to pick up the new status.
-            clearStudentConcern(payload.case_id);
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.alerts.list(),
-            });
-            toast.success(
-                `Sinh viên xác nhận đã giải quyết · ${payload.rating}⭐`,
-                { description: payload.comment || undefined },
-            );
-        } else {
-            setStudentConcern(
-                payload.case_id,
-                payload.comment || "(Sinh viên không nêu lý do)",
-            );
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.alerts.list(),
-            });
-            toast.warning("Sinh viên báo chưa giải quyết xong", {
-                description:
-                    payload.comment || "Cần liên hệ lại với sinh viên.",
-                duration: 8000,
-            });
-        }
-    });
 
     const [localAlertState, setLocalAlertState] = React.useState<
         Record<string, { goals: Goal[] }>
