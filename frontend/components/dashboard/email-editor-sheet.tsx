@@ -50,11 +50,26 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
     } = useDraftStatus(alert?.caseId);
     const [subject, setSubject] = React.useState("");
     const [body, setBody] = React.useState("");
+    const [currentAlertId, setCurrentAlertId] = React.useState<string | null>(null);
+
+    const isSent = alert?.interventionStatus === "sent";
 
     // Initial load or background completion
     React.useEffect(() => {
-        if (alert) {
-            // If we don't have a body yet, but the background draft just finished, use it
+        if (!alert) {
+            if (currentAlertId !== null) setCurrentAlertId(null);
+            return;
+        }
+
+        if (alert.id !== currentAlertId) {
+            // New student opened - force override state with their specific data
+            const newSubject = alert.subject || alert.draftSubject || draft?.subject || "";
+            const newBody = alert.body || alert.draftBody || draft?.body || "";
+            setSubject(newSubject);
+            setBody(newBody);
+            setCurrentAlertId(alert.id);
+        } else {
+            // Same student - only fill in if fields are currently empty (e.g. background AI draft finished)
             const currentSubject =
                 subject ||
                 alert.subject ||
@@ -67,7 +82,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
             if (!subject && currentSubject) setSubject(currentSubject);
             if (!body && currentBody) setBody(currentBody);
         }
-    }, [alert, draft, subject, body]);
+    }, [alert, draft, subject, body, currentAlertId]);
 
     const reset = () => {
         if (draft?.body) {
@@ -103,10 +118,10 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                             </div>
                             <div>
                                 <SheetTitle className="font-serif text-xl">
-                                    Soạn thảo Email
+                                    {isSent ? "Nội dung Email (Chỉ đọc)" : "Soạn thảo Email"}
                                 </SheetTitle>
                                 <SheetDescription>
-                                    Gửi thông điệp hỗ trợ tới sinh viên
+                                    {isSent ? "Email đã được gửi cho sinh viên" : "Gửi thông điệp hỗ trợ tới sinh viên"}
                                 </SheetDescription>
                             </div>
                         </div>
@@ -114,19 +129,30 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                             variant="secondary"
                             className={cn(
                                 "rounded-md px-2.5 py-0.5 text-xs font-medium",
-                                isGenerating
-                                    ? "bg-primary/15 text-primary"
-                                    : body
-                                      ? "bg-success/15 text-success"
-                                      : "bg-muted text-muted-foreground",
+                                isSent 
+                                    ? "bg-success/15 text-success"
+                                    : isGenerating
+                                      ? "bg-primary/15 text-primary"
+                                      : body
+                                        ? "bg-success/15 text-success"
+                                        : "bg-muted text-muted-foreground",
                             )}
                         >
-                            <Sparkles className="mr-1 size-3" />
-                            {isGenerating
-                                ? "AI đang soạn..."
-                                : body
-                                  ? "Bản nháp đã sẵn sàng"
-                                  : "Chưa có bản nháp"}
+                            {isSent ? (
+                                <>
+                                    <Send className="mr-1 size-3" />
+                                    Đã gửi
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="mr-1 size-3" />
+                                    {isGenerating
+                                        ? "AI đang soạn..."
+                                        : body
+                                          ? "Bản nháp đã sẵn sàng"
+                                          : "Chưa có bản nháp"}
+                                </>
+                            )}
                         </Badge>
                     </div>
                 </SheetHeader>
@@ -136,7 +162,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                 </div>
 
                 <ScrollArea className="flex-1 overflow-y-auto px-6">
-                    <div className="grid gap-6 py-6">
+                    <div className={cn("grid gap-6 py-6", isSent && "opacity-80")}>
                         {/* Student Info Summary */}
                         <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border/60 bg-muted/30 p-4">
                             <div className="flex items-center gap-2">
@@ -163,7 +189,7 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                         <div className="grid gap-3">
                             <Label
                                 htmlFor="subject"
-                                className="text-sm font-semibold"
+                                className="text-sm font-semibold text-foreground/70"
                             >
                                 Tiêu đề Email
                             </Label>
@@ -171,8 +197,12 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 id="subject"
                                 value={subject}
                                 onChange={(e) => setSubject(e.target.value)}
+                                disabled={isSent}
                                 placeholder="VD: Trao đổi về tình hình học tập học kỳ này"
-                                className="h-11 rounded-xl border-border/60 focus-visible:ring-primary/20"
+                                className={cn(
+                                    "h-11 rounded-xl border-border/60 focus-visible:ring-primary/20",
+                                    isSent && "bg-muted/50 cursor-not-allowed opacity-70"
+                                )}
                             />
                         </div>
 
@@ -180,34 +210,36 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                             <div className="flex items-center justify-between">
                                 <Label
                                     htmlFor="body"
-                                    className="text-sm font-semibold"
+                                    className="text-sm font-semibold text-foreground/70"
                                 >
                                     Nội dung chi tiết
                                 </Label>
                                 <div className="flex items-center gap-2">
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={body ? "ghost" : "secondary"}
-                                        disabled={isGenerating}
-                                        onClick={onGenerateDraft}
-                                        className={cn(
-                                            "h-7 gap-1.5 px-2 text-[11px] font-medium",
-                                            !body && "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300",
-                                        )}
-                                    >
-                                        {isGenerating ? (
-                                            <>
-                                                <Loader2 className="size-3 animate-spin" />
-                                                AI đang soạn...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Sparkles className="size-3" />
-                                                {body ? "Tạo lại bằng AI" : "Tạo nội dung AI"}
-                                            </>
-                                        )}
-                                    </Button>
+                                    {!isSent && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant={body ? "ghost" : "secondary"}
+                                            disabled={isGenerating}
+                                            onClick={onGenerateDraft}
+                                            className={cn(
+                                                "h-7 gap-1.5 px-2 text-[11px] font-medium",
+                                                !body && "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300",
+                                            )}
+                                        >
+                                            {isGenerating ? (
+                                                <>
+                                                    <Loader2 className="size-3 animate-spin" />
+                                                    AI đang soạn...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="size-3" />
+                                                    {body ? "Tạo lại bằng AI" : "Tạo nội dung AI"}
+                                                </>
+                                            )}
+                                        </Button>
+                                    )}
                                     <span className="text-[11px] text-muted-foreground">
                                         {body.split(/\s+/).filter(Boolean).length}{" "}
                                         từ
@@ -218,28 +250,34 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                                 id="body"
                                 value={body}
                                 onChange={(e) => setBody(e.target.value)}
+                                disabled={isSent}
                                 placeholder={
                                     isGenerating
                                         ? "Hệ thống đang phân tích kết quả học tập để soạn thư hỗ trợ phù hợp..."
                                         : "Nhập nội dung email tại đây..."
                                 }
-                                className="min-h-[400px] resize-none rounded-2xl border-border/60 p-4 font-sans text-base leading-relaxed focus-visible:ring-primary/20"
+                                className={cn(
+                                    "min-h-[400px] resize-none rounded-2xl border-border/60 p-4 font-sans text-base leading-relaxed focus-visible:ring-primary/20",
+                                    isSent && "bg-muted/50 cursor-not-allowed opacity-70"
+                                )}
                             />
-                            <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
-                                <p className="text-[11px] text-muted-foreground italic">
-                                    Mẹo: Nên bắt đầu bằng lời hỏi thăm chân
-                                    thành trước khi đề cập đến kết quả học tập.
-                                </p>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={reset}
-                                    className="h-7 gap-1.5 px-2 text-[11px] font-medium hover:bg-primary/10 hover:text-primary"
-                                >
-                                    <RotateCcw className="size-3" />
-                                    Khôi phục AI
-                                </Button>
-                            </div>
+                            {!isSent && (
+                                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                                    <p className="text-[11px] text-muted-foreground italic">
+                                        Mẹo: Nên bắt đầu bằng lời hỏi thăm chân
+                                        thành trước khi đề cập đến kết quả học tập.
+                                    </p>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={reset}
+                                        className="h-7 gap-1.5 px-2 text-[11px] font-medium hover:bg-primary/10 hover:text-primary"
+                                    >
+                                        <RotateCcw className="size-3" />
+                                        Khôi phục AI
+                                    </Button>
+                                </div>
+                            )}
                         </div>
 
                         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
@@ -284,8 +322,13 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                         Đóng
                     </Button>
                     <Button
-                        disabled={isGenerating || !body.trim()}
-                        className="h-11 rounded-xl bg-primary px-8 font-semibold shadow-lg shadow-primary/20 hover:bg-primary/90"
+                        disabled={isSent || isGenerating || !body.trim()}
+                        className={cn(
+                            "h-11 rounded-xl px-8 font-semibold shadow-lg transition-all",
+                            isSent 
+                                ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none" 
+                                : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
+                        )}
                         onClick={() => {
                             if (!alert) return;
                             const fullUrl = `https://${displayUrl}`;
@@ -295,8 +338,17 @@ export function EmailEditorSheet({ alert, onClose, onSave, onGenerateDraft, isAi
                             onSave({ ...alert, subject, body: finalBody });
                         }}
                     >
-                        <Send className="mr-2 size-4" />
-                        Lưu & Sẵn sàng gửi
+                        {isSent ? (
+                            <>
+                                <Send className="mr-2 size-4" />
+                                Đã sẵn sàng gửi
+                            </>
+                        ) : (
+                            <>
+                                <Send className="mr-2 size-4" />
+                                Lưu & Sẵn sàng gửi
+                            </>
+                        )}
                     </Button>
                 </SheetFooter>
             </SheetContent>
