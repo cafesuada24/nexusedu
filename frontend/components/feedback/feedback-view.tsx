@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { useSocket } from "@/hooks/use-socket"
 import { submitFeedback, type StudentSatisfaction } from "@/lib/api"
 
 const RATING_LABELS = ["", "Không hài lòng", "Tạm được", "Ổn", "Hài lòng", "Rất hài lòng"]
@@ -52,20 +51,7 @@ export function FeedbackView({ token }: { token: string }) {
   const [comment, setComment] = React.useState("")
   const [submitting, setSubmitting] = React.useState<Submitting>("none")
   const [stage, setStage] = React.useState<Stage>("form")
-  const socket = useSocket()
-
   const active = hovered || rating
-
-  const emit = (resolved: boolean) => {
-    socket.emit("student_feedback", {
-      token,
-      case_id: caseId,
-      resolved,
-      rating,
-      comment: comment.trim(),
-      submitted_at: Math.floor(Date.now() / 1000),
-    })
-  }
 
   const handleResolved = async () => {
     if (rating === 0) {
@@ -74,7 +60,6 @@ export function FeedbackView({ token }: { token: string }) {
     }
     setSubmitting("resolved")
     try {
-      emit(true)
       await submitFeedback(token, toSatisfaction(rating, true), comment.trim() || null)
       await new Promise((r) => setTimeout(r, 400))
       setStage("done_resolved")
@@ -91,7 +76,6 @@ export function FeedbackView({ token }: { token: string }) {
     }
     setSubmitting("unresolved")
     try {
-      emit(false)
       await submitFeedback(token, toSatisfaction(0, false), comment.trim())
       await new Promise((r) => setTimeout(r, 400))
       setStage("done_unresolved")
