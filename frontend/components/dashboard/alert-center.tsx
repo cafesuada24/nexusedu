@@ -362,27 +362,26 @@ export function AlertCenter() {
             return;
         }
         try {
-            // If no AI draft yet (UNAVAILABLE), PATCH sets content + status to DRAFT.
-            // Skip PATCH when draftBody already exists (email is already DRAFT from AI).
-            if (!a.draftBody) {
-                try {
-                    await updateEmailDraft(caseId, {
-                        subject: emailSubject,
-                        body: emailBody,
+            // Always update the email draft with the current local content before sending
+            // to ensure manual edits are persisted.
+            try {
+                await updateEmailDraft(caseId, {
+                    subject: emailSubject,
+                    body: emailBody,
+                });
+            } catch (patchErr: any) {
+                if (
+                    patchErr.message?.toLowerCase().includes("generating")
+                ) {
+                    toast.error("AI đang soạn thảo", {
+                        description:
+                            "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
                     });
-                } catch (patchErr: any) {
-                    if (
-                        patchErr.message?.toLowerCase().includes("generating")
-                    ) {
-                        toast.error("AI đang soạn thảo", {
-                            description:
-                                "Vui lòng đợi AI hoàn thành nội dung trước khi gửi.",
-                        });
-                        return;
-                    }
-                    throw patchErr;
+                    return;
                 }
+                throw patchErr;
             }
+            
             await sendNudge(caseId, { body: emailBody });
             setEmailTargetId(null);
             toast.success(`Đã gửi email cho ${a.name}`, {
