@@ -17,13 +17,22 @@ from src.domain.entities.point_ledger import (
 from src.domain.entities.point_ledger import (
     PointLedgerEntry as DomainLedgerEntry,
 )
+from src.domain.entities.schedule import DayOff as DomainDayOff
+from src.domain.entities.schedule import WorkingHours as DomainWorkingHours
 from src.domain.entities.student import Student as DomainStudent
 from src.domain.value_objects.status import (
     EmailStatus,
+    MeetingMethod,
     RiskStatus,
 )
 from src.infrastructure.database.models import (
     Advisor as OrmAdvisor,
+)
+from src.infrastructure.database.models import (
+    AdvisorDayOff as OrmDayOff,
+)
+from src.infrastructure.database.models import (
+    AdvisorWorkingHours as OrmWorkingHours,
 )
 from src.infrastructure.database.models import (
     Appointment as OrmAppointment,
@@ -93,6 +102,50 @@ class DataMapper:
         )
 
     @staticmethod
+    def to_domain_working_hours(orm_wh: OrmWorkingHours) -> DomainWorkingHours:
+        """Map ORM WorkingHours to Domain WorkingHours."""
+        return DomainWorkingHours(
+            id=orm_wh.id,
+            advisor_id=orm_wh.advisor_id,
+            day_of_week=orm_wh.day_of_week,
+            start_time=orm_wh.start_time,
+            end_time=orm_wh.end_time,
+            timezone=orm_wh.timezone,
+        )
+
+    @staticmethod
+    def to_orm_working_hours(domain_wh: DomainWorkingHours) -> OrmWorkingHours:
+        """Map Domain WorkingHours to ORM WorkingHours."""
+        return OrmWorkingHours(
+            id=domain_wh.id,
+            advisor_id=domain_wh.advisor_id,
+            day_of_week=domain_wh.day_of_week,
+            start_time=domain_wh.start_time,
+            end_time=domain_wh.end_time,
+            timezone=domain_wh.timezone,
+        )
+
+    @staticmethod
+    def to_domain_day_off(orm_do: OrmDayOff) -> DomainDayOff:
+        """Map ORM DayOff to Domain DayOff."""
+        return DomainDayOff(
+            id=orm_do.id,
+            advisor_id=orm_do.advisor_id,
+            date=orm_do.date,
+            reason=orm_do.reason,
+        )
+
+    @staticmethod
+    def to_orm_day_off(domain_do: DomainDayOff) -> OrmDayOff:
+        """Map Domain DayOff to ORM DayOff."""
+        return OrmDayOff(
+            id=domain_do.id,
+            advisor_id=domain_do.advisor_id,
+            date=domain_do.date,
+            reason=domain_do.reason,
+        )
+
+    @staticmethod
     def to_domain_advisor(orm_advisor: OrmAdvisor) -> DomainAdvisor:
         """Map ORM Advisor to Domain Advisor."""
         return DomainAdvisor(
@@ -157,6 +210,26 @@ class DataMapper:
             assigned_at=orm_case.assigned_at,
             assigned_advisor_id=orm_case.assigned_advisor_id,
             version=orm_case.version,
+            appointment=DataMapper.to_domain_appointment(orm_case.appointment)
+            if orm_case.appointment
+            else None,
+        )
+
+    @staticmethod
+    def to_orm_case(domain_case: DomainCase) -> OrmCase:
+        """Map Domain Case to ORM Case."""
+        return OrmCase(
+            case_id=domain_case.case_id,
+            sid=domain_case.sid,
+            intervention_status=domain_case.intervention_status,
+            created_at=domain_case.created_at,
+            assigned_at=domain_case.assigned_at,
+            closed_at=domain_case.closed_at,
+            version=domain_case.version,
+            assigned_advisor_id=domain_case.assigned_advisor_id,
+            appointment=DataMapper.to_orm_appointment(domain_case.appointment)
+            if domain_case.appointment
+            else None,
         )
 
     @staticmethod
@@ -171,17 +244,3 @@ class DataMapper:
             started_at=orm_case.started_at,
             ended_at=orm_case.completed_at,
         )
-
-    # @staticmethod
-    # def to_domain_task(orm_task: OrmTask) -> DomainTask:
-    #     """Map ORM Task to Domain Task."""
-    #     return DomainTask(
-    #         task_id=orm_task.task_id,
-    #         case_id=orm_task.case_id,
-    #         action_type=TaskType(orm_task.action_type),
-    #         status=TaskStatus(orm_task.status),
-    #         points_reward=orm_task.points_reward,
-    #         created_at=orm_task.created_at,
-    #         completed_at=orm_task.completed_at,
-    #         completed_by_advisor_id=orm_task.completed_by_advisor_id,
-    #     )
