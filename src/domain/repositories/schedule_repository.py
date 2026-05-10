@@ -14,6 +14,10 @@ class ScheduleRepository(Protocol):
         """Fetch all recurring working hour blocks for an advisor."""
         ...
 
+    async def get_working_hours_by_id(self, wh_id: UUID) -> WorkingHours:
+        """Fetch a specific working hour block. Raises WorkingHoursNotFoundError if not found."""
+        ...
+
     async def get_days_off(
         self,
         advisor_id: UUID,
