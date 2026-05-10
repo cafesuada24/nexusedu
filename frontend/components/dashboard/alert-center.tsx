@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GoalsDialog, type Goal } from "@/components/dashboard/goals-dialog";
 import { type Problem, type StudentRow } from "@/lib/csv";
 import {
-    fetchStudentCases,
     generateAiDraftForAlert,
     ingestData,
     sendNudge,
