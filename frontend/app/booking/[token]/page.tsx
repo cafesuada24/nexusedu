@@ -4,16 +4,7 @@ import { BookingView } from "@/components/booking/booking-view"
 import { PublicBookingHeader } from "@/components/booking/public-header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-
-const advisors: Record<
-  string,
-  { advisor: string; role: string; student?: string }
-> = {
-  "le-ha": {
-    advisor: "TS. Lê Hà",
-    role: "Cố vấn học tập · Khoa CNTT",
-  },
-}
+import { ADVISOR_META, DEFAULT_ADVISOR_META } from "@/lib/static-content"
 
 export default async function PublicBookingPage({
   params,
@@ -25,13 +16,9 @@ export default async function PublicBookingPage({
   const { token } = await params
   const { cid } = await searchParams
 
-  const meta = advisors[token] ?? {
-    advisor: "Cố vấn học tập",
-    role: "NexusEdu",
-  }
+  const meta = ADVISOR_META[token] ?? DEFAULT_ADVISOR_META
 
   const caseId = typeof cid === "string" ? cid : undefined
-  const studentName = undefined // Mock student lookup by SID is deprecated here
 
 
   if (!caseId) {
@@ -74,8 +61,7 @@ export default async function PublicBookingPage({
               Lời mời cá nhân từ cố vấn của bạn
             </Badge>
             <h1 className="font-serif text-3xl font-bold tracking-tight text-balance md:text-4xl">
-              Chào {studentName || "bạn"}, hãy chọn một khung giờ phù hợp với{" "}
-              {meta.advisor}
+              Chào bạn, hãy chọn một khung giờ phù hợp với {meta.advisor}
             </h1>
             <p className="max-w-2xl text-sm text-muted-foreground text-pretty md:text-base">
               Buổi gặp kéo dài khoảng 30 phút — hoàn toàn tự nguyện, riêng tư,
@@ -85,7 +71,6 @@ export default async function PublicBookingPage({
 
           <BookingView
             caseId={caseId}
-            studentName={studentName}
             advisorToken={token}
           />
 

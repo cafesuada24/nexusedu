@@ -4,13 +4,7 @@ import { Button } from "@/components/ui/button"
 import { FeedbackView } from "@/components/feedback/feedback-view"
 import { PublicBookingHeader } from "@/components/booking/public-header"
 import Link from "next/link"
-
-const ADVISOR_META: Record<string, { advisor: string; role: string }> = {
-  "le-ha": {
-    advisor: "TS. Lê Hà",
-    role: "Cố vấn học tập · Khoa CNTT",
-  },
-}
+import { ADVISOR_META, DEFAULT_ADVISOR_META } from "@/lib/static-content"
 
 function decodeJwtPayload(
   token: string,
