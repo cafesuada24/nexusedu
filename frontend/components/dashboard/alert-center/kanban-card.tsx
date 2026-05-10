@@ -114,7 +114,7 @@ function KanbanCardInner({
                         {isEmailSent && (
                             <div 
                                 className="flex size-5 shrink-0 items-center justify-center rounded-full bg-success/20 text-success"
-                                title="Đã gửi email"
+                                title="Đã được gửi"
                             >
                                 <CheckCircle2 className="size-3.5" />
                             </div>
@@ -217,6 +217,10 @@ function KanbanCardInner({
                 </p>
             ) : a.status === "accepted" && aiDraftError ? (
                 <p className="mt-3 text-[13px] text-destructive">{aiDraftError}</p>
+            ) : isEmailSent ? (
+                <p className="mt-3 text-[13px] text-success font-medium">
+                    Đã được gửi.
+                </p>
             ) : a.status === "accepted" && (isAiDraftReady || a.draftSubject) ? (
                 <p className="mt-3 text-[13px] text-success">
                     Bản nháp đã sẵn sàng.
