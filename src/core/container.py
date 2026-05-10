@@ -277,7 +277,6 @@ class Container:
     def get_advisor_query_handler(self) -> AdvisorQueryHandler:
         return AdvisorQueryHandler(
             advisor_repo=self.advisor_repo,
-            schedule_repo=self.schedule_repo,
             point_ledger_query_service=self.point_ledger_query_service,
             gamification_query_service=self.gamification_query_service,
             advisor_metrics_query_service=self.advisor_metrics_query_service,
