@@ -3,7 +3,7 @@ import os
 import random
 import sys
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -13,24 +13,25 @@ project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from dateutil import parser
-from src.infrastructure.database.models import (
-    Activity,
-    Advisor,
-    Base,
-    Case,
-    PointLedger,
-    Student,
-    Task,
-    User,
-)
-from src.infrastructure.database.session import async_session_maker, engine
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
     SqlAlchemyUserSettingsRepository,
 )
+
+from src.infrastructure.database.models import (
+    Activity,
+    Advisor,
+    AdvisorWorkingHours,
+    Base,
+    Case,
+    PointLedger,
+    Student,
+    User,
+)
+from src.infrastructure.database.session import async_session_maker, engine
 from src.presentation.api.auth import SQLAlchemyUserDatabase, UserManager, UserRole
 from src.presentation.schemas.auth import UserCreate
 
@@ -57,7 +58,17 @@ async def reseed() -> None:
     print('Importing students...')
     stu_df = pd.read_csv('data/v2_students.csv')
     students = [
-        Student(**{**row, 'sid': uuid.UUID(row['sid']), 'last_notified_timestamp':  parser.parse(row['last_notified_timestamp'])})
+        Student(
+            **{
+                **row,
+                'sid': uuid.UUID(row['sid']),
+                'last_notified_timestamp': (
+                    parser.parse(row['last_notified_timestamp'])
+                    if isinstance(row.get('last_notified_timestamp'), str)
+                    else None
+                ),
+            },
+        )
         for row in stu_df.to_dict(orient='records')
     ]
 
@@ -71,7 +82,7 @@ async def reseed() -> None:
                 'activity_id': uuid.UUID(row['activity_id']),
                 'sid': uuid.UUID(row['sid']),
                 'timestamp': parser.parse(row['timestamp']),
-            }
+            },
         )
         for row in act_df.to_dict(orient='records')
     ]
@@ -81,32 +92,52 @@ async def reseed() -> None:
         session.add_all(students)
         session.add_all(activities)
 
+        # Seed default working hours for all advisors
+        print('Seeding default working hours (Mon-Fri, 9:00-11:00)...')
+        for advisor in advisors:
+            for day in range(5):
+                session.add(
+                    AdvisorWorkingHours(
+                        id=uuid.uuid4(),
+                        advisor_id=advisor.advisor_id,
+                        day_of_week=day,
+                        start_time=time(9, 0),
+                        end_time=time(11, 0),
+                        timezone='UTC',
+                    ),
+                )
+
         # Create default admin user
         print('Creating default admin user (admin@example.com / password123)...')
         user_db = SQLAlchemyUserDatabase(session, User)
         user_settings_repo = SqlAlchemyUserSettingsRepository(session)
         advisor_repo = SqlAlchemyAdvisorRepository(session)
-        user_manager = UserManager(user_db, user_settings_repo, advisor_repo)
+        # Use Outbox for event publishing during seeding to avoid errors
+        from src.application.services.event_publisher import TaskQueueEventPublisher
+        from src.infrastructure.queue.outbox_adapter import TransactionalOutboxAdapter
+        event_publisher = TaskQueueEventPublisher(TransactionalOutboxAdapter(session))
+        user_manager = UserManager(user_db, user_settings_repo, advisor_repo, event_publisher)
         user = await user_manager.create(
-            UserCreate(email='dev@example.com', password='dev'), safe=True
+            UserCreate(email='dev@example.com', password='dev'), safe=True,
         )
         adv = await user_manager.create(
-            UserCreate(email='adv@example.com', password='adv'), safe=True
+            UserCreate(email='adv@example.com', password='adv'), safe=True,
         )
         # Update role to admin
         from sqlalchemy import update
 
         await session.execute(
-            update(User).where(User.id == user.id).values(role=UserRole.ADMIN.value)
+            update(User).where(User.id == user.id).values(role=UserRole.ADMIN.value),
         )
         await session.execute(
-            update(User).where(User.id == adv.id).values(role=UserRole.ADVISOR.value)
+            update(User).where(User.id == adv.id).values(role=UserRole.ADVISOR.value),
         )
 
         await session.commit()
 
         print('Running anomaly detection...')
         from collections import defaultdict
+
         from src.domain.services.anomaly_engine.zscore import ZScore
         from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
@@ -131,7 +162,7 @@ async def reseed() -> None:
         # 3. Call the pure domain service
         anomaly_engine = ZScore()
         new_history_records, risk_statuses = anomaly_engine.run(
-            student_data, history_set
+            student_data, history_set,
         )
 
         # 4. Persist new history records
@@ -148,26 +179,19 @@ async def reseed() -> None:
             if not student:
                 continue
 
-            if student.intervention_status in (
-                InterventionStatus.NONE,
-                InterventionStatus.RESOLVED,
-            ):
-                await student_repo.update_risk_status(
-                    sid,
-                    risk_status=latest_risk,
-                    intervention_status=InterventionStatus.NOTIFIED,
-                )
-                new_at_risk_sids.append(sid)
-            else:
-                await student_repo.update_risk_status(sid, risk_status=latest_risk)
+            # In the current model, intervention_status is on Case, not Student.
+            # Use 'save' method which exists in the repository
+            student.current_risk_status = latest_risk
+            await student_repo.save(student)
+            new_at_risk_sids.append(sid)
 
         print(
-            f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk."
+            f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk.",
         )
 
         print('Seeding cases and tasks...')
         # Create cases for at-risk students
-        from src.domain.value_objects.status import CaseStatus, TaskStatus, TaskType
+        from src.domain.value_objects.status import InterventionStatus, TaskStatus
 
         cases = []
         tasks = []
@@ -178,52 +202,49 @@ async def reseed() -> None:
                 Case(
                     case_id=case_id,
                     sid=sid,
-                    status=CaseStatus.OPEN.value,
+                    intervention_status=InterventionStatus.NEW,
                     assigned_advisor_id=advisor.advisor_id,
-                )
+                ),
             )
 
-            # Standard tasks
-            standard_tasks = [
-                (TaskType.SEND_EMAIL.value, 10),
-                (TaskType.STUDENT_BOOK.value, 20),
-                (TaskType.RESOLVE_CASE.value, 50),
-                (TaskType.REVIEW_DRAFT.value, 5),
-            ]
-            for action_type, points in standard_tasks:
-                tasks.append(
-                    Task(
-                        task_id=uuid.uuid4(),
-                        case_id=case_id,
-                        action_type=action_type,
-                        status=TaskStatus.PENDING.value,
-                        points_reward=points,
-                    )
-                )
+            # Standard tasks (simulated, no Task model)
+            # standard_tasks = [
+            #     ('send_email', 10),
+            #     ('student_book', 20),
+            #     ('resolve_case', 50),
+            #     ('review_draft', 5),
+            # ]
+            # for action_type, points in standard_tasks:
+            #     tasks.append(
+            #         Task(
+            #             task_id=uuid.uuid4(),
+            #             case_id=case_id,
+            #             action_type=action_type,
+            #             status=TaskStatus.PENDING.value,
+            #             points_reward=points,
+            #         ),
+            #     )
 
         session.add_all(cases)
-        session.add_all(tasks)
+        # session.add_all(tasks)  # Task model is currently disabled
         await session.flush()  # To get task IDs if needed
 
         print('Seeding point ledger...')
         ledger_entries = []
-        # Complete some random tasks
-        completed_tasks = random.sample(tasks, min(len(tasks), 50))
-        for t in completed_tasks:
-            case_obj = next(c for c in cases if c.case_id == t.case_id)
+        # Complete some random tasks (simulated by adding points)
+        for _ in range(20):
+            case_obj = random.choice(cases)
             aid = case_obj.assigned_advisor_id
-            t.status = TaskStatus.COMPLETED.value
-            t.completed_at = datetime.now(UTC) - timedelta(days=random.randint(0, 7))
-            t.completed_by_advisor_id = aid
-
+            
             ledger_entries.append(
                 PointLedger(
                     id=uuid.uuid4(),
                     advisor_id=aid,
-                    task_id=t.task_id,
-                    points=t.points_reward,
-                    earned_at=t.completed_at,
-                )
+                    case_id=case_obj.case_id,
+                    action='system_seeded_intervention',
+                    points=random.randint(5, 50),
+                    earned_at=datetime.now(UTC) - timedelta(days=random.randint(0, 7)),
+                ),
             )
 
         session.add_all(ledger_entries)

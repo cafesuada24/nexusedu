@@ -1,13 +1,14 @@
+import os
 import sqlite3
 import sys
-import os
 from urllib.parse import urlparse
+
 
 def dump_users() -> None:
     """Dumps user data from the local SQLite database."""
     # Respect DATABASE_URL if set, otherwise default to data/app.db
     db_url = os.environ.get('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db')
-    
+
     # Parse the SQLite path from the URL
     if db_url.startswith('sqlite'):
         # Handle sqlite+aiosqlite:///./data/app.db or sqlite:///data/app.db
@@ -17,18 +18,18 @@ def dump_users() -> None:
     else:
         print(f"Error: DATABASE_URL {db_url} is not a SQLite database.")
         return
-    
+
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('SELECT id, email, is_active, role FROM user')
         users = cursor.fetchall()
-        
+
         print('ID | Email | Active | Role')
         print('-' * 60)
         for u in users:
             print(f'{u[0]} | {u[1]} | {u[2]} | {u[3]}')
-            
+
     except sqlite3.OperationalError as e:
         print(f'Error: Could not open database at {db_path}. Ensure it exists.')
         print(f'Details: {e}')
