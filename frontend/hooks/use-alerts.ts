@@ -20,19 +20,6 @@ import React from "react";
 
 import { useAuth } from "@/hooks/use-auth";
 import { getAllStudentConcerns } from "@/lib/awaiting-feedback";
-import type { Appointment } from "@/lib/appointments";
-
-const PRE_BOOKED_STATUSES = new Set(["new", "accepted", "sent"]);
-
-async function fetchAppointments(): Promise<Appointment[]> {
-    try {
-        const res = await fetch("/api/appointments", { cache: "no-store" });
-        if (!res.ok) return [];
-        return (await res.json()) as Appointment[];
-    } catch {
-        return [];
-    }
-}
 
 /**
  * Hook to fetch the list of alerts (at-risk students).
@@ -54,53 +41,30 @@ export function useAlerts() {
                 "[useAlerts] Fetching open and assigned cases...",
             );
             try {
-                // Fetch open and assigned cases + appointments in parallel
-                const [openRes, assignedRes, appointments] = await Promise.all([
+                const [openRes, assignedRes] = await Promise.all([
                     fetchOpenCases(100, 0),
                     fetchAssignedCases(100, 0),
-                    fetchAppointments(),
                 ]);
 
                 const allItems = [...openRes.items, ...assignedRes.items];
-
                 const concerns = getAllStudentConcerns();
-                const bookedCaseIds = new Set(
-                    appointments.map((a) => a.caseId),
-                );
 
-                // Map cases to the unified alert shape expected by the UI
-                const enriched = allItems.map((c) => {
-                    const backendStatus = (
-                        c.intervention_status || ""
-                    ).toLowerCase();
-                    // If the student has booked a slot via /api/appointments,
-                    // surface the case as "booked" — but only when the backend
-                    // hasn't already moved past BOOKED (supporting /
-                    // pending_review / resolved take precedence).
-                    const appointmentOverride =
-                        bookedCaseIds.has(c.case_id) &&
-                        PRE_BOOKED_STATUSES.has(backendStatus)
-                            ? "booked"
-                            : null;
-
-                    return {
-                        sid: c.sid,
-                        student_name: c.student_name,
-                        email: c.email || "",
-                        current_risk_status: c.current_risk_status,
-                        intervention_status:
-                            appointmentOverride ?? c.intervention_status,
-                        student_concern: concerns[c.case_id] ?? null,
-                        active_case_id: c.case_id,
-                        case_id: c.case_id,
-                        assigned_advisor_id: c.assigned_advisor_id,
-                        assigned_to: c.assigned_to,
-                        draft_subject: c.draft_subject || null,
-                        draft_body: c.draft_body || null,
-                        draft_status: c.draft_status || null,
-                        is_generating: c.draft_status === "generating",
-                    };
-                });
+                const enriched = allItems.map((c) => ({
+                    sid: c.sid,
+                    student_name: c.student_name,
+                    email: c.email || "",
+                    current_risk_status: c.current_risk_status,
+                    intervention_status: c.intervention_status,
+                    student_concern: concerns[c.case_id] ?? null,
+                    active_case_id: c.case_id,
+                    case_id: c.case_id,
+                    assigned_advisor_id: c.assigned_advisor_id,
+                    assigned_to: c.assigned_to,
+                    draft_subject: c.draft_subject || null,
+                    draft_body: c.draft_body || null,
+                    draft_status: c.draft_status || null,
+                    is_generating: c.draft_status === "generating",
+                }));
 
                 console.log(
                     "[useAlerts] Unified alerts from cases:",
