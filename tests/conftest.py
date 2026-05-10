@@ -25,7 +25,6 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
 )
 from src.presentation.api.auth import User, UserRole, current_active_user
 from src.presentation.api.main import app
-from src.presentation.dependencies.providers import get_agent
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
@@ -68,12 +67,6 @@ def mock_baml(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     # Core API and Infrastructure components
     monkeypatch.setattr('src.presentation.api.routes.health.b', mock_b)
     monkeypatch.setattr('src.infrastructure.extern.baml_drafting_service.b_async', mock_b)
-    monkeypatch.setattr('src.infrastructure.agents.nodes.sql_worker.b', mock_b)
-
-    # Agent Nodes (New Clean Architecture paths)
-    monkeypatch.setattr('src.infrastructure.agents.nodes.planner.b', mock_b)
-    monkeypatch.setattr('src.infrastructure.agents.nodes.responder.b', mock_b)
-    monkeypatch.setattr('src.infrastructure.agents.nodes.email_agent.b', mock_b)
 
     return mock_b
 
@@ -91,23 +84,6 @@ def mock_arq_pool(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
         AsyncMock(return_value=mock_pool),
     )
     return mock_pool
-
-
-@pytest.fixture
-def mock_agent() -> MagicMock:
-    """Provides a MagicMock for the LangGraph agent."""
-    agent = MagicMock()
-    agent.ainvoke = AsyncMock(
-        return_value={
-            'messages': [
-                {
-                    'role': 'assistant',
-                    'content': 'Hello {{STUDENT_NAME}}, this is an AI draft.',
-                },
-            ],
-        },
-    )
-    return agent
 
 
 @pytest.fixture
@@ -150,12 +126,6 @@ def student_repository(test_db_session: AsyncSession) -> StudentRepository:
 def advisor_repository(test_db_session: AsyncSession) -> AdvisorRepository:
     """Provides a SqlAlchemyAdvisorRepository."""
     return SqlAlchemyAdvisorRepository(test_db_session)
-
-
-@pytest.fixture
-def alert_repository(test_db_session: AsyncSession) -> AlertRepository:
-    """Provides a SqlAlchemyAlertRepository."""
-    return SqlAlchemyAlertRepository(test_db_session)
 
 
 @pytest.fixture
@@ -202,12 +172,10 @@ def idempotency_repository(test_db_session: AsyncSession) -> IdempotencyReposito
 
 @pytest.fixture
 def client(
-    mock_agent: MagicMock,
     mock_user: User,
     test_db_session: AsyncSession,
 ) -> Generator[TestClient, None, None]:
     """Provides a FastAPI TestClient with mocked dependencies."""
-    app.dependency_overrides[get_agent] = lambda: mock_agent
     app.dependency_overrides[current_active_user] = lambda: mock_user
     app.dependency_overrides[get_async_session] = lambda: test_db_session
 

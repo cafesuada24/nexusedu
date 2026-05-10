@@ -4,10 +4,8 @@ from functools import cached_property
 from typing import Any
 
 from arq import ArqRedis
-from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.commands.agent_commands import AgentCommandHandler
 from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.commands.schedule_commands import ScheduleCommandHandler
@@ -28,7 +26,6 @@ from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
-from src.application.services.agent_metadata import AgentMetadataService
 from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -102,12 +99,10 @@ class Container:
         self,
         session: AsyncSession,
         redis_pool: ArqRedis | None = None,
-        agent: CompiledStateGraph[Any, Any, Any] | None = None,
     ) -> None:
         """Initialize the container with core resources."""
         self.session = session
         self.redis_pool = redis_pool
-        self.agent = agent
 
     # Repositories
     @cached_property
@@ -213,10 +208,6 @@ class Container:
     def event_publisher(self) -> TaskQueueEventPublisher:
         return TaskQueueEventPublisher(self.task_queue)
 
-    @cached_property
-    def agent_metadata_service(self) -> AgentMetadataService:
-        return AgentMetadataService(self.metadata_repo)
-
     # Query Services
     @cached_property
     def point_ledger_query_service(self) -> PointLedgerQueryService:
@@ -271,15 +262,6 @@ class Container:
             self.case_repo,
             self.job_repo,
             self.anomaly_engine,
-        )
-
-    def get_agent_command_handler(self) -> AgentCommandHandler:
-        if self.agent is None:
-            raise ValueError('Agent is required for AgentCommandHandler.')
-        return AgentCommandHandler(
-            self.agent,
-            self.agent_metadata_service,
-            self.idempotency_repo,
         )
 
     # Query Handlers

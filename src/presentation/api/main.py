@@ -23,7 +23,6 @@ from src.presentation.api.routes import (
     health,
     jobs,
     metrics,
-    query,
     students,
     users,
 )
@@ -31,7 +30,7 @@ from src.presentation.schemas.auth import UserCreate, UserRead
 
 app = FastAPI(
     title='Agent Assistant API',
-    description='API to interact with the LangGraph Agent for data analysis and visualization.',
+    description='API for student intervention and performance tracking.',
     version='1.0.0',
     lifespan=lifespan,
 )
@@ -146,7 +145,6 @@ async def root() -> dict[str, str]:
 # Include routers
 api_v1_router.include_router(health.router)
 api_v1_router.include_router(jobs.router)
-api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(cases.router)
 api_v1_router.include_router(advisors.router)

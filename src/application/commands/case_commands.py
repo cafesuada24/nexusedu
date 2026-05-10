@@ -27,6 +27,8 @@ from src.domain.exceptions import (
     EmailUnavailableError,
     InvalidActionError,
     JobNotFoundError,
+    MissingPerformanceDataError,
+    StudentNameMissingError,
     TimeSlotUnavailableError,
     UserIsNotAnAdvisorError,
 )
@@ -229,19 +231,24 @@ class CaseCommandHandler:
         await self.email_repo.save(email)
 
         student_data = await self.student_repo.get_by_id(case.sid)
+        if not student_data.student_name:
+            raise StudentNameMissingError(case.sid)
 
-        # 2. Fetch performance data
+        # 2. Fetch performance data (Deterministic Fetching)
         perf_raw = await self.student_repo.get_recent_performance(case.sid)
+        if not perf_raw:
+            raise MissingPerformanceDataError(case.sid)
+
         history_lines = [
             f'Year {p["yr"]} Sem {p["sem"]} Week {p["wk"]}: Score {p["score"]} ({p["status"]})'
             for p in perf_raw
         ]
         context_str = 'Trend: ' + ' | '.join(history_lines)
 
-        # 3. Generate via AI port
+        # 3. Generate via AI port (Synthesis & Generation)
         booking_link = command.booking_link or 'https://calendly.com/advisor-help'
         personalized_body = await self.email_drafting_service.generate_draft(
-            student_data.student_name or '',
+            student_data.student_name,
             context_str,
             booking_link,
         )
