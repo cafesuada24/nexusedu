@@ -2,6 +2,8 @@ import { AdvisorLeaderboard } from "@/components/dashboard/advisor-leaderboard";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { SlotTakenError } from "@/lib/appointments";
+
 /**
  * Backend API client for the NexusEDU intervention service.
  *
@@ -303,7 +305,7 @@ export type DraftStatusResponse = z.infer<typeof DraftStatusResponseSchema>;
 /*  Configuration                                                          */
 /* ----------------------------------------------------------------------- */
 
-const DEFAULT_TIMEOUT_MS = 10_000;
+export const DEFAULT_TIMEOUT_MS = 10_000;
 const INGEST_TIMEOUT_MS = 60_000;
 
 /**
@@ -1260,6 +1262,10 @@ export async function confirmBooking(
         DEFAULT_TIMEOUT_MS,
     );
     if (res.ok) return;
+
+    if (res.status === 409) {
+        throw new SlotTakenError();
+    }
 
     const body = await res.text().catch(() => "");
     let detail = res.statusText;
