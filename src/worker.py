@@ -7,19 +7,16 @@ from uuid import UUID
 import jwt
 from arq import cron
 from arq.connections import RedisSettings
-from langgraph.checkpoint.memory import MemorySaver
 
 from src.application.commands.case_commands import (
     GenerateEmailDraftCommand,
     SubmitCaseReviewCommand,
 )
 from src.application.commands.schedule_commands import AddWorkingHoursCommand
-from src.application.dtos.agent_dtos import AgentResponseDTO, RunAgentTaskCommand
 from src.core.config import config
 from src.core.container import Container
 from src.core.logger import logger
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
-from src.infrastructure.agents.agent import create_graph
 from src.infrastructure.database.session import async_session_maker, get_async_session
 
 
@@ -66,33 +63,6 @@ async def run_email_draft_task(
             logger.info(
                 f'Worker: Email generated job failed for case with id {case_id}, error: {e}',
             )
-
-
-async def run_agent_task(
-    _: dict[Any, Any],
-    job_id: str,
-    query: str,
-    thread_id: str | None,
-    user_dict: dict[str, Any],
-) -> AgentResponseDTO:
-    """Worker task to process agent query using AgentCommandHandler."""
-    logger.info(f'Worker: Starting agent task for {job_id}')
-
-    checkpointer = MemorySaver()
-    agent = create_graph(checkpointer=checkpointer)
-
-    async with async_session_maker() as session:
-        container = Container(session=session, agent=agent)
-        handler = container.get_agent_command_handler()
-
-        command = RunAgentTaskCommand(
-            job_id=UUID(job_id),
-            query=query,
-            thread_id=UUID(thread_id) if thread_id else None,
-            user_dict=user_dict,
-        )
-
-        return await handler.handle_run_agent_task(command)
 
 
 async def run_dispatch_email_task(
@@ -494,7 +464,6 @@ class WorkerSettings:
 
     functions = [
         run_email_draft_task,
-        run_agent_task,
         run_dispatch_email_task,
         run_dispatch_review_email_task,
         run_evaluate_badges_task,

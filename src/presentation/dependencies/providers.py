@@ -4,10 +4,8 @@ from typing import Annotated, Any
 
 from arq import ArqRedis
 from fastapi import Depends, Request
-from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.commands.agent_commands import AgentCommandHandler
 from src.application.commands.case_commands import CaseCommandHandler
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.commands.schedule_commands import ScheduleCommandHandler
@@ -24,7 +22,6 @@ from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
-from src.application.services.agent_metadata import AgentMetadataService
 from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.container import Container
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -42,7 +39,6 @@ from src.domain.repositories.status_history_repository import StatusHistoryRepos
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.gamification import GamificationService
-from src.infrastructure.agents.state import AgentState
 from src.infrastructure.database.session import get_async_session
 
 
@@ -53,9 +49,8 @@ async def get_container(
     """Dependency provider for the DI Container."""
     app_state = getattr(request.app.state, 'app_state', None)
     redis_pool = getattr(app_state, 'arq_pool', None) if app_state else None
-    agent = getattr(app_state, 'agent', None) if app_state else None
 
-    return Container(session=session, redis_pool=redis_pool, agent=agent)
+    return Container(session=session, redis_pool=redis_pool)
 
 
 # Repository Providers
@@ -257,23 +252,3 @@ async def get_student_query_handler(
 ) -> StudentQueryHandler:
     """Dependency provider for the StudentQueryHandler."""
     return container.get_student_query_handler()
-
-
-async def get_agent_metadata_service(
-    container: Annotated[Container, Depends(get_container)],
-) -> AgentMetadataService:
-    """Dependency provider for the AgentMetadataService."""
-    return container.agent_metadata_service
-
-
-def get_agent(request: Request) -> CompiledStateGraph[AgentState, Any, AgentState]:
-    """Dependency provider for the compiled LangGraph agent."""
-    state = request.app.state.app_state
-    return state.agent
-
-
-async def get_agent_command_handler(
-    container: Annotated[Container, Depends(get_container)],
-) -> AgentCommandHandler:
-    """Dependency provider for the AgentCommandHandler."""
-    return container.get_agent_command_handler()

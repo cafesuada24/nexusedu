@@ -1,6 +1,6 @@
 """API route handlers."""
 
-from . import advisors, cases, data, health, jobs, metrics, query, students, users
+from . import advisors, cases, data, health, jobs, metrics, students, users
 
 __all__ = [
     'advisors',
@@ -9,7 +9,6 @@ __all__ = [
     'health',
     'jobs',
     'metrics',
-    'query',
     'students',
     'users',
 ]
