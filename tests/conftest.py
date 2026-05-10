@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 
     from src.domain.repositories.activity_repository import ActivityRepository
     from src.domain.repositories.advisor_repository import AdvisorRepository
-    from src.domain.repositories.alert_repository import AlertRepository
     from src.domain.repositories.case_repository import CaseRepository
     from src.domain.repositories.email_repository import EmailRepository
     from src.domain.repositories.idempotency_repository import IdempotencyRepository

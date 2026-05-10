@@ -64,6 +64,9 @@ class Scope(StrEnum):
     CASE_READ = 'case:read'
     CASE_READ_ALL = 'case:read'
 
+    STUDENTS_READ = 'students:read'
+    STUDENTS_WRITE = 'students:write'
+
 
 class UserRole(StrEnum):
     """Simplified user roles."""
@@ -84,10 +87,12 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
         Scope.QUERY_EXECUTE,
         Scope.CASE_ACCEPT,
         Scope.CASE_READ,
+        Scope.STUDENTS_READ,
     },
     UserRole.VIEWER: {
         Scope.ALERTS_READ,
         Scope.ADVISORS_READ,
+        Scope.STUDENTS_READ,
     },
 }
 
