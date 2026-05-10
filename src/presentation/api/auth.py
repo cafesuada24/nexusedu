@@ -49,6 +49,7 @@ class Scope(StrEnum):
     ALERTS_READ = 'alerts:read'
     ALERTS_WRITE = 'alerts:write'
     ADVISORS_READ = 'advisors:read'
+    ADVISORS_WRITE = 'advisors:write'
 
     DATA_INGEST = 'data:ingest'
     JOBS_READ = 'jobs:read'
