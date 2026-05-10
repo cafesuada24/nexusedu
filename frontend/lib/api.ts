@@ -1218,16 +1218,33 @@ export async function acceptCase(case_id: string): Promise<void> {
     );
 }
 
+export type MeetingMethod = "online" | "in_person";
+
+export type ConfirmBookingPayload = {
+    /** ISO 8601 datetime with timezone offset, e.g. "2026-05-15T09:30:00+07:00". */
+    appointmentTime: string;
+    meetingMethod: MeetingMethod;
+    notes?: string | null;
+};
+
 /**
  * POST /cases/{case_id}/book — student confirms appointment booking.
  * Public endpoint (no auth required) — called from /booking/[token] page.
  */
-export async function confirmBooking(case_id: string): Promise<void> {
+export async function confirmBooking(
+    case_id: string,
+    payload: ConfirmBookingPayload,
+): Promise<void> {
     const trimmedCaseId = case_id.trim();
     if (!z.string().uuid().safeParse(trimmedCaseId).success) {
         throw new Error("Mã case không hợp lệ.");
     }
     const url = endpoint(`/cases/${encodeURIComponent(trimmedCaseId)}/book`);
+    const requestBody = JSON.stringify({
+        appointment_time: payload.appointmentTime,
+        meeting_method: payload.meetingMethod,
+        notes: payload.notes ?? null,
+    });
     const res = await withTimeout(
         (signal) =>
             authFetch(
@@ -1235,7 +1252,7 @@ export async function confirmBooking(case_id: string): Promise<void> {
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: "{}",
+                    body: requestBody,
                     suppressUnauthorizedEvent: true,
                 },
                 signal,
