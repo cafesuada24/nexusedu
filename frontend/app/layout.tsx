@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "@/components/providers";
-import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 // We intentionally avoid next/font/google in dev to reduce server-side
@@ -37,15 +36,7 @@ export default function RootLayout({
         <html lang="vi" suppressHydrationWarning>
             <head />
             <body className="font-sans antialiased bg-background">
-                <ThemeProvider
-                    attribute="class"
-                    defaultTheme="light"
-                    enableSystem
-                    disableTransitionOnChange
-                    enableColorScheme={false}
-                >
-                    <Providers>{children}</Providers>
-                </ThemeProvider>
+                <Providers>{children}</Providers>
                 {process.env.NODE_ENV === "production" && <Analytics />}
             </body>
         </html>

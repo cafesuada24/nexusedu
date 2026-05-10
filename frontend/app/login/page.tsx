@@ -50,7 +50,7 @@ export default function LoginPage() {
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-10 md:px-6">
         <div className="w-full max-w-md">
           <div className="mb-6 flex justify-center">
-            <Logo size="lg" href={null} />
+            <Logo size="xl" href={null} priority />
           </div>
 
           <div className="glass-strong rounded-2xl border border-border/60 bg-white/95 p-6 shadow-xl shadow-primary/10 md:p-8 dark:border-slate-800 dark:bg-[#0f172a] dark:shadow-2xl dark:shadow-black/50">

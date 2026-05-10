@@ -33,7 +33,9 @@ export function SiteFooter() {
       <div className="mx-auto w-full max-w-7xl px-4 py-14 md:px-6">
         <div className="grid gap-10 md:grid-cols-4">
           <div>
-            <Logo />
+            <div className="w-fit flex-none">
+              <Logo size="lg" />
+            </div>
             <p className="mt-4 max-w-xs text-sm text-muted-foreground">
               AI đồng hành, gắn kết tình thầy trò. Giúp nhà trường hiểu và
               chăm sóc sinh viên đúng lúc.
@@ -59,7 +61,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border/60 pt-6 text-xs text-muted-foreground md:flex-row">
-          <p>© {new Date().getFullYear()} NexusEdu. Bảo lưu mọi quyền.</p>
+          <p>© {new Date().getFullYear()} <span className="font-sans font-bold tracking-tighter bg-gradient-to-r from-[#2563eb] to-[#f97316] bg-clip-text text-transparent">NexusEdu</span>. Bảo lưu mọi quyền.</p>
           <p>
             Thiết kế cho các trường đại học Việt Nam với{" "}
             <span className="text-primary">❤</span>
