@@ -43,54 +43,6 @@ export type BackendInterventionStatus = z.infer<
     typeof BackendInterventionStatusSchema
 >;
 
-export const BackendRiskStatusSchema = z.enum([
-    "Normal",
-    "Elevated",
-    "Critical",
-    "Unknown",
-]);
-export type BackendRiskStatus = z.infer<typeof BackendRiskStatusSchema>;
-
-export const BackendAlertSchema = z.object({
-    sid: z.string().uuid(),
-    student_name: z.string().nullable().optional(),
-    email: z.string().email().nullable().optional().or(z.literal("")),
-    current_risk_status: z.string().nullable().optional(),
-    intervention_status: z.string().nullable().optional(),
-    is_generating: z.boolean().nullable().optional(),
-    active_case_id: z.string().uuid().nullable().optional(),
-
-    // Optional fallback fields for compatibility with other usages like AlertCenter
-    case_id: z.string().uuid().nullable().optional(),
-    assigned_advisor_id: z.string().uuid().nullable().optional(),
-    assigned_to: z.string().nullable().optional(),
-    draft_subject: z.string().nullable().optional(),
-    draft_body: z.string().nullable().optional(),
-});
-export type BackendAlert = z.infer<typeof BackendAlertSchema>;
-
-export const BackendAlertPagedResponseSchema = z.object({
-    items: z.array(BackendAlertSchema),
-    metadata: z.object({
-        total_count: z.number().nonnegative(),
-        limit: z.number().nonnegative(),
-        offset: z.number().nonnegative(),
-        has_next: z.boolean(),
-    }),
-});
-export type BackendAlertPagedResponse = z.infer<
-    typeof BackendAlertPagedResponseSchema
->;
-
-/**
- * Pulls the authoritative list of at-risk students from the backend.
- * @deprecated Use fetchOpenCases and fetchAssignedCases instead.
- * Returns an empty array directly since /alerts is deprecated/removed in the backend.
- */
-export async function fetchAlerts(): Promise<BackendAlert[]> {
-    return [];
-}
-
 export const TaskItemBaseSchema = z.object({
     case_id: z.string(),
     created_at: z.string(),
