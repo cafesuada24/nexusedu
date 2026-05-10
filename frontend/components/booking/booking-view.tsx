@@ -131,7 +131,13 @@ export function BookingView({
     }
 
     try {
-      await confirmBooking(caseId)
+      // UI hiển thị "Múi giờ (GMT+7) Hồ Chí Minh" — gắn explicit offset để
+      // backend nhận đúng instant bất kể browser của student đang ở đâu.
+      const appointmentTime = `${dateStr}T${slot}:00+07:00`
+      await confirmBooking(caseId, {
+        appointmentTime,
+        meetingMethod: mode === "video" ? "online" : "in_person",
+      })
     } catch (error) {
       // Best-effort case-status sync; slot lock has already succeeded.
       // eslint-disable-next-line no-console
