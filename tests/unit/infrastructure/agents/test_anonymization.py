@@ -37,7 +37,7 @@ async def test_sql_worker_node_dynamic_masking_viewer() -> None:
     mock_metadata.execute = AsyncMock(return_value=[{"col": "val"}])
 
     config = {
-        "configurable": {"metadata_service": mock_metadata, "user_role": "viewer"}
+        "configurable": {"metadata_service": mock_metadata, "user_role": "viewer"},
     }
 
     mock_sql_data = GeneratedSQL(

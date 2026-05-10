@@ -55,7 +55,7 @@ async def test_student_repository(session: AsyncSession) -> None:
     ]
     await repo.ingest_students(updated_students)
     await session.commit()
-    
+
     s1_updated = await repo.get_by_id(sids[0])
     assert s1_updated.student_name == 'Alice'  # ingest_students uses DO NOTHING
 
@@ -69,21 +69,22 @@ async def test_email_repository(session: AsyncSession) -> None:
     c1 = uuid4()
     # Need to include student_name and email to avoid NOT NULL constraint failure
     await student_repo.ingest_students(
-        [{'sid': s1, 'student_name': 'Test Student', 'email': 't@test.com', 'major': 'CS'}]
+        [{'sid': s1, 'student_name': 'Test Student', 'email': 't@test.com', 'major': 'CS'}],
     )
     await session.commit()
 
     # Test basic add and get
+    from datetime import UTC, datetime
+
     from src.domain.entities.intervention_email import InterventionEmail as DomainEmail
-    from datetime import datetime, UTC
-    
+
     email = DomainEmail(
         email_id=uuid4(),
         case_id=c1,
         status=EmailStatus.UNAVAILABLE,
         subject="Sub",
         body="Body",
-        created_at=datetime.now(UTC)
+        created_at=datetime.now(UTC),
     )
     await repo.add(email)
     await session.commit()
@@ -135,7 +136,7 @@ async def test_advisor_repository_metrics(session: AsyncSession) -> None:
             {'sid': uuid4(), 'student_name': 'S1', 'email': 's1@test.com', 'major': 'CS'},
             {'sid': uuid4(), 'student_name': 'S2', 'email': 's2@test.com', 'major': 'CS'},
             {'sid': uuid4(), 'student_name': 'S3', 'email': 's3@test.com', 'major': 'Math'},
-        ]
+        ],
     )
     await session.commit()
 
@@ -168,7 +169,7 @@ async def test_metrics_repository(session: AsyncSession) -> None:
                 'email': 'r@test.com',
                 'current_risk_status': 'Significant Drop',
             },
-        ]
+        ],
     )
     await session.commit()
 

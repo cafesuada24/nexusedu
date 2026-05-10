@@ -1,32 +1,39 @@
 """Integration tests for the book appointment endpoint."""
 
 import uuid
+from datetime import UTC, datetime
 import pytest
 from typing import TYPE_CHECKING
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.case import Case
-from src.domain.value_objects.status import InterventionStatus
-from src.infrastructure.database.models import Advisor, User
-
-if TYPE_CHECKING:
-    from src.domain.repositories.case_repository import CaseRepository
-    from src.domain.repositories.student_repository import StudentRepository
-    from src.domain.repositories.email_repository import EmailRepository
+from src.domain.value_objects.status import InterventionStatus, MeetingMethod
+from src.infrastructure.database.models import Advisor, AdvisorWorkingHours, User
 
 @pytest.fixture(autouse=True)
 async def seed_advisor(test_db_session: AsyncSession, mock_user: User) -> None:
-    """Seed an advisor profile for the mock user."""
+    """Seed an advisor profile and working hours for the mock user."""
+    from datetime import time
     from uuid import uuid4
-    from src.presentation.api.auth import User
     
+    advisor_id = uuid4()
     test_db_session.add(
         Advisor(
-            advisor_id=uuid4(),
+            advisor_id=advisor_id,
             user_id=mock_user.id,
             name='Test Advisor',
             email=mock_user.email,
+        )
+    )
+    # Seed working hours for Monday (day 0) 9-5 UTC
+    test_db_session.add(
+        AdvisorWorkingHours(
+            advisor_id=advisor_id,
+            day_of_week=0,
+            start_time=time(9, 0),
+            end_time=time(17, 0),
+            timezone='UTC',
         )
     )
     await test_db_session.commit()
@@ -60,8 +67,14 @@ async def test_book_appointment_success(
     await case_repository.add(case)
     await student_repository.session.commit()
 
-    # 2. Act: Call the book endpoint
-    response = client.post(f'/api/v1/cases/{cid}/book')
+    # 2. Act: Call the book endpoint with a valid future Monday slot
+    # 2026-05-11 is a Monday
+    payload = {
+        'appointment_time': '2026-05-11T10:00:00Z',
+        'meeting_method': 'online',
+        'notes': 'Test booking',
+    }
+    response = client.post(f'/api/v1/cases/{cid}/book', json=payload)
 
     # 3. Assert
     assert response.status_code == 200
@@ -106,7 +119,10 @@ async def test_start_supporting_success(
     case.intervention_status = InterventionStatus.ACCEPTED
     case.assigned_advisor_id = advisor.advisor_id
     case.mark_as_sent()
-    case.record_booking()
+    case.record_booking(
+        appointment_time=datetime(2026, 5, 11, 10, 0, tzinfo=UTC),
+        meeting_method=MeetingMethod.ONLINE,
+    )
 
     await case_repository.add(case)
     await student_repository.session.commit()
@@ -155,7 +171,10 @@ async def test_resolve_case_success(
     case.intervention_status = InterventionStatus.ACCEPTED
     case.assigned_advisor_id = advisor.advisor_id
     case.mark_as_sent()
-    case.record_booking()
+    case.record_booking(
+        appointment_time=datetime(2026, 5, 11, 10, 0, tzinfo=UTC),
+        meeting_method=MeetingMethod.ONLINE,
+    )
     case.start_supporting()
 
     await case_repository.add(case)
@@ -181,7 +200,11 @@ async def test_resolve_case_success(
 async def test_book_appointment_case_not_found(client: TestClient) -> None:
     """Verify 404 is returned for a non-existent case."""
     random_id = uuid.uuid4()
-    response = client.post(f'/api/v1/cases/{random_id}/book')
+    payload = {
+        'appointment_time': '2026-05-11T10:00:00Z',
+        'meeting_method': 'online',
+    }
+    response = client.post(f'/api/v1/cases/{random_id}/book', json=payload)
     assert response.status_code == 404
 
 @pytest.mark.asyncio
@@ -203,7 +226,11 @@ async def test_book_appointment_invalid_transition(
     await student_repository.session.commit()
 
     # Act: Call the book endpoint
-    response = client.post(f'/api/v1/cases/{cid}/book')
+    payload = {
+        'appointment_time': '2026-05-15T10:00:00Z',
+        'meeting_method': MeetingMethod.ONLINE,
+    }
+    response = client.post(f'/api/v1/cases/{cid}/book', json=payload)
 
     # Assert
     assert response.status_code == 400

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Dialect,
     Double,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    Time,
     TypeDecorator,
     UniqueConstraint,
     Uuid,
@@ -286,6 +288,48 @@ class Advisor(Base):
     user: Mapped[User | None] = relationship('User', uselist=False)
 
 
+class AdvisorWorkingHours(Base):
+    """Recurring weekly working hours for an advisor."""
+
+    __tablename__ = 'advisor_working_hours'
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    advisor_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('advisors.advisor_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    day_of_week: Mapped[int] = mapped_column(Integer, nullable=False)  # 0=Monday, 6=Sunday
+    start_time: Mapped[time] = mapped_column(Time, nullable=False)
+    end_time: Mapped[time] = mapped_column(Time, nullable=False)
+    timezone: Mapped[str] = mapped_column(String, nullable=False, default='UTC')
+
+
+class AdvisorDayOff(Base):
+    """Specific dates when an advisor is unavailable."""
+
+    __tablename__ = 'advisor_days_off'
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    advisor_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey('advisors.advisor_id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    reason: Mapped[str | None] = mapped_column(String)
+
+
 class PointLedger(Base):
     """Ledger recording points earned by users for completed tasks."""
 
@@ -414,6 +458,9 @@ class Appointment(Base):
         UniqueConstraint('case_id', name='uq_appointments_case_id'),
     )
 
+    # Relationships
+    case: Mapped[Case] = relationship('Case', back_populates='appointment')
+
 
 class Case(Base):
     """Represents an intervention case for a student."""
@@ -461,12 +508,13 @@ class Case(Base):
 
     # Relationships
     student: Mapped[Student] = relationship('Student')
-    # tasks: Mapped[list[Task]] = relationship(
-    #     'Task',
-    #     back_populates='case',
-    #     cascade='all, delete-orphan',
-    #     lazy='selectin',
-    # )
+    appointment: Mapped[Appointment | None] = relationship(
+        'Appointment',
+        back_populates='case',
+        uselist=False,
+        cascade='all, delete-orphan',
+        lazy='selectin',
+    )
 
 
 # class Task(Base):

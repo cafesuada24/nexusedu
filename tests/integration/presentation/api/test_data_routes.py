@@ -85,9 +85,9 @@ async def test_ingest_ignore_duplicates(
                         'sid': str(s1 := uuid4()),
                         'student_name': 'Original Name',
                         'email': 'original@ex.com',
-                    }
+                    },
                 ],
-            }
+            },
         ],
     }
     resp1 = client.post('/api/v1/data/ingest', json=initial_payload)
@@ -105,9 +105,9 @@ async def test_ingest_ignore_duplicates(
                         'sid': str(s1),
                         'student_name': 'Duplicate Name',
                         'email': 'duplicate@ex.com',
-                    }
+                    },
                 ],
-            }
+            },
         ],
     }
     resp2 = client.post('/api/v1/data/ingest', json=duplicate_payload)

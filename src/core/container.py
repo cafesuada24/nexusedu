@@ -14,6 +14,9 @@ from src.application.interfaces.advisor_metrics_query_service import (
     AdvisorMetricsQueryService,
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
+from src.application.interfaces.availability_query_service import (
+    AdvisorAvailabilityQueryService,
+)
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
@@ -27,7 +30,6 @@ from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
-from src.domain.repositories.appointment_repository import AppointmentRepository
 from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
@@ -36,11 +38,13 @@ from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.metadata_repository import MetadataRepository
 from src.domain.repositories.metrics_repository import MetricsRepository
 from src.domain.repositories.point_ledger_repository import PointLedgerRepository
+from src.domain.repositories.schedule_repository import ScheduleRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
+from src.domain.services.availability import AdvisorAvailabilityService
 from src.domain.services.email_sending import EmailSendingService
 from src.domain.services.gamification import GamificationService
 from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
@@ -57,10 +61,12 @@ from src.infrastructure.persistence.query_services.gamification_query_service im
 from src.infrastructure.persistence.query_services.point_ledger_query_service import (
     SqlAlchemyPointLedgerQueryService,
 )
+from src.infrastructure.persistence.query_services.sqlalchemy_availability_query_service import (
+    SqlAlchemyAdvisorAvailabilityQueryService,
+)
 from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
-    SqlAlchemyAppointmentRepository,
     SqlAlchemyBadgeRepository,
     SqlAlchemyCaseRepository,
     SqlAlchemyEmailRepository,
@@ -69,6 +75,7 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
     SqlAlchemyMetadataRepository,
     SqlAlchemyMetricsRepository,
     SqlAlchemyPointLedgerRepository,
+    SqlAlchemyScheduleRepository,
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
     SqlAlchemyUserSettingsRepository,
@@ -100,10 +107,6 @@ class Container:
     @cached_property
     def student_repo(self) -> StudentRepository:
         return SqlAlchemyStudentRepository(self.session)
-
-    @cached_property
-    def appointment_repo(self) -> AppointmentRepository:
-        return SqlAlchemyAppointmentRepository(self.session)
 
     @cached_property
     def advisor_repo(self) -> AdvisorRepository:
@@ -150,6 +153,10 @@ class Container:
         return SqlAlchemyPointLedgerRepository(self.session)
 
     @cached_property
+    def schedule_repo(self) -> ScheduleRepository:
+        return SqlAlchemyScheduleRepository(self.session)
+
+    @cached_property
     def badge_repo(self) -> BadgeRepository:
         return SqlAlchemyBadgeRepository(self.session)
 
@@ -157,6 +164,13 @@ class Container:
     @cached_property
     def gamification_service(self) -> GamificationService:
         return GamificationService()
+
+    @cached_property
+    def availability_service(self) -> AdvisorAvailabilityService:
+        return AdvisorAvailabilityService(
+            schedule_repo=self.schedule_repo,
+            case_repo=self.case_repo,
+        )
 
     @cached_property
     def email_sending_service(self) -> EmailSendingService:
@@ -200,10 +214,15 @@ class Container:
     # Query Services
     @cached_property
     def point_ledger_query_service(self) -> PointLedgerQueryService:
-        return SqlAlchemyPointLedgerQueryService(session=self.session)
+        return SqlAlchemyPointLedgerQueryService(self.session)
+
+    @cached_property
+    def availability_query_service(self) -> AdvisorAvailabilityQueryService:
+        return SqlAlchemyAdvisorAvailabilityQueryService(self.session)
 
     @cached_property
     def gamification_query_service(self) -> GamificationQueryService:
+
         return SqlAlchemyGamificationQueryService(session=self.session)
 
     @cached_property
@@ -224,10 +243,10 @@ class Container:
             self.email_repo,
             self.case_repo,
             self.advisor_repo,
-            self.appointment_repo,
             self.job_repo,
             self.task_queue,
             self.event_publisher,
+            availability_service=self.availability_service,
             email_drafting_service=BamlEmailDraftingService(),
         )
 
@@ -257,6 +276,7 @@ class Container:
             point_ledger_query_service=self.point_ledger_query_service,
             gamification_query_service=self.gamification_query_service,
             advisor_metrics_query_service=self.advisor_metrics_query_service,
+            availability_query_service=self.availability_query_service,
         )
 
     def get_case_query_handler(self) -> CaseQueryHandler:

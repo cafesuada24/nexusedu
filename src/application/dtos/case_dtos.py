@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, EmailStr
+from pydantic import AwareDatetime, BaseModel, EmailStr, FutureDatetime
 
 from src.domain.value_objects.status import (
     EmailStatus,
@@ -64,7 +64,7 @@ class BookAppointmentCommand:
     """Command to record a student booking an appointment."""
 
     case_id: UUID
-    appointment_time: datetime
+    appointment_time: FutureDatetime
     meeting_method: MeetingMethod
     notes: str | None = None
 

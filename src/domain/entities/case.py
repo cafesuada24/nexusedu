@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+from src.domain.entities.appointment import Appointment
 from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
     CaseAcceptedEvent,
@@ -56,6 +57,7 @@ class Case:
     assigned_at: datetime | None = None
     closed_at: datetime | None = None
     assigned_advisor_id: UUID | None = None
+    appointment: Appointment | None = None
     version: int = field(default=0)
     _domain_events: list[DomainEvent] = field(default_factory=list[DomainEvent], init=False)
 
@@ -134,6 +136,12 @@ class Case:
     ) -> None:
         """Student booked an appointment."""
         self._transition_to(InterventionStatus.BOOKED)
+        self.appointment = Appointment(
+            case_id=self.case_id,
+            appointment_time=appointment_time,
+            meeting_method=meeting_method,
+            notes=notes,
+        )
         self.register_event(
             StudentBookedEvent(
                 case_id=self.case_id,

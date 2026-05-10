@@ -1,5 +1,6 @@
 """API routes for Advisor management and Leaderboards."""
 
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -7,21 +8,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.application.dtos.advisor_dtos import (
     AdvisorProfileDTO,
+    AvailabilitySlotDTO,
+    GetAdvisorAvailabilityQuery,
     GetAdvisorProfileQuery,
 )
-from src.application.dtos.gamification_dtos import LeaderboardEntryDTO
+from src.application.dtos.gamification_dtos import (
+    GetLeaderboardQuery,
+    LeaderboardEntryDTO,
+)
+from src.application.dtos.pagination import PagedResponse
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
 )
 from src.core.logger import logger
 from src.domain.exceptions import AdvisorNotFoundError, UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
+from src.domain.value_objects.gamification import RankingType
 from src.presentation.api.auth import Scope, User, current_active_user, require_scope
 from src.presentation.dependencies.providers import (
     get_advisor_query_handler,
     get_advisor_repository,
 )
-from src.presentation.dtos.pagination import PagedResponse, PaginationMetadata
 from src.presentation.schemas.advisor import AdvisorProfileUpdate
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
@@ -96,6 +103,41 @@ async def get_advisor_profile(
         return await advisor_query_handler.handle_get_advisor_profile(query)
     except AdvisorNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.get('/{advisor_id}/availability')
+async def get_advisor_availability(
+    advisor_id: UUID,
+    advisor_query_handler: Annotated[
+        AdvisorQueryHandler,
+        Depends(get_advisor_query_handler),
+    ],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+    start_date: Annotated[
+        date,
+        Query(..., description='Start date for availability check (YYYY-MM-DD)'),
+    ],
+    end_date: Annotated[
+        date,
+        Query(..., description='End date for availability check (YYYY-MM-DD)'),
+    ],
+) -> list[AvailabilitySlotDTO]:
+    """Retrieve available appointment slots for a specific advisor."""
+    try:
+        query = GetAdvisorAvailabilityQuery(
+            advisor_id=advisor_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return await advisor_query_handler.handle_get_advisor_availability(query)
+    except AdvisorNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.error(f'Error fetching availability: {e}', exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail='Failed to fetch availability',
+        ) from e
 
 
 @router.get('/me/points')
@@ -176,12 +218,15 @@ async def get_my_points(
 async def get_leaderboard(
     query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
     _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
-    time_window: str = Query(
-        'all_time',
-        pattern='^(weekly|monthly|semester|all_time)$',
-    ),
-    limit: int = Query(10, ge=1, le=50),
-    offset: int = Query(0, ge=0),
+    time_window: Annotated[
+        RankingType,
+        Query(
+            'all_time',
+            pattern='^(weekly|monthly|semester|all_time)$',
+        ),
+    ],
+    limit: Annotated[int, Query(10, ge=1, le=50)],
+    offset: Annotated[int, Query(0, ge=0)],
 ) -> PagedResponse[LeaderboardEntryDTO]:
     """Retrieve the advisor leaderboard based on gamification points."""
     try:
@@ -190,16 +235,7 @@ async def get_leaderboard(
             limit=limit,
             offset=offset,
         )
-        entries, total_count = await query_handler.handle_get_leaderboard(query)
-        return PagedResponse(
-            items=entries,
-            metadata=PaginationMetadata(
-                total_count=total_count,
-                limit=limit,
-                offset=offset,
-                has_next=(query.offset + query.limit) < total_count,
-            ),
-        )
+        return await query_handler.handle_get_leaderboard(query)
     except Exception as e:
         logger.error(f'Failed to fetch leaderboard: {e}')
         raise HTTPException(

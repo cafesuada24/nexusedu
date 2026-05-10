@@ -56,7 +56,7 @@ async def test_handle_run_agent_task_success(
         job_id=uuid4(),
         query='How many students are at risk?',
         thread_id=None,
-        user_dict={'role': 'admin'}
+        user_dict={'role': 'admin'},
     )
     expected_answer = 'There are 5 students at risk.'
     mock_data = [{'sid': str(uuid4()), 'status': 'risk'}]
@@ -79,7 +79,7 @@ async def test_handle_run_agent_task_success(
 
 @pytest.mark.asyncio
 async def test_handle_run_agent_task_failure(
-    agent_command_handler: AgentCommandHandler, mock_agent: MagicMock
+    agent_command_handler: AgentCommandHandler, mock_agent: MagicMock,
 ) -> None:
     """Verify that agent execution failure raises an exception."""
     # Arrange
@@ -87,7 +87,7 @@ async def test_handle_run_agent_task_failure(
         job_id=uuid4(),
         query='trigger error',
         thread_id=None,
-        user_dict={}
+        user_dict={},
     )
     error_message = 'Agent crashed'
     mock_agent.ainvoke.side_effect = Exception(error_message)
@@ -99,7 +99,7 @@ async def test_handle_run_agent_task_failure(
 
 @pytest.mark.asyncio
 async def test_handle_run_agent_task_empty_state(
-    agent_command_handler: AgentCommandHandler, mock_agent: MagicMock
+    agent_command_handler: AgentCommandHandler, mock_agent: MagicMock,
 ) -> None:
     """Verify handling of empty state returned by agent raises ValueError."""
     # Arrange
@@ -107,7 +107,7 @@ async def test_handle_run_agent_task_empty_state(
         job_id=uuid4(),
         query='empty-response',
         thread_id=None,
-        user_dict={}
+        user_dict={},
     )
     mock_agent.ainvoke.return_value = None
 

@@ -39,8 +39,8 @@ from src.domain.exceptions import (
     EmailUnavailableError,
     InvalidActionError,
     InvalidStateTransitionError,
-    SlotAlreadyTakenError,
     StudentNotFoundError,
+    TimeSlotUnavailableError,
     UserIsNotAnAdvisorError,
 )
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
@@ -323,8 +323,8 @@ async def book_appointment(
         )
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    except SlotAlreadyTakenError as e:
-        raise HTTPException(status_code=409, detail=str(e)) from e
+    except TimeSlotUnavailableError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

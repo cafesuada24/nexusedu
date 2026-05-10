@@ -26,21 +26,21 @@ def raw_client(test_db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_admin_promote_user(
-    raw_client: TestClient, test_db_session: AsyncSession
+    raw_client: TestClient, test_db_session: AsyncSession,
 ) -> None:
     """Verify that an admin can promote another user's role."""
     # 1. Register a regular user
     user_email = f'user_{uuid.uuid4().hex[:8]}@example.com'
     user_password = 'password123'
     raw_client.post(
-        '/api/v1/auth/register', json={'email': user_email, 'password': user_password}
+        '/api/v1/auth/register', json={'email': user_email, 'password': user_password},
     )
 
     # 2. Register an admin
     admin_email = f'admin_{uuid.uuid4().hex[:8]}@example.com'
     admin_password = 'adminpassword'
     raw_client.post(
-        '/api/v1/auth/register', json={'email': admin_email, 'password': admin_password}
+        '/api/v1/auth/register', json={'email': admin_email, 'password': admin_password},
     )
 
     # 3. Manually elevate the admin in the DB
@@ -64,7 +64,7 @@ async def test_admin_promote_user(
     )
     user_token = user_login.json()['access_token']
     me_resp = raw_client.get(
-        '/api/v1/users/me', headers={'Authorization': f'Bearer {user_token}'}
+        '/api/v1/users/me', headers={'Authorization': f'Bearer {user_token}'},
     )
     assert me_resp.status_code == 200
     user_id = me_resp.json()['id']
@@ -85,37 +85,37 @@ async def test_non_admin_cannot_promote(raw_client: TestClient) -> None:
     # 1. Register two regular users
     user1_email = f'u1_{uuid.uuid4().hex[:8]}@example.com'
     raw_client.post(
-        '/api/v1/auth/register', json={'email': user1_email, 'password': 'password'}
+        '/api/v1/auth/register', json={'email': user1_email, 'password': 'password'},
     )
 
     user2_email = f'u2_{uuid.uuid4().hex[:8]}@example.com'
     raw_client.post(
-        '/api/v1/auth/register', json={'email': user2_email, 'password': 'password'}
+        '/api/v1/auth/register', json={'email': user2_email, 'password': 'password'},
     )
 
     # 2. Login as User 1
     login_resp = raw_client.post(
-        '/api/v1/auth/jwt/login', data={'username': user1_email, 'password': 'password'}
+        '/api/v1/auth/jwt/login', data={'username': user1_email, 'password': 'password'},
     )
     u1_token = login_resp.json()['access_token']
 
     # 3. Attempt to access the users list (should be forbidden)
     resp = raw_client.get(
-        '/api/v1/users', headers={'Authorization': f'Bearer {u1_token}'}
+        '/api/v1/users', headers={'Authorization': f'Bearer {u1_token}'},
     )
     assert resp.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_admin_list_users(
-    raw_client: TestClient, test_db_session: AsyncSession
+    raw_client: TestClient, test_db_session: AsyncSession,
 ) -> None:
     """Verify that an admin can list all users."""
     # 1. Register an admin
     admin_email = f'admin_{uuid.uuid4().hex[:8]}@example.com'
     admin_password = 'adminpassword'
     raw_client.post(
-        '/api/v1/auth/register', json={'email': admin_email, 'password': admin_password}
+        '/api/v1/auth/register', json={'email': admin_email, 'password': admin_password},
     )
 
     # 2. Manually elevate the admin in the DB
@@ -134,7 +134,7 @@ async def test_admin_list_users(
 
     # 4. List users
     resp = raw_client.get(
-        '/api/v1/users/', headers={'Authorization': f'Bearer {admin_token}'}
+        '/api/v1/users/', headers={'Authorization': f'Bearer {admin_token}'},
     )
     assert resp.status_code == 200
     users = resp.json()
