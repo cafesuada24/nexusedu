@@ -1,16 +1,10 @@
-export type AppointmentMode = "video" | "inperson"
+export type AppointmentMeetingMethod = "online" | "in_person"
 
 export type Appointment = {
-  id: string
-  advisorToken: string
-  caseId: string
   date: string
   slot: string
-  mode: AppointmentMode
-  createdAt: number
+  meeting_method: AppointmentMeetingMethod
 }
-
-export type CreateAppointmentInput = Omit<Appointment, "id" | "createdAt">
 
 export class SlotTakenError extends Error {
   code = "SLOT_TAKEN" as const

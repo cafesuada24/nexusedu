@@ -26,6 +26,7 @@ from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.container import Container
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
+from src.domain.repositories.appointment_repository import AppointmentRepository
 from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
@@ -68,6 +69,13 @@ async def get_advisor_repository(
 ) -> AdvisorRepository:
     """Dependency provider for the AdvisorRepository."""
     return container.advisor_repo
+
+
+async def get_appointment_repository(
+    container: Annotated[Container, Depends(get_container)],
+) -> AppointmentRepository:
+    """Dependency provider for the AppointmentRepository."""
+    return container.appointment_repo
 
 
 async def get_idempotency_repository(

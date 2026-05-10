@@ -1,5 +1,6 @@
 """Appointment repository interface."""
 
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -23,4 +24,13 @@ class AppointmentRepository(Protocol):
 
     async def find_by_case(self, case_id: UUID) -> Appointment | None:
         """Retrieve the appointment associated with a specific case."""
+        ...
+
+    async def list_by_advisor_and_range(
+        self,
+        advisor_id: UUID,
+        from_dt: datetime,
+        to_dt: datetime,
+    ) -> list[Appointment]:
+        """List appointments for an advisor within a datetime range [from_dt, to_dt)."""
         ...

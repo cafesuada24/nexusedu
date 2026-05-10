@@ -1,6 +1,6 @@
 """Command handlers for case-related operations."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from src.application.dtos.case_dtos import (
@@ -28,6 +28,7 @@ from src.domain.exceptions import (
     EmailUnavailableError,
     InvalidActionError,
     JobNotFoundError,
+    SlotAlreadyTakenError,
     UserIsNotAnAdvisorError,
 )
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -258,6 +259,18 @@ class CaseCommandHandler:
         case = await self.case_repo.get_by_id(command.case_id)
         if not case:
             raise CaseNotFoundError(command.case_id)
+
+        if case.assigned_advisor_id is not None:
+            conflicts = await self.appointment_repo.list_by_advisor_and_range(
+                advisor_id=case.assigned_advisor_id,
+                from_dt=command.appointment_time,
+                to_dt=command.appointment_time + timedelta(seconds=1),
+            )
+            if conflicts:
+                raise SlotAlreadyTakenError(
+                    case.assigned_advisor_id,
+                    command.appointment_time,
+                )
 
         case.record_booking(
             appointment_time=command.appointment_time,

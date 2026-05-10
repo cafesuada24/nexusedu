@@ -18,6 +18,7 @@ from src.presentation.api.lifecycle import lifespan
 from src.presentation.api.middleware.rate_limit import rate_limit_middleware
 from src.presentation.api.routes import (
     advisors,
+    appointments,
     cases,
     data,
     health,
@@ -149,6 +150,7 @@ api_v1_router.include_router(query.router)
 api_v1_router.include_router(data.router)
 api_v1_router.include_router(cases.router)
 api_v1_router.include_router(advisors.router)
+api_v1_router.include_router(appointments.router)
 api_v1_router.include_router(metrics.router)
 
 app.include_router(api_v1_router)

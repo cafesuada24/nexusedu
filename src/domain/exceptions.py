@@ -58,6 +58,14 @@ class CaseAlreadyClosedError(CaseError):
     def __init__(self, case_id: UUID) -> None:
         super().__init__(f"Case with with id '{case_id}' is closed.")
 
+class SlotAlreadyTakenError(CaseError):
+    """Raised when a student tries to book a slot already taken by another appointment."""
+
+    def __init__(self, advisor_id: UUID, appointment_time: object) -> None:
+        super().__init__(
+            f"Slot at {appointment_time} for advisor '{advisor_id}' is already taken.",
+        )
+
 class EmailUnavailableError(DomainError):
     """Raised when an advisor tries to send an unavailable email."""
 
