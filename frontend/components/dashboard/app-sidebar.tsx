@@ -116,7 +116,7 @@ export function AppSidebar() {
             collapsible="icon"
             className="border-r border-sidebar-border transition-all duration-300"
         >
-            <SidebarHeader className="border-b border-sidebar-border bg-gradient-to-b from-primary/5 to-transparent px-3 py-4 transition-all duration-300 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
+            <SidebarHeader className="border-b border-sidebar-border bg-gradient-to-b from-primary/5 to-transparent px-4 py-3 transition-all duration-300 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
                 <Logo size="sm" />
             </SidebarHeader>
 
