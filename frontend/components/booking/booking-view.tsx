@@ -47,12 +47,8 @@ const APPOINTMENTS_WINDOW_DAYS = 60
 
 export function BookingView({
   caseId,
-  studentName,
-  advisorToken,
 }: {
   caseId: string
-  studentName?: string
-  advisorToken: string
 }) {
   const today = startOfToday()
   const { schedule } = useScheduleQuery()
