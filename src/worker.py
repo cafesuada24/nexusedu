@@ -58,7 +58,6 @@ async def run_email_draft_task(
             await job_repo.save(job)
             await session.commit()
 
-            # Notify UI via WebSocket
             ws_publisher = container.websocket_publisher
             await ws_publisher.publish(
                 'JOB:COMPLETED',
@@ -92,6 +91,7 @@ async def run_email_draft_task(
                         },
                         user_id=user_id,
                     )
+
                 except Exception as ws_err:
                     logger.error(f'Worker: Failed to publish WS failure: {ws_err}')
 
@@ -139,6 +139,20 @@ async def run_dispatch_email_task(
 
         await email_repo.save(email)
         await case_repo.save(case)
+
+        # Notify UI via WebSocket
+        try:
+            ws_publisher = container.websocket_publisher
+            await ws_publisher.publish(
+                'CASE:STATUS_UPDATED',
+                {
+                    'case_id': str(case_id),
+                    'new_status': case.intervention_status.value,
+                },
+                user_id=case.assigned_advisor_id,
+            )
+        except Exception as ws_err:
+            logger.error(f'Worker: Failed to publish WS status update: {ws_err}')
 
         points = gamification_service.calculate_points(
             gamification_service.Action.SEND_EMAIL,
