@@ -1,9 +1,10 @@
 """Dependency injection providers for the application."""
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from arq import ArqRedis
 from fastapi import Depends, Request
+from fastapi.requests import HTTPConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.commands.case_commands import CaseCommandHandler
@@ -44,10 +45,10 @@ from src.infrastructure.database.session import get_async_session
 
 async def get_container(
     session: Annotated[AsyncSession, Depends(get_async_session)],
-    request: Request,
+    connection: HTTPConnection,
 ) -> Container:
     """Dependency provider for the DI Container."""
-    app_state = getattr(request.app.state, 'app_state', None)
+    app_state = getattr(connection.app.state, 'app_state', None)
     redis_pool = getattr(app_state, 'arq_pool', None) if app_state else None
 
     return Container(session=session, redis_pool=redis_pool)
