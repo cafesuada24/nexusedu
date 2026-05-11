@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import uuid
+import uuid  # noqa: TC003
 from datetime import UTC, date, datetime, time
 
-import uuid6
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
     Boolean,
@@ -30,6 +29,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from src.core.identifiers import generate_uuid
 from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
@@ -118,7 +118,7 @@ class Base(DeclarativeBase):
 class User(SQLAlchemyBaseUserTableUUID, Base):
     """SQLAlchemy model for the User table, integrating with FastAPI-Users."""
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid6.uuid7)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=generate_uuid)
 
     role: Mapped[str] = mapped_column(String, default='viewer', nullable=False)
 
@@ -158,7 +158,7 @@ class Student(Base):
 
     __tablename__ = 'students'
 
-    sid: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid6.uuid7)
+    sid: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=generate_uuid)
     student_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     email: Mapped[str] = mapped_column(
         String,
@@ -197,7 +197,7 @@ class Activity(Base):
     activity_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     sid: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -230,7 +230,7 @@ class StudentStatusHistory(Base):
     history_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     sid: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -267,7 +267,7 @@ class Advisor(Base):
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey('user.id'),
@@ -299,7 +299,7 @@ class AdvisorWorkingHours(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -321,7 +321,7 @@ class AdvisorDayOff(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -342,7 +342,7 @@ class PointLedger(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -376,7 +376,7 @@ class AdvisorBadge(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     advisor_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -400,7 +400,7 @@ class InterventionEmail(Base):
     email_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     case_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -438,7 +438,7 @@ class Appointment(Base):
     appointment_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     case_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -475,7 +475,7 @@ class Case(Base):
     case_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     sid: Mapped[uuid.UUID] = mapped_column(
         Uuid,
@@ -530,7 +530,7 @@ class Case(Base):
 #     task_id: Mapped[uuid.UUID] = mapped_column(
 #         Uuid,
 #         primary_key=True,
-#         default=uuid6.uuid7,
+#         default=generate_uuid,
 #     )
 #     case_id: Mapped[uuid.UUID] = mapped_column(
 #         Uuid,
@@ -569,7 +569,7 @@ class BackgroundJobTracker(Base):
     job_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     status: Mapped[JobStatus] = mapped_column(
         Enum(JobStatus),
@@ -599,7 +599,7 @@ class OutboxEvent(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
         primary_key=True,
-        default=uuid6.uuid7,
+        default=generate_uuid,
     )
     task_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
     payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

@@ -2,12 +2,11 @@
 
 import pickle
 import uuid
-
-import uuid6
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.identifiers import generate_uuid
 from src.domain.value_objects.status import OutboxStatus
 from src.infrastructure.database.models import OutboxEvent
 
@@ -28,7 +27,7 @@ class TransactionalOutboxAdapter:
         payload = pickle.dumps(kwargs)
 
         event = OutboxEvent(
-            id=uuid6.uuid7(),
+            id=generate_uuid(),
             task_name=task_name,
             payload=payload,
             status=OutboxStatus.PENDING,

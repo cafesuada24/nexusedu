@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
+from src.core.identifiers import EntityID
 from src.domain.events.base import DomainEvent
 from src.domain.value_objects.status import MeetingMethod
 
@@ -12,15 +12,15 @@ from src.domain.value_objects.status import MeetingMethod
 class CaseAcceptedEvent(DomainEvent):
     """Event triggered when a case is accepted by an advisor."""
 
-    case_id: UUID
-    advisor_id: UUID
+    case_id: EntityID
+    advisor_id: EntityID
 
 
 @dataclass(frozen=True)
 class StudentBookedEvent(DomainEvent):
     """Event triggered when a student books an appointment."""
 
-    case_id: UUID
+    case_id: EntityID
     appointment_time: datetime
     meeting_method: MeetingMethod
     notes: str | None = None
@@ -30,16 +30,16 @@ class StudentBookedEvent(DomainEvent):
 class CaseReviewRequestedEvent(DomainEvent):
     """Event triggered when an advisor requests a case resolution, pending student review."""
 
-    case_id: UUID
-    advisor_id: UUID
+    case_id: EntityID
+    advisor_id: EntityID
 
 
 @dataclass(frozen=True)
 class CaseResolvedEvent(DomainEvent):
     """Event triggered when a case is successfully resolved after review."""
 
-    case_id: UUID
-    advisor_id: UUID
+    case_id: EntityID
+    advisor_id: EntityID
     satisfaction: str | None = None
     comment: str | None = None
 
@@ -48,7 +48,7 @@ class CaseResolvedEvent(DomainEvent):
 class CaseFailedEvent(DomainEvent):
     """Event triggered when a case resolution fails based on student review."""
 
-    case_id: UUID
-    advisor_id: UUID
+    case_id: EntityID
+    advisor_id: EntityID
     satisfaction: str | None = None
     comment: str | None = None

@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, EmailStr, FutureDatetime
 
+from src.core.identifiers import EntityID
 from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
@@ -18,8 +18,8 @@ from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 class AcceptCaseCommand:
     """Command to complete a task and award points."""
 
-    case_id: UUID
-    user_id: UUID
+    case_id: EntityID
+    user_id: EntityID
     accepted_at: datetime
 
 
@@ -27,34 +27,34 @@ class AcceptCaseCommand:
 class TriggerDraftCommand:
     """Command to trigger a background email draft generation."""
 
-    case_id: UUID
-    user_id: UUID
+    case_id: EntityID
+    user_id: EntityID
 
 
 @dataclass
 class GenerateEmailDraftCommand:
     """Command to generate an email draft (intended for worker)."""
 
-    case_id: UUID
-    job_id: UUID
+    case_id: EntityID
+    job_id: EntityID
     booking_link: str | None = None
-    user_id: UUID | None = None
+    user_id: EntityID | None = None
 
 
 @dataclass
 class SendEmailCommand:
     """Command to record and send an intervention email."""
 
-    case_id: UUID
-    user_id: UUID
+    case_id: EntityID
+    user_id: EntityID
 
 
 @dataclass
 class UpdateEmailCommand:
     """Command to manually update an email draft."""
 
-    case_id: UUID
-    user_id: UUID
+    case_id: EntityID
+    user_id: EntityID
     subject: str | None = None
     body: str | None = None
 
@@ -63,7 +63,7 @@ class UpdateEmailCommand:
 class BookAppointmentCommand:
     """Command to record a student booking an appointment."""
 
-    case_id: UUID
+    case_id: EntityID
     appointment_time: FutureDatetime
     meeting_method: MeetingMethod
     notes: str | None = None
@@ -73,23 +73,23 @@ class BookAppointmentCommand:
 class StartSupportingCommand:
     """Command for an advisor to start supporting a case."""
 
-    case_id: UUID
-    user_id: UUID
+    case_id: EntityID
+    user_id: EntityID
 
 
 @dataclass(frozen=True)
 class ResolveCaseCommand:
     """Command for an advisor to resolve a case."""
 
-    case_id: UUID
-    user_id: UUID
+    case_id: EntityID
+    user_id: EntityID
 
 
 @dataclass(frozen=True)
 class SubmitCaseReviewCommand:
     """Command to submit a student review and finalize the case."""
 
-    case_id: UUID
+    case_id: EntityID
     satisfaction: StudentSatisfaction
     comment: str | None = None
 
@@ -98,7 +98,7 @@ class SubmitCaseReviewCommand:
 class GetAssignedQuery:
     """Query to retrieve advisor task list."""
 
-    user_id: UUID
+    user_id: EntityID
     limit: int = 20
     offset: int = 0
 
@@ -115,7 +115,7 @@ class GetUnassignedQuery:
 class GetAllCasesQuery:
     """Query to retrieve all cases (Admin only)."""
 
-    user_id: UUID
+    user_id: EntityID
     limit: int = 20
     offset: int = 0
 
@@ -126,7 +126,7 @@ class GetAllCasesQuery:
 
 
 class TriggerDraftDTO(BaseModel):
-    job_id: UUID
+    job_id: EntityID
     status: JobStatus
     is_new_job: bool
 
@@ -146,7 +146,7 @@ class ReviewCaseDTO(BaseModel):
 
 
 class QueryEmailDTO(BaseModel):
-    email_id: UUID
+    email_id: EntityID
 
     recipent: EmailStr
     subject: str | None = None
@@ -158,11 +158,11 @@ class QueryEmailDTO(BaseModel):
 class CaseDTO(BaseModel):
     """Schema for a student case."""
 
-    case_id: UUID
-    sid: UUID
+    case_id: EntityID
+    sid: EntityID
     created_at: AwareDatetime
 
-    assigned_advisor_id: UUID | None
+    assigned_advisor_id: EntityID | None
     assigned_to: str | None
 
     student_name: str

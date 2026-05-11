@@ -2,25 +2,25 @@
 
 from datetime import date
 from typing import Protocol
-from uuid import UUID
 
+from src.core.identifiers import EntityID
 from src.domain.entities.schedule import DayOff, WorkingHours
 
 
 class ScheduleRepository(Protocol):
     """Interface for managing advisor schedules and days off."""
 
-    async def get_working_hours(self, advisor_id: UUID) -> list[WorkingHours]:
+    async def get_working_hours(self, advisor_id: EntityID) -> list[WorkingHours]:
         """Fetch all recurring working hour blocks for an advisor."""
         ...
 
-    async def get_working_hours_by_id(self, wh_id: UUID) -> WorkingHours:
+    async def get_working_hours_by_id(self, wh_id: EntityID) -> WorkingHours:
         """Fetch a specific working hour block. Raises WorkingHoursNotFoundError if not found."""
         ...
 
     async def get_days_off(
         self,
-        advisor_id: UUID,
+        advisor_id: EntityID,
         start_date: date,
         end_date: date,
     ) -> list[DayOff]:
@@ -39,10 +39,10 @@ class ScheduleRepository(Protocol):
         """Update an existing working hour block."""
         ...
 
-    async def delete_working_hours(self, wh_id: UUID) -> None:
+    async def delete_working_hours(self, wh_id: EntityID) -> None:
         """Delete a working hour block."""
         ...
 
-    async def delete_day_off(self, do_id: UUID) -> None:
+    async def delete_day_off(self, do_id: EntityID) -> None:
         """Delete a day off."""
         ...

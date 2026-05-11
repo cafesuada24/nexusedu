@@ -2,21 +2,20 @@
 
 from dataclasses import dataclass, field
 from datetime import date, time
-from uuid import UUID
 
-import uuid6
+from src.core.identifiers import EntityID, generate_uuid
 
 
 @dataclass
 class WorkingHours:
     """Represents a recurring weekly working hour block for an advisor."""
 
-    advisor_id: UUID
+    advisor_id: EntityID
     day_of_week: int  # 0=Monday, 6=Sunday
     start_time: time
     end_time: time
     timezone: str = 'UTC'
-    id: UUID = field(default_factory=uuid6.uuid7)
+    id: EntityID = field(default_factory=generate_uuid)
 
     def __post_init__(self) -> None:
         """Validate working hours invariants."""
@@ -44,7 +43,7 @@ class WorkingHours:
 class DayOff:
     """Represents a specific date when an advisor is unavailable."""
 
-    advisor_id: UUID
+    advisor_id: EntityID
     date: date
     reason: str | None = None
-    id: UUID = field(default_factory=uuid6.uuid7)
+    id: EntityID = field(default_factory=generate_uuid)

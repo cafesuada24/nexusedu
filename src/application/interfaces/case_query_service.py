@@ -1,10 +1,10 @@
 """Case query service interface."""
 
 from typing import Protocol
-from uuid import UUID
 
 from src.application.dtos.case_dtos import CaseDTO
 from src.application.dtos.pagination import PagedResponse
+from src.core.identifiers import EntityID
 
 
 class CaseQueryService(Protocol):
@@ -12,7 +12,7 @@ class CaseQueryService(Protocol):
 
     async def find_assigned_to(
         self,
-        advisor_id: UUID | None,
+        advisor_id: EntityID | None,
         limit: int,
         offset: int,
     ) -> PagedResponse[CaseDTO]:

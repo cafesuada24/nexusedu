@@ -1,6 +1,5 @@
 """Query handlers for case-related operations."""
 
-from uuid import UUID
 
 from src.application.dtos.case_dtos import (
     CaseDTO,
@@ -11,6 +10,7 @@ from src.application.dtos.case_dtos import (
 )
 from src.application.dtos.pagination import PagedResponse
 from src.application.interfaces.case_query_service import CaseQueryService
+from src.core.identifiers import EntityID
 from src.domain.exceptions import (
     CaseNotFoundError,
     UserIsNotAnAdvisorError,
@@ -74,7 +74,7 @@ class CaseQueryHandler:
             offset=query.offset,
         )
 
-    async def handle_get_case_details(self, case_id: UUID) -> CaseDTO:
+    async def handle_get_case_details(self, case_id: EntityID) -> CaseDTO:
         """Retrieve full details of a specific case, including its associated email."""
         case = await self.__case_repo.get_by_id(case_id)
         advisor = None
@@ -109,8 +109,8 @@ class CaseQueryHandler:
 
     async def handle_get_case_email(
         self,
-        case_id: UUID,
-        user_id: UUID,
+        case_id: EntityID,
+        user_id: EntityID,
     ) -> QueryEmailDTO:
         """Retrieve the current AI email status and content for a case."""
         case = await self.__case_repo.get_by_id(case_id)

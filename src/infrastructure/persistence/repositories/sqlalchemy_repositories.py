@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-import uuid6
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
@@ -26,6 +25,7 @@ from sqlalchemy import (
 
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
+from src.core.identifiers import generate_uuid
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseNotFoundError,
@@ -189,7 +189,7 @@ class SqlAlchemyActivityRepository:
         # Ensure UUID fields are actual UUID objects (SQLAlchemy Uuid type requirement)
         for record in records:
             if not record.get('activity_id'):
-                record['activity_id'] = uuid6.uuid7()
+                record['activity_id'] = generate_uuid()
             elif isinstance(record['activity_id'], str):
                 record['activity_id'] = uuid.UUID(record['activity_id'])
 
@@ -366,7 +366,7 @@ class SqlAlchemyAdvisorRepository:
 
         # 2. Use native UPSERT for user_id to handle concurrency
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
-        advisor_id = uuid6.uuid7()
+        advisor_id = generate_uuid()
         batch = [
             {
                 'advisor_id': advisor_id,

@@ -1,7 +1,6 @@
 """Query handlers for advisor-related operations."""
 
 from datetime import timedelta
-from uuid import UUID
 
 from pydantic_extra_types.phone_numbers import PhoneNumber
 
@@ -31,6 +30,7 @@ from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
 )
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
+from src.core.identifiers import EntityID
 from src.domain.exceptions import UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
 
@@ -55,7 +55,7 @@ class AdvisorQueryHandler:
 
     async def handle_get_user_advisor_profile(
         self,
-        user_id: UUID,
+        user_id: EntityID,
     ) -> AdvisorProfileDTO:
         """Retrieve the advisor profile associated with a user ID."""
         advisor = await self.__advisor_repo.get_by_user_id(user_id)
@@ -92,7 +92,7 @@ class AdvisorQueryHandler:
             personal_metrics=personal_metrics,
         )
 
-    async def handle_get_user_advisor_points(self, user_id: UUID) -> int:
+    async def handle_get_user_advisor_points(self, user_id: EntityID) -> int:
         """Retrieve total points for the advisor associated with a user ID."""
         advisor = await self.__advisor_repo.get_by_user_id(user_id)
         return await self.__point_ledger_query_service.get_total_points(
@@ -112,7 +112,7 @@ class AdvisorQueryHandler:
 
     async def handle_get_advisor_metrics(
         self,
-        advisor_id: UUID,
+        advisor_id: EntityID,
     ) -> PersonalAdvisorMetricsDTO:
         """Execute the get advisor metrics query."""
         # Ensure advisor exists
@@ -121,7 +121,7 @@ class AdvisorQueryHandler:
             advisor_id,
         )
 
-    async def handle_get_advisor_badges(self, advisor_id: UUID) -> list[BadgeDTO]:
+    async def handle_get_advisor_badges(self, advisor_id: EntityID) -> list[BadgeDTO]:
         """Execute the get advisor badges query with caching."""
         _ = advisor_id
         return []
@@ -162,6 +162,6 @@ class AdvisorQueryHandler:
     ) -> AdvisorScheduleDTO:
         """Execute the get advisor schedule query."""
         return await self.__availability_query_service.get_advisor_schedule(
-            query.advisor_id
+            query.advisor_id,
         )
 

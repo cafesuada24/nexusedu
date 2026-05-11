@@ -2,27 +2,24 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from uuid import UUID
 
-import uuid6
-
+from src.core.identifiers import EntityID, generate_uuid
 from src.domain.exceptions import (
     EmptyEmailError,
     InvalidActionError,
     InvalidStateTransitionError,
 )
 from src.domain.value_objects.status import EmailStatus
-from src.presentation.schemas.response import EmailDraft
 
 
 @dataclass
 class InterventionEmail:
     """Represents an intervention email drafted or sent to a student."""
 
-    case_id: UUID
+    case_id: EntityID
     status: EmailStatus = EmailStatus.UNAVAILABLE
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    email_id: UUID = field(default_factory=uuid6.uuid7)
+    email_id: EntityID = field(default_factory=generate_uuid)
     subject: str | None = None
     body: str | None = None
     sent_at: datetime | None = None

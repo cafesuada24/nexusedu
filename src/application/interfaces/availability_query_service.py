@@ -2,9 +2,9 @@
 
 from datetime import date, datetime
 from typing import Protocol
-from uuid import UUID
 
 from src.application.dtos.advisor_dtos import AdvisorScheduleDTO
+from src.core.identifiers import EntityID
 
 
 class AdvisorAvailabilityQueryService(Protocol):
@@ -12,7 +12,7 @@ class AdvisorAvailabilityQueryService(Protocol):
 
     async def get_available_slots(
         self,
-        advisor_id: UUID,
+        advisor_id: EntityID,
         start_date: date,
         end_date: date,
         slot_duration_minutes: int = 30,
@@ -20,6 +20,6 @@ class AdvisorAvailabilityQueryService(Protocol):
         """Directly calculate available UTC timeslots without domain entities."""
         ...
 
-    async def get_advisor_schedule(self, advisor_id: UUID) -> AdvisorScheduleDTO:
+    async def get_advisor_schedule(self, advisor_id: EntityID) -> AdvisorScheduleDTO:
         """Fetch the full schedule directly from the database."""
         ...

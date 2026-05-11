@@ -3,10 +3,9 @@
 from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
-from uuid import UUID
 
 from src.application.dtos.data_dtos import DataIngestionCommand
-from src.core.logger import logger
+from src.core.identifiers import EntityID
 from src.domain.entities.case import Case
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.case_repository import CaseRepository
@@ -59,7 +58,7 @@ class DataCommandHandler:
             'new_sids': new_sids,
         }
 
-    async def _run_anomaly_detection(self) -> list[tuple[UUID, UUID]]:
+    async def _run_anomaly_detection(self) -> list[tuple[EntityID, EntityID]]:
         """Orchestrate the anomaly detection process."""
         # 1. Fetch data
         weekly_avgs = await self.activity_repo.get_weekly_averages()
@@ -71,7 +70,7 @@ class DataCommandHandler:
             for h in existing_history
         }
 
-        student_data: dict[UUID, list[dict[str, Any]]] = defaultdict(list)
+        student_data: dict[EntityID, list[dict[str, Any]]] = defaultdict(list)
         for avg in weekly_avgs:
             student_data[avg['sid']].append(avg)
 
@@ -86,7 +85,7 @@ class DataCommandHandler:
             await self.history_repo.batch_create_history(new_history_records)
 
         # 5. Transition student statuses and identify new at-risk students
-        new_at_risk_sids: list[tuple[UUID, UUID]] = []
+        new_at_risk_sids: list[tuple[EntityID, EntityID]] = []
         for sid, latest_risk in risk_statuses.items():
             student = await self.student_repo.get_by_id(sid)
             if not student:

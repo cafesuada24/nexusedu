@@ -2,10 +2,8 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
 
-import uuid6
-
+from src.core.identifiers import EntityID, generate_uuid
 from src.domain.entities.appointment import Appointment
 from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
@@ -52,13 +50,13 @@ _INTERVENTION_STATUS_TRANSITION = {
 class Case:
     """Represents an intervention case for a student."""
 
-    sid: UUID
-    case_id: UUID = field(default_factory=uuid6.uuid7)
+    sid: EntityID
+    case_id: EntityID = field(default_factory=generate_uuid)
     intervention_status: InterventionStatus = InterventionStatus.NEW
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     assigned_at: datetime | None = None
     closed_at: datetime | None = None
-    assigned_advisor_id: UUID | None = None
+    assigned_advisor_id: EntityID | None = None
     appointment: Appointment | None = None
     version: int = field(default=0)
     _domain_events: list[DomainEvent] = field(default_factory=list[DomainEvent], init=False)
@@ -109,7 +107,7 @@ class Case:
             and self.assigned_advisor_id is not None
         )
 
-    def assign_advisor(self, advisor_id: UUID, occurred_at: datetime) -> None:
+    def assign_advisor(self, advisor_id: EntityID, occurred_at: datetime) -> None:
         """Assign this case to an advisor."""
         if self.is_assigned:
             raise CaseAlreadyAssignedError(self.case_id)

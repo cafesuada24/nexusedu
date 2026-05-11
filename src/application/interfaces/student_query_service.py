@@ -1,10 +1,10 @@
 """Student query service interface."""
 
 from typing import Protocol
-from uuid import UUID
 
 from src.application.dtos.pagination import PagedResponse
 from src.application.dtos.student_dtos import StudentDTO
+from src.core.identifiers import EntityID
 
 
 class StudentQueryService(Protocol):
@@ -18,6 +18,6 @@ class StudentQueryService(Protocol):
         """Retrieve a paginated list of students."""
         ...
 
-    async def get_student(self, sid: UUID) -> StudentDTO:
+    async def get_student(self, sid: EntityID) -> StudentDTO:
         """Retrieve a single student by ID."""
         ...

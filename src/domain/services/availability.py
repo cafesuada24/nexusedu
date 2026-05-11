@@ -1,9 +1,9 @@
 """Advisor availability domain service (Command Side)."""
 
 from datetime import UTC, datetime
-from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from src.core.identifiers import EntityID
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.schedule_repository import ScheduleRepository
 
@@ -21,7 +21,7 @@ class AdvisorAvailabilityService:
 
     async def is_slot_available(
         self,
-        advisor_id: UUID,
+        advisor_id: EntityID,
         requested_time: datetime,
     ) -> bool:
         """Check if a specific UTC time slot is valid and available for booking."""
