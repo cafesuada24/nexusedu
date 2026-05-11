@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from datetime import date, time
 from typing import Annotated
-from uuid import UUID
 
 from pydantic import (
     AwareDatetime,
@@ -15,34 +14,36 @@ from pydantic import (
 )
 from pydantic_extra_types.phone_numbers import PhoneNumber, PhoneNumberValidator
 
+from src.core.identifiers import EntityID
+
 # ========== QUERY =========
 
 
 @dataclass(frozen=True)
 class GetUsersAdvisorProfileQuery:
-    user_id: UUID
+    user_id: EntityID
 
 
 @dataclass(frozen=True)
 class GetAdvisorProfileQuery:
-    advisor_id: UUID
+    advisor_id: EntityID
     include_metrics: bool
 
 
 @dataclass(frozen=True)
 class GetAdvisorAvailabilityQuery:
-    advisor_id: UUID
+    advisor_id: EntityID
     start_date: date
     end_date: date
 
 
 @dataclass(frozen=True)
 class GetAdvisorScheduleQuery:
-    advisor_id: UUID
+    advisor_id: EntityID
 
 @dataclass(frozen=True)
 class GetUserAdvisorScheduleQuery:
-    user_id: UUID
+    user_id: EntityID
 
 
 class PersonalAdvisorMetricsDTO(BaseModel):
@@ -59,7 +60,7 @@ class PersonalAdvisorMetricsDTO(BaseModel):
 class AdvisorProfileDTO(BaseModel):
     """DTO for an advisor."""
 
-    advisor_id: UUID
+    advisor_id: EntityID
     name: str
     email: EmailStr
     title: str | None = Field(default=None)
@@ -83,7 +84,7 @@ class AvailabilitySlotDTO(BaseModel):
 class WorkingHoursDTO(BaseModel):
     """DTO for a working hour block."""
 
-    id: UUID
+    id: EntityID
     day_of_week: int
     start_time: time
     end_time: time
@@ -93,7 +94,7 @@ class WorkingHoursDTO(BaseModel):
 class DayOffDTO(BaseModel):
     """DTO for a day off."""
 
-    id: UUID
+    id: EntityID
     date: date
     reason: str | None = None
 
@@ -120,7 +121,7 @@ class BadgeDTO:
 
 @dataclass(frozen=True)
 class AddWorkingHoursCommand:
-    advisor_id: UUID
+    advisor_id: EntityID
     day_of_week: int
     start_time: time
     end_time: time
@@ -129,7 +130,7 @@ class AddWorkingHoursCommand:
 
 @dataclass(frozen=True)
 class UpdateWorkingHoursCommand:
-    working_hours_id: UUID
+    working_hours_id: EntityID
     day_of_week: int
     start_time: time
     end_time: time
@@ -138,16 +139,16 @@ class UpdateWorkingHoursCommand:
 
 @dataclass(frozen=True)
 class DeleteWorkingHoursCommand:
-    working_hours_id: UUID
+    working_hours_id: EntityID
 
 
 @dataclass(frozen=True)
 class AddDayOffCommand:
-    advisor_id: UUID
+    advisor_id: EntityID
     date: date
     reason: str | None = None
 
 
 @dataclass(frozen=True)
 class DeleteDayOffCommand:
-    day_off_id: UUID
+    day_off_id: EntityID

@@ -19,11 +19,13 @@ from sqlalchemy import (
     literal_column,
     quoted_name,
     select,
+    text,
     update,
 )
 
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
+from src.core.identifiers import generate_uuid
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseNotFoundError,
@@ -159,6 +161,14 @@ class SqlAlchemyStudentRepository:
                 table=Student,
                 records=batch,
                 index_elements=['sid'],
+                update_cols=[
+                    'student_name',
+                    'email',
+                    'major',
+                    'current_risk_status',
+                    'last_notified_timestamp',
+                    'last_notified_satisfaction',
+                ],
             )
 
             await self.session.execute(stmt)
@@ -179,7 +189,7 @@ class SqlAlchemyActivityRepository:
         # Ensure UUID fields are actual UUID objects (SQLAlchemy Uuid type requirement)
         for record in records:
             if not record.get('activity_id'):
-                record['activity_id'] = uuid.uuid4()
+                record['activity_id'] = generate_uuid()
             elif isinstance(record['activity_id'], str):
                 record['activity_id'] = uuid.UUID(record['activity_id'])
 
@@ -356,7 +366,7 @@ class SqlAlchemyAdvisorRepository:
 
         # 2. Use native UPSERT for user_id to handle concurrency
         dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
-        advisor_id = uuid.uuid4()
+        advisor_id = generate_uuid()
         batch = [
             {
                 'advisor_id': advisor_id,
@@ -720,6 +730,7 @@ class SqlAlchemyCaseRepository:
             )
             .values(
                 assigned_advisor_id=advisor_id,
+                version=OrmCase.version + 1,
             )
         )
         result = await self.session.execute(stmt)

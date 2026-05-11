@@ -1,7 +1,7 @@
-from uuid import UUID
 
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
 
+from src.core.identifiers import EntityID
 from src.domain.value_objects.gamification import RankingType
 
 
@@ -16,7 +16,7 @@ class GetLeaderboardQuery(BaseModel):
 class LeaderboardEntryDTO(BaseModel):
     """DTO for a single leaderboard entry."""
 
-    advisor_id: UUID
+    advisor_id: EntityID
     name: str
     total_points: NonNegativeInt
     actions_count: NonNegativeInt

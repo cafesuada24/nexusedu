@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.core.identifiers import generate_uuid
+
 # Add project root to sys.path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
@@ -98,7 +100,7 @@ async def reseed() -> None:
             for day in range(5):
                 session.add(
                     AdvisorWorkingHours(
-                        id=uuid.uuid4(),
+                        id=generate_uuid(),
                         advisor_id=advisor.advisor_id,
                         day_of_week=day,
                         start_time=time(9, 0),
@@ -196,7 +198,7 @@ async def reseed() -> None:
         cases = []
         tasks = []
         for sid in new_at_risk_sids:
-            case_id = uuid.uuid4()
+            case_id = generate_uuid()
             advisor = random.choice(advisors)
             cases.append(
                 Case(
@@ -217,7 +219,7 @@ async def reseed() -> None:
             # for action_type, points in standard_tasks:
             #     tasks.append(
             #         Task(
-            #             task_id=uuid.uuid4(),
+            #             task_id=generate_uuid(),
             #             case_id=case_id,
             #             action_type=action_type,
             #             status=TaskStatus.PENDING.value,
@@ -238,7 +240,7 @@ async def reseed() -> None:
             
             ledger_entries.append(
                 PointLedger(
-                    id=uuid.uuid4(),
+                    id=generate_uuid(),
                     advisor_id=aid,
                     case_id=case_obj.case_id,
                     action='system_seeded_intervention',

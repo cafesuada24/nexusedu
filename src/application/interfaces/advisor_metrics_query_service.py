@@ -1,9 +1,9 @@
 """Advisor metrics query service interface."""
 
 from typing import Protocol
-from uuid import UUID
 
 from src.application.dtos.advisor_dtos import PersonalAdvisorMetricsDTO
+from src.core.identifiers import EntityID
 
 
 class AdvisorMetricsQueryService(Protocol):
@@ -11,7 +11,7 @@ class AdvisorMetricsQueryService(Protocol):
 
     async def get_advisor_metrics(
         self,
-        advisor_id: UUID,
+        advisor_id: EntityID,
     ) -> PersonalAdvisorMetricsDTO:
         """Calculate and retrieve personal performance metrics for an advisor."""
         ...

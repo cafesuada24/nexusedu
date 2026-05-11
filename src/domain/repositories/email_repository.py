@@ -1,8 +1,8 @@
 """Email repository interface."""
 
 from typing import Protocol
-from uuid import UUID
 
+from src.core.identifiers import EntityID
 from src.domain.entities.intervention_email import InterventionEmail
 
 
@@ -17,10 +17,10 @@ class EmailRepository(Protocol):
         """Update the content and status of an existing case email."""
         ...
 
-    async def get_by_case(self, case_id: UUID) -> InterventionEmail:
+    async def get_by_case(self, case_id: EntityID) -> InterventionEmail:
         """Find the email associated with a specific case."""
         ...
 
-    async def find_by_case(self, case_id: UUID) -> InterventionEmail | None:
+    async def find_by_case(self, case_id: EntityID) -> InterventionEmail | None:
         """Retrieve the email associated with a specific case."""
         ...

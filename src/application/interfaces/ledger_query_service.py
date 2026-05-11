@@ -1,13 +1,13 @@
 """Ledger query service interface."""
 
-from datetime import datetime
 from typing import Protocol
-from uuid import UUID
+
+from src.core.identifiers import EntityID
 
 
 class PointLedgerQueryService(Protocol):
     """Query Service for Point Ledger (Read-only)."""
 
-    async def get_total_points(self, advisor_id: UUID) -> int:
+    async def get_total_points(self, advisor_id: EntityID) -> int:
         """Calculates total points for an advisor."""
         ...

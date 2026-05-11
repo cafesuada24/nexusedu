@@ -1,8 +1,8 @@
 """Status history repository interface."""
 
 from typing import Any, Protocol
-from uuid import UUID
 
+from src.core.identifiers import EntityID
 from src.domain.value_objects.status import RiskStatus
 
 
@@ -21,6 +21,6 @@ class StatusHistoryRepository(Protocol):
         """Retrieve all status history records."""
         ...
 
-    async def get_latest_anomaly(self, sid: UUID) -> RiskStatus | None:
+    async def get_latest_anomaly(self, sid: EntityID) -> RiskStatus | None:
         """Get the most recent anomaly flag for a student."""
         ...

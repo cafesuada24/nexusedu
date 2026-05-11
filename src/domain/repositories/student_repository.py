@@ -1,15 +1,15 @@
 """Student repository interface."""
 
 from typing import Any, Protocol
-from uuid import UUID
 
+from src.core.identifiers import EntityID
 from src.domain.entities.student import Student
 
 
 class StudentRepository(Protocol):
     """Interface for student-related data operations."""
 
-    async def get_by_id(self, sid: UUID) -> Student:
+    async def get_by_id(self, sid: EntityID) -> Student:
         """Retrieve a student by their unique ID."""
         ...
 
@@ -19,7 +19,7 @@ class StudentRepository(Protocol):
 
     async def get_recent_performance(
         self,
-        sid: UUID,
+        sid: EntityID,
         limit: int = 4,
     ) -> list[dict[str, Any]]:
         """Retrieve recent performance history for a student."""

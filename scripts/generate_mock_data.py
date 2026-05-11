@@ -1,10 +1,11 @@
 import os
 import random
 import time
-import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pandas as pd
+
+from src.core.identifiers import generate_uuid
 
 # Constants
 NUM_STUDENTS = 100
@@ -45,7 +46,7 @@ def generate_mock_data():
     # 1. Generate Students (SIS data)
     students = []
     for i in range(NUM_STUDENTS):
-        sid = uuid.uuid4()
+        sid = generate_uuid()
         name = f'Student {i}'
         profile = random.choices(
             ['steady', 'improving', 'degrading'], weights=[0.6, 0.2, 0.2],
@@ -109,7 +110,7 @@ def generate_mock_data():
 
                             activities.append(
                                 {
-                                    'activity_id': str(uuid.uuid4()),
+                                    'activity_id': str(generate_uuid()),
                                     'sid': student['sid'],
                                     'course_id': course['id'],
                                     'course_name': course['name'],

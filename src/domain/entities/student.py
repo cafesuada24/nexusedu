@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
+from src.core.identifiers import EntityID
 from src.domain.value_objects.status import RiskStatus
 
 
@@ -11,7 +11,7 @@ from src.domain.value_objects.status import RiskStatus
 class Student:
     """Represents a student in the system."""
 
-    sid: UUID
+    sid: EntityID
     student_name: str
     email: str
     major: str

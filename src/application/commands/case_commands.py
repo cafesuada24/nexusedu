@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime
 from string import Template
-from uuid import uuid4
 
 from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
@@ -19,6 +18,7 @@ from src.application.dtos.case_dtos import (
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.event_publisher import EventPublisher
 from src.core.config import config
+from src.core.identifiers import generate_uuid
 from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
@@ -143,7 +143,7 @@ class CaseCommandHandler:
         existing_email.mark_as_generating()
         await self.email_repo.save(existing_email)
 
-        job_id = uuid4()
+        job_id = generate_uuid()
         new_job = Job(
             job_id=job_id,
             correlation_id=case.case_id,
@@ -191,7 +191,7 @@ class CaseCommandHandler:
 
         recipient_email = student.email
 
-        job_id = uuid4()
+        job_id = generate_uuid()
         new_job = Job(
             job_id=job_id,
             correlation_id=case.case_id,
@@ -272,7 +272,7 @@ class CaseCommandHandler:
             )
         except DraftGenerationError as e:
             logger.warning(
-                f'Draft generation failed for case {command.case_id}: {e}. Falling back to safe template.'
+                f'Draft generation failed for case {command.case_id}: {e}. Falling back to safe template.',
             )
             subject = SAFE_SUBJECT
             personalized_body = SAFE_BODY.safe_substitute(

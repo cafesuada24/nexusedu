@@ -1,8 +1,8 @@
 """Advisor-related domain events."""
 
 from dataclasses import dataclass
-from uuid import UUID
 
+from src.core.identifiers import EntityID
 from src.domain.events.base import DomainEvent
 
 
@@ -10,6 +10,6 @@ from src.domain.events.base import DomainEvent
 class AdvisorCreatedEvent(DomainEvent):
     """Event triggered when a new advisor is created."""
 
-    advisor_id: UUID
+    advisor_id: EntityID
     email: str
     name: str

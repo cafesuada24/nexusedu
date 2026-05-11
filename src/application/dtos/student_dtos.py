@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
-from pydantic import UUID4, BaseModel
+from pydantic import BaseModel
 
+from src.core.identifiers import EntityID
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
 
@@ -23,13 +23,13 @@ class GetAllStudentsQuery:
 class GetStudentQuery:
     """Query to retrieve a single student."""
 
-    sid: UUID
+    sid: EntityID
 
 
 class StudentDTO(BaseModel):
     """DTO for student data."""
 
-    sid: UUID4
+    sid: EntityID
     student_name: str | None
     email: str | None
     major: str
@@ -37,7 +37,7 @@ class StudentDTO(BaseModel):
     intervention_status: InterventionStatus | None = None
     last_notified_at: datetime | None
     is_generating: bool = False
-    active_case_id: UUID4 | None = None
+    active_case_id: EntityID | None = None
 
 
 class AlertDTO(BaseModel):
