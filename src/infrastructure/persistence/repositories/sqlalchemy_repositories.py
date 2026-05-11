@@ -730,6 +730,7 @@ class SqlAlchemyCaseRepository:
             )
             .values(
                 assigned_advisor_id=advisor_id,
+                version=OrmCase.version + 1,
             )
         )
         result = await self.session.execute(stmt)
