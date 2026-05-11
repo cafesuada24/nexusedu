@@ -83,6 +83,16 @@ class EmailNotFoundError(DomainError):
 class MissingReceipentInformationError(DomainError):
     """Raised when the recipent information is missing."""
 
+class DraftGenerationError(DomainError):
+    """Base exception for email draft generation failures."""
+
+class ToxicityDetectedError(DraftGenerationError):
+    """Raised when toxic content or hate speech is detected in the draft."""
+
+class TonePolicyViolationError(DraftGenerationError):
+    """Raised when the draft violates the empathetic tone policy."""
+
+
 
 
 # =============================

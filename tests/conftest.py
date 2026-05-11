@@ -66,7 +66,7 @@ def mock_baml(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 
     # Core API and Infrastructure components
     monkeypatch.setattr('src.presentation.api.routes.health.b', mock_b)
-    monkeypatch.setattr('src.infrastructure.extern.baml_drafting_service.b_async', mock_b)
+    monkeypatch.setattr('src.infrastructure.extern.guardrails_drafting_service.b_async', mock_b)
 
     return mock_b
 

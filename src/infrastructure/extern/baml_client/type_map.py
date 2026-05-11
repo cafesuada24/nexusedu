@@ -10,12 +10,17 @@
 # BAML files and re-generate this code using: baml-cli generate
 # baml-cli is available with the baml package.
 
-from . import stream_types, types
+from . import types
+from . import stream_types
+
 
 type_map = {
 
     "types.DiscoveryRequest": types.DiscoveryRequest,
     "stream_types.DiscoveryRequest": stream_types.DiscoveryRequest,
+
+    "types.EmailDraft": types.EmailDraft,
+    "stream_types.EmailDraft": stream_types.EmailDraft,
 
     "types.GeneratedSQL": types.GeneratedSQL,
     "stream_types.GeneratedSQL": stream_types.GeneratedSQL,
@@ -29,5 +34,7 @@ type_map = {
     "types.RouterPlan": types.RouterPlan,
     "stream_types.RouterPlan": stream_types.RouterPlan,
 
+
+    "types.ToneEvaluation": types.ToneEvaluation,
 
 }

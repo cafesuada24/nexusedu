@@ -1,6 +1,7 @@
 """Command handlers for case-related operations."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
+from string import Template
 from uuid import uuid4
 
 from src.application.dtos.case_dtos import (
@@ -24,6 +25,7 @@ from src.domain.entities.job import Job
 from src.domain.exceptions import (
     CaseAlreadyClosedError,
     CaseNotFoundError,
+    DraftGenerationError,
     EmailUnavailableError,
     InvalidActionError,
     JobNotFoundError,
@@ -40,6 +42,18 @@ from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.availability import AdvisorAvailabilityService
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
+
+# Application-level safe fallbacks
+SAFE_SUBJECT = 'Checking in on your academic progress'
+SAFE_BODY = Template(
+    'Hi ${student_name},\n\n'
+    'I noticed a change in your recent course activity and wanted to check in to see how things are going. '
+    'We are here to support you and help you navigate any challenges you might be facing.\n\n'
+    'If you have a moment, I would love to chat and see how we can help. '
+    'You can book a time with me here: ${advisor_link}\n\n'
+    'Best regards,\n'
+    'Your Academic Advisor',
+)
 
 
 class CaseCommandHandler:
@@ -247,15 +261,28 @@ class CaseCommandHandler:
 
         # 3. Generate via AI port (Synthesis & Generation)
         booking_link = command.booking_link or 'https://calendly.com/advisor-help'
-        personalized_body = await self.email_drafting_service.generate_draft(
-            student_data.student_name,
-            context_str,
-            booking_link,
-        )
+        try:
+            (
+                subject,
+                personalized_body,
+            ) = await self.email_drafting_service.generate_draft(
+                student_data.student_name,
+                context_str,
+                booking_link,
+            )
+        except DraftGenerationError as e:
+            logger.warning(
+                f'Draft generation failed for case {command.case_id}: {e}. Falling back to safe template.'
+            )
+            subject = SAFE_SUBJECT
+            personalized_body = SAFE_BODY.safe_substitute(
+                student_name=student_data.student_name,
+                advisor_link=booking_link,
+            )
 
         # 4. Persistent storage: Update the existing placeholder
         email.set_draft_content(
-            'Checking in on your academic progress',
+            subject,
             personalized_body,
         )
         await self.email_repo.save(email)

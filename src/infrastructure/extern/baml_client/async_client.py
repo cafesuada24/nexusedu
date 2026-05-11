@@ -11,16 +11,13 @@
 # baml-cli is available with the baml package.
 
 import typing
-
-import baml_py
 import typing_extensions
+import baml_py
 
-from . import stream_types, type_builder, types
-from .globals import (
-    DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME as __runtime__,
-)
+from . import stream_types, types, type_builder
 from .parser import LlmResponseParser, LlmStreamParser
-from .runtime import BamlCallOptions, DoNotUseDirectlyCallManager
+from .runtime import DoNotUseDirectlyCallManager, BamlCallOptions
+from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME as __runtime__
 
 
 class BamlAsyncClient:
@@ -40,13 +37,13 @@ class BamlAsyncClient:
         self.__llm_stream_parser = LlmStreamParser(options)
 
     def with_options(self,
-        tb: type_builder.TypeBuilder | None = None,
-        client_registry: baml_py.baml_py.ClientRegistry | None = None,
-        client: str | None = None,
-        collector: baml_py.baml_py.Collector | list[baml_py.baml_py.Collector] | None = None,
-        env: dict[str, str | None] | None = None,
-        tags: dict[str, str] | None = None,
-        on_tick: typing.Callable[[str, baml_py.baml_py.FunctionLog], None] | None = None,
+        tb: typing.Optional[type_builder.TypeBuilder] = None,
+        client_registry: typing.Optional[baml_py.baml_py.ClientRegistry] = None,
+        client: typing.Optional[str] = None,
+        collector: typing.Optional[typing.Union[baml_py.baml_py.Collector, typing.List[baml_py.baml_py.Collector]]] = None,
+        env: typing.Optional[typing.Dict[str, typing.Optional[str]]] = None,
+        tags: typing.Optional[typing.Dict[str, str]] = None,
+        on_tick: typing.Optional[typing.Callable[[str, baml_py.baml_py.FunctionLog], None]] = None,
     ) -> "BamlAsyncClient":
         options: BamlCallOptions = {}
         if tb is not None:
@@ -85,20 +82,36 @@ class BamlAsyncClient:
     def parse_stream(self):
       return self.__llm_stream_parser
 
+    async def EvaluateDraftTone(self, subject: str,body: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.ToneEvaluation:
+        # Check if on_tick is provided
+        if 'on_tick' in baml_options:
+            # Use streaming internally when on_tick is provided
+            __stream__ = self.stream.EvaluateDraftTone(subject=subject,body=body,
+                baml_options=baml_options)
+            return await __stream__.get_final_response()
+        else:
+            # Original non-streaming code
+            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="EvaluateDraftTone", args={
+                "subject": subject,"body": body,
+            })
+            return typing.cast(types.ToneEvaluation, __result__.cast_to(types, types, stream_types, False, __runtime__))
     async def GenerateDraftEmail(self, user_intent: str,context: str,
         baml_options: BamlCallOptions = {},
-    ) -> str:
+    ) -> types.EmailDraft:
         # Check if on_tick is provided
         if 'on_tick' in baml_options:
             # Use streaming internally when on_tick is provided
             __stream__ = self.stream.GenerateDraftEmail(user_intent=user_intent,context=context,
                 baml_options=baml_options)
             return await __stream__.get_final_response()
-        # Original non-streaming code
-        __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="GenerateDraftEmail", args={
-            "user_intent": user_intent,"context": context,
-        })
-        return typing.cast("str", __result__.cast_to(types, types, stream_types, False, __runtime__))
+        else:
+            # Original non-streaming code
+            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="GenerateDraftEmail", args={
+                "user_intent": user_intent,"context": context,
+            })
+            return typing.cast(types.EmailDraft, __result__.cast_to(types, types, stream_types, False, __runtime__))
     async def GenerateSQL(self, message: str,
         baml_options: BamlCallOptions = {},
     ) -> typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]:
@@ -108,11 +121,12 @@ class BamlAsyncClient:
             __stream__ = self.stream.GenerateSQL(message=message,
                 baml_options=baml_options)
             return await __stream__.get_final_response()
-        # Original non-streaming code
-        __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="GenerateSQL", args={
-            "message": message,
-        })
-        return typing.cast("types.GeneratedSQL | types.RequestTableSchema", __result__.cast_to(types, types, stream_types, False, __runtime__))
+        else:
+            # Original non-streaming code
+            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="GenerateSQL", args={
+                "message": message,
+            })
+            return typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], __result__.cast_to(types, types, stream_types, False, __runtime__))
     async def PlanNextStep(self, thread: str,
         baml_options: BamlCallOptions = {},
     ) -> types.RouterPlan:
@@ -122,11 +136,12 @@ class BamlAsyncClient:
             __stream__ = self.stream.PlanNextStep(thread=thread,
                 baml_options=baml_options)
             return await __stream__.get_final_response()
-        # Original non-streaming code
-        __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="PlanNextStep", args={
-            "thread": thread,
-        })
-        return typing.cast("types.RouterPlan", __result__.cast_to(types, types, stream_types, False, __runtime__))
+        else:
+            # Original non-streaming code
+            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="PlanNextStep", args={
+                "thread": thread,
+            })
+            return typing.cast(types.RouterPlan, __result__.cast_to(types, types, stream_types, False, __runtime__))
     async def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
         baml_options: BamlCallOptions = {},
     ) -> str:
@@ -136,11 +151,12 @@ class BamlAsyncClient:
             __stream__ = self.stream.ReflectSQLError(query=query,error=error,db_schema_hint=db_schema_hint,
                 baml_options=baml_options)
             return await __stream__.get_final_response()
-        # Original non-streaming code
-        __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="ReflectSQLError", args={
-            "query": query,"error": error,"db_schema_hint": db_schema_hint,
-        })
-        return typing.cast("str", __result__.cast_to(types, types, stream_types, False, __runtime__))
+        else:
+            # Original non-streaming code
+            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="ReflectSQLError", args={
+                "query": query,"error": error,"db_schema_hint": db_schema_hint,
+            })
+            return typing.cast(str, __result__.cast_to(types, types, stream_types, False, __runtime__))
     async def Respond(self, result: str,
         baml_options: BamlCallOptions = {},
     ) -> str:
@@ -150,12 +166,13 @@ class BamlAsyncClient:
             __stream__ = self.stream.Respond(result=result,
                 baml_options=baml_options)
             return await __stream__.get_final_response()
-        # Original non-streaming code
-        __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="Respond", args={
-            "result": result,
-        })
-        return typing.cast("str", __result__.cast_to(types, types, stream_types, False, __runtime__))
-
+        else:
+            # Original non-streaming code
+            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="Respond", args={
+                "result": result,
+            })
+            return typing.cast(str, __result__.cast_to(types, types, stream_types, False, __runtime__))
+    
 
 
 class BamlStreamClient:
@@ -164,16 +181,28 @@ class BamlStreamClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    def EvaluateDraftTone(self, subject: str,body: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlStream[types.ToneEvaluation, types.ToneEvaluation]:
+        __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="EvaluateDraftTone", args={
+            "subject": subject,"body": body,
+        })
+        return baml_py.BamlStream[types.ToneEvaluation, types.ToneEvaluation](
+          __result__,
+          lambda x: typing.cast(types.ToneEvaluation, x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(types.ToneEvaluation, x.cast_to(types, types, stream_types, False, __runtime__)),
+          __ctx__,
+        )
     def GenerateDraftEmail(self, user_intent: str,context: str,
         baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[str, str]:
+    ) -> baml_py.BamlStream[stream_types.EmailDraft, types.EmailDraft]:
         __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="GenerateDraftEmail", args={
             "user_intent": user_intent,"context": context,
         })
-        return baml_py.BamlStream[str, str](
+        return baml_py.BamlStream[stream_types.EmailDraft, types.EmailDraft](
           __result__,
-          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast(stream_types.EmailDraft, x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(types.EmailDraft, x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def GenerateSQL(self, message: str,
@@ -184,8 +213,8 @@ class BamlStreamClient:
         })
         return baml_py.BamlStream[typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]](
           __result__,
-          lambda x: typing.cast("stream_types.GeneratedSQL | stream_types.RequestTableSchema", x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast("types.GeneratedSQL | types.RequestTableSchema", x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast(typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def PlanNextStep(self, thread: str,
@@ -196,8 +225,8 @@ class BamlStreamClient:
         })
         return baml_py.BamlStream[stream_types.RouterPlan, types.RouterPlan](
           __result__,
-          lambda x: typing.cast("stream_types.RouterPlan", x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast("types.RouterPlan", x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast(stream_types.RouterPlan, x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(types.RouterPlan, x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
@@ -208,8 +237,8 @@ class BamlStreamClient:
         })
         return baml_py.BamlStream[str, str](
           __result__,
-          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
     def Respond(self, result: str,
@@ -220,11 +249,11 @@ class BamlStreamClient:
         })
         return baml_py.BamlStream[str, str](
           __result__,
-          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast("str", x.cast_to(types, types, stream_types, False, __runtime__)),
+          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, True, __runtime__)),
+          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
-
+    
 
 class BamlHttpRequestClient:
     __options: DoNotUseDirectlyCallManager
@@ -232,6 +261,13 @@ class BamlHttpRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    async def EvaluateDraftTone(self, subject: str,body: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.baml_py.HTTPRequest:
+        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="EvaluateDraftTone", args={
+            "subject": subject,"body": body,
+        }, mode="request")
+        return __result__
     async def GenerateDraftEmail(self, user_intent: str,context: str,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.baml_py.HTTPRequest:
@@ -267,7 +303,7 @@ class BamlHttpRequestClient:
             "result": result,
         }, mode="request")
         return __result__
-
+    
 
 class BamlHttpStreamRequestClient:
     __options: DoNotUseDirectlyCallManager
@@ -275,6 +311,13 @@ class BamlHttpStreamRequestClient:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    async def EvaluateDraftTone(self, subject: str,body: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.baml_py.HTTPRequest:
+        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="EvaluateDraftTone", args={
+            "subject": subject,"body": body,
+        }, mode="stream")
+        return __result__
     async def GenerateDraftEmail(self, user_intent: str,context: str,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.baml_py.HTTPRequest:
@@ -310,6 +353,6 @@ class BamlHttpStreamRequestClient:
             "result": result,
         }, mode="stream")
         return __result__
-
+    
 
 b = BamlAsyncClient(DoNotUseDirectlyCallManager({}))

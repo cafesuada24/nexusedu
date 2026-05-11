@@ -14,8 +14,8 @@ class EmailDraftingService(Protocol):
         student_name: str,
         performance_context: str,
         booking_link: str,
-    ) -> str:
-        """Generate a personalized email body.
+    ) -> tuple[str, str]:
+        """Generate a personalized email subject and body.
 
         Args:
             student_name: The name of the student.
@@ -23,6 +23,6 @@ class EmailDraftingService(Protocol):
             booking_link: The URL for the student to book a meeting.
 
         Returns:
-            The generated email body text.
+            A tuple of (subject, body).
         """
         ...

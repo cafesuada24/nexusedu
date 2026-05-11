@@ -1,4 +1,9 @@
-function GenerateDraftEmail(user_intent: string, context: string) -> string {
+class EmailDraft {
+  subject string
+  body string
+}
+
+function GenerateDraftEmail(user_intent: string, context: string) -> EmailDraft {
   client Gemini_31_Flash_Lite
   prompt #"
     {{ _.role("system") }}
@@ -26,7 +31,8 @@ function GenerateDraftEmail(user_intent: string, context: string) -> string {
     </placeholders>
 
     <output_specification>
-      Print ONLY the draft email an nothing else.
+      Return a JSON object with 'subject' and 'body' fields.
+      Ensure the 'body' is concise and warm.
     </output_specification>
 
     <closing_instruction>
@@ -44,5 +50,40 @@ function GenerateDraftEmail(user_intent: string, context: string) -> string {
     </context>
 
     Email:
+  "#
+}
+
+enum ToneEvaluation {
+  SAFE
+  PUNITIVE
+  TOXIC
+}
+
+function EvaluateDraftTone(subject: string, body: string) -> ToneEvaluation {
+  client Gemini_31_Flash_Lite
+  prompt #"
+    {{ _.role("system") }}
+    You are an expert **FERPA Compliance Officer**. 
+    Evaluate the following email draft for "Academic Shaming" or non-supportive tone.
+    
+    Criteria for PUNITIVE:
+    - Language that focuses on "failure", "probation", or "risk" in a way that feels like a warning or punishment.
+    - Cold, bureaucratic, or disappointing tone.
+    - Phrases like "you failed to", "disappointing progress", "final warning".
+
+    Criteria for TOXIC:
+    - Hate speech, insults, profanity, or bias.
+
+    Criteria for SAFE:
+    - Curious, supportive, checking in.
+    - Emphasizes "noticing a change" and "here to help".
+    - Empathetic and warm.
+
+    Return ONLY one of the enum values: SAFE, PUNITIVE, TOXIC.
+
+    Subject: {{ subject }}
+    Body: {{ body }}
+
+    Evaluation:
   "#
 }

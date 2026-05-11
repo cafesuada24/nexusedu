@@ -923,9 +923,14 @@ class SqlAlchemyJobRepository:
         correlation_type: str,
     ) -> Job | None:
         """Find job by a correlation id."""
-        stmt = select(BackgroundJobTracker).where(
-            BackgroundJobTracker.correlation_id == correlation_id,
-            BackgroundJobTracker.correlation_type == correlation_type,
+        stmt = (
+            select(BackgroundJobTracker)
+            .where(
+                BackgroundJobTracker.correlation_id == correlation_id,
+                BackgroundJobTracker.correlation_type == correlation_type,
+            )
+            .order_by(BackgroundJobTracker.created_at.desc())
+            .limit(1)
         )
         result = await self.session.execute(stmt)
         value = result.scalar_one_or_none()

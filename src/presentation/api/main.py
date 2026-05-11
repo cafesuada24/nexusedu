@@ -95,25 +95,6 @@ async def value_error_handler(_request: Request, exc: ValueError) -> JSONRespons
     )
 
 
-try:
-    from sqlglot import ParseError as SQLParseError
-except ImportError:
-    SQLParseError = Exception
-
-
-@app.exception_handler(SQLParseError)
-async def sql_parse_error_handler(_request: Request, exc: Exception) -> JSONResponse:
-    """Handles SQL parsing errors specifically."""
-    logger.warning(f'SQL Parse Error: {exc}')
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={
-            'detail': 'The generated or provided SQL query is invalid.',
-            'type': 'SQLParseError',
-        },
-    )
-
-
 # API v1 Router
 api_v1_router = APIRouter(prefix='/api/v1')
 

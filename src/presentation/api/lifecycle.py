@@ -15,6 +15,7 @@ from fastapi import FastAPI
 
 from src.core.config import config
 from src.core.logger import logger
+from src.infrastructure.extern.presidio_pii_masker import PresidioPiiMasker
 
 
 @dataclass
@@ -30,6 +31,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # ==== Database ====
     # Schema is managed by Alembic migrations. Run: alembic upgrade head
     logger.info('API Lifecycle: Starting up (DB managed by Alembic)...')
+
+    # ==== PII Masker Warmup ====
+    # Pre-load heavy NLP models once during startup
+    logger.info('API Lifecycle: Warming up PII Masker...')
+    PresidioPiiMasker()
 
     # ==== ARQ Redis Pool ====
     try:
