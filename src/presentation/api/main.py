@@ -25,6 +25,7 @@ from src.presentation.api.routes import (
     metrics,
     students,
     users,
+    websocket,
 )
 from src.presentation.schemas.auth import UserCreate, UserRead
 
@@ -131,6 +132,7 @@ api_v1_router.include_router(cases.router)
 api_v1_router.include_router(advisors.router)
 api_v1_router.include_router(metrics.router)
 api_v1_router.include_router(students.router)
+api_v1_router.include_router(websocket.router)
 
 app.include_router(api_v1_router)
 
