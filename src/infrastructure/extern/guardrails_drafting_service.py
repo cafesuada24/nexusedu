@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Mapping
 from typing import Annotated
 
@@ -20,35 +19,43 @@ from src.domain.exceptions import (
     TonePolicyViolationError,
     ToxicityDetectedError,
 )
-from src.domain.services.email_drafting import EmailDraftingService
 from src.infrastructure.extern.baml_client.async_client import b as b_async
-from src.infrastructure.extern.baml_client.types import EmailDraft, ToneEvaluation
+from src.infrastructure.extern.baml_client.types import EmailDraft
 
 
 @register_validator(name='ferpa_tone_validator', data_type='string')
 class FerpaToneValidator(Validator):
-    """Custom Guardrails validator using BAML LLM-as-a-judge for semantic tone check."""
+    """Custom Guardrails validator using local heuristic for semantic tone check."""
 
     def _validate(
         self,
         value: str,
         metadata: Mapping[str, object],
     ) -> ValidationResult:
-        """Asynchronously validate the tone using BAML."""
-        subject = metadata.get('subject', 'No Subject')
-        body = value
+        """Synchronously validate the tone using keyword heuristics."""
+        body_lower = value.lower()
 
-        evaluation = asyncio.run(b_async.EvaluateDraftTone(subject, body))
+        punitive_words = [
+            'failure',
+            'probation',
+            'risk',
+            'failed',
+            'disappointing',
+            'warning',
+            'punishment',
+            'consequence',
+            'shaming',
+        ]
 
-        match evaluation:
-            case ToneEvaluation.SAFE:
-                return PassResult()
-            case ToneEvaluation.TOXIC:
-                return FailResult(errorMessage='Toxic content detected.')
-            case _:
+        for word in punitive_words:
+            if word in body_lower:
+                logger.info(f'Tone evaluation failed: Found punitive word "{word}"')
                 return FailResult(
-                    errorMessage='Academic shaming or punitive tone detected.',
+                    errorMessage=f'Academic shaming or punitive tone detected: "{word}"'
                 )
+
+        logger.info('Tone evaluation passed (SAFE).')
+        return PassResult()
 
 
 class EmailDraftSchema(BaseModel):
@@ -69,8 +76,8 @@ class GuardrailsEmailDraftingService:
 
     def __init__(self, pii_masker: PiiMasker) -> None:
         self._pii_masker = pii_masker
-        self._guard = AsyncGuard.for_pydantic(output_class=EmailDraftSchema)
-        # self._guard = Guard.from_pydantic(EmailDraftSchema)
+        # Removing AsyncGuard from __init__ prevents 1s latency on the API endpoint
+        # since CaseCommandHandler evaluates this in its constructor.
 
     async def generate_draft(
         self,
@@ -80,6 +87,7 @@ class GuardrailsEmailDraftingService:
     ) -> tuple[str, str]:
 
         # 1. Mask PII in input
+        logger.info('Masking PII in performance context...')
         masked_context = self._pii_masker.mask(performance_context)
         self._validate_input_masking(performance_context, masked_context)
 
@@ -106,12 +114,20 @@ class GuardrailsEmailDraftingService:
         except (ToxicityDetectedError, TonePolicyViolationError):
             raise
         except Exception as e:
+            logger.error(f'Draft generation error: {e}', exc_info=True)
             raise DraftGenerationError(f'Failed to generate valid draft: {e}') from e
 
     async def _validate_semantic_policy(self, baml_output: EmailDraft) -> None:
         """Run semantic policy checks on the LLM output."""
         try:
-            await self._guard.parse(
+            logger.info(f'Validating body tone with Guardrails: {baml_output.subject}')
+
+            # Lazy initialize the Guard to avoid endpoint latency
+            body_guard = AsyncGuard().use(
+                FerpaToneValidator(on_fail=OnFailAction.EXCEPTION),
+            )
+
+            await body_guard.parse(
                 llm_output=baml_output.body,
                 metadata={'subject': baml_output.subject},
             )
