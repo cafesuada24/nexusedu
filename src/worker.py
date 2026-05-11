@@ -1,5 +1,6 @@
 """ARQ Worker for background job processing."""
 
+import asyncio
 from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from uuid import UUID
@@ -16,6 +17,7 @@ from src.application.commands.schedule_commands import AddWorkingHoursCommand
 from src.core.config import config
 from src.core.container import Container
 from src.core.logger import logger
+from src.domain.value_objects.status import JobStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 from src.infrastructure.database.session import async_session_maker, get_async_session
 
@@ -54,15 +56,21 @@ async def run_email_draft_task(
 
             job.finish(datetime.now(UTC))
             await job_repo.save(job)
+            await session.commit()
             logger.info(
                 f'Worker: Email generated job finished sucessfully for case with id {case_id}',
             )
-        except Exception as e:
-            job.fail(datetime.now(UTC))
-            await job_repo.save(job)
-            logger.info(
-                f'Worker: Email generated job failed for case with id {case_id}, error: {e}',
+        except (Exception, asyncio.CancelledError) as e:
+            if job.status == JobStatus.RUNNING:
+                job.fail(datetime.now(UTC))
+                await job_repo.save(job)
+                await session.commit()
+
+            logger.error(
+                f'Worker: Email generated job failed or timed out for case with id {case_id}, error: {e}',
             )
+            if isinstance(e, asyncio.CancelledError):
+                raise e
 
 
 async def run_dispatch_email_task(
@@ -450,9 +458,13 @@ async def run_advisor_created_task(
             )
             try:
                 await schedule_handler.handle_add_working_hours(command)
-                logger.debug(f'Worker: Added default hours for advisor {advisor_id} on day {day}')
+                logger.debug(
+                    f'Worker: Added default hours for advisor {advisor_id} on day {day}'
+                )
             except Exception as e:
-                logger.error(f'Worker: Failed to add default hours for advisor {advisor_id} on day {day}: {e}')
+                logger.error(
+                    f'Worker: Failed to add default hours for advisor {advisor_id} on day {day}: {e}'
+                )
 
         await session.commit()
 
