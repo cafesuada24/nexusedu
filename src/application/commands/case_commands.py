@@ -247,7 +247,7 @@ class CaseCommandHandler:
 
         # 3. Generate via AI port (Synthesis & Generation)
         booking_link = command.booking_link or 'https://calendly.com/advisor-help'
-        personalized_body = await self.email_drafting_service.generate_draft(
+        subject, personalized_body = await self.email_drafting_service.generate_draft(
             student_data.student_name,
             context_str,
             booking_link,
@@ -255,7 +255,7 @@ class CaseCommandHandler:
 
         # 4. Persistent storage: Update the existing placeholder
         email.set_draft_content(
-            'Checking in on your academic progress',
+            subject,
             personalized_body,
         )
         await self.email_repo.save(email)

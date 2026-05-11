@@ -1,4 +1,9 @@
-function GenerateDraftEmail(user_intent: string, context: string) -> string {
+class EmailDraft {
+  subject string
+  body string
+}
+
+function GenerateDraftEmail(user_intent: string, context: string) -> EmailDraft {
   client Gemini_31_Flash_Lite
   prompt #"
     {{ _.role("system") }}
@@ -26,7 +31,8 @@ function GenerateDraftEmail(user_intent: string, context: string) -> string {
     </placeholders>
 
     <output_specification>
-      Print ONLY the draft email an nothing else.
+      Return a JSON object with 'subject' and 'body' fields.
+      Ensure the 'body' is concise and warm.
     </output_specification>
 
     <closing_instruction>

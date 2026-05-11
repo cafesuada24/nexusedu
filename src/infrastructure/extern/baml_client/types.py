@@ -11,11 +11,14 @@
 # baml-cli is available with the baml package.
 
 import typing
+import typing_extensions
 from enum import Enum
 
-import baml_py
-import typing_extensions
+
 from pydantic import BaseModel, ConfigDict, Field
+
+
+import baml_py
 
 CheckT = typing_extensions.TypeVar('CheckT')
 CheckName = typing_extensions.TypeVar('CheckName', bound=str)
@@ -26,30 +29,34 @@ class Check(BaseModel):
     status: str
 class Checked(BaseModel, typing.Generic[CheckT, CheckName]):
     value: CheckT
-    checks: dict[CheckName, Check]
+    checks: typing.Dict[CheckName, Check]
 
-def get_checks(checks: dict[CheckName, Check]) -> list[Check]:
+def get_checks(checks: typing.Dict[CheckName, Check]) -> typing.List[Check]:
     return list(checks.values())
 
-def all_succeeded(checks: dict[CheckName, Check]) -> bool:
+def all_succeeded(checks: typing.Dict[CheckName, Check]) -> bool:
     return all(check.status == "succeeded" for check in get_checks(checks))
 # #########################################################################
 # Generated enums (0)
 # #########################################################################
 
 # #########################################################################
-# Generated classes (5)
+# Generated classes (6)
 # #########################################################################
 
 class DiscoveryRequest(BaseModel):
-    tool_name: typing_extensions.Literal['get_db_list'] | typing_extensions.Literal['list_tables'] | typing_extensions.Literal['describe_table'] = Field(description='The name of the discovery tool to call."')
-    db_id: str | None = Field(default=None, description='The database ID.')
-    table_name: str | None = Field(default=None, description='The table name if calling describe_table.')
+    tool_name: typing.Union[typing_extensions.Literal['get_db_list'], typing_extensions.Literal['list_tables'], typing_extensions.Literal['describe_table']] = Field(description='The name of the discovery tool to call."')
+    db_id: typing.Optional[str] = Field(default=None, description='The database ID.')
+    table_name: typing.Optional[str] = Field(default=None, description='The table name if calling describe_table.')
+
+class EmailDraft(BaseModel):
+    subject: str
+    body: str
 
 class GeneratedSQL(BaseModel):
     sql: str = Field(description='The generated SQL query.')
     explanation: str = Field(description='Brief explanation of the query logic.')
-    accessed_tables: list[str] = Field(description='Table names used in the query.')
+    accessed_tables: typing.List[str] = Field(description='Table names used in the query.')
     dialect_used: str
 
 class PlannerTask(BaseModel):
@@ -60,14 +67,14 @@ class PlannerTask(BaseModel):
 
 class RequestTableSchema(BaseModel):
     db_id: str = Field(description='The db id to request its schema.')
-    table_names: list[str] = Field(description='The list of table names to request their schema.')
+    table_names: typing.List[str] = Field(description='The list of table names to request their schema.')
 
 class RouterPlan(BaseModel):
-    path: typing_extensions.Literal['SQL_EXECUTION'] | typing_extensions.Literal['DIRECT_ANSWER'] | typing_extensions.Literal['DISCOVERY_REQUIRED'] | typing_extensions.Literal['EXTERNAL_TOOL'] = Field(description='The execution path chosen by the planner.\'')
-    tasks: list["PlannerTask"] | None = Field(default=None, description='The list of parallel SQL tasks to execute (required if path is SQL_EXECUTION).')
-    next_action_after_sql: typing_extensions.Literal['RESPOND'] | typing_extensions.Literal['EMAIL_DRAFT'] = Field(description='The next step to take after SQL execution (e.g., RESPOND or EMAIL_DRAFT).\'')
-    direct_response_draft: str | None = Field(default=None, description='A draft of the direct response (required if path is DIRECT_ANSWER).')
-    discovery_requests: list["DiscoveryRequest"] | None = Field(default=None, description='The list of discovery tools to call (required if path is DISCOVERY_REQUIRED).')
+    path: typing.Union[typing_extensions.Literal['SQL_EXECUTION'], typing_extensions.Literal['DIRECT_ANSWER'], typing_extensions.Literal['DISCOVERY_REQUIRED'], typing_extensions.Literal['EXTERNAL_TOOL']] = Field(description='The execution path chosen by the planner.\'')
+    tasks: typing.Optional[typing.List["PlannerTask"]] = Field(default=None, description='The list of parallel SQL tasks to execute (required if path is SQL_EXECUTION).')
+    next_action_after_sql: typing.Union[typing_extensions.Literal['RESPOND'], typing_extensions.Literal['EMAIL_DRAFT']] = Field(description='The next step to take after SQL execution (e.g., RESPOND or EMAIL_DRAFT).\'')
+    direct_response_draft: typing.Optional[str] = Field(default=None, description='A draft of the direct response (required if path is DIRECT_ANSWER).')
+    discovery_requests: typing.Optional[typing.List["DiscoveryRequest"]] = Field(default=None, description='The list of discovery tools to call (required if path is DISCOVERY_REQUIRED).')
 
 # #########################################################################
 # Generated type aliases (0)
