@@ -211,6 +211,8 @@ export function EmailEditorSheet({
         ? `${baseDomain}/booking?cid=${alert.caseId}`
         : `${baseDomain}/booking`;
 
+    const isFormIncomplete = !subject.trim() || !body.trim();
+
     return (
         <Sheet open={!!alert} onOpenChange={(o) => !o && onClose()}>
             <SheetContent className="flex h-full max-h-screen w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[700px]">
@@ -479,7 +481,7 @@ export function EmailEditorSheet({
                     <Separator />
                 </div>
 
-                <SheetFooter className="mt-0 gap-3 px-6 pb-6 sm:justify-end">
+                <SheetFooter className="mt-0 flex w-full justify-center sm:justify-center gap-3 px-6 pb-6">
                     <Button
                         variant="outline"
                         className="h-11 rounded-xl px-6"
@@ -488,11 +490,11 @@ export function EmailEditorSheet({
                         Đóng
                     </Button>
                     <Button
-                        disabled={isSent || isGenerating || !body.trim()}
+                        disabled={isSent || isGenerating || isFormIncomplete}
                         className={cn(
                             "h-11 rounded-xl px-8 font-semibold shadow-lg transition-all",
-                            isSent
-                                ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none"
+                            isSent || isFormIncomplete
+                                ? "bg-muted text-muted-foreground cursor-not-allowed shadow-none opacity-50"
                                 : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90",
                         )}
                         onClick={() => {
