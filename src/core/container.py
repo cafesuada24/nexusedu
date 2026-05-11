@@ -1,7 +1,6 @@
 """Centralized Dependency Injection Container."""
 
 from functools import cached_property
-from typing import Any
 
 from arq import ArqRedis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,15 +11,16 @@ from src.application.commands.schedule_commands import ScheduleCommandHandler
 from src.application.interfaces.advisor_metrics_query_service import (
     AdvisorMetricsQueryService,
 )
-from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.availability_query_service import (
     AdvisorAvailabilityQueryService,
 )
+from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.case_query_service import CaseQueryService
 from src.application.interfaces.gamification_query_service import (
     GamificationQueryService,
 )
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
+from src.application.interfaces.pii_masker import PiiMasker
 from src.application.interfaces.student_query_service import StudentQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
@@ -45,10 +45,14 @@ from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.anomaly_engine.zscore import ZScore
 from src.domain.services.availability import AdvisorAvailabilityService
+from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.email_sending import EmailSendingService
 from src.domain.services.gamification import GamificationService
-from src.infrastructure.extern.baml_drafting_service import BamlEmailDraftingService
 from src.infrastructure.extern.email_sender import AioSmtpEmailSender
+from src.infrastructure.extern.guardrails_drafting_service import (
+    GuardrailsEmailDraftingService,
+)
+from src.infrastructure.extern.presidio_pii_masker import PresidioPiiMasker
 from src.infrastructure.persistence.query_services.advisor_metrics_query_service import (
     SqlAlchemyAdvisorMetricsQueryService,
 )
@@ -61,11 +65,11 @@ from src.infrastructure.persistence.query_services.gamification_query_service im
 from src.infrastructure.persistence.query_services.point_ledger_query_service import (
     SqlAlchemyPointLedgerQueryService,
 )
-from src.infrastructure.persistence.query_services.student_query_service import (
-    SqlAlchemyStudentQueryService,
-)
 from src.infrastructure.persistence.query_services.sqlalchemy_availability_query_service import (
     SqlAlchemyAdvisorAvailabilityQueryService,
+)
+from src.infrastructure.persistence.query_services.student_query_service import (
+    SqlAlchemyStudentQueryService,
 )
 from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
@@ -188,6 +192,14 @@ class Container:
         return ZScore()
 
     @cached_property
+    def pii_masker(self) -> PiiMasker:
+        return PresidioPiiMasker()
+
+    @cached_property
+    def email_drafting_service(self) -> EmailDraftingService:
+        return GuardrailsEmailDraftingService(pii_masker=self.pii_masker)
+
+    @cached_property
     def direct_task_queue(self) -> ArqTaskQueueAdapter:
         """Real background queue for immediate dispatching (used by poller)."""
         if self.redis_pool is None:
@@ -248,7 +260,7 @@ class Container:
             self.task_queue,
             self.event_publisher,
             availability_service=self.availability_service,
-            email_drafting_service=BamlEmailDraftingService(),
+            email_drafting_service=self.email_drafting_service,
         )
 
     def get_schedule_command_handler(self) -> ScheduleCommandHandler:
