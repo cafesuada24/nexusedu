@@ -27,6 +27,7 @@ from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
 from src.application.services.event_publisher import TaskQueueEventPublisher
+from src.application.services.websocket_publisher import WebSocketEventPublisher
 from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -219,6 +220,12 @@ class Container:
     @cached_property
     def event_publisher(self) -> TaskQueueEventPublisher:
         return TaskQueueEventPublisher(self.task_queue)
+
+    @cached_property
+    def websocket_publisher(self) -> WebSocketEventPublisher:
+        if self.redis_pool is None:
+            raise ValueError('Redis pool is required for WebSocket publishing.')
+        return WebSocketEventPublisher(self.redis_pool)
 
     # Query Services
     @cached_property
