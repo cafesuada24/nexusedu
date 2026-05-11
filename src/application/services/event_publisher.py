@@ -3,7 +3,6 @@
 from collections.abc import Sequence
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
-from src.application.interfaces.event_publisher import EventPublisher
 from src.domain.events.advisor_events import AdvisorCreatedEvent
 from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
@@ -15,7 +14,7 @@ from src.domain.events.case_events import (
 )
 
 
-class TaskQueueEventPublisher(EventPublisher):
+class TaskQueueEventPublisher:
     """Dispatches domain events to background tasks."""
 
     def __init__(self, task_queue: BackgroundTaskQueue) -> None:
