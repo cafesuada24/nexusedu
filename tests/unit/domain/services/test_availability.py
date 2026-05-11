@@ -29,7 +29,7 @@ def availability_service(schedule_repo, case_repo):
 async def test_is_slot_available_success(availability_service, schedule_repo, case_repo):
     # Setup
     advisor_id = uuid4()
-    requested_time = datetime(2026, 5, 11, 9, 0, tzinfo=UTC)  # Monday
+    requested_time = datetime(2027, 5, 10, 9, 0, tzinfo=UTC)  # Monday May 10
     
     schedule_repo.get_working_hours.return_value = [
         WorkingHours(advisor_id=advisor_id, day_of_week=0, start_time=time(9, 0), end_time=time(17, 0), timezone="UTC"),
@@ -48,7 +48,7 @@ async def test_is_slot_available_success(availability_service, schedule_repo, ca
 async def test_is_slot_available_outside_hours(availability_service, schedule_repo, case_repo):
     # Setup
     advisor_id = uuid4()
-    requested_time = datetime(2026, 5, 11, 8, 30, tzinfo=UTC)  # Monday 8:30 (starts at 9)
+    requested_time = datetime(2027, 5, 10, 8, 30, tzinfo=UTC)  # Monday 8:30 (starts at 9)
     
     schedule_repo.get_working_hours.return_value = [
         WorkingHours(advisor_id=advisor_id, day_of_week=0, start_time=time(9, 0), end_time=time(17, 0), timezone="UTC"),
@@ -66,7 +66,7 @@ async def test_is_slot_available_outside_hours(availability_service, schedule_re
 async def test_is_slot_available_day_off(availability_service, schedule_repo, case_repo):
     # Setup
     advisor_id = uuid4()
-    requested_time = datetime(2026, 5, 11, 10, 0, tzinfo=UTC)
+    requested_time = datetime(2027, 5, 10, 10, 0, tzinfo=UTC)
     
     schedule_repo.get_working_hours.return_value = [
         WorkingHours(advisor_id=advisor_id, day_of_week=0, start_time=time(9, 0), end_time=time(17, 0), timezone="UTC"),
@@ -84,7 +84,7 @@ async def test_is_slot_available_day_off(availability_service, schedule_repo, ca
 async def test_is_slot_available_conflict(availability_service, schedule_repo, case_repo):
     # Setup
     advisor_id = uuid4()
-    requested_time = datetime(2026, 5, 11, 10, 0, tzinfo=UTC)
+    requested_time = datetime(2027, 5, 10, 10, 0, tzinfo=UTC)
     
     schedule_repo.get_working_hours.return_value = [
         WorkingHours(advisor_id=advisor_id, day_of_week=0, start_time=time(9, 0), end_time=time(17, 0), timezone="UTC"),
@@ -97,3 +97,27 @@ async def test_is_slot_available_conflict(availability_service, schedule_repo, c
 
     # Verify
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_is_slot_available_dynamic_duration(availability_service, schedule_repo, case_repo):
+    # Setup
+    advisor_id = uuid4()
+    requested_time = datetime(2027, 5, 10, 10, 0, tzinfo=UTC)
+    dynamic_duration = 60
+    
+    schedule_repo.get_working_hours.return_value = [
+        WorkingHours(advisor_id=advisor_id, day_of_week=0, start_time=time(9, 0), end_time=time(17, 0), timezone="UTC"),
+    ]
+    schedule_repo.get_days_off.return_value = []
+    case_repo.has_overlapping_appointment.return_value = False
+
+    # Execute
+    await availability_service.is_slot_available(advisor_id, requested_time, duration_minutes=dynamic_duration)
+
+    # Verify
+    case_repo.has_overlapping_appointment.assert_called_once_with(
+        advisor_id,
+        requested_time,
+        duration_minutes=dynamic_duration
+    )

@@ -66,6 +66,7 @@ class BookAppointmentCommand:
     case_id: EntityID
     appointment_time: FutureDatetime
     meeting_method: MeetingMethod
+    duration_minutes: int = 30
     notes: str | None = None
 
 

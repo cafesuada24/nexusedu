@@ -77,6 +77,7 @@ class SqlAlchemyCaseQueryService:
                 OrmEmail.body.label('draft_body'),
                 OrmEmail.status.label('draft_status'),
                 OrmEmail.email_id,
+                OrmEmail.sent_at,
             )
             .join(OrmStudent, OrmCase.sid == OrmStudent.sid)
             .outerjoin(OrmEmail, OrmCase.case_id == OrmEmail.case_id)
@@ -138,6 +139,7 @@ class SqlAlchemyCaseQueryService:
                         body=row['draft_body'],
                         status=row['draft_status'],
                         created_at=row['created_at'],
+                        sent_at=row['sent_at'],
                     )
                     if row['email_id']
                     else None,

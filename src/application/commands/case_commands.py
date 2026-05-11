@@ -296,6 +296,7 @@ class CaseCommandHandler:
             is_available = await self.availability_service.is_slot_available(
                 case.assigned_advisor_id,
                 command.appointment_time,
+                duration_minutes=command.duration_minutes,
             )
             if not is_available:
                 raise TimeSlotUnavailableError(
@@ -306,6 +307,7 @@ class CaseCommandHandler:
         case.record_booking(
             appointment_time=command.appointment_time,
             meeting_method=command.meeting_method,
+            duration_minutes=command.duration_minutes,
             notes=command.notes,
         )
 

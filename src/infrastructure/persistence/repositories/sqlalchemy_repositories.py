@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
@@ -706,19 +707,35 @@ class SqlAlchemyCaseRepository:
         self,
         advisor_id: uuid.UUID,
         appointment_time: datetime,
+        duration_minutes: int = 30,
     ) -> bool:
-        """Check if an advisor already has an appointment at the given time."""
+        """Check if an advisor already has an appointment that overlaps with the given time."""
+        # Use the passed duration_minutes for the NEW appointment.
+        requested_start = appointment_time.astimezone(UTC)
+        requested_end = requested_start + timedelta(minutes=duration_minutes)
+
+        # Fetch all appointments for this advisor within a safety window to check overlaps.
+        # We use a 24-hour window to be absolutely safe across all timezone boundaries.
         stmt = (
             select(Appointment)
             .join(OrmCase, OrmCase.case_id == Appointment.case_id)
             .where(
                 OrmCase.assigned_advisor_id == advisor_id,
-                Appointment.appointment_time == appointment_time,
+                Appointment.appointment_time >= requested_start - timedelta(hours=24),
+                Appointment.appointment_time <= requested_end + timedelta(hours=24),
             )
-            .limit(1)
         )
         result = await self.session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        existing_appointments = result.scalars().all()
+
+        for app in existing_appointments:
+            existing_start = app.appointment_time.astimezone(UTC)
+            existing_end = existing_start + timedelta(minutes=app.duration_minutes)
+            # Overlap condition: max(start1, start2) < min(end1, end2)
+            if max(requested_start, existing_start) < min(requested_end, existing_end):
+                return True
+
+        return False
 
     async def assign_case(self, case_id: uuid.UUID, advisor_id: uuid.UUID) -> bool:
         """Assign an advisor to a case."""

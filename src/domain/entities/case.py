@@ -59,7 +59,10 @@ class Case:
     assigned_advisor_id: EntityID | None = None
     appointment: Appointment | None = None
     version: int = field(default=0)
-    _domain_events: list[DomainEvent] = field(default_factory=list[DomainEvent], init=False)
+    _domain_events: list[DomainEvent] = field(
+        default_factory=list[DomainEvent],
+        init=False,
+    )
 
     @property
     def domain_events(self) -> list[DomainEvent]:
@@ -132,6 +135,7 @@ class Case:
         self,
         appointment_time: datetime,
         meeting_method: MeetingMethod,
+        duration_minutes: int = 30,
         notes: str | None = None,
     ) -> None:
         """Student booked an appointment."""
@@ -140,6 +144,7 @@ class Case:
             case_id=self.case_id,
             appointment_time=appointment_time,
             meeting_method=meeting_method,
+            duration_minutes=duration_minutes,
             notes=notes,
         )
         self.register_event(
@@ -148,7 +153,6 @@ class Case:
                 appointment_time=appointment_time,
                 meeting_method=meeting_method,
                 notes=notes,
-                occurred_at=datetime.now(UTC),
             ),
         )
 
@@ -175,7 +179,9 @@ class Case:
         is_failed: bool = False,
     ) -> None:
         """Mark the case as resolved or failed after review."""
-        next_status = InterventionStatus.FAILED if is_failed else InterventionStatus.RESOLVED
+        next_status = (
+            InterventionStatus.FAILED if is_failed else InterventionStatus.RESOLVED
+        )
         self._transition_to(next_status)
         self.closed_at = occurred_at
 

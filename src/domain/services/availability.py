@@ -23,6 +23,7 @@ class AdvisorAvailabilityService:
         self,
         advisor_id: EntityID,
         requested_time: datetime,
+        duration_minutes: int = 30,
     ) -> bool:
         """Check if a specific UTC time slot is valid and available for booking."""
         requested_utc = requested_time.astimezone(UTC)
@@ -31,22 +32,39 @@ class AdvisorAvailabilityService:
 
         # 1. Check if the slot is within working hours
         working_hours = await self.schedule_repo.get_working_hours(advisor_id)
-        day_of_week = requested_utc.weekday()
-
-        # We need to find if any working hour block matches the local time of the advisor
-        # For simplicity, we check if the advisor has ANY working hours defined first.
-        # If no hours defined, we assume unavailable (as per new robust rule).
         if not working_hours:
             return False
 
         is_within_hours = False
         for wh in working_hours:
-            if wh.day_of_week == day_of_week:
-                tz = ZoneInfo(wh.timezone)
-                local_req = requested_utc.astimezone(tz)
-                if wh.start_time <= local_req.time() < wh.end_time:
+            tz = ZoneInfo(wh.timezone)
+            local_req = requested_utc.astimezone(tz)
+            local_time = local_req.time()
+            local_weekday = local_req.weekday()
+
+            # Check if this working hour block applies to the local weekday
+            if wh.day_of_week == local_weekday:
+                if wh.start_time < wh.end_time:
+                    # Normal shift
+                    if wh.start_time <= local_time < wh.end_time:
+                        is_within_hours = True
+                        break
+                # Cross-midnight shift (e.g., 22:00 - 06:00)
+                # If local time is >= 22:00, it's the start part of the shift on the same day.
+                elif local_time >= wh.start_time:
                     is_within_hours = True
                     break
+
+            # Also check if this is the "tail" end of a cross-midnight shift from the PREVIOUS day
+            # If local time is < 06:00, it's the tail part of the shift from yesterday.
+            previous_weekday = (local_weekday - 1) % 7
+            if (
+                wh.day_of_week == previous_weekday
+                and wh.start_time >= wh.end_time
+                and local_time < wh.end_time
+            ):
+                is_within_hours = True
+                break
 
         if not is_within_hours:
             return False
@@ -64,6 +82,7 @@ class AdvisorAvailabilityService:
         has_conflict = await self.case_repo.has_overlapping_appointment(
             advisor_id,
             requested_utc,
+            duration_minutes=duration_minutes,
         )
 
         return not has_conflict

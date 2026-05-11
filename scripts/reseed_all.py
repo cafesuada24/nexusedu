@@ -95,9 +95,10 @@ async def reseed() -> None:
         session.add_all(activities)
 
         # Seed default working hours for all advisors
-        print('Seeding default working hours (Mon-Fri, 9:00-11:00)...')
+        print('Seeding default working hours (Mon-Fri, 9:00-11:00 and 14:00-17:00 UTC+7)...')
         for advisor in advisors:
             for day in range(5):
+                # Morning session
                 session.add(
                     AdvisorWorkingHours(
                         id=generate_uuid(),
@@ -105,7 +106,18 @@ async def reseed() -> None:
                         day_of_week=day,
                         start_time=time(9, 0),
                         end_time=time(11, 0),
-                        timezone='UTC',
+                        timezone='Asia/Ho_Chi_Minh',
+                    ),
+                )
+                # Afternoon session
+                session.add(
+                    AdvisorWorkingHours(
+                        id=generate_uuid(),
+                        advisor_id=advisor.advisor_id,
+                        day_of_week=day,
+                        start_time=time(14, 0),
+                        end_time=time(17, 0),
+                        timezone='Asia/Ho_Chi_Minh',
                     ),
                 )
 
