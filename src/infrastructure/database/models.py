@@ -447,6 +447,7 @@ class Appointment(Base):
         index=True,
     )
     appointment_time: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    duration_minutes: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     meeting_method: Mapped[MeetingMethod] = mapped_column(
         Enum(MeetingMethod),
         nullable=False,

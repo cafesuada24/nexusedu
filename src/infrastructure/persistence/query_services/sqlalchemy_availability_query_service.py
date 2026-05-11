@@ -59,20 +59,23 @@ class SqlAlchemyAdvisorAvailabilityQueryService(AdvisorAvailabilityQueryService)
         days_off_dates = set(do_result.scalars().all())
 
         # 3. Fetch Booked Appointments
-        # We join with OrmCase because advisor_id is on Case
+        # Pad range by 1 day to safely cover timezone overlaps
         app_stmt = (
-            select(Appointment.appointment_time)
+            select(Appointment.appointment_time, Appointment.duration_minutes)
             .join(OrmCase, OrmCase.case_id == Appointment.case_id)
             .where(
                 OrmCase.assigned_advisor_id == advisor_id,
                 Appointment.appointment_time
-                >= datetime.combine(start_date, time.min, tzinfo=UTC),
+                >= datetime.combine(start_date - timedelta(days=1), time.min, tzinfo=UTC),
                 Appointment.appointment_time
-                <= datetime.combine(end_date, time.max, tzinfo=UTC),
+                <= datetime.combine(end_date + timedelta(days=1), time.max, tzinfo=UTC),
             )
         )
         app_result = await self.session.execute(app_stmt)
-        booked_times = {t.astimezone(UTC) for t in app_result.scalars().all()}
+        # Store as (start_utc, duration)
+        booked_appointments = [
+            (row[0].astimezone(UTC), row[1]) for row in app_result.all()
+        ]
 
         # 4. Generate Slots
         available_slots: list[datetime] = []
@@ -94,11 +97,30 @@ class SqlAlchemyAdvisorAvailabilityQueryService(AdvisorAvailabilityQueryService)
                 local_start = datetime.combine(current_date, wh.start_time, tzinfo=tz)
                 local_end = datetime.combine(current_date, wh.end_time, tzinfo=tz)
 
+                # Handle cross-midnight shifts
+                if wh.end_time <= wh.start_time:
+                    local_end += timedelta(days=1)
+
                 cursor = local_start
                 while cursor + timedelta(minutes=slot_duration_minutes) <= local_end:
-                    utc_slot = cursor.astimezone(UTC)
-                    if utc_slot not in booked_times and utc_slot > now_utc:
-                        available_slots.append(utc_slot)
+                    utc_slot_start = cursor.astimezone(UTC)
+                    utc_slot_end = utc_slot_start + timedelta(
+                        minutes=slot_duration_minutes
+                    )
+
+                    if utc_slot_start > now_utc:
+                        # Check for overlaps with any booked appointment
+                        is_booked = False
+                        for b_start, b_duration in booked_appointments:
+                            b_end = b_start + timedelta(minutes=b_duration)
+                            # Overlap: max(start1, start2) < min(end1, end2)
+                            if max(utc_slot_start, b_start) < min(utc_slot_end, b_end):
+                                is_booked = True
+                                break
+
+                        if not is_booked:
+                            available_slots.append(utc_slot_start)
+
                     cursor += timedelta(minutes=slot_duration_minutes)
 
             current_date += timedelta(days=1)

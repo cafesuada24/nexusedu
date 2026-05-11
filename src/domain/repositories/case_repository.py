@@ -42,6 +42,8 @@ class CaseRepository(Protocol):
         self,
         advisor_id: EntityID,
         appointment_time: datetime,
+        duration_minutes: int = 30,
     ) -> bool:
         """Check if an advisor already has an appointment at the given time."""
         ...
+

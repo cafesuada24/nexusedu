@@ -14,6 +14,12 @@ class Appointment:
     case_id: EntityID
     appointment_time: datetime
     meeting_method: MeetingMethod
+    duration_minutes: int = 30
     notes: str | None = None
     appointment_id: EntityID = field(default_factory=generate_uuid)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def __post_init__(self) -> None:
+        """Validate appointment invariants."""
+        if self.duration_minutes <= 0:
+            raise ValueError("duration_minutes must be positive")
