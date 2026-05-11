@@ -36,9 +36,11 @@ async def websocket_endpoint(
         while True:
             # Keep connection alive; handle incoming messages if needed
             # Using receive_text() as a heartbeat/keep-alive mechanism
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            logger.info(f"Received: {data}")
     except WebSocketDisconnect:
-        ws_manager.disconnect(user.id, websocket)
+        logger.info(f"WS disconnected normally: {user.id}")
     except Exception as e:
         logger.error(f'WS: Unexpected error for user {user.id}: {e}')
+    finally:
         ws_manager.disconnect(user.id, websocket)
