@@ -112,67 +112,83 @@ class Container:
     # Repositories
     @cached_property
     def student_repo(self) -> StudentRepository:
+        """Student repository."""
         return SqlAlchemyStudentRepository(self.session)
 
     @cached_property
     def advisor_repo(self) -> AdvisorRepository:
+        """Advisor repository."""
         return SqlAlchemyAdvisorRepository(self.session)
 
     @cached_property
     def idempotency_repo(self) -> IdempotencyRepository:
+        """Idempotency repository."""
         return SqlAlchemyIdempotencyRepository(self.session)
 
     @cached_property
     def email_repo(self) -> EmailRepository:
+        """Email repository."""
         return SqlAlchemyEmailRepository(self.session)
 
     @cached_property
     def case_repo(self) -> CaseRepository:
+        """Case repository."""
         return SqlAlchemyCaseRepository(self.session)
 
     @cached_property
     def activity_repo(self) -> ActivityRepository:
+        """Activity repository."""
         return SqlAlchemyActivityRepository(self.session)
 
     @cached_property
     def status_history_repo(self) -> StatusHistoryRepository:
+        """Status history repository."""
         return SqlAlchemyStatusHistoryRepository(self.session)
 
     @cached_property
     def metrics_repo(self) -> MetricsRepository:
+        """Metrics repository."""
         return SqlAlchemyMetricsRepository(self.session)
 
     @cached_property
     def metadata_repo(self) -> MetadataRepository:
+        """Metadata repository."""
         return SqlAlchemyMetadataRepository(self.session)
 
     @cached_property
     def job_repo(self) -> JobRepository:
+        """Job repository."""
         return SqlAlchemyJobRepository(self.session)
 
     @cached_property
     def user_settings_repo(self) -> UserSettingsRepository:
+        """User settings repository."""
         return SqlAlchemyUserSettingsRepository(self.session)
 
     @cached_property
     def point_ledger_repo(self) -> PointLedgerRepository:
+        """Point ledger repository."""
         return SqlAlchemyPointLedgerRepository(self.session)
 
     @cached_property
     def schedule_repo(self) -> ScheduleRepository:
+        """Schedule repository."""
         return SqlAlchemyScheduleRepository(self.session)
 
     @cached_property
     def badge_repo(self) -> BadgeRepository:
+        """Badge repository."""
         return SqlAlchemyBadgeRepository(self.session)
 
     # Services & Infrastructure
     @cached_property
     def gamification_service(self) -> GamificationService:
+        """Gamification domain service."""
         return GamificationService()
 
     @cached_property
     def availability_service(self) -> AdvisorAvailabilityService:
+        """Advisor availability service."""
         return AdvisorAvailabilityService(
             schedule_repo=self.schedule_repo,
             case_repo=self.case_repo,
@@ -180,6 +196,7 @@ class Container:
 
     @cached_property
     def email_sending_service(self) -> EmailSendingService:
+        """Email sending infrastructure service."""
         return AioSmtpEmailSender(
             host=config.smtp_host,
             port=config.smtp_port,
@@ -190,14 +207,17 @@ class Container:
 
     @cached_property
     def anomaly_engine(self) -> AnomalyEngine:
+        """Anomaly detection engine."""
         return ZScore()
 
     @cached_property
     def pii_masker(self) -> PiiMasker:
+        """PII masking service."""
         return PresidioPiiMasker()
 
     @cached_property
     def email_drafting_service(self) -> EmailDraftingService:
+        """Email drafting domain service."""
         return GuardrailsEmailDraftingService(pii_masker=self.pii_masker)
 
     @cached_property
@@ -219,10 +239,12 @@ class Container:
 
     @cached_property
     def event_publisher(self) -> TaskQueueEventPublisher:
+        """Domain event publisher."""
         return TaskQueueEventPublisher(self.task_queue)
 
     @cached_property
     def websocket_publisher(self) -> WebSocketEventPublisher:
+        """WebSocket event publisher."""
         if self.redis_pool is None:
             raise ValueError('Redis pool is required for WebSocket publishing.')
         return WebSocketEventPublisher(self.redis_pool)
@@ -230,23 +252,27 @@ class Container:
     # Query Services
     @cached_property
     def point_ledger_query_service(self) -> PointLedgerQueryService:
+        """Point ledger query service."""
         return SqlAlchemyPointLedgerQueryService(self.session)
 
     @cached_property
     def availability_query_service(self) -> AdvisorAvailabilityQueryService:
+        """Advisor availability query service."""
         return SqlAlchemyAdvisorAvailabilityQueryService(self.session)
 
     @cached_property
     def gamification_query_service(self) -> GamificationQueryService:
-
+        """Gamification query service."""
         return SqlAlchemyGamificationQueryService(session=self.session)
 
     @cached_property
     def advisor_metrics_query_service(self) -> AdvisorMetricsQueryService:
+        """Advisor metrics query service."""
         return SqlAlchemyAdvisorMetricsQueryService(session=self.session)
 
     @cached_property
     def case_query_service(self) -> CaseQueryService:
+        """Case query service."""
         return SqlAlchemyCaseQueryService(
             session=self.session,
             gamification_service=self.gamification_service,
@@ -254,10 +280,12 @@ class Container:
 
     @cached_property
     def student_query_service(self) -> StudentQueryService:
+        """Student query service."""
         return SqlAlchemyStudentQueryService(self.session)
 
     # Command Handlers
     def get_case_command_handler(self) -> CaseCommandHandler:
+        """Case command handler."""
         return CaseCommandHandler(
             self.student_repo,
             self.email_repo,
@@ -266,14 +294,17 @@ class Container:
             self.job_repo,
             self.task_queue,
             self.event_publisher,
+            self.websocket_publisher,
             availability_service=self.availability_service,
             email_drafting_service=self.email_drafting_service,
         )
 
     def get_schedule_command_handler(self) -> ScheduleCommandHandler:
+        """Schedule command handler."""
         return ScheduleCommandHandler(self.schedule_repo)
 
     def get_data_command_handler(self) -> DataCommandHandler:
+        """Data command handler."""
         return DataCommandHandler(
             self.student_repo,
             self.activity_repo,
@@ -285,6 +316,7 @@ class Container:
 
     # Query Handlers
     def get_advisor_query_handler(self) -> AdvisorQueryHandler:
+        """Advisor query handler."""
         return AdvisorQueryHandler(
             advisor_repo=self.advisor_repo,
             point_ledger_query_service=self.point_ledger_query_service,
@@ -294,6 +326,7 @@ class Container:
         )
 
     def get_case_query_handler(self) -> CaseQueryHandler:
+        """Case query handler."""
         return CaseQueryHandler(
             case_query_service=self.case_query_service,
             advisor_repo=self.advisor_repo,
@@ -303,7 +336,9 @@ class Container:
         )
 
     def get_metrics_query_handler(self) -> MetricsQueryHandler:
+        """Metrics query handler."""
         return MetricsQueryHandler(self.metrics_repo)
 
     def get_student_query_handler(self) -> StudentQueryHandler:
+        """Student query handler."""
         return StudentQueryHandler(self.student_query_service)
