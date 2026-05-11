@@ -37,14 +37,6 @@ from src.presentation.dependencies.providers import (
     get_user_settings_repository,
 )
 
-# Configuration
-if config.jwt_secret is None:
-    if config.environment == 'production':
-        raise ValueError(
-            'config.jwt_secret variable is required in production environment.',
-        )
-    config.jwt_secret = 'SET_ME_IN_PRODUCTION_HAHAH'
-
 
 class Scope(StrEnum):
     """Granular permissions (capabilities) in the system."""
@@ -137,13 +129,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             # Ensure an advisor profile exists and is linked
             name = user.email.split('@')[0].capitalize()
             advisor_id, created = await self._advisor_repo.upsert_advisor_for_user(
-                user.id, user.email, name,
+                user.id,
+                user.email,
+                name,
             )
             if created:
                 await self._event_publisher.publish(
                     [
                         AdvisorCreatedEvent(
-                            advisor_id=advisor_id, email=user.email, name=name,
+                            advisor_id=advisor_id,
+                            email=user.email,
+                            name=name,
                         ),
                     ],
                 )
@@ -160,13 +156,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
             # Ensure an advisor profile exists and is linked
             name = user.email.split('@')[0].capitalize()
             advisor_id, created = await self._advisor_repo.upsert_advisor_for_user(
-                user.id, user.email, name,
+                user.id,
+                user.email,
+                name,
             )
             if created:
                 await self._event_publisher.publish(
                     [
                         AdvisorCreatedEvent(
-                            advisor_id=advisor_id, email=user.email, name=name,
+                            advisor_id=advisor_id,
+                            email=user.email,
+                            name=name,
                         ),
                     ],
                 )
@@ -195,7 +195,7 @@ async def get_user_manager(
 bearer_transport = BearerTransport(tokenUrl='api/v1/auth/jwt/login')
 
 
-def get_jwt_strategy() -> JWTStrategy:
+def get_jwt_strategy() -> JWTStrategy[User, uuid.UUID]:
     """Strategy for generating and validating JWT tokens."""
     # matches frontend cookie maxAge in app/actions/auth.ts
     return JWTStrategy(secret=config.jwt_secret, lifetime_seconds=28800)
@@ -213,7 +213,7 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
     [auth_backend],
 )
 
-current_active_user: Callable[..., User] = fastapi_users.current_user(active=True)
+current_active_user = fastapi_users.current_user(active=True)
 
 
 # RBAC Utilities

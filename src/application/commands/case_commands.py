@@ -17,8 +17,9 @@ from src.application.dtos.case_dtos import (
 )
 from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.application.interfaces.event_publisher import EventPublisher
+from src.application.services.websocket_publisher import WebSocketEventPublisher
 from src.core.config import config
-from src.core.identifiers import generate_uuid
+from src.core.identifiers import EntityID, generate_uuid
 from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
@@ -41,6 +42,7 @@ from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.availability import AdvisorAvailabilityService
 from src.domain.services.email_drafting import EmailDraftingService
+from src.domain.value_objects.status import InterventionStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 # Application-level safe fallbacks
@@ -59,7 +61,7 @@ SAFE_BODY = Template(
 class CaseCommandHandler:
     """Handler for case-related commands."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         student_repo: StudentRepository,
         email_repo: EmailRepository,
@@ -68,6 +70,7 @@ class CaseCommandHandler:
         job_repo: JobRepository,
         task_queue: BackgroundTaskQueue,
         event_publisher: EventPublisher,
+        websocket_publisher: WebSocketEventPublisher,
         availability_service: AdvisorAvailabilityService,
         email_drafting_service: EmailDraftingService,
     ) -> None:
@@ -81,6 +84,7 @@ class CaseCommandHandler:
         self.availability_service = availability_service
         self.task_queue = task_queue
         self.event_publisher = event_publisher
+        self.websocket_publisher = websocket_publisher
 
     async def handle_accept_case(self, command: AcceptCaseCommand) -> None:
         """Try assign a case to an advisor."""
@@ -98,9 +102,26 @@ class CaseCommandHandler:
 
         await self.case_repo.save(case)
 
+        # Notify UI via WebSocket
+        await self._notify_status_change(case.case_id, case.intervention_status)
+
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
         case.clear_events()
+
+    async def _notify_status_change(
+        self,
+        case_id: EntityID,
+        new_status: InterventionStatus,
+    ) -> None:
+        """Helper to broadcast case status changes via WebSocket."""
+        await self.websocket_publisher.publish(
+            event_type='CASE:STATUS_UPDATED',
+            payload={
+                'case_id': str(case_id),
+                'new_status': new_status.value,
+            },
+        )
 
     async def handle_trigger_draft(
         self,
@@ -313,6 +334,9 @@ class CaseCommandHandler:
 
         await self.case_repo.save(case)
 
+        # Notify UI via WebSocket
+        await self._notify_status_change(case.case_id, case.intervention_status)
+
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
         case.clear_events()
@@ -331,6 +355,9 @@ class CaseCommandHandler:
 
         await self.case_repo.save(case)
 
+        # Notify UI via WebSocket
+        await self._notify_status_change(case.case_id, case.intervention_status)
+
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
         case.clear_events()
@@ -348,6 +375,9 @@ class CaseCommandHandler:
         case.request_resolution(datetime.now(UTC))
 
         await self.case_repo.save(case)
+
+        # Notify UI via WebSocket
+        await self._notify_status_change(case.case_id, case.intervention_status)
 
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
@@ -372,6 +402,9 @@ class CaseCommandHandler:
         )
 
         await self.case_repo.save(case)
+
+        # Notify UI via WebSocket
+        await self._notify_status_change(case.case_id, case.intervention_status)
 
         # Dispatch events via publisher (CaseResolvedEvent or CaseFailedEvent)
         await self.event_publisher.publish(case.domain_events)

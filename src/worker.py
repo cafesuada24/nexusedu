@@ -19,7 +19,7 @@ from src.core.container import Container
 from src.core.logger import logger
 from src.domain.value_objects.status import JobStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
-from src.infrastructure.database.session import async_session_maker, get_async_session
+from src.infrastructure.database.session import get_async_session
 
 
 async def run_email_draft_task(
@@ -57,6 +57,18 @@ async def run_email_draft_task(
             job.finish(datetime.now(UTC))
             await job_repo.save(job)
             await session.commit()
+
+            ws_publisher = container.websocket_publisher
+            await ws_publisher.publish(
+                'JOB:COMPLETED',
+                {
+                    'job_id': str(job_id),
+                    'case_id': str(case_id),
+                    'status': job.status,
+                },
+                user_id=user_id,
+            )
+
             logger.info(
                 f'Worker: Email generated job finished sucessfully for case with id {case_id}',
             )
@@ -65,6 +77,23 @@ async def run_email_draft_task(
                 job.fail(datetime.now(UTC))
                 await job_repo.save(job)
                 await session.commit()
+
+                # Notify UI via WebSocket of failure
+                try:
+                    ws_publisher = container.websocket_publisher
+                    await ws_publisher.publish(
+                        'JOB:FAILED',
+                        {
+                            'job_id': str(job_id),
+                            'case_id': str(case_id),
+                            'status': job.status,
+                            'error': str(e),
+                        },
+                        user_id=user_id,
+                    )
+
+                except Exception as ws_err:
+                    logger.error(f'Worker: Failed to publish WS failure: {ws_err}')
 
             logger.error(
                 f'Worker: Email generated job failed or timed out for case with id {case_id}, error: {e}',
@@ -110,6 +139,20 @@ async def run_dispatch_email_task(
 
         await email_repo.save(email)
         await case_repo.save(case)
+
+        # Notify UI via WebSocket
+        try:
+            ws_publisher = container.websocket_publisher
+            await ws_publisher.publish(
+                'CASE:STATUS_UPDATED',
+                {
+                    'case_id': str(case_id),
+                    'new_status': case.intervention_status.value,
+                },
+                user_id=case.assigned_advisor_id,
+            )
+        except Exception as ws_err:
+            logger.error(f'Worker: Failed to publish WS status update: {ws_err}')
 
         points = gamification_service.calculate_points(
             gamification_service.Action.SEND_EMAIL,

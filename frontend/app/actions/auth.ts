@@ -48,7 +48,7 @@ export async function loginAction(username: string, password: string) {
       })
 
       logger.info({ username }, "Login successful")
-      return { success: true }
+      return { success: true, token }
     }
 
     logger.error({ username }, "No token received from server")
