@@ -71,7 +71,7 @@ async def test_generate_email_draft_success(handler, mock_repos):
         {'yr': 2024, 'sem': 1, 'wk': 5, 'score': 85, 'status': 'STABLE'}
     ]
 
-    mock_repos['email_drafting_service'].generate_draft.return_value = "Generated Body"
+    mock_repos['email_drafting_service'].generate_draft.return_value = ("Generated Subject", "Generated Body")
 
     # Act
     await handler.handle_generate_email_draft(command)
@@ -82,7 +82,10 @@ async def test_generate_email_draft_success(handler, mock_repos):
         "Trend: Year 2024 Sem 1 Week 5: Score 85 (STABLE)",
         "http://test.link"
     )
-    mock_email.set_draft_content.assert_called_once()
+    mock_email.set_draft_content.assert_called_once_with(
+        "Generated Subject",
+        "Generated Body"
+    )
 
 
 @pytest.mark.asyncio
