@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import UUID
+
+import uuid6
 
 from src.domain.value_objects.status import MeetingMethod
 
@@ -15,5 +17,5 @@ class Appointment:
     appointment_time: datetime
     meeting_method: MeetingMethod
     notes: str | None = None
-    appointment_id: UUID = field(default_factory=uuid4)
+    appointment_id: UUID = field(default_factory=uuid6.uuid7)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))

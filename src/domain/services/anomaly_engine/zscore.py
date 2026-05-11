@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import uuid
+
+import uuid6
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -12,8 +14,7 @@ from src.domain.value_objects.status import RiskStatus
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
-
-    from pydantic import UUID4
+    from uuid import UUID
 
 
 @dataclass
@@ -37,9 +38,9 @@ class ZScore:
 
     def run(
         self,
-        student_data: Mapping[UUID4, Sequence[Mapping[str, int | float]]],
-        history_set: set[tuple[UUID4, int, int, int]],
-    ) -> tuple[list[dict[str, Any]], dict[UUID4, RiskStatus]]:
+        student_data: Mapping[UUID, Sequence[Mapping[str, int | float]]],
+        history_set: set[tuple[UUID, int, int, int]],
+    ) -> tuple[list[dict[str, Any]], dict[UUID, RiskStatus]]:
         """Calculate anomalies and return results for orchestration.
 
         Returns:
@@ -58,12 +59,12 @@ class ZScore:
 
     def _calculate_anomalies(
         self,
-        student_data: Mapping[UUID4, Sequence[Mapping[str, int | float]]],
-        history_set: set[tuple[UUID4, int, int, int]],
-    ) -> tuple[list[dict[str, Any]], dict[UUID4, RiskStatus]]:
+        student_data: Mapping[UUID, Sequence[Mapping[str, int | float]]],
+        history_set: set[tuple[UUID, int, int, int]],
+    ) -> tuple[list[dict[str, Any]], dict[UUID, RiskStatus]]:
         """Identify new anomalies based on score trends."""
         new_records: list[dict[str, Any]] = []
-        risk_statuses: dict[UUID4, RiskStatus] = {}
+        risk_statuses: dict[UUID, RiskStatus] = {}
 
         for sid, weeks in student_data.items():
             sorted_weeks = sorted(weeks, key=lambda x: (x['academic_year'], x['semester'], x['week']))
@@ -92,7 +93,7 @@ class ZScore:
 
     def _process_week(
         self,
-        sid: UUID4,
+        sid: UUID,
         week_data: Mapping[str, int | float],
         historical_scores: list[float],
         exists: bool,
@@ -122,7 +123,7 @@ class ZScore:
         record = None
         if not exists:
             record = {
-                'history_id': uuid.uuid4(),
+                'history_id': uuid6.uuid7(),
                 'sid': sid,
                 'academic_year': week_data['academic_year'],
                 'semester': week_data['semester'],

@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+import uuid6
+
 
 @dataclass(frozen=True)
 class PointLedgerEntry:
@@ -33,7 +35,7 @@ class PointLedger:
             raise ValueError("Points must be positive.")
 
         entry = PointLedgerEntry(
-            id=uuid.uuid4(),
+            id=uuid6.uuid7(),
             advisor_id=self.advisor_id,
             case_id=case_id,
             action=action,

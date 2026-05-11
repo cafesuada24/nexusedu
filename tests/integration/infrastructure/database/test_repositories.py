@@ -57,8 +57,7 @@ async def test_student_repository(session: AsyncSession) -> None:
     await session.commit()
 
     s1_updated = await repo.get_by_id(sids[0])
-    assert s1_updated.student_name == 'Alice'  # ingest_students uses DO NOTHING
-
+    assert s1_updated.student_name == 'Alice Updated'  # ingest_students now uses DO UPDATE
 
 @pytest.mark.asyncio
 async def test_email_repository(session: AsyncSession) -> None:

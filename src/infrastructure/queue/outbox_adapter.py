@@ -2,6 +2,8 @@
 
 import pickle
 import uuid
+
+import uuid6
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +28,7 @@ class TransactionalOutboxAdapter:
         payload = pickle.dumps(kwargs)
 
         event = OutboxEvent(
-            id=uuid.uuid4(),
+            id=uuid6.uuid7(),
             task_name=task_name,
             payload=payload,
             status=OutboxStatus.PENDING,

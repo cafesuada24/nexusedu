@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import UUID
+
+import uuid6
 
 from src.domain.exceptions import InvalidStateTransitionError
 from src.domain.value_objects.status import JobStatus
@@ -16,7 +18,7 @@ class Job:
     correlation_type: str
     started_at: datetime | None = None
     ended_at: datetime | None = None
-    job_id: UUID = field(default_factory=uuid4)
+    job_id: UUID = field(default_factory=uuid6.uuid7)
     status: JobStatus = JobStatus.PENDING
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 

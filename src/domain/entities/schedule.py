@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from datetime import date, time
-from uuid import UUID, uuid4
+from uuid import UUID
+
+import uuid6
 
 
 @dataclass
@@ -14,7 +16,7 @@ class WorkingHours:
     start_time: time
     end_time: time
     timezone: str = 'UTC'
-    id: UUID = field(default_factory=uuid4)
+    id: UUID = field(default_factory=uuid6.uuid7)
 
     def __post_init__(self) -> None:
         """Validate working hours invariants."""
@@ -45,4 +47,4 @@ class DayOff:
     advisor_id: UUID
     date: date
     reason: str | None = None
-    id: UUID = field(default_factory=uuid4)
+    id: UUID = field(default_factory=uuid6.uuid7)

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 from string import Template
-from uuid import uuid4
+import uuid6
 
 from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
@@ -143,7 +143,7 @@ class CaseCommandHandler:
         existing_email.mark_as_generating()
         await self.email_repo.save(existing_email)
 
-        job_id = uuid4()
+        job_id = uuid6.uuid7()
         new_job = Job(
             job_id=job_id,
             correlation_id=case.case_id,
@@ -191,7 +191,7 @@ class CaseCommandHandler:
 
         recipient_email = student.email
 
-        job_id = uuid4()
+        job_id = uuid6.uuid7()
         new_job = Job(
             job_id=job_id,
             correlation_id=case.case_id,

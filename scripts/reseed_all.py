@@ -3,6 +3,8 @@ import os
 import random
 import sys
 import uuid
+
+import uuid6
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
@@ -98,7 +100,7 @@ async def reseed() -> None:
             for day in range(5):
                 session.add(
                     AdvisorWorkingHours(
-                        id=uuid.uuid4(),
+                        id=uuid6.uuid7(),
                         advisor_id=advisor.advisor_id,
                         day_of_week=day,
                         start_time=time(9, 0),
@@ -196,7 +198,7 @@ async def reseed() -> None:
         cases = []
         tasks = []
         for sid in new_at_risk_sids:
-            case_id = uuid.uuid4()
+            case_id = uuid6.uuid7()
             advisor = random.choice(advisors)
             cases.append(
                 Case(
@@ -217,7 +219,7 @@ async def reseed() -> None:
             # for action_type, points in standard_tasks:
             #     tasks.append(
             #         Task(
-            #             task_id=uuid.uuid4(),
+            #             task_id=uuid6.uuid7(),
             #             case_id=case_id,
             #             action_type=action_type,
             #             status=TaskStatus.PENDING.value,
@@ -238,7 +240,7 @@ async def reseed() -> None:
             
             ledger_entries.append(
                 PointLedger(
-                    id=uuid.uuid4(),
+                    id=uuid6.uuid7(),
                     advisor_id=aid,
                     case_id=case_obj.case_id,
                     action='system_seeded_intervention',

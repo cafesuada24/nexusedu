@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import UUID
+
+import uuid6
 
 from src.domain.entities.appointment import Appointment
 from src.domain.events.base import DomainEvent
@@ -51,7 +53,7 @@ class Case:
     """Represents an intervention case for a student."""
 
     sid: UUID
-    case_id: UUID = field(default_factory=uuid4)
+    case_id: UUID = field(default_factory=uuid6.uuid7)
     intervention_status: InterventionStatus = InterventionStatus.NEW
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     assigned_at: datetime | None = None

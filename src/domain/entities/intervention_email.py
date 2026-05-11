@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from uuid import UUID, uuid4
+from uuid import UUID
+
+import uuid6
 
 from src.domain.exceptions import (
     EmptyEmailError,
@@ -20,7 +22,7 @@ class InterventionEmail:
     case_id: UUID
     status: EmailStatus = EmailStatus.UNAVAILABLE
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    email_id: UUID = field(default_factory=uuid4)
+    email_id: UUID = field(default_factory=uuid6.uuid7)
     subject: str | None = None
     body: str | None = None
     sent_at: datetime | None = None

@@ -2,8 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
-
-from pydantic import UUID4
+from uuid import UUID
 
 from src.domain.value_objects.status import RiskStatus
 
@@ -13,9 +12,9 @@ class AnomalyEngine(Protocol):
 
     def run(
         self,
-        student_data: Mapping[UUID4, Sequence[Mapping[str, int | float]]],
-        history_set: set[tuple[UUID4, int, int, int]],
-    ) -> tuple[list[dict[str, Any]], dict[UUID4, RiskStatus]]:
+        student_data: Mapping[UUID, Sequence[Mapping[str, int | float]]],
+        history_set: set[tuple[UUID, int, int, int]],
+    ) -> tuple[list[dict[str, Any]], dict[UUID, RiskStatus]]:
         """Calculate anomalies and return results for orchestration.
 
         Returns:
