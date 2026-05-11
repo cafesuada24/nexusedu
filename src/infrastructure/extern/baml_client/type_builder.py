@@ -22,12 +22,16 @@ class TypeBuilder(type_builder.TypeBuilder):
         super().__init__(classes=set(
           ["DiscoveryRequest","EmailDraft","GeneratedSQL","PlannerTask","RequestTableSchema","RouterPlan",]
         ), enums=set(
-          []
+          ["ToneEvaluation",]
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
 
     # #########################################################################
-    # Generated enums 0
+    # Generated enums 1
     # #########################################################################
+
+    @property
+    def ToneEvaluation(self) -> "ToneEvaluationViewer":
+        return ToneEvaluationViewer(self)
 
 
     # #########################################################################
@@ -61,8 +65,54 @@ class TypeBuilder(type_builder.TypeBuilder):
 
 
 # #########################################################################
-# Generated enums 0
+# Generated enums 1
 # #########################################################################
+
+class ToneEvaluationAst:
+    def __init__(self, tb: type_builder.TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("ToneEvaluation")
+        self._values: typing.Set[str] = set([  "SAFE",  "PUNITIVE",  "TOXIC",  ])
+        self._vals = ToneEvaluationValues(self._bldr, self._values)
+
+    def type(self) -> baml_py.FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "ToneEvaluationValues":
+        return self._vals
+
+
+class ToneEvaluationViewer(ToneEvaluationAst):
+    def __init__(self, tb: type_builder.TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_values(self) -> typing.List[typing.Tuple[str, type_builder.EnumValueViewer]]:
+        return [(name, type_builder.EnumValueViewer(self._bldr.value(name))) for name in self._values]
+    
+
+class ToneEvaluationValues:
+    def __init__(self, enum_bldr: baml_py.EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values # type: ignore (we know how to use this private attribute) # noqa: F821
+
+    
+    
+    @property
+    def SAFE(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("SAFE"))
+    
+    @property
+    def PUNITIVE(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("PUNITIVE"))
+    
+    @property
+    def TOXIC(self) -> type_builder.EnumValueViewer:
+        return type_builder.EnumValueViewer(self.__bldr.value("TOXIC"))
+    
+    
+
 
 
 # #########################################################################

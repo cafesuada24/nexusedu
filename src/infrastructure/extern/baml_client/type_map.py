@@ -35,4 +35,6 @@ type_map = {
     "stream_types.RouterPlan": stream_types.RouterPlan,
 
 
+    "types.ToneEvaluation": types.ToneEvaluation,
+
 }
