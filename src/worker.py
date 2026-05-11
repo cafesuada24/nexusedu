@@ -449,17 +449,27 @@ async def run_advisor_created_task(
 
         # Monday (0) to Friday (4)
         for day in range(5):
-            command = AddWorkingHoursCommand(
+            # Morning session
+            morning_cmd = AddWorkingHoursCommand(
                 advisor_id=advisor_id,
                 day_of_week=day,
                 start_time=time(9, 0),
                 end_time=time(11, 0),
-                timezone='UTC',
+                timezone='Asia/Ho_Chi_Minh',
+            )
+            # Afternoon session
+            afternoon_cmd = AddWorkingHoursCommand(
+                advisor_id=advisor_id,
+                day_of_week=day,
+                start_time=time(14, 0),
+                end_time=time(17, 0),
+                timezone='Asia/Ho_Chi_Minh',
             )
             try:
-                await schedule_handler.handle_add_working_hours(command)
+                await schedule_handler.handle_add_working_hours(morning_cmd)
+                await schedule_handler.handle_add_working_hours(afternoon_cmd)
                 logger.debug(
-                    f'Worker: Added default hours for advisor {advisor_id} on day {day}'
+                    f'Worker: Added default hours (morning & afternoon) for advisor {advisor_id} on day {day}'
                 )
             except Exception as e:
                 logger.error(
