@@ -103,7 +103,11 @@ class CaseCommandHandler:
         await self.case_repo.save(case)
 
         # Notify UI via WebSocket
-        await self._notify_status_change(case.case_id, case.intervention_status)
+        await self._notify_status_change(
+            case.case_id,
+            case.intervention_status,
+            user_id=command.user_id,
+        )
 
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
@@ -113,6 +117,7 @@ class CaseCommandHandler:
         self,
         case_id: EntityID,
         new_status: InterventionStatus,
+        user_id: EntityID | None = None,
     ) -> None:
         """Helper to broadcast case status changes via WebSocket."""
         await self.websocket_publisher.publish(
@@ -121,6 +126,7 @@ class CaseCommandHandler:
                 'case_id': str(case_id),
                 'new_status': new_status.value,
             },
+            user_id=user_id,
         )
 
     async def handle_trigger_draft(
@@ -335,6 +341,7 @@ class CaseCommandHandler:
         await self.case_repo.save(case)
 
         # Notify UI via WebSocket
+        # For public booking, we broadcast as we don't have the advisor's user_id here
         await self._notify_status_change(case.case_id, case.intervention_status)
 
         # Dispatch events via publisher
@@ -356,7 +363,11 @@ class CaseCommandHandler:
         await self.case_repo.save(case)
 
         # Notify UI via WebSocket
-        await self._notify_status_change(case.case_id, case.intervention_status)
+        await self._notify_status_change(
+            case.case_id,
+            case.intervention_status,
+            user_id=command.user_id,
+        )
 
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
@@ -377,7 +388,11 @@ class CaseCommandHandler:
         await self.case_repo.save(case)
 
         # Notify UI via WebSocket
-        await self._notify_status_change(case.case_id, case.intervention_status)
+        await self._notify_status_change(
+            case.case_id,
+            case.intervention_status,
+            user_id=command.user_id,
+        )
 
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
@@ -404,6 +419,7 @@ class CaseCommandHandler:
         await self.case_repo.save(case)
 
         # Notify UI via WebSocket
+        # For public review, we broadcast to ensure the advisor sees it
         await self._notify_status_change(case.case_id, case.intervention_status)
 
         # Dispatch events via publisher (CaseResolvedEvent or CaseFailedEvent)
