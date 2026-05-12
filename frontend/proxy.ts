@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { authFetch, endpoint } from "./lib/api";
 
 type UserRole = "admin" | "advisor" | "viewer";
 
@@ -56,27 +57,30 @@ async function resolveUserRole(token: string, request: NextRequest): Promise<Use
 
   // Fetch directly from the backend to avoid Next.js middleware fetch loops.
   // We use the origin of NEXT_PUBLIC_API_BASE_URL to construct the /me URL safely.
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
-  let apiOrigin = "http://localhost:8000";
+  // const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+  // let apiOrigin = "http://localhost:8000";
+  // try {
+  //   apiOrigin = new URL(apiBaseUrl).origin;
+  // } catch {
+  //   // Fallback if URL is malformed
+  // }
+  //
+  // // Force IPv4 for local backend to prevent Node 18+ IPv6 localhost resolution failures
+  // // This is a common issue in Next.js Edge runtime when fetching local servers.
+  // apiOrigin = apiOrigin.replace("://localhost", "://127.0.0.1");
+
   try {
-    apiOrigin = new URL(apiBaseUrl).origin;
-  } catch {
-    // Fallback if URL is malformed
-  }
+    const res = await authFetch(
+      endpoint('users/me'),
+      {
+        method: "GET",
+        cache: "no-store",
+      });
 
-  const meUrl = `${apiOrigin}/api/v1/users/me`;
-
-  try {
-    const res = await fetch(meUrl, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[proxy] /users/me returned status ${res.status}`);
+      return null;
+    }
     const data = (await res.json()) as { role?: unknown };
     if (typeof data.role !== "string") return null;
 
@@ -85,7 +89,7 @@ async function resolveUserRole(token: string, request: NextRequest): Promise<Use
       return normalized;
     }
   } catch (error) {
-    console.warn("[proxy] Failed to resolve role from /users/me", error);
+    console.warn("[proxy] Failed to resolve role from /users/me:", error);
     return null;
   }
 
