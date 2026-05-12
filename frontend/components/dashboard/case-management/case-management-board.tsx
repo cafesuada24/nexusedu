@@ -37,6 +37,8 @@ const INTERVENTION_LABEL: Record<BackendInterventionStatus, string> = {
     sent: "Đã gửi email",
     booked: "Đã đặt hẹn",
     supporting: "Đang hỗ trợ",
+    pending_review: "Chờ xem xét",
+    failed: "Thất bại",
     resolved: "Đã giải quyết",
     dismissed: "Đã đóng",
     expired: "Đã hết hạn",
@@ -49,6 +51,9 @@ const INTERVENTION_TONE: Record<BackendInterventionStatus, string> = {
     booked: "bg-green-500/10 text-green-700 ring-green-500/25 dark:text-green-300",
     supporting:
         "bg-blue-500/10 text-blue-700 ring-blue-500/25 dark:text-blue-300",
+    pending_review:
+        "bg-purple-500/10 text-purple-700 ring-purple-500/25 dark:text-purple-300",
+    failed: "bg-destructive/10 text-destructive ring-destructive/20",
     resolved:
         "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300",
     dismissed: "bg-muted/40 text-muted-foreground ring-border/60",
@@ -89,7 +94,7 @@ function getProblemFromRisk(risk: string): Problem {
 
 function toAlert(row: TaskItem): Alert {
     const now = Math.floor(Date.now() / 1000);
-    const severity: Alert["severity"] = row.current_risk_status
+    const severity: Alert["severity"] = (row.current_risk_status || "")
         .toLowerCase()
         .includes("elevated")
         ? "medium"
@@ -100,8 +105,8 @@ function toAlert(row: TaskItem): Alert {
         name: row.student_name ?? "",
         mssv: row.sid.slice(0, 8).toUpperCase(),
         email: row.email ?? "",
-        problem: getProblemFromRisk(row.current_risk_status),
-        summary: row.current_risk_status,
+        problem: getProblemFromRisk(row.current_risk_status || ""),
+        summary: row.current_risk_status || "",
         severity,
         subject: "",
         body: "",
@@ -127,11 +132,13 @@ const INTERVENTION_FILTER_OPTIONS: Array<{
     label: string;
 }> = [
     { value: "all", label: "Tất cả trạng thái" },
-    { value: "none", label: INTERVENTION_LABEL.none },
-    { value: "notified", label: INTERVENTION_LABEL.notified },
+    { value: "new", label: INTERVENTION_LABEL.new },
+    { value: "accepted", label: INTERVENTION_LABEL.accepted },
     { value: "sent", label: INTERVENTION_LABEL.sent },
     { value: "booked", label: INTERVENTION_LABEL.booked },
     { value: "supporting", label: INTERVENTION_LABEL.supporting },
+    { value: "pending_review", label: INTERVENTION_LABEL.pending_review },
+    { value: "failed", label: INTERVENTION_LABEL.failed },
     { value: "resolved", label: INTERVENTION_LABEL.resolved },
     { value: "dismissed", label: INTERVENTION_LABEL.dismissed },
     { value: "expired", label: INTERVENTION_LABEL.expired },
@@ -196,7 +203,7 @@ export function CaseManagementBoard() {
         const unassigned = rows.filter((r) => !r.assigned_to).length;
         const assigned = rows.filter((r) => !!r.assigned_to).length;
         for (const r of rows) {
-            byRisk[riskKey(r.current_risk_status)]++;
+            byRisk[riskKey(r.current_risk_status || "")]++;
         }
         return { total, unassigned, assigned, byRisk };
     }, [rows]);
@@ -368,7 +375,7 @@ export function CaseManagementBoard() {
                             ) : (
                                 filtered.map((row) => {
                                     const rKey = riskKey(
-                                        row.current_risk_status,
+                                        row.current_risk_status || "",
                                     );
                                     return (
                                         <TableRow
@@ -430,17 +437,15 @@ export function CaseManagementBoard() {
                                                     className={cn(
                                                         "ring-1",
                                                         INTERVENTION_TONE[
-                                                            row
-                                                                .intervention_status
-                                                        ],
+                                                            (row.intervention_status as BackendInterventionStatus) ||
+                                                                "new"
+                                                        ] || INTERVENTION_TONE.new,
                                                     )}
                                                 >
-                                                    {
-                                                        INTERVENTION_LABEL[
-                                                            row
-                                                                .intervention_status
-                                                        ]
-                                                    }
+                                                    {INTERVENTION_LABEL[
+                                                        (row.intervention_status as BackendInterventionStatus) ||
+                                                            "new"
+                                                    ] || INTERVENTION_LABEL.new}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right pr-4">

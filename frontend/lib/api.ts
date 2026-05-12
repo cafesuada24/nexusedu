@@ -34,6 +34,8 @@ export const BackendInterventionStatusSchema = z.enum([
   "booked",
   "sent",
   "supporting",
+  "pending_review",
+  "failed",
   "resolved",
   "dismissed",
   "expired",
