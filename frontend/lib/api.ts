@@ -226,6 +226,51 @@ export const AdvisorProfileUpdateSchema = z.object({
 });
 export type AdvisorProfileUpdate = z.infer<typeof AdvisorProfileUpdateSchema>;
 
+export const WorkingHoursReadSchema = z.object({
+  id: z.string(),
+  day_of_week: z.number(),
+  start_time: z.string(), // "HH:MM:SS"
+  end_time: z.string(),
+  timezone: z.string(),
+});
+export type WorkingHoursRead = z.infer<typeof WorkingHoursReadSchema>;
+
+export const DayOffReadSchema = z.object({
+  id: z.string(),
+  date: z.string(), // "YYYY-MM-DD"
+  reason: z.string().nullable().optional(),
+});
+export type DayOffRead = z.infer<typeof DayOffReadSchema>;
+
+export const AdvisorScheduleReadSchema = z.object({
+  working_hours: z.array(WorkingHoursReadSchema),
+  days_off: z.array(DayOffReadSchema),
+});
+export type AdvisorScheduleRead = z.infer<typeof AdvisorScheduleReadSchema>;
+
+export const WorkingHoursCreateSchema = z.object({
+  day_of_week: z.number(),
+  start_time: z.string(),
+  end_time: z.string(),
+  timezone: z.string().default("UTC"),
+});
+export type WorkingHoursCreate = z.infer<typeof WorkingHoursCreateSchema>;
+
+export const WorkingHoursUpdateSchema = z.object({
+  day_of_week: z.number(),
+  start_time: z.string(),
+  end_time: z.string(),
+  timezone: z.string(),
+});
+export type WorkingHoursUpdate = z.infer<typeof WorkingHoursUpdateSchema>;
+
+export const DayOffCreateSchema = z.object({
+  date: z.string(),
+  reason: z.string().nullable().optional(),
+});
+export type DayOffCreate = z.infer<typeof DayOffCreateSchema>;
+
+
 export const KpiStatsSchema = z.object({
   retention_rate: z.number(),
   total_interventions: z.number(),
@@ -936,6 +981,139 @@ export async function updateAdvisorProfile(
   }
   const data = await res.json();
   return AdvisorProfileReadSchema.parse(data);
+}
+
+/**
+ * GET /advisors/me/schedule — returns current user's schedule.
+ */
+export async function fetchAdvisorSchedule(): Promise<AdvisorScheduleRead> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(endpoint("/advisors/me/schedule"), { method: "GET" }, signal),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Lỗi tải lịch: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return AdvisorScheduleReadSchema.parse(data);
+}
+
+/**
+ * POST /advisors/{advisor_id}/working-hours
+ */
+export async function addWorkingHours(
+  advisor_id: string,
+  payload: WorkingHoursCreate,
+): Promise<void> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/advisors/${encodeURIComponent(advisor_id)}/working-hours`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Lỗi thêm giờ: ${res.statusText}`);
+  }
+}
+
+/**
+ * PUT /advisors/working-hours/{wh_id}
+ */
+export async function updateWorkingHours(
+  wh_id: string,
+  payload: WorkingHoursUpdate,
+): Promise<void> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/advisors/working-hours/${encodeURIComponent(wh_id)}`),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Lỗi cập nhật giờ: ${res.statusText}`);
+  }
+}
+
+/**
+ * DELETE /advisors/working-hours/{wh_id}
+ */
+export async function deleteWorkingHours(wh_id: string): Promise<void> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/advisors/working-hours/${encodeURIComponent(wh_id)}`),
+        { method: "DELETE" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Lỗi xoá giờ: ${res.statusText}`);
+  }
+}
+
+/**
+ * POST /advisors/{advisor_id}/days-off
+ */
+export async function addDayOff(
+  advisor_id: string,
+  payload: DayOffCreate,
+): Promise<void> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/advisors/${encodeURIComponent(advisor_id)}/days-off`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Lỗi thêm ngày nghỉ: ${res.statusText}`);
+  }
+}
+
+/**
+ * DELETE /advisors/days-off/{do_id}
+ */
+export async function deleteDayOff(do_id: string): Promise<void> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/advisors/days-off/${encodeURIComponent(do_id)}`),
+        { method: "DELETE" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.detail || `Lỗi xoá ngày nghỉ: ${res.statusText}`);
+  }
 }
 
 /**
