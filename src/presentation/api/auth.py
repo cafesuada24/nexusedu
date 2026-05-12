@@ -16,6 +16,7 @@ from fastapi_users.authentication import (
     CookieTransport,
     JWTStrategy,
 )
+from fastapi_users.jwt import generate_jwt
 from fastapi_users_db_sqlalchemy import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,7 +55,7 @@ class Scope(StrEnum):
 
     CASE_ACCEPT = 'case:accept'
     CASE_READ = 'case:read'
-    CASE_READ_ALL = 'case:read'
+    CASE_READ_ALL = 'case:read_all'
 
     STUDENTS_READ = 'students:read'
     STUDENTS_WRITE = 'students:write'
@@ -201,9 +202,27 @@ cookie_transport = CookieTransport(
 )
 
 
+class RoleJWTStrategy(JWTStrategy[User, uuid.UUID]):
+    """JWT strategy that includes the user's role in the token payload."""
+
+    async def write_token(self, user: User) -> str:
+        """Create a JWT token with custom claims (role)."""
+        data = {
+            'sub': str(user.id),
+            'aud': self.token_audience,
+            'role': user.role,
+        }
+        return generate_jwt(
+            data,
+            self.decode_key,
+            self.lifetime_seconds,
+            algorithm=self.algorithm,
+        )
+
+
 def get_jwt_strategy() -> JWTStrategy[User, uuid.UUID]:
     """Strategy for generating and validating JWT tokens."""
-    return JWTStrategy(secret=config.jwt_secret, lifetime_seconds=28800)
+    return RoleJWTStrategy(secret=config.jwt_secret, lifetime_seconds=28800)
 
 
 auth_backend = AuthenticationBackend(

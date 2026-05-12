@@ -61,7 +61,7 @@ class GamificationService:
         risk_multiplier = self.RISK_MULTIPLIERS.get(risk_level, 0.3)
         points_after_risk = base_points * risk_multiplier
 
-        # Satisfaction multiplier for RESOLVE_CASE
+        # Satis;ction multiplier for RESOLVE_CASE
         satisfaction_multiplier = 1.0
         if action_type == self.Action.RESOLVE_CASE and satisfaction:
 

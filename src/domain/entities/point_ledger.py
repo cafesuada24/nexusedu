@@ -29,8 +29,8 @@ class PointLedger:
         earned_at: datetime,
     ) -> None:
         """Adds a new point award to the ledger."""
-        if points <= 0:
-            raise ValueError("Points must be positive.")
+        if points < 0:
+            raise ValueError("Points must be non negative.")
 
         entry = PointLedgerEntry(
             id=generate_uuid(),

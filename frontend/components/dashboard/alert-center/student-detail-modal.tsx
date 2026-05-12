@@ -12,7 +12,7 @@ import { type Alert } from "@/lib/alerts";
 import { type StudentRow } from "@/lib/csv";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { X, Calendar, MapPin, MessageSquareText } from "lucide-react";
 
 type StudentDetailModalProps = {
     open: boolean;
@@ -105,6 +105,58 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                     </div>
                                 </div>
                             </section>
+
+                            {/* Appointment Info Card */}
+                            {alert.appointmentAt && (
+                                <section className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-8 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-8">
+                                        <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                                            <Calendar className="size-4" />
+                                        </div>
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-600">
+                                            Thông tin đặt hẹn
+                                        </h4>
+                                    </div>
+                                    <div className="grid gap-5 text-sm">
+                                        <div className="grid grid-cols-[30%_1fr] items-center border-b border-emerald-100/50 pb-4">
+                                            <div className="flex items-center gap-2 text-emerald-700/70">
+                                                <Calendar className="size-3.5" />
+                                                <span>Thời gian</span>
+                                            </div>
+                                            <span className="font-medium text-emerald-900 text-right">
+                                                {new Date(alert.appointmentAt * 1000).toLocaleString("vi-VN", {
+                                                    weekday: "long",
+                                                    year: "numeric",
+                                                    month: "long",
+                                                    day: "numeric",
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-[30%_1fr] items-center border-b border-emerald-100/50 pb-4">
+                                            <div className="flex items-center gap-2 text-emerald-700/70">
+                                                <MapPin className="size-3.5" />
+                                                <span>Hình thức</span>
+                                            </div>
+                                            <span className="font-medium text-emerald-900 text-right">
+                                                {alert.meetingMethod === "online" ? "Trực tuyến" : "Trực tiếp"}
+                                            </span>
+                                        </div>
+                                        {alert.appointmentNotes && alert.appointmentNotes !== "null" && (
+                                            <div className="grid grid-cols-[30%_1fr] items-start">
+                                                <div className="flex items-center gap-2 text-emerald-700/70 pt-0.5">
+                                                    <MessageSquareText className="size-3.5" />
+                                                    <span>Ghi chú</span>
+                                                </div>
+                                                <span className="font-medium text-emerald-900 text-right italic leading-relaxed">
+                                                    "{alert.appointmentNotes}"
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+                            )}
 
                             {/* LMS Overview Card */}
                             <section className="rounded-xl border border-slate-100 bg-white p-8 shadow-sm">

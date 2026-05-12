@@ -23,7 +23,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useOpenCases } from "@/hooks/use-alerts";
+import { useCases } from "@/hooks/use-alerts";
 import { useDataset } from "@/hooks/use-dataset";
 import { type TaskItem, type BackendInterventionStatus } from "@/lib/api";
 import { type StudentRow, type Problem } from "@/lib/csv";
@@ -32,8 +32,8 @@ import { cn } from "@/lib/utils";
 import { StudentDetailModal } from "@/components/dashboard/alert-center/student-detail-modal";
 
 const INTERVENTION_LABEL: Record<BackendInterventionStatus, string> = {
-    none: "Chưa khởi tạo",
-    notified: "Mới",
+    new: "Mới",
+    accepted: "Đã nhận",
     sent: "Đã gửi email",
     booked: "Đã đặt hẹn",
     supporting: "Đang hỗ trợ",
@@ -43,8 +43,8 @@ const INTERVENTION_LABEL: Record<BackendInterventionStatus, string> = {
 };
 
 const INTERVENTION_TONE: Record<BackendInterventionStatus, string> = {
-    none: "bg-muted/40 text-muted-foreground ring-border/60",
-    notified: "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-300",
+    new: "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-300",
+    accepted: "bg-muted/40 text-muted-foreground ring-border/60",
     sent: "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-300",
     booked: "bg-green-500/10 text-green-700 ring-green-500/25 dark:text-green-300",
     supporting:
@@ -111,7 +111,13 @@ function toAlert(row: TaskItem): Alert {
         draftJobId: null,
         draftSubject: row.draft_subject ?? null,
         draftBody: row.draft_body ?? null,
-        appointmentAt: null,
+        appointmentAt: row.appointment
+            ? Math.floor(
+                  new Date(row.appointment.appointment_time).getTime() / 1000,
+              )
+            : null,
+        meetingMethod: row.appointment?.meeting_method || null,
+        appointmentNotes: row.appointment?.notes || null,
         goals: [],
     };
 }
@@ -143,7 +149,7 @@ const RISK_FILTER_OPTIONS: Array<{
 ];
 
 export function CaseManagementBoard() {
-    const { data: paged, isLoading } = useOpenCases();
+    const { data: paged, isLoading } = useCases();
     const rows = React.useMemo<TaskItem[]>(() => paged?.items ?? [], [paged]);
     const { dataset } = useDataset();
 

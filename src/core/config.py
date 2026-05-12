@@ -15,7 +15,7 @@ class Config(BaseSettings):
     environment: Literal['production', 'development', 'test'] = 'development'
     log_level: Literal['INFO', 'WARNING', 'ERROR', 'DEBUG'] = 'DEBUG'
     jwt_secret: str = 'PLEASE_SET_ME_IN_PRODUCTION'
-    database_url: str = 'sqlite+aiosqlite:///./data/app.dp'
+    database_url: str = 'sqlite+aiosqlite:///./data/app.db'
     pg_dsn: PostgresDsn | None = None
     motherduck_token: str | None = None
     db_ingest_chunk_size: PositiveInt = 50

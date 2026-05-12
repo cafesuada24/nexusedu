@@ -6,6 +6,7 @@ from src.application.dtos.case_dtos import (
     GetAllCasesQuery,
     GetAssignedQuery,
     GetUnassignedQuery,
+    QueryAppointmentDTO,
     QueryEmailDTO,
 )
 from src.application.dtos.pagination import PagedResponse
@@ -104,6 +105,14 @@ class CaseQueryHandler:
                 sent_at=email.sent_at,
             )
             if email
+            else None,
+            appointment=QueryAppointmentDTO(
+                appointment_time=case.appointment.appointment_time,
+                duration_minutes=case.appointment.duration_minutes,
+                meeting_method=case.appointment.meeting_method,
+                notes=case.appointment.notes,
+            )
+            if case.appointment
             else None,
         )
 

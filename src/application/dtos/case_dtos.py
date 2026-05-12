@@ -156,6 +156,12 @@ class QueryEmailDTO(BaseModel):
     created_at: datetime
     sent_at: datetime | None = None
 
+class QueryAppointmentDTO(BaseModel):
+    appointment_time: AwareDatetime
+    duration_minutes: int
+    meeting_method: MeetingMethod
+    notes: str | None
+
 class CaseDTO(BaseModel):
     """Schema for a student case."""
 
@@ -173,3 +179,4 @@ class CaseDTO(BaseModel):
     intervention_status: InterventionStatus
 
     email: QueryEmailDTO | None
+    appointment: QueryAppointmentDTO | None = None
