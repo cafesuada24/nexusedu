@@ -134,6 +134,13 @@ function toHHMM(mins: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
 }
 
+/** Converts "HH:mm" from UTC to UTC+7. */
+export function convertUtcToUtc7(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number)
+  const newH = (h + 7) % 24
+  return `${newH.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+}
+
 /** Is this calendar date fully blocked (weekday off, or off override)? */
 export function isDateOff(date: Date, schedule: Schedule): boolean {
   const dk = dayKeyFromDate(date)
@@ -171,46 +178,6 @@ export function generateSlotsForDate(
     }
   }
   return out
-}
-
-export type WeekSummaryGroup = {
-  keys: DayKey[]
-  label: string
-  hours: string
-  enabled: boolean
-}
-
-/**
- * Collapse consecutive days that share the same schedule into a single
- * row for the Settings summary card.
- */
-export function summarizeWeek(week: WeekSchedule): WeekSummaryGroup[] {
-  const items = DAY_ORDER.map((k) => ({
-    key: k,
-    day: week[k],
-    sig: week[k].enabled
-      ? week[k].slots.map((s) => `${s.from}-${s.to}`).join("|") || "empty"
-      : "off",
-  }))
-  const groups: { keys: DayKey[]; sig: string; day: DayConfig }[] = []
-  for (const it of items) {
-    const last = groups[groups.length - 1]
-    if (last && last.sig === it.sig) last.keys.push(it.key)
-    else groups.push({ keys: [it.key], sig: it.sig, day: it.day })
-  }
-  return groups.map((g) => {
-    const labels = g.keys.map((k) => DAYS.find((d) => d.key === k)!.long)
-    const label =
-      g.keys.length === 1
-        ? labels[0]
-        : `${labels[0]} – ${labels[labels.length - 1]}`
-    const hours = !g.day.enabled
-      ? "Nghỉ"
-      : g.day.slots.length === 0
-      ? "Trống (chưa cấu hình khung giờ)"
-      : g.day.slots.map((s) => `${s.from} – ${s.to}`).join(" · ")
-    return { keys: g.keys, label, hours, enabled: g.day.enabled }
-  })
 }
 
 /** Total number of working hours per week. */
