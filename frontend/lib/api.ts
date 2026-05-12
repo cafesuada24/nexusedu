@@ -446,6 +446,28 @@ async function parseErrorDetail(res: Response): Promise<string> {
   }
 }
 
+// Standard fetch-parse-validate for endpoints that return JSON conforming to a Zod schema.
+// Leave special cases (null-on-401, SlotTakenError, retry loops, void responses) handcoded.
+// Uses z.ZodTypeAny + z.output<S> so transform schemas (ZodEffects) infer correctly.
+async function apiCall<S extends z.ZodTypeAny>(
+  url: string,
+  init: RequestInit,
+  schema: S,
+  errorPrefix: string,
+  timeout = DEFAULT_TIMEOUT_MS,
+): Promise<z.output<S>> {
+  const res = await withTimeout(
+    (signal) => authFetch(url, init, signal),
+    timeout,
+  );
+  if (!res.ok) {
+    const detail = await parseErrorDetail(res);
+    throw new Error(`${errorPrefix}: ${detail}`);
+  }
+  const data = await res.json();
+  return schema.parse(data);
+}
+
 /* ----------------------------------------------------------------------- */
 /*  Auth API: register / login / me                                         */
 /* ----------------------------------------------------------------------- */
@@ -481,25 +503,12 @@ export async function getCurrentUser(): Promise<UserRead | null> {
  * GET /users/me/settings — returns current user settings.
  */
 export async function getUserSettings(): Promise<UserSettings> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint("/users/me/settings"),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/users/me/settings"),
+    { method: "GET" },
+    UserSettingsSchema,
+    "Failed to fetch user settings",
   );
-
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    throw new Error(
-      errorBody.detail || `Failed to fetch user settings: ${res.status}`,
-    );
-  }
-
-  const data = await res.json();
-  return UserSettingsSchema.parse(data);
 }
 
 /**
@@ -508,29 +517,16 @@ export async function getUserSettings(): Promise<UserSettings> {
 export async function updateUserSettings(
   settings: Pick<UserSettings, "auto_draft_enabled">,
 ): Promise<UserSettings> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint("/users/me/settings"),
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(settings),
-        },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/users/me/settings"),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    },
+    UserSettingsSchema,
+    "Failed to update user settings",
   );
-
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    throw new Error(
-      errorBody.detail || `Failed to update user settings: ${res.status}`,
-    );
-  }
-
-  const data = await res.json();
-  return UserSettingsSchema.parse(data);
 }
 
 /* ----------------------------------------------------------------------- */
@@ -593,22 +589,12 @@ export async function fetchOpenCases(
   limit: number = 20,
   offset: number = 0,
 ): Promise<TaskPagedResponse> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/cases/open?limit=${limit}&offset=${offset}`),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint(`/cases/open?limit=${limit}&offset=${offset}`),
+    { method: "GET" },
+    TaskPagedResponseSchema,
+    "Không thể lấy danh sách case đang mở",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy danh sách case đang mở: ${message}`);
-  }
-  const data = await res.json();
-  return TaskPagedResponseSchema.parse(data);
 }
 
 /**
@@ -618,22 +604,12 @@ export async function fetchAllCases(
   limit: number = 100,
   offset: number = 0,
 ): Promise<TaskPagedResponse> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/cases?limit=${limit}&offset=${offset}`),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint(`/cases?limit=${limit}&offset=${offset}`),
+    { method: "GET" },
+    TaskPagedResponseSchema,
+    "Không thể lấy danh sách toàn bộ case",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy danh sách toàn bộ case: ${message}`);
-  }
-  const data = await res.json();
-  return TaskPagedResponseSchema.parse(data);
 }
 
 /**
@@ -643,22 +619,12 @@ export async function fetchAssignedCases(
   limit: number = 20,
   offset: number = 0,
 ): Promise<TaskPagedResponse> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/cases/assigned?limit=${limit}&offset=${offset}`),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint(`/cases/assigned?limit=${limit}&offset=${offset}`),
+    { method: "GET" },
+    TaskPagedResponseSchema,
+    "Không thể lấy danh sách case được giao",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy danh sách case được giao: ${message}`);
-  }
-  const data = await res.json();
-  return TaskPagedResponseSchema.parse(data);
 }
 
 /**
@@ -757,22 +723,12 @@ export async function generateAiDraftForAlert(
  * { job_id, status, result?, error? }
  */
 export async function getJobStatus(job_id: string): Promise<JobResult> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/jobs/${encodeURIComponent(job_id)}`),
-        {
-          method: "GET",
-        },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint(`/jobs/${encodeURIComponent(job_id)}`),
+    { method: "GET" },
+    JobResultSchema,
+    "Kiểm tra trạng thái job thất bại",
   );
-  if (!res.ok) {
-    throw new Error(`Kiểm tra trạng thái job thất bại: ${res.status}`);
-  }
-  const data = await res.json();
-  return JobResultSchema.parse(data);
 }
 
 /**
@@ -844,62 +800,36 @@ export async function fetchAdvisorsLeaderboard(
   const qp = time_window
     ? `?time_window=${encodeURIComponent(time_window)}`
     : "";
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/advisors/leaderboard${qp}`),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint(`/advisors/leaderboard${qp}`),
+    { method: "GET" },
+    AdvisorLeaderboardSchema,
+    "Không thể lấy bảng xếp hạng",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy bảng xếp hạng: ${message}`);
-  }
-  const data = await res.json();
-  return AdvisorLeaderboardSchema.parse(data);
 }
 
 /**
  * GET /advisors/profile — returns current user's advisor profile.
  */
 export async function fetchAdvisorProfile(): Promise<AdvisorProfileRead> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(endpoint("/advisors/profile"), { method: "GET" }, signal),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/advisors/profile"),
+    { method: "GET" },
+    AdvisorProfileReadSchema,
+    "Không thể lấy thông tin hồ sơ",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy thông tin hồ sơ: ${message}`);
-  }
-  const data = await res.json();
-  return AdvisorProfileReadSchema.parse(data);
 }
 
 /**
  * GET /advisors/me/points — returns current user's advisor points.
  */
 export async function fetchAdvisorPoints(): Promise<AdvisorPoints> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint("/advisors/me/points"),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/advisors/me/points"),
+    { method: "GET" },
+    AdvisorPointsSchema,
+    "Không thể lấy điểm thưởng",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy điểm thưởng: ${message}`);
-  }
-  const data = await res.json();
-  return AdvisorPointsSchema.parse(data);
 }
 
 /**
@@ -908,43 +838,28 @@ export async function fetchAdvisorPoints(): Promise<AdvisorPoints> {
 export async function updateAdvisorProfile(
   payload: AdvisorProfileUpdate,
 ): Promise<AdvisorProfileRead> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint("/advisors/profile"),
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/advisors/profile"),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    AdvisorProfileReadSchema,
+    "Cập nhật hồ sơ thất bại",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Cập nhật hồ sơ thất bại: ${message}`);
-  }
-  const data = await res.json();
-  return AdvisorProfileReadSchema.parse(data);
 }
 
 /**
  * GET /advisors/me/schedule — returns current user's schedule.
  */
 export async function fetchAdvisorSchedule(): Promise<AdvisorScheduleRead> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(endpoint("/advisors/me/schedule"), { method: "GET" }, signal),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/advisors/me/schedule"),
+    { method: "GET" },
+    AdvisorScheduleReadSchema,
+    "Lỗi tải lịch",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    throw new Error(errorBody.detail || `Lỗi tải lịch: ${res.statusText}`);
-  }
-  const data = await res.json();
-  return AdvisorScheduleReadSchema.parse(data);
 }
 
 /**
@@ -1067,40 +982,24 @@ export async function deleteDayOff(do_id: string): Promise<void> {
  * GET /metrics/stats — returns high-level dashboard KPIs.
  */
 export async function fetchKpiStats(): Promise<KpiStats> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(endpoint("/metrics/stats"), { method: "GET" }, signal),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/metrics/stats"),
+    { method: "GET" },
+    KpiStatsSchema,
+    "Không thể lấy chỉ số KPI",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy chỉ số KPI: ${message}`);
-  }
-  const data = await res.json();
-  return KpiStatsSchema.parse(data);
 }
 
 /**
  * GET /metrics/retention — returns retention trend data.
  */
 export async function fetchRetentionTrend(): Promise<RetentionTrendItem[]> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint("/metrics/retention"),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint("/metrics/retention"),
+    { method: "GET" },
+    z.array(RetentionTrendItemSchema),
+    "Không thể lấy xu hướng giữ chân",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy xu hướng giữ chân: ${message}`);
-  }
-  const data = await res.json();
-  return z.array(RetentionTrendItemSchema).parse(data);
 }
 
 /**
@@ -1135,22 +1034,12 @@ export async function fetchCaseEmail(
 export async function fetchDraftStatus(
   case_id: string,
 ): Promise<DraftStatusResponse> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/cases/${encodeURIComponent(case_id)}/email`),
-        { method: "GET" },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint(`/cases/${encodeURIComponent(case_id)}/email`),
+    { method: "GET" },
+    DraftStatusResponseSchema,
+    "Không thể lấy trạng thái bản nháp",
   );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể lấy trạng thái bản nháp: ${message}`);
-  }
-  const data = await res.json();
-  return DraftStatusResponseSchema.parse(data);
 }
 
 /**
@@ -1159,22 +1048,12 @@ export async function fetchDraftStatus(
 export async function fetchCaseDetails(
   case_id: string,
 ): Promise<CaseDetailsResponse> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/cases/${encodeURIComponent(case_id)}`),
-        {
-          method: "GET",
-        },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
+  return apiCall(
+    endpoint(`/cases/${encodeURIComponent(case_id)}`),
+    { method: "GET" },
+    CaseDetailsResponseSchema,
+    "Không thể lấy chi tiết case",
   );
-  if (!res.ok) {
-    throw new Error(`Không thể lấy chi tiết case: ${res.status}`);
-  }
-  const data = await res.json();
-  return CaseDetailsResponseSchema.parse(data);
 }
 
 
