@@ -54,10 +54,20 @@ async function resolveUserRole(token: string, request: NextRequest): Promise<Use
     if (roleFromToken) return roleFromToken;
   }
 
-  const meUrl = new URL("/api/v1/users/me", request.url);
+  // Fetch directly from the backend to avoid Next.js middleware fetch loops.
+  // We use the origin of NEXT_PUBLIC_API_BASE_URL to construct the /me URL safely.
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+  let apiOrigin = "http://localhost:8000";
+  try {
+    apiOrigin = new URL(apiBaseUrl).origin;
+  } catch {
+    // Fallback if URL is malformed
+  }
+
+  const meUrl = `${apiOrigin}/api/v1/users/me`;
 
   try {
-    const res = await fetch(meUrl.toString(), {
+    const res = await fetch(meUrl, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
