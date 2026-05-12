@@ -57,7 +57,7 @@ from src.presentation.schemas.request import BookAppointmentRequest, UpdateEmail
 router = APIRouter(prefix='/cases', tags=['cases'])
 
 
-@router.get('/')
+@router.get('')
 async def get_all_cases(
     query_handler: Annotated[CaseQueryHandler, Depends(get_case_query_handler)],
     user: Annotated[User, Depends(require_scope(Scope.CASE_READ_ALL))],

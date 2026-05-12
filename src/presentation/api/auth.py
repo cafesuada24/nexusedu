@@ -55,7 +55,7 @@ class Scope(StrEnum):
 
     CASE_ACCEPT = 'case:accept'
     CASE_READ = 'case:read'
-    CASE_READ_ALL = 'case:read'
+    CASE_READ_ALL = 'case:read_all'
 
     STUDENTS_READ = 'students:read'
     STUDENTS_WRITE = 'students:write'
