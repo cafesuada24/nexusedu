@@ -367,6 +367,7 @@ export async function authFetch(
         const token = await getAuthToken();
         if (token) {
             headers.set("Authorization", `Bearer ${token}`);
+            headers.set("Cookie", `nexusedu_auth_token=${token}`);
         }
     }
     // On the client, we rely on middleware to inject the token from the httpOnly cookie

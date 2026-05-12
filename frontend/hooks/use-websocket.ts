@@ -16,8 +16,13 @@ const RECONNECT_DELAY = 5_000;
 const NORMAL_CLOSE_CODE = 1000;
 const UNAUTHORIZED_CLOSE_CODE = 4003;
 
-export function useWebSocket() {
-  const { authReady, token } = useAuth();
+export interface UseWebSocketOptions {
+  onMessage?: (message: WebSocketMessage) => void;
+}
+
+export function useWebSocket(options: UseWebSocketOptions = {}) {
+  const { authReady, isAuthenticated } = useAuth();
+  const { onMessage } = options;
 
   const [lastMessage, setLastMessage] =
     useState<WebSocketMessage | null>(null);
@@ -31,6 +36,11 @@ export function useWebSocket() {
   );
 
   const manuallyClosedRef = useRef(false);
+  const onMessageRef = useRef(onMessage);
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   const clearReconnectTimeout = useCallback(() => {
     if (!reconnectTimeoutRef.current) {
@@ -66,14 +76,10 @@ export function useWebSocket() {
   );
 
   const buildWebSocketUrl = useCallback(
-    (authToken: string) => {
-      const encodedToken = encodeURIComponent(authToken);
-
+    () => {
       // Explicit WS URL has highest priority
       if (process.env.NEXT_PUBLIC_WS_URL) {
-        const wsUrl = process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, "");
-
-        return `${wsUrl}?token=${encodedToken}`;
+        return process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, "");
       }
 
       const apiBaseUrl = (
@@ -84,7 +90,7 @@ export function useWebSocket() {
       if (apiBaseUrl.startsWith("http")) {
         const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
 
-        return `${wsBaseUrl}/ws?token=${encodedToken}`;
+        return `${wsBaseUrl}/ws`;
       }
 
       // Fallback
@@ -99,13 +105,15 @@ export function useWebSocket() {
         ? "localhost:8000"
         : window.location.host;
 
-      return `${protocol}//${host}/api/v1/ws?token=${encodedToken}`;
+      return `${protocol}//${host}/api/v1/ws`;
     },
     [],
   );
 
   const connect = useCallback(() => {
-  if (!authReady || !token) {
+    console.debug("[WS] Connect attempt. authReady:", authReady, "isAuthenticated:", isAuthenticated);
+    if (!authReady || !isAuthenticated) {
+      console.debug("[WS] Not ready or not authenticated, ensuring disconnected.");
       disconnect();
 
       return;
@@ -121,6 +129,7 @@ export function useWebSocket() {
         currentSocket.readyState === WebSocket.CONNECTING
       )
     ) {
+      console.debug("[WS] Already connected or connecting, skipping.");
       return;
     }
 
@@ -128,18 +137,21 @@ export function useWebSocket() {
 
     clearReconnectTimeout();
 
-    const wsUrl = buildWebSocketUrl(token);
+    const wsUrl = buildWebSocketUrl();
 
     setStatus("connecting");
+    console.info("[WS] Connecting to:", wsUrl);
 
     const socket = new WebSocket(wsUrl);
 
     socketRef.current = socket;
 
     socket.onopen = () => {
-      setStatus("open");
-
-      console.info("[WebSocket] Connected");
+      // Ensure we only update status if this is still the current socket
+      if (socketRef.current === socket) {
+        setStatus("open");
+        console.info("[WS] Connected successfully");
+      }
     };
 
     socket.onmessage = (event: MessageEvent<string>) => {
@@ -149,26 +161,27 @@ export function useWebSocket() {
         );
 
         setLastMessage(parsedMessage);
+        onMessageRef.current?.(parsedMessage);
       } catch (error) {
         console.error(
-          "[WebSocket] Failed to parse message:",
+          "[WS] Failed to parse message:",
           error,
         );
       }
     };
 
     socket.onerror = (error) => {
-      console.error("[WebSocket] Error:", error);
+      console.error("[WS] Error:", error);
     };
 
     socket.onclose = (event: CloseEvent) => {
-      socketRef.current = null;
-
-      setStatus("closed");
-
-      console.info(
-        `[WebSocket] Closed (${event.code}) ${event.reason}`,
-      );
+      console.info(`[WS] Closed (${event.code}) ${event.reason}`);
+      
+      // Only update state if this was our current socket
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+        setStatus("closed");
+      }
 
       // Do not reconnect if:
       // - manually disconnected
@@ -182,12 +195,14 @@ export function useWebSocket() {
         return;
       }
 
+      console.debug("[WS] Scheduling reconnect...");
       reconnectTimeoutRef.current = setTimeout(() => {
         connect();
       }, RECONNECT_DELAY);
     };
   }, [
-    token,
+    isAuthenticated,
+    authReady,
     disconnect,
     clearReconnectTimeout,
     buildWebSocketUrl,

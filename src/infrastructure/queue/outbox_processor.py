@@ -1,7 +1,7 @@
 """Service for processing pending outbox events and dispatching them to ARQ."""
 
 import pickle
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,10 @@ from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.core.logger import logger
 from src.domain.value_objects.status import OutboxStatus
 from src.infrastructure.database.models import OutboxEvent
+
+# Retry configuration
+MAX_RETRIES = 3
+RETRY_DELAY_SECONDS = 5
 
 
 class OutboxProcessor:
@@ -24,7 +28,14 @@ class OutboxProcessor:
         """Fetch and dispatch pending outbox events."""
         stmt = (
             select(OutboxEvent)
-            .where(OutboxEvent.status == OutboxStatus.PENDING)
+            .where(OutboxEvent.status.in_([OutboxStatus.PENDING, OutboxStatus.FAILED]))
+            .where(
+                (OutboxEvent.processed_at == None)  # noqa: E711
+                | (
+                    OutboxEvent.processed_at
+                    <= datetime.now(UTC) - timedelta(seconds=RETRY_DELAY_SECONDS)
+                )
+            )
             .order_by(OutboxEvent.created_at)
             .limit(limit)
         )
@@ -39,9 +50,13 @@ class OutboxProcessor:
         if not events:
             return
 
-        logger.info(f'Outbox: Processing {len(events)} pending events.')
+        logger.info(f'Outbox: Processing {len(events)} pending/failed events.')
 
         for event in events:
+            # Skip if max retries reached
+            if event.error and 'Retry limit reached' in event.error:
+                continue
+
             try:
                 kwargs = pickle.loads(event.payload)
                 await self.arq_queue.enqueue(event.task_name, **kwargs)
@@ -50,9 +65,24 @@ class OutboxProcessor:
                 event.processed_at = datetime.now(UTC)
                 logger.debug(f'Outbox: Dispatched task {event.task_name} ({event.id})')
             except Exception as e:
-                logger.error(
-                    f'Outbox: Failed to dispatch event {event.id} ({event.task_name}): {e}',
+                # Basic retry logic using processed_at as last attempt timestamp
+                current_error = str(e)
+                retry_count = (
+                    event.error.count('Retry attempt') + 1 if event.error else 1
                 )
-                event.status = OutboxStatus.FAILED
-                event.error = str(e)
+
+                if retry_count < MAX_RETRIES:
+                    event.status = OutboxStatus.FAILED
+                    event.error = f'Retry attempt {retry_count}: {current_error}'
+                    logger.warning(
+                        f'Outbox: Transient failure for {event.id} ({event.task_name}). '
+                        f'Will retry. Error: {current_error}',
+                    )
+                else:
+                    event.status = OutboxStatus.FAILED
+                    event.error = f'Retry limit reached ({MAX_RETRIES}): {current_error}'
+                    logger.error(
+                        f'Outbox: Permanent failure for {event.id} ({event.task_name}): {current_error}',
+                    )
+
                 event.processed_at = datetime.now(UTC)

@@ -34,8 +34,28 @@ export async function loginAction(username: string, password: string) {
       return { success: false, error: errorBody.detail || "Đăng nhập thất bại" }
     }
 
-    const data = await res.json()
-    const token = data.access_token
+    // Backend using CookieTransport returns token in Set-Cookie header.
+    // Use getSetCookie() for reliable extraction from multiple headers if available.
+    const setCookies = (res.headers as any).getSetCookie?.() || [];
+    let token = null;
+
+    if (setCookies.length > 0) {
+      for (const cookieStr of setCookies) {
+        if (cookieStr.includes("nexusedu_auth_token=")) {
+          const match = cookieStr.match(/nexusedu_auth_token=([^;]+)/);
+          if (match) {
+            token = match[1];
+            break;
+          }
+        }
+      }
+    } else {
+      const setCookieHeader = res.headers.get("set-cookie");
+      const match = setCookieHeader?.match(/nexusedu_auth_token=([^;]+)/);
+      if (match) {
+        token = match[1];
+      }
+    }
 
     if (token) {
       const cookieStore = await cookies()
@@ -44,14 +64,14 @@ export async function loginAction(username: string, password: string) {
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
-        maxAge: 60 * 60 * 8, // 8h — matches planned JWT lifetime_seconds in src/presentation/api/auth.py
+        maxAge: 60 * 60 * 8, // 8h
       })
 
       logger.info({ username }, "Login successful")
-      return { success: true, token }
+      return { success: true }
     }
 
-    logger.error({ username }, "No token received from server")
+    logger.error({ username }, "No token received from server Set-Cookie header")
     return { success: false, error: "Không nhận được token từ server" }
   } catch (error: any) {
     logger.error({ err: error, username }, "Internal login error")
@@ -61,7 +81,23 @@ export async function loginAction(username: string, password: string) {
 
 export async function logoutAction() {
   try {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1"
+    const url = `${baseUrl.replace(/\/+$/, "")}/auth/jwt/logout`
+    
     const cookieStore = await cookies()
+    const token = cookieStore.get("nexusedu_auth_token")?.value
+
+    // Call backend logout
+    if (token) {
+      await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Cookie: `nexusedu_auth_token=${token}`,
+        },
+      }).catch(err => logger.error({ err }, "Backend logout failed"));
+    }
+
     cookieStore.delete("nexusedu_auth_token")
     logger.info("Logout successful")
     return { success: true }

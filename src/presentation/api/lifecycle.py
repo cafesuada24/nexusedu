@@ -34,10 +34,10 @@ async def redis_pubsub_listener() -> None:
     """Listens to Redis Pub/Sub and broadcasts messages to WebSockets."""
     r = redis.Redis(host=config.redis_host, port=config.redis_port, decode_responses=True)
     pubsub = r.pubsub()
-    await pubsub.subscribe('ws_updates')
-    logger.info('API Lifecycle: Redis Pub/Sub listener started on channel "ws_updates".')
 
     try:
+        await pubsub.subscribe('ws_updates')
+        logger.info('API Lifecycle: Redis Pub/Sub listener started on channel "ws_updates".')
         async for message in pubsub.listen():
             if message['type'] == 'message':
                 try:
@@ -53,10 +53,12 @@ async def redis_pubsub_listener() -> None:
                         await ws_manager.broadcast(data)
                 except Exception as e:
                     logger.error(f'API Lifecycle: Error processing Pub/Sub message: {e}')
+    except redis.ConnectionError:
+        logger.info('API Lifecycle: Redis Pub/Sub listener stopping...')
     except asyncio.CancelledError:
         logger.info('API Lifecycle: Redis Pub/Sub listener stopping...')
-    finally:
         await pubsub.unsubscribe('ws_updates')
+    finally:
         await r.close()
 
 

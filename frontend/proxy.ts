@@ -115,15 +115,16 @@ export async function proxy(request: NextRequest) {
   }
 
   // 2. Authenticated user visiting login page
-  if (pathname === "/login" && token) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  // if (pathname === "/login" && token) {
+  //   return NextResponse.redirect(new URL("/dashboard", request.url));
+  // }
 
   // 3. Token Injection & API Proxying
   if (pathname.startsWith("/api/v1")) {
     const requestHeaders = new Headers(request.headers);
     if (token) {
       requestHeaders.set("Authorization", `Bearer ${token}`);
+      requestHeaders.set("Cookie", `nexusedu_auth_token=${token}`);
     }
 
     // Pass through to next.config.mjs rewrites with injected headers

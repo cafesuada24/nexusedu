@@ -13,7 +13,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import (
     AuthenticationBackend,
-    BearerTransport,
+    CookieTransport,
     JWTStrategy,
 )
 from fastapi_users_db_sqlalchemy import BaseUserDatabase, SQLAlchemyUserDatabase
@@ -192,18 +192,23 @@ async def get_user_manager(
 
 
 # Authentication Backend
-bearer_transport = BearerTransport(tokenUrl='api/v1/auth/jwt/login')
+cookie_transport = CookieTransport(
+    cookie_name='nexusedu_auth_token',
+    cookie_max_age=28800,
+    cookie_httponly=True,
+    cookie_samesite='lax',
+    cookie_secure=config.environment == 'production',
+)
 
 
 def get_jwt_strategy() -> JWTStrategy[User, uuid.UUID]:
     """Strategy for generating and validating JWT tokens."""
-    # matches frontend cookie maxAge in app/actions/auth.ts
     return JWTStrategy(secret=config.jwt_secret, lifetime_seconds=28800)
 
 
 auth_backend = AuthenticationBackend(
     name='jwt',
-    transport=bearer_transport,
+    transport=cookie_transport,
     get_strategy=get_jwt_strategy,
 )
 

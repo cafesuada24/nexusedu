@@ -216,7 +216,10 @@ export function useUpdateAlertStatus() {
     onSuccess: () => { },
 
     // Always refetch after error or success to ensure we are in sync with the server
-    onSettled: () => {
+    onSettled: async () => {
+      // Small delay to allow background workers to process before the refetch
+      // This helps prevent the "revert" jump in the UI.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       queryClient.invalidateQueries({
         queryKey: queryKeys.alerts.list(),
       });
