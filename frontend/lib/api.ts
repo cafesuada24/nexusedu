@@ -390,16 +390,15 @@ export async function authFetch(
   const headers = new Headers(fetchOpts.headers || undefined);
   headers.set("Accept", headers.get("Accept") || "application/json");
 
-  // On the server, we must manually inject the token from cookies
+  // On the server, inject via Cookie header (backend uses CookieTransport, not Bearer).
+  // On the client, middleware reads the httpOnly cookie and injects Authorization header
+  // before the rewrite to the real backend — client JS never sees the token.
   if (typeof window === "undefined") {
     const token = await getAuthToken();
     if (token) {
-      // headers.set("Authorization", `Bearer ${token}`);
       headers.set("Cookie", `nexusedu_auth_token=${token}`);
     }
   }
-  // On the client, we rely on middleware to inject the token from the httpOnly cookie
-  // for all requests to /api/v1/*
 
   const merged: RequestInit = {
     ...fetchOpts,
@@ -1243,7 +1242,6 @@ export async function confirmBooking(
     meeting_method: payload.meetingMethod,
     notes: payload.notes ?? "null",
   });
-  console.log(requestBody);
   const res = await withTimeout(
     (signal) =>
       authFetch(
