@@ -142,15 +142,17 @@ async def run_dispatch_email_task(
 
         # Notify UI via WebSocket
         try:
-            ws_publisher = container.websocket_publisher
-            await ws_publisher.publish(
-                'CASE:STATUS_UPDATED',
-                {
-                    'case_id': str(case_id),
-                    'new_status': case.intervention_status.value,
-                },
-                user_id=case.assigned_advisor_id,
-            )
+            advisor = await advisor_repo.get_by_id(case.assigned_advisor_id)
+            if advisor.user_id:
+                ws_publisher = container.websocket_publisher
+                await ws_publisher.publish(
+                    'CASE:STATUS_UPDATED',
+                    {
+                        'case_id': str(case_id),
+                        'new_status': case.intervention_status.value,
+                    },
+                    user_id=advisor.user_id,
+                )
         except Exception as ws_err:
             logger.error(f'Worker: Failed to publish WS status update: {ws_err}')
 
