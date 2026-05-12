@@ -186,7 +186,7 @@ export default function MetricsPage() {
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="stripe-success rounded-2xl border-success/15 bg-gradient-to-br from-success/18 via-success/8 to-card">
+        <Card className="stripe-success w-full overflow-hidden rounded-2xl border-success/15 bg-gradient-to-br from-success/18 via-success/8 to-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 font-serif text-lg">
               <span className="grid size-7 place-items-center rounded-lg bg-success/10 text-success ring-1 ring-success/15">
@@ -200,7 +200,7 @@ export default function MetricsPage() {
           </CardContent>
         </Card>
 
-        <Card className="stripe-primary rounded-2xl border-primary/15 bg-gradient-to-br from-primary/18 via-primary/8 to-card">
+        <Card className="stripe-primary w-full overflow-hidden rounded-2xl border-primary/15 bg-gradient-to-br from-primary/18 via-primary/8 to-card">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 font-serif text-lg">
               <span className="grid size-7 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
