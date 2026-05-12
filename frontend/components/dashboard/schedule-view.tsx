@@ -4,7 +4,7 @@ import * as React from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useScheduleQuery } from "@/hooks/use-schedule-query"
 import { useAuth } from "@/hooks/use-auth"
-import { summarizeWeek, totalWeeklyHours, type DayKey } from "@/lib/schedule"
+import { totalWeeklyHours, type DayKey } from "@/lib/schedule"
 import { ScheduleStats } from "./schedule/schedule-stats"
 import { WorkingHoursCard } from "./schedule/working-hours-card"
 import { OverridesCard } from "./schedule/overrides-card"
@@ -17,11 +17,6 @@ export function ScheduleView() {
   const bookingSlug = user?.email?.split("@")[0] || "advisor"
   const bookingUrl = `https://nexusedu.app/booking/${bookingSlug}`
   const displayUrl = `nexusedu.app/booking/${bookingSlug}`
-
-  const weekSummary = React.useMemo(
-    () => summarizeWeek(schedule.week),
-    [schedule.week],
-  )
 
   const weeklyHours = React.useMemo(
     () => totalWeeklyHours(schedule.week),
@@ -39,12 +34,10 @@ export function ScheduleView() {
     [schedule.overrides],
   )
 
-  const toggleGroup = (keys: DayKey[], enabled: boolean) => {
+  const toggleDay = (key: DayKey, enabled: boolean) => {
     setSchedule((prev) => {
       const next = { ...prev.week }
-      keys.forEach((k) => {
-        next[k] = { ...next[k], enabled }
-      })
+      next[key] = { ...next[key], enabled }
       return { ...prev, week: next }
     })
   }
@@ -60,8 +53,8 @@ export function ScheduleView() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <WorkingHoursCard
-            weekSummary={weekSummary}
-            onToggleGroup={toggleGroup}
+            week={schedule.week}
+            onToggleDay={toggleDay}
           />
 
           <div className="grid gap-6">
