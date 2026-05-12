@@ -104,7 +104,7 @@ export function ImpactHero() {
         </div>
 
         {/* Mini stats — icons + numbers only */}
-        <ul role="list" className="grid grid-cols-3 gap-2 lg:grid-cols-1">
+        <ul role="list" className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
           {MINI_STATS.map((s) => {
             const Icon = s.icon
             const tint =
@@ -120,17 +120,17 @@ export function ImpactHero() {
               >
                 <span
                   className={cn(
-                    "grid size-9 shrink-0 place-items-center rounded-lg",
+                    "grid size-8 shrink-0 place-items-center rounded-lg sm:size-9",
                     tint,
                   )}
                   aria-hidden
                 >
-                  <Icon className="size-4" />
+                  <Icon className="size-3.5 sm:size-4" />
                 </span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div
                     className={cn(
-                      "font-serif text-xl font-bold leading-none tabular-nums",
+                      "font-serif text-xl font-bold leading-none tabular-nums sm:text-lg lg:text-xl",
                       valueTone,
                     )}
                   >
