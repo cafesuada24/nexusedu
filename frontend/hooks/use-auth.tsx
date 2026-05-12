@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { type UserRead } from "@/lib/api"
 import { useProfile } from "@/hooks/use-profile"
 import { loginAction, logoutAction } from "@/app/actions/auth"
+import { ApiError } from "next/dist/server/api-utils"
 
 function warnLog(...args: unknown[]) {
   console.warn("[hooks/use-auth]", ...args)
@@ -14,7 +15,6 @@ function warnLog(...args: unknown[]) {
 
 interface AuthContextType {
   user: UserRead | null
-  token: string | null
 
   /**
    * True after client hydration completes.
@@ -53,13 +53,7 @@ export function AuthProvider({
     React.useState(false)
 
   /**
-   * null = unauthenticated
-   */
-  const [token, setToken] =
-    React.useState<string | null>(null)
-
-  /**
-   * True after localStorage hydration.
+   * True after component hydration.
    */
   const [authReady, setAuthReady] =
     React.useState(false)
@@ -74,30 +68,12 @@ export function AuthProvider({
    */
   React.useEffect(() => {
     setMounted(true)
+    setAuthReady(true)
   }, [])
 
   /**
-   * Hydrate auth token exactly once.
-   */
-  React.useEffect(() => {
-    if (!mounted) {
-      return
-    }
-
-    const storedToken =
-      window.localStorage.getItem(
-        "nexusedu:auth:token",
-      )
-
-    setToken(storedToken)
-
-    setAuthReady(true)
-  }, [mounted])
-
-  /**
-   * Profile query only runs after:
-   * - hydration complete
-   * - token available
+   * Profile query only runs after hydration.
+   * Authentication is handled via HTTP-only cookies.
    */
   const {
     data: user,
@@ -105,10 +81,7 @@ export function AuthProvider({
     refetch,
     error,
   } = useProfile({
-    enabled:
-      mounted &&
-      authReady &&
-      !!token,
+    enabled: mounted && authReady,
   })
 
   const isLoggingOut =
@@ -123,12 +96,6 @@ export function AuthProvider({
       isLoggingOut.current = true
 
       try {
-        window.localStorage.removeItem(
-          "nexusedu:auth:token",
-        )
-
-        setToken(null)
-
         try {
           await logoutAction()
         } catch (err) {
@@ -155,24 +122,9 @@ export function AuthProvider({
 
   /**
    * Explicit authentication failure handler.
-   *
-   * Avoid triggering logout from transient
-   * query invalidation states.
    */
   React.useEffect(() => {
-    if (!mounted) {
-      return
-    }
-
-    if (!authReady) {
-      return
-    }
-
-    if (!token) {
-      return
-    }
-
-    if (isLoading) {
+    if (!mounted || !authReady || isLoading) {
       return
     }
 
@@ -180,23 +132,37 @@ export function AuthProvider({
       return
     }
 
-    warnLog(
-      "Authentication failure detected",
+    // Only log and potentially logout if we have a real error and we're not loading
+    console.error(
+      "[AUTH] Profile fetch failed",
       error,
     )
 
-    const path =
-      window.location.pathname
+    /**
+     * ONLY logout on explicit unauthorized (401).
+     */
+    const isUnauthorized =
+      typeof error === "object" &&
+      error !== null &&
+      "status" in error &&
+      (error as any).status === 401
 
-    if (path.startsWith("/dashboard")) {
+    if (!isUnauthorized) {
+      return
+    }
+
+    // If we were authenticated but now get a 401, or if we're on a dashboard route
+    const isDashboard = window.location.pathname.startsWith("/dashboard")
+    if (isDashboard || user) {
+      warnLog("Unauthorized access detected, logging out...")
       logout()
     }
   }, [
     mounted,
     authReady,
-    token,
     isLoading,
     error,
+    user,
     logout,
   ])
 
@@ -244,32 +210,24 @@ export function AuthProvider({
         if (!result?.success) {
           toast.error(
             result?.error ??
-              "Đăng nhập thất bại",
+            "Đăng nhập thất bại",
           )
 
           return
         }
 
-        if (result.token) {
-          window.localStorage.setItem(
-            "nexusedu:auth:token",
-            result.token,
-          )
-
-          setToken(result.token)
-        }
-
+        console.debug("[AUTH] Login action success, refetching profile...");
         await refetch()
 
         toast.success(
           "Đăng nhập thành công",
         )
 
-        router.push("/dashboard")
+        router.replace("/dashboard")
       } catch (error: any) {
         toast.error(
           error?.message ??
-            "Đăng nhập thất bại",
+          "Đăng nhập thất bại",
         )
 
         throw error
@@ -280,44 +238,40 @@ export function AuthProvider({
 
   const value =
     React.useMemo<AuthContextType>(
-      () => ({
-        user: user ?? null,
+      () => {
+        console.debug("[AUTH] Context value update. user:", !!user, "isLoading:", isLoading, "isAuthenticated:", mounted && authReady && !!user);
+        return {
+          user: user ?? null,
 
-        token,
+          authReady,
 
-        authReady,
+          /**
+           * Stable loading state.
+           */
+          loading:
+            !mounted ||
+            !authReady ||
+            isLoading,
 
-        /**
-         * Stable loading state.
-         */
-        loading:
-          !mounted ||
-          !authReady ||
-          (
+          /**
+           * Websocket-safe authentication state.
+           */
+          isAuthenticated:
+            mounted &&
             authReady &&
-            !!token &&
-            isLoading
-          ),
+            !!user,
 
-        /**
-         * Websocket-safe authentication state.
-         */
-        isAuthenticated:
-          mounted &&
-          authReady &&
-          !!token,
+          login,
+          logout,
 
-        login,
-        logout,
-
-        refreshUser: async () => {
-          await refetch()
-        },
-      }),
+          refreshUser: async () => {
+            await refetch()
+          },
+        }
+      },
       [
         mounted,
         user,
-        token,
         authReady,
         isLoading,
         login,
