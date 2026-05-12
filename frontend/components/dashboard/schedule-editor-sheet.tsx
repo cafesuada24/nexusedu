@@ -9,10 +9,9 @@ import {
   Clock,
   Users,
   CalendarX,
-  Globe,
   Link2,
   Check,
-  Info,
+  Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -26,18 +25,9 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -208,19 +198,11 @@ DayRow.displayName = "DayRow"
  * ──────────────────────────────────────────────────────────────── */
 
 export function ScheduleEditorSheet() {
-  const { schedule, setSchedule, resetSchedule } = useScheduleQuery()
+  const { schedule, setSchedule, resetSchedule, isMutating } = useScheduleQuery()
   const [open, setOpen] = React.useState(false)
 
   // Draft state
   const [week, setWeek] = React.useState<WeekSchedule>(schedule.week)
-  const [duration, setDuration] = React.useState(String(schedule.duration))
-  const [buffer, setBuffer] = React.useState(String(schedule.buffer))
-  const [dailyCap, setDailyCap] = React.useState(String(schedule.dailyCap))
-  const [autoConfirm, setAutoConfirm] = React.useState(schedule.autoConfirm)
-  const [allowOnline, setAllowOnline] = React.useState(schedule.allowOnline)
-  const [requireReason, setRequireReason] = React.useState(
-    schedule.requireReason,
-  )
   const [overrides, setOverrides] = React.useState<Override[]>(
     schedule.overrides,
   )
@@ -230,12 +212,6 @@ export function ScheduleEditorSheet() {
   React.useEffect(() => {
     if (!open) return
     setWeek(schedule.week)
-    setDuration(String(schedule.duration))
-    setBuffer(String(schedule.buffer))
-    setDailyCap(String(schedule.dailyCap))
-    setAutoConfirm(schedule.autoConfirm)
-    setAllowOnline(schedule.allowOnline)
-    setRequireReason(schedule.requireReason)
     setOverrides(schedule.overrides)
   }, [open, schedule])
 
@@ -320,26 +296,15 @@ export function ScheduleEditorSheet() {
   const reset = React.useCallback(() => {
     setWeek(DEFAULT_SCHEDULE.week)
     setOverrides(DEFAULT_SCHEDULE.overrides)
-    setDuration(String(DEFAULT_SCHEDULE.duration))
-    setBuffer(String(DEFAULT_SCHEDULE.buffer))
-    setDailyCap(String(DEFAULT_SCHEDULE.dailyCap))
-    setAutoConfirm(DEFAULT_SCHEDULE.autoConfirm)
-    setAllowOnline(DEFAULT_SCHEDULE.allowOnline)
-    setRequireReason(DEFAULT_SCHEDULE.requireReason)
     resetSchedule()
     toast.success("Đã khôi phục lịch mặc định")
   }, [resetSchedule])
 
   const save = React.useCallback(() => {
     setSchedule({
+      ...DEFAULT_SCHEDULE,
       week,
       overrides,
-      duration: parseInt(duration, 10) || DEFAULT_SCHEDULE.duration,
-      buffer: parseInt(buffer, 10) || 0,
-      dailyCap: parseInt(dailyCap, 10) || DEFAULT_SCHEDULE.dailyCap,
-      autoConfirm,
-      allowOnline,
-      requireReason,
       timezone: schedule.timezone,
     })
     toast.success("Đã lưu lịch chi tiết", {
@@ -351,12 +316,6 @@ export function ScheduleEditorSheet() {
     setSchedule,
     week,
     overrides,
-    duration,
-    buffer,
-    dailyCap,
-    autoConfirm,
-    allowOnline,
-    requireReason,
     schedule.timezone,
   ])
 
@@ -375,10 +334,10 @@ export function ScheduleEditorSheet() {
   }, [week])
 
   const weeklyCapacity = React.useMemo(() => {
-    const dur = (parseInt(duration, 10) || 0) + (parseInt(buffer, 10) || 0)
+    const dur = DEFAULT_SCHEDULE.duration + DEFAULT_SCHEDULE.buffer
     if (!dur) return 0
     return Math.floor((Number(totalActiveHours) * 60) / dur)
-  }, [totalActiveHours, duration, buffer])
+  }, [totalActiveHours])
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -402,8 +361,7 @@ export function ScheduleEditorSheet() {
                 Chỉnh sửa lịch chi tiết
               </SheetTitle>
               <SheetDescription className="mt-1 text-pretty">
-                Tuỳ chỉnh khung giờ tiếp sinh viên, độ dài mỗi cuộc, ngày nghỉ
-                và quy tắc đặt lịch công khai.
+                Tuỳ chỉnh khung giờ tiếp sinh viên và ngày nghỉ ngoại lệ.
               </SheetDescription>
             </div>
             <div className="hidden items-center gap-2 sm:flex">
@@ -454,135 +412,6 @@ export function ScheduleEditorSheet() {
                   onRemoveSlot={removeSlot}
                   onUpdateSlot={updateSlot}
                 />
-              ))}
-            </div>
-          </section>
-
-          <Separator className="bg-border/60" />
-
-          {/* Meeting parameters */}
-          <section className="grid gap-5">
-            <div>
-              <h3 className="font-serif text-base font-medium text-foreground/90">
-                Thông số cuộc hẹn
-              </h3>
-              <p className="text-[11px] text-muted-foreground">
-                Quyết định độ dài mỗi cuộc, thời gian nghỉ giữa các cuộc và
-                giới hạn mỗi ngày.
-              </p>
-            </div>
-
-            <div className="grid gap-3">
-              <Label className="text-[13px] font-medium text-foreground/80">
-                Thời lượng mỗi cuộc (phút)
-              </Label>
-              <ToggleGroup
-                type="single"
-                value={duration}
-                onValueChange={(v) => v && setDuration(v)}
-                variant="outline"
-                className="w-fit gap-2"
-              >
-                {["15", "30", "45", "60"].map((m) => (
-                  <ToggleGroupItem
-                    key={m}
-                    value={m}
-                    aria-label={`${m} phút`}
-                    className="h-9 min-w-[50px] rounded-lg border-border/60 transition-all data-[state=on]:bg-primary/10 data-[state=on]:text-primary data-[state=on]:ring-1 data-[state=on]:ring-primary/20"
-                  >
-                    {m}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="buffer" className="text-[13px] font-medium text-foreground/80">
-                  Nghỉ giữa hai cuộc
-                </Label>
-                <Select value={buffer} onValueChange={setBuffer}>
-                  <SelectTrigger id="buffer" className="h-10 rounded-xl border-border/60 bg-muted/20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="0">Không nghỉ</SelectItem>
-                    <SelectItem value="5">5 phút</SelectItem>
-                    <SelectItem value="10">10 phút</SelectItem>
-                    <SelectItem value="15">15 phút</SelectItem>
-                    <SelectItem value="30">30 phút</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="cap" className="text-[13px] font-medium text-foreground/80">
-                  Số cuộc tối đa mỗi ngày
-                </Label>
-                <Input
-                  id="cap"
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={dailyCap}
-                  onChange={(e) => setDailyCap(e.target.value)}
-                  className="h-10 rounded-xl border-border/60 bg-muted/20 px-4"
-                />
-              </div>
-            </div>
-
-            <Separator className="bg-border/60" />
-
-            <div className="grid gap-3">
-              {[
-                {
-                  key: "auto",
-                  icon: Check,
-                  label: "Tự động xác nhận đặt lịch",
-                  detail:
-                    "Khung giờ rảnh sẽ được xác nhận ngay mà không cần bạn duyệt thủ công.",
-                  value: autoConfirm,
-                  set: setAutoConfirm,
-                },
-                {
-                  key: "online",
-                  icon: Globe,
-                  label: "Cho phép cuộc hẹn online",
-                  detail:
-                    "Link Google Meet / Teams được tạo tự động khi sinh viên chọn hình thức online.",
-                  value: allowOnline,
-                  set: setAllowOnline,
-                },
-                {
-                  key: "reason",
-                  icon: Info,
-                  label: "Bắt buộc nhập lý do",
-                  detail:
-                    "Sinh viên phải nêu vấn đề cần trao đổi. Giúp bạn chuẩn bị trước cuộc gặp.",
-                  value: requireReason,
-                  set: setRequireReason,
-                },
-              ].map((item) => (
-                <div
-                  key={item.key}
-                  className="flex items-center justify-between gap-4 rounded-2xl border border-border/50 bg-muted/20 p-4 transition-all hover:bg-muted/30"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
-                      <item.icon className="size-4.5" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-foreground/90">{item.label}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground/80">
-                        {item.detail}
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={item.value}
-                    onCheckedChange={item.set}
-                    className="data-[state=checked]:bg-primary"
-                  />
-                </div>
               ))}
             </div>
           </section>
@@ -760,9 +589,14 @@ export function ScheduleEditorSheet() {
             <Button 
               className="h-10 rounded-xl bg-primary px-8 text-[13px] font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98]" 
               onClick={save}
+              disabled={isMutating}
             >
-              <Check className="mr-2 size-4" />
-              Lưu lịch
+              {isMutating ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <Check className="mr-2 size-4" />
+              )}
+              {isMutating ? "Đang lưu…" : "Lưu lịch"}
             </Button>
           </div>
         </SheetFooter>
