@@ -429,6 +429,23 @@ function warnLog(...args: any[]) {
   console.warn("[lib/api]", ...args);
 }
 
+// Reads the error detail string from a non-ok Response body.
+// Tries JSON first (FastAPI returns { detail } or { message }), falls back to raw text.
+async function parseErrorDetail(res: Response): Promise<string> {
+  const body = await res.text().catch(() => "");
+  try {
+    const parsed = body ? JSON.parse(body) : {};
+    return (
+      (typeof parsed?.detail === "string" ? parsed.detail : "") ||
+      (typeof parsed?.message === "string" ? parsed.message : "") ||
+      body ||
+      res.statusText
+    );
+  } catch {
+    return body || res.statusText;
+  }
+}
+
 /* ----------------------------------------------------------------------- */
 /*  Auth API: register / login / me                                         */
 /* ----------------------------------------------------------------------- */
@@ -1179,7 +1196,6 @@ export async function acceptCase(case_id: string): Promise<void> {
   let lastError: {
     response?: Response;
     url: string;
-    body: string;
     detail: string;
   } | null = null;
 
@@ -1190,19 +1206,8 @@ export async function acceptCase(case_id: string): Promise<void> {
     );
     if (res.ok) return;
 
-    const body = await res.text().catch(() => "");
-    let detail = res.statusText;
-    try {
-      const parsed = body ? JSON.parse(body) : {};
-      detail =
-        (typeof parsed?.detail === "string" ? parsed.detail : "") ||
-        (typeof parsed?.message === "string" ? parsed.message : "") ||
-        detail;
-    } catch {
-      if (body) detail = body;
-    }
-
-    lastError = { response: res, url, body, detail };
+    const detail = await parseErrorDetail(res);
+    lastError = { response: res, url, detail };
     if (res.status !== 404) break;
   }
 
@@ -1262,17 +1267,7 @@ export async function confirmBooking(
     throw new SlotTakenError();
   }
 
-  const body = await res.text().catch(() => "");
-  let detail = res.statusText;
-  try {
-    const parsed = body ? JSON.parse(body) : {};
-    detail =
-      (typeof parsed?.detail === "string" ? parsed.detail : "") ||
-      (typeof parsed?.message === "string" ? parsed.message : "") ||
-      detail;
-  } catch {
-    if (body) detail = body;
-  }
+  const detail = await parseErrorDetail(res);
   throw new Error(`Xác nhận đặt lịch thất bại [${res.status}]: ${detail}`);
 }
 
@@ -1300,17 +1295,7 @@ export async function startSupporting(case_id: string): Promise<void> {
     DEFAULT_TIMEOUT_MS,
   );
   if (res.ok) return;
-  const body = await res.text().catch(() => "");
-  let detail = res.statusText;
-  try {
-    const parsed = body ? JSON.parse(body) : {};
-    detail =
-      (typeof parsed?.detail === "string" ? parsed.detail : "") ||
-      (typeof parsed?.message === "string" ? parsed.message : "") ||
-      detail;
-  } catch {
-    if (body) detail = body;
-  }
+  const detail = await parseErrorDetail(res);
   throw new Error(`Bắt đầu hỗ trợ thất bại [${res.status}]: ${detail}`);
 }
 
@@ -1338,17 +1323,7 @@ export async function resolveCase(case_id: string): Promise<void> {
     DEFAULT_TIMEOUT_MS,
   );
   if (res.ok) return;
-  const body = await res.text().catch(() => "");
-  let detail = res.statusText;
-  try {
-    const parsed = body ? JSON.parse(body) : {};
-    detail =
-      (typeof parsed?.detail === "string" ? parsed.detail : "") ||
-      (typeof parsed?.message === "string" ? parsed.message : "") ||
-      detail;
-  } catch {
-    if (body) detail = body;
-  }
+  const detail = await parseErrorDetail(res);
   throw new Error(`Giải quyết case thất bại [${res.status}]: ${detail}`);
 }
 
@@ -1387,17 +1362,7 @@ export async function submitFeedback(
     DEFAULT_TIMEOUT_MS,
   );
   if (res.ok) return;
-  const body = await res.text().catch(() => "");
-  let detail = res.statusText;
-  try {
-    const parsed = body ? JSON.parse(body) : {};
-    detail =
-      (typeof parsed?.detail === "string" ? parsed.detail : "") ||
-      (typeof parsed?.message === "string" ? parsed.message : "") ||
-      detail;
-  } catch {
-    if (body) detail = body;
-  }
+  const detail = await parseErrorDetail(res);
   throw new Error(`Gửi đánh giá thất bại [${res.status}]: ${detail}`);
 }
 
