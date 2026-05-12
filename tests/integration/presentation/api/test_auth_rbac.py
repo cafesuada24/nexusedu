@@ -13,19 +13,16 @@ from src.infrastructure.database.models import User
 from src.infrastructure.database.session import get_async_session
 from src.presentation.api.auth import UserRole
 from src.presentation.api.main import app
-from src.presentation.dependencies.providers import get_agent
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
-def raw_client(mock_agent, test_db_session: AsyncSession) -> TestClient:
+def raw_client(test_db_session: AsyncSession) -> TestClient:
     """Provides a TestClient without the current_active_user override."""
     # Ensure any residual overrides are cleared
     app.dependency_overrides.clear()
-
-    app.dependency_overrides[get_agent] = lambda: mock_agent
 
     app.dependency_overrides[get_async_session] = lambda: test_db_session
 
@@ -67,10 +64,9 @@ def test_auth_login_and_token(raw_client: TestClient) -> None:
         '/api/v1/auth/jwt/login',
         data={'username': email, 'password': password},
     )
-    assert login_response.status_code == 200
-    data = login_response.json()
-    assert 'access_token' in data
-    assert data['token_type'] == 'bearer'
+    assert login_response.status_code == 204
+    # Check for cookie
+    assert 'nexusedu_auth_token' in login_response.cookies
 
 
 def test_auth_rbac_forbidden(raw_client: TestClient) -> None:
@@ -127,29 +123,25 @@ async def test_auth_rbac_advisor_vs_viewer(
     await test_db_session.commit()
 
     # 2. Login as Viewer and try to patch alert (should fail)
-    v_login = raw_client.post(
+    raw_client.post(
         '/api/v1/auth/jwt/login',
         data={'username': viewer_email, 'password': 'password'},
     )
-    v_token = v_login.json()['access_token']
     # Use case-centric route
     v_resp = raw_client.patch(
         f'/api/v1/cases/{uuid.uuid4()}/status',
         json={'status': 'sent'},
-        headers={'Authorization': f'Bearer {v_token}'},
     )
     assert v_resp.status_code == 403
 
     # 3. Login as Advisor and try to patch alert (should pass authentication check)
-    a_login = raw_client.post(
+    raw_client.post(
         '/api/v1/auth/jwt/login',
         data={'username': advisor_email, 'password': 'password'},
     )
-    a_token = a_login.json()['access_token']
     a_resp = raw_client.patch(
         f'/api/v1/cases/{uuid.uuid4()}/status',
         json={'status': 'sent'},
-        headers={'Authorization': f'Bearer {a_token}'},
     )
     # Might be 404 because case doesn't exist, but NOT 403
     assert a_resp.status_code != 403
@@ -174,11 +166,10 @@ async def test_auth_rbac_success(
     await test_db_session.commit()
 
     # 3. Login
-    login_response = raw_client.post(
+    raw_client.post(
         '/api/v1/auth/jwt/login',
         data={'username': email, 'password': password},
     )
-    token = login_response.json()['access_token']
 
     # 4. Hit Admin Endpoint
     response = raw_client.post(
@@ -188,7 +179,6 @@ async def test_auth_rbac_success(
             'upload_timestamp': '2024-01-01T00:00:00',
             'data_sources': [],
         },
-        headers={'Authorization': f'Bearer {token}'},
     )
     # Should not be 401 or 403
     assert response.status_code != 401
