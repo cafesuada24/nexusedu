@@ -35,12 +35,6 @@ const baseMainNav: NavItem[] = [
         tone: "primary",
     },
     {
-        href: "/dashboard/alerts",
-        label: "Trung tâm cảnh báo",
-        icon: BellRing,
-        tone: "destructive",
-    },
-    {
         href: "/dashboard/cases",
         label: "Quản lý case",
         icon: ClipboardList,
@@ -51,6 +45,12 @@ const baseMainNav: NavItem[] = [
         label: "Câu chuyện thành công",
         icon: Sparkles,
         tone: "success",
+    },
+    {
+        href: "/dashboard/alerts",
+        label: "Trung tâm cảnh báo",
+        icon: BellRing,
+        tone: "destructive",
     },
     {
         href: "/dashboard/import",
