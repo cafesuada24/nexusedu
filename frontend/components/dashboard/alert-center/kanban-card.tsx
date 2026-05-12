@@ -89,7 +89,7 @@ function KanbanCardInner({
     return (
         <article
             className={cn(
-                "group rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500",
+                "group rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500 sm:p-4",
                 isHighlighted && highlightTone,
                 isEmailSent &&
                     "border-success/40 bg-success/5 dark:border-success/40 dark:bg-success/10",
@@ -101,14 +101,14 @@ function KanbanCardInner({
             )}
         >
             <div className="flex items-start gap-3">
-                <Avatar className="size-12 shrink-0">
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+                <Avatar className="size-10 shrink-0 sm:size-12">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold sm:text-sm">
                         {getInitials(a.name)}
                     </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                        <p className="truncate text-base font-semibold leading-tight">
+                        <p className="truncate text-sm font-semibold leading-tight sm:text-base">
                             {a.name}
                         </p>
                         {isEmailSent && (
