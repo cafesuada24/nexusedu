@@ -23,7 +23,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useOpenCases } from "@/hooks/use-alerts";
+import { useCases } from "@/hooks/use-alerts";
 import { useDataset } from "@/hooks/use-dataset";
 import { type TaskItem, type BackendInterventionStatus } from "@/lib/api";
 import { type StudentRow, type Problem } from "@/lib/csv";
@@ -149,7 +149,7 @@ const RISK_FILTER_OPTIONS: Array<{
 ];
 
 export function CaseManagementBoard() {
-    const { data: paged, isLoading } = useOpenCases();
+    const { data: paged, isLoading } = useCases();
     const rows = React.useMemo<TaskItem[]>(() => paged?.items ?? [], [paged]);
     const { dataset } = useDataset();
 

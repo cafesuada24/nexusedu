@@ -639,6 +639,31 @@ export async function fetchOpenCases(
 }
 
 /**
+ * Pulls the list of all cases for the admin dashboard.
+ */
+export async function fetchAllCases(
+  limit: number = 100,
+  offset: number = 0,
+): Promise<TaskPagedResponse> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/cases?limit=${limit}&offset=${offset}`),
+        { method: "GET" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể lấy danh sách toàn bộ case: ${message}`);
+  }
+  const data = await res.json();
+  return TaskPagedResponseSchema.parse(data);
+}
+
+/**
  * Pulls the list of cases assigned to the current advisor.
  */
 export async function fetchAssignedCases(
