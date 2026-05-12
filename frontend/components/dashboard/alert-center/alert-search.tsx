@@ -45,48 +45,51 @@ export function AlertSearch({
                 onValueChange={(v) =>
                     onProblemFilterChange(v as "all" | Problem)
                 }
+                className="w-full sm:w-auto"
             >
-                <TabsList className="h-9 w-full rounded-lg sm:w-auto">
-                    <TabsTrigger
-                        value="all"
-                        className="rounded-md px-2.5 text-xs sm:text-sm"
-                    >
-                        Tất cả{" "}
-                        <span className="ml-1 font-mono text-muted-foreground">
-                            {totalAlerts}
-                        </span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="failed_final"
-                        className="rounded-md px-2.5 text-xs sm:text-sm"
-                        title={problemLabels.failed_final}
-                    >
-                        Cuối kỳ{" "}
-                        <span className="ml-1 font-mono text-muted-foreground">
-                            {problemCounts.failed_final}
-                        </span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="failed_midterm"
-                        className="rounded-md px-2.5 text-xs sm:text-sm"
-                        title={problemLabels.failed_midterm}
-                    >
-                        Giữa kỳ{" "}
-                        <span className="ml-1 font-mono text-muted-foreground">
-                            {problemCounts.failed_midterm}
-                        </span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="low_average"
-                        className="rounded-md px-2.5 text-xs sm:text-sm"
-                        title={problemLabels.low_average}
-                    >
-                        TB thấp{" "}
-                        <span className="ml-1 font-mono text-muted-foreground">
-                            {problemCounts.low_average}
-                        </span>
-                    </TabsTrigger>
-                </TabsList>
+                <div className="hide-scrollbar w-full overflow-x-auto">
+                    <TabsList className="h-9 w-max min-w-full rounded-lg sm:w-auto sm:min-w-0">
+                        <TabsTrigger
+                            value="all"
+                            className="rounded-md px-2.5 text-xs sm:text-sm"
+                        >
+                            Tất cả{" "}
+                            <span className="ml-1 font-mono text-muted-foreground">
+                                {totalAlerts}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="failed_final"
+                            className="rounded-md px-2.5 text-xs sm:text-sm"
+                            title={problemLabels.failed_final}
+                        >
+                            Cuối kỳ{" "}
+                            <span className="ml-1 font-mono text-muted-foreground">
+                                {problemCounts.failed_final}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="failed_midterm"
+                            className="rounded-md px-2.5 text-xs sm:text-sm"
+                            title={problemLabels.failed_midterm}
+                        >
+                            Giữa kỳ{" "}
+                            <span className="ml-1 font-mono text-muted-foreground">
+                                {problemCounts.failed_midterm}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="low_average"
+                            className="rounded-md px-2.5 text-xs sm:text-sm"
+                            title={problemLabels.low_average}
+                        >
+                            TB thấp{" "}
+                            <span className="ml-1 font-mono text-muted-foreground">
+                                {problemCounts.low_average}
+                            </span>
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
             </Tabs>
         </div>
     );

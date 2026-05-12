@@ -66,7 +66,7 @@ export function KanbanColumn({
     <section
       role="listitem"
       className={cn(
-        "flex min-w-[380px] w-[380px] shrink-0 basis-[380px] flex-col rounded-2xl border border-border/60 border-t-4 transition-all duration-300 dark:border-slate-800",
+        "flex w-[85vw] min-w-[85vw] shrink-0 basis-[85vw] snap-center flex-col rounded-2xl border border-border/60 border-t-4 transition-all duration-300 dark:border-slate-800 md:w-[380px] md:min-w-[380px] md:basis-[380px]",
         col.containerTone,
         col.topBorderTone,
         isCollapsed ? "h-auto" : "h-full",
