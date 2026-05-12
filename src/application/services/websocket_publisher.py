@@ -4,9 +4,10 @@ import json
 import uuid
 from typing import Any
 
+import structlog
 from arq import ArqRedis
 
-from src.core.logger import logger
+logger = structlog.get_logger(__name__)
 
 
 class WebSocketEventPublisher:

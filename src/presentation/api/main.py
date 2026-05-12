@@ -7,12 +7,13 @@ and includes the API routers for the agent's functionality.
 import time
 from collections.abc import Awaitable, Callable
 
+import structlog
 from fastapi import APIRouter, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.core.config import config
-from src.core.logger import logger
+from src.core.otel import setup_otel
 from src.presentation.api.auth import auth_backend, fastapi_users
 from src.presentation.api.lifecycle import lifespan
 from src.presentation.api.middleware.rate_limit import rate_limit_middleware
@@ -29,12 +30,18 @@ from src.presentation.api.routes import (
 )
 from src.presentation.schemas.auth import UserCreate, UserRead
 
+logger = structlog.get_logger(__name__)
+
+
 app = FastAPI(
     title='Agent Assistant API',
     description='API for student intervention and performance tracking.',
     version='1.0.0',
     lifespan=lifespan,
 )
+
+# Initialize OpenTelemetry
+setup_otel(app)
 
 # CORS Configuration
 allowed_origins_str = config.allowed_origins

@@ -4,6 +4,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.application.commands.schedule_commands import ScheduleCommandHandler
@@ -29,7 +30,6 @@ from src.application.dtos.pagination import PagedResponse
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
 )
-from src.core.logger import logger
 from src.domain.exceptions import AdvisorNotFoundError, UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.domain.value_objects.gamification import RankingType
@@ -46,6 +46,8 @@ from src.presentation.schemas.advisor import (
     WorkingHoursCreate,
     WorkingHoursUpdate,
 )
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 

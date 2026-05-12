@@ -3,10 +3,11 @@
 import time
 from collections.abc import Awaitable, Callable
 
+import structlog
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 
-from src.core.logger import logger
+logger = structlog.get_logger(__name__)
 
 # Note: For multi-worker production, always use Redis.
 # This implementation remains in-memory for this refactor phase

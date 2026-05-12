@@ -3,16 +3,19 @@
 from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from fastapi_users import BaseUserManager
 
-from src.core.logger import logger
 from src.infrastructure.database.models import User
 from src.presentation.api.auth import (
     get_jwt_strategy,
     get_user_manager,
 )
 from src.presentation.api.websocket import ws_manager
+
+logger = structlog.get_logger(__name__)
+
 
 router = APIRouter(tags=['websocket'])
 
@@ -36,7 +39,6 @@ async def get_ws_current_user(
         raise WebSocketDisconnect(
             code=status.WS_1008_POLICY_VIOLATION,
         )
-
 
     user = await strategy.read_token(
         token,

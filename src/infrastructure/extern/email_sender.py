@@ -3,8 +3,9 @@
 from email.message import EmailMessage
 
 import aiosmtplib
+import structlog
 
-from src.core.logger import logger
+logger = structlog.get_logger(__name__)
 
 
 class AioSmtpEmailSender:

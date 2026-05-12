@@ -3,14 +3,15 @@
 import pickle
 from datetime import UTC, datetime, timedelta
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.interfaces.background_queue import BackgroundTaskQueue
-from src.core.logger import logger
 from src.domain.value_objects.status import OutboxStatus
 from src.infrastructure.database.models import OutboxEvent
 
+logger = structlog.get_logger(__name__)
 # Retry configuration
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 5

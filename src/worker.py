@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID
 
 import jwt
+import structlog
 from arq import cron
 from arq.connections import RedisSettings
 
@@ -16,10 +17,19 @@ from src.application.commands.case_commands import (
 from src.application.commands.schedule_commands import AddWorkingHoursCommand
 from src.core.config import config
 from src.core.container import Container
-from src.core.logger import logger
+from src.core.otel import setup_otel
 from src.domain.value_objects.status import JobStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 from src.infrastructure.database.session import get_async_session
+
+logger = structlog.get_logger(__name__)
+
+
+
+async def on_startup(_ctx: dict[str, Any]) -> None:
+    """Initializes observability and other resources on worker startup."""
+    setup_otel()
+    logger.info('Worker: OpenTelemetry initialized.')
 
 
 async def run_email_draft_task(
@@ -543,6 +553,7 @@ class WorkerSettings:
         run_outbox_poller_task,
         run_advisor_created_task,
     ]
+    on_startup = on_startup
     cron_jobs = [
         cron(run_outbox_poller_task, second=set(range(0, 60, 5))),
     ]

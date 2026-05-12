@@ -3,11 +3,11 @@
 from typing import Annotated, Any
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
-from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
@@ -15,6 +15,8 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.schemas.request import CoreDataSource, DataIngestionRequest
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix='/data', tags=['data'])
 

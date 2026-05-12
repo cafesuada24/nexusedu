@@ -7,9 +7,10 @@ facilitate message broadcasting to specific users or all connected clients.
 import uuid
 from typing import Any
 
+import structlog
 from fastapi import WebSocket
 
-from src.core.logger import logger
+logger = structlog.get_logger(__name__)
 
 
 class WebSocketManager:

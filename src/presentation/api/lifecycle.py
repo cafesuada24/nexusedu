@@ -13,14 +13,16 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import redis.asyncio as redis
+import structlog
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
 from fastapi import FastAPI
 
 from src.core.config import config
-from src.core.logger import logger
 from src.infrastructure.extern.presidio_pii_masker import PresidioPiiMasker
 from src.presentation.api.websocket import ws_manager
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass

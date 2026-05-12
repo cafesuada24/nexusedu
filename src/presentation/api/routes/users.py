@@ -1,14 +1,14 @@
 """API routes for user management."""
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.presentation.api.auth import (
@@ -30,6 +30,9 @@ from src.presentation.schemas.auth import (
     UserSettingsUpdate,
     UserUpdate,
 )
+
+logger = structlog.get_logger(__name__)
+
 
 router = APIRouter(prefix='/users', tags=['users'])
 

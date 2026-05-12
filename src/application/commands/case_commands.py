@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from string import Template
 from typing import Any
 
+import structlog
+
 from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
     BookAppointmentCommand,
@@ -21,7 +23,6 @@ from src.application.interfaces.event_publisher import EventPublisher
 from src.application.services.websocket_publisher import WebSocketEventPublisher
 from src.core.config import config
 from src.core.identifiers import EntityID, generate_uuid
-from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
 from src.domain.exceptions import (
@@ -46,6 +47,7 @@ from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.value_objects.status import InterventionStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
+logger = structlog.get_logger(__name__)
 # Application-level safe fallbacks
 SAFE_SUBJECT = 'Checking in on your academic progress'
 SAFE_BODY = Template(

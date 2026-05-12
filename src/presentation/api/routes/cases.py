@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 import jwt
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 
 from src.application.commands.case_commands import (
@@ -33,7 +34,6 @@ from src.application.queries.case_queries import (
     GetUnassignedQuery,
 )
 from src.core.config import config
-from src.core.logger import logger
 from src.domain.exceptions import (
     CaseAlreadyAssignedError,
     CaseNotFoundError,
@@ -53,6 +53,9 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.schemas.request import BookAppointmentRequest, UpdateEmailRequest
+
+logger = structlog.get_logger(__name__)
+
 
 router = APIRouter(prefix='/cases', tags=['cases'])
 
