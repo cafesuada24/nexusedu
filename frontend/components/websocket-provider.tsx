@@ -109,14 +109,25 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     console.log("[WS] Case status updated, surgical cache update...", payload);
                     if (payload.case_id) {
                         // Surgical update to all lists
-                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, (item) => ({
+                        const updater = (item: any) => ({
                             ...item,
                             intervention_status: payload.new_status,
-                        }));
-                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, (item) => ({
-                            ...item,
-                            intervention_status: payload.new_status,
-                        }));
+                            // Fat event: patch appointment details if they are in the payload
+                            ...(payload.appointment
+                                ? { appointment: payload.appointment }
+                                : {}),
+                        });
+
+                        updateSurgicalCache(
+                            queryKeys.cases.all,
+                            payload.case_id,
+                            updater
+                        );
+                        updateSurgicalCache(
+                            queryKeys.alerts.all,
+                            payload.case_id,
+                            updater
+                        );
 
                         // Invalidate specific case details if any component is listening
                         queryClient.invalidateQueries({

@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from string import Template
+from typing import Any
 
 from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
@@ -118,14 +119,19 @@ class CaseCommandHandler:
         case_id: EntityID,
         new_status: InterventionStatus,
         user_id: EntityID | None = None,
+        appointment: dict[str, Any] | None = None,
     ) -> None:
         """Helper to broadcast case status changes via WebSocket."""
+        payload = {
+            'case_id': str(case_id),
+            'new_status': new_status.value,
+        }
+        if appointment is not None:
+            payload['appointment'] = appointment
+
         await self.websocket_publisher.publish(
             event_type='CASE:STATUS_UPDATED',
-            payload={
-                'case_id': str(case_id),
-                'new_status': new_status.value,
-            },
+            payload=payload,
             user_id=user_id,
         )
 
@@ -342,7 +348,17 @@ class CaseCommandHandler:
 
         # Notify UI via WebSocket
         # For public booking, we broadcast as we don't have the advisor's user_id here
-        await self._notify_status_change(case.case_id, case.intervention_status)
+        appointment_payload = {
+            'appointment_time': command.appointment_time.isoformat(),
+            'duration_minutes': command.duration_minutes,
+            'meeting_method': command.meeting_method.value,
+            'notes': command.notes,
+        }
+        await self._notify_status_change(
+            case.case_id,
+            case.intervention_status,
+            appointment=appointment_payload,
+        )
 
         # Dispatch events via publisher
         await self.event_publisher.publish(case.domain_events)
