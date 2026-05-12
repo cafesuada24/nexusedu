@@ -1,4 +1,3 @@
-import { AdvisorLeaderboard } from "@/components/dashboard/advisor-leaderboard";
 import { z } from "zod";
 
 import { SlotTakenError } from "@/lib/appointments";
@@ -106,7 +105,7 @@ export const TaskPagedResponseSchema = z.object({
 });
 export type TaskPagedResponse = z.infer<typeof TaskPagedResponseSchema>;
 
-export const BackendIngestRowSchema = z.object({
+const BackendIngestRowSchema = z.object({
   sid: z.string(),
   student_name: z.string(),
   course_id: z.string(),
@@ -120,7 +119,7 @@ export const BackendIngestRowSchema = z.object({
   academic_year: z.number(),
   semester: z.number(),
 });
-export type BackendIngestRow = z.infer<typeof BackendIngestRowSchema>;
+type BackendIngestRow = z.infer<typeof BackendIngestRowSchema>;
 
 export const JobResultSchema = z.object({
   job_id: z.string(),
@@ -134,16 +133,16 @@ export const JobResultSchema = z.object({
 });
 export type JobResult = z.infer<typeof JobResultSchema>;
 
-export const CaseResponseSchema = z.object({
+const CaseResponseSchema = z.object({
   case_id: z.string(),
   sid: z.string(),
   status: z.string(),
   created_at: z.string(),
   resolved_at: z.string().nullable().optional(),
 });
-export type CaseResponse = z.infer<typeof CaseResponseSchema>;
+type CaseResponse = z.infer<typeof CaseResponseSchema>;
 
-export const EmailHistoryItemSchema = z.object({
+const EmailHistoryItemSchema = z.object({
   email_id: z.string(),
   subject: z.string(),
   body: z.string(),
@@ -151,22 +150,22 @@ export const EmailHistoryItemSchema = z.object({
   created_at: z.string(),
   sent_at: z.string().nullable(),
 });
-export type EmailHistoryItem = z.infer<typeof EmailHistoryItemSchema>;
+type EmailHistoryItem = z.infer<typeof EmailHistoryItemSchema>;
 
 
-export const CaseDetailsResponseSchema = CaseResponseSchema.extend({
+const CaseDetailsResponseSchema = CaseResponseSchema.extend({
   email: EmailHistoryItemSchema.nullable().optional(),
   appointment: AppointmentSchema.nullable().optional(),
 });
-export type CaseDetailsResponse = z.infer<typeof CaseDetailsResponseSchema>;
+type CaseDetailsResponse = z.infer<typeof CaseDetailsResponseSchema>;
 
-export const DraftJobResponseSchema = z.object({
+const DraftJobResponseSchema = z.object({
   job_id: z.string(),
   status: z.string(),
 });
-export type DraftJobResponse = z.infer<typeof DraftJobResponseSchema>;
+type DraftJobResponse = z.infer<typeof DraftJobResponseSchema>;
 
-export const AdvisorLeaderboardItemSchema = z.object({
+const AdvisorLeaderboardItemSchema = z.object({
   advisor_id: z.string(),
   name: z.string(),
   total_points: z.number(),
@@ -174,11 +173,11 @@ export const AdvisorLeaderboardItemSchema = z.object({
   sent_count: z.number(),
   resolved_count: z.number(),
 });
-export type AdvisorLeaderboardItem = z.infer<
+type AdvisorLeaderboardItem = z.infer<
   typeof AdvisorLeaderboardItemSchema
 >;
 
-export const AdvisorLeaderboardSchema = z.object({
+const AdvisorLeaderboardSchema = z.object({
   items: z.array(AdvisorLeaderboardItemSchema),
   metadata: z.object({
     total_count: z.number().int().gte(0),
@@ -187,7 +186,7 @@ export const AdvisorLeaderboardSchema = z.object({
     has_next: z.boolean(),
   }),
 });
-export type AdvisorLeaderboard = z.infer<typeof AdvisorLeaderboardSchema>;
+type AdvisorLeaderboard = z.infer<typeof AdvisorLeaderboardSchema>;
 
 export const UserReadSchema = z.object({
   id: z.string(),
@@ -201,10 +200,10 @@ export const UserSettingsSchema = z.object({
 });
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
-export const AdvisorPointsSchema = z.object({
+const AdvisorPointsSchema = z.object({
   points: z.number().int(),
 });
-export type AdvisorPoints = z.infer<typeof AdvisorPointsSchema>;
+type AdvisorPoints = z.infer<typeof AdvisorPointsSchema>;
 
 export const AdvisorProfileReadSchema = z.object({
   advisor_id: z.string(),
@@ -228,21 +227,21 @@ export const AdvisorProfileUpdateSchema = z.object({
 });
 export type AdvisorProfileUpdate = z.infer<typeof AdvisorProfileUpdateSchema>;
 
-export const WorkingHoursReadSchema = z.object({
+const WorkingHoursReadSchema = z.object({
   id: z.string(),
   day_of_week: z.number(),
   start_time: z.string(), // "HH:MM:SS"
   end_time: z.string(),
   timezone: z.string(),
 });
-export type WorkingHoursRead = z.infer<typeof WorkingHoursReadSchema>;
+type WorkingHoursRead = z.infer<typeof WorkingHoursReadSchema>;
 
-export const DayOffReadSchema = z.object({
+const DayOffReadSchema = z.object({
   id: z.string(),
   date: z.string(), // "YYYY-MM-DD"
   reason: z.string().nullable().optional(),
 });
-export type DayOffRead = z.infer<typeof DayOffReadSchema>;
+type DayOffRead = z.infer<typeof DayOffReadSchema>;
 
 export const AdvisorScheduleReadSchema = z.object({
   working_hours: z.array(WorkingHoursReadSchema),
@@ -250,7 +249,7 @@ export const AdvisorScheduleReadSchema = z.object({
 });
 export type AdvisorScheduleRead = z.infer<typeof AdvisorScheduleReadSchema>;
 
-export const WorkingHoursCreateSchema = z.object({
+const WorkingHoursCreateSchema = z.object({
   day_of_week: z.number(),
   start_time: z.string(),
   end_time: z.string(),
@@ -258,22 +257,22 @@ export const WorkingHoursCreateSchema = z.object({
 });
 export type WorkingHoursCreate = z.infer<typeof WorkingHoursCreateSchema>;
 
-export const WorkingHoursUpdateSchema = z.object({
+const WorkingHoursUpdateSchema = z.object({
   day_of_week: z.number(),
   start_time: z.string(),
   end_time: z.string(),
   timezone: z.string(),
 });
-export type WorkingHoursUpdate = z.infer<typeof WorkingHoursUpdateSchema>;
+type WorkingHoursUpdate = z.infer<typeof WorkingHoursUpdateSchema>;
 
-export const DayOffCreateSchema = z.object({
+const DayOffCreateSchema = z.object({
   date: z.string(),
   reason: z.string().nullable().optional(),
 });
 export type DayOffCreate = z.infer<typeof DayOffCreateSchema>;
 
 
-export const KpiStatsSchema = z.object({
+const KpiStatsSchema = z.object({
   retention_rate: z.number(),
   total_interventions: z.number(),
   advisor_engagement: z.number(),
@@ -282,7 +281,7 @@ export const KpiStatsSchema = z.object({
 });
 export type KpiStats = z.infer<typeof KpiStatsSchema>;
 
-export const RetentionTrendItemSchema = z.object({
+const RetentionTrendItemSchema = z.object({
   month: z.string(),
   baseline: z.number(),
   current: z.number(),
@@ -300,7 +299,7 @@ const _QueryEmailDTOSchema = z.object({
   sent_at: z.string().nullable().optional(),
 });
 
-export const DraftStatusResponseSchema = _QueryEmailDTOSchema.transform(
+const DraftStatusResponseSchema = _QueryEmailDTOSchema.transform(
   (d) => ({
     subject: d.subject ?? null,
     body: d.body ?? null,
@@ -308,7 +307,7 @@ export const DraftStatusResponseSchema = _QueryEmailDTOSchema.transform(
     status: d.status,
   }),
 );
-export type DraftStatusResponse = z.infer<typeof DraftStatusResponseSchema>;
+type DraftStatusResponse = z.infer<typeof DraftStatusResponseSchema>;
 
 /* ----------------------------------------------------------------------- */
 /*  Configuration                                                          */
@@ -317,11 +316,6 @@ export type DraftStatusResponse = z.infer<typeof DraftStatusResponseSchema>;
 export const DEFAULT_TIMEOUT_MS = 10_000;
 const INGEST_TIMEOUT_MS = 60_000;
 
-/**
- * LocalStorage key used to persist the JWT token on the client.
- * We keep this internal to the API module to avoid sprinkling the key around.
- */
-const TOKEN_STORAGE_KEY = "nexusedu:auth:token";
 
 function getApiBase(): string {
   // On the client, we MUST use the relative proxy path so that proxy.ts can
@@ -371,7 +365,7 @@ export async function withTimeout<T>(
  * Get token (server-side only helper).
  * Client-side should rely on cookies being sent automatically.
  */
-export async function getAuthToken(): Promise<string | null> {
+async function getAuthToken(): Promise<string | null> {
   if (typeof window === "undefined") {
     try {
       const { cookies } = await import("next/headers");
@@ -383,29 +377,6 @@ export async function getAuthToken(): Promise<string | null> {
   }
   return null; // Client cannot read httpOnly cookies
 }
-
-/**
- * @deprecated Use /api/auth/login route instead.
- * This is kept for compatibility during refactor but will now be a no-op on client.
- */
-export function setAuthToken(token: string | null) {
-  if (typeof window !== "undefined") {
-    if (!token) {
-      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    }
-  }
-}
-
-/** Clear stored token. */
-export async function logout() {
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    await fetch("/api/auth/logout", { method: "POST" });
-  }
-}
-
 /**
  * authFetch behaves like fetch but injects Authorization header when a JWT
  * token is available. It merges headers and accepts all the same fetch options.
@@ -419,16 +390,15 @@ export async function authFetch(
   const headers = new Headers(fetchOpts.headers || undefined);
   headers.set("Accept", headers.get("Accept") || "application/json");
 
-  // On the server, we must manually inject the token from cookies
+  // On the server, inject via Cookie header (backend uses CookieTransport, not Bearer).
+  // On the client, middleware reads the httpOnly cookie and injects Authorization header
+  // before the rewrite to the real backend — client JS never sees the token.
   if (typeof window === "undefined") {
     const token = await getAuthToken();
     if (token) {
-      // headers.set("Authorization", `Bearer ${token}`);
       headers.set("Cookie", `nexusedu_auth_token=${token}`);
     }
   }
-  // On the client, we rely on middleware to inject the token from the httpOnly cookie
-  // for all requests to /api/v1/*
 
   const merged: RequestInit = {
     ...fetchOpts,
@@ -462,54 +432,6 @@ function warnLog(...args: any[]) {
 /* ----------------------------------------------------------------------- */
 /*  Auth API: register / login / me                                         */
 /* ----------------------------------------------------------------------- */
-
-/**
- * Login using the Next.js API route which sets an httpOnly cookie.
- */
-export async function login(
-  username: string,
-  password: string,
-): Promise<{ success: boolean } | null> {
-  const res = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify({ username, password }),
-  });
-
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Đăng nhập thất bại: ${message}`);
-  }
-
-  return res.json();
-}
-
-/**
- * Register a new user. Returns parsed response or throws on non-ok.
- * Per ENDPOINTS_concise.md: POST /auth/register with JSON body { email, password }.
- */
-export async function register(email: string, password: string): Promise<any> {
-  const res = await withTimeout(
-    (signal) =>
-      fetch(endpoint("/auth/register"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        signal,
-      }),
-    DEFAULT_TIMEOUT_MS,
-  );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Đăng ký thất bại: ${message}`);
-  }
-  return res.json();
-}
 
 /**
  * GET /users/me — returns the current user profile and role.
@@ -635,19 +557,6 @@ export async function ingestData(
   }
 }
 
-/**
- * Sends parsed CSV rows to the backend for long-term storage and analysis.
- * @deprecated Use ingestData for multi-source support.
- */
-export async function ingestRows(rows: BackendIngestRow[]): Promise<void> {
-  return ingestData([
-    {
-      source_type: "custom",
-      table_name: "ingest_rows",
-      records: rows,
-    },
-  ]);
-}
 
 /**
  * Pulls the unified list of tasks for the advisor dashboard.
@@ -744,7 +653,26 @@ export async function generateAiDraftForAlert(
 ): Promise<{ job_id?: string; status?: string }> {
   // If we have a case_id, use the standard case-based draft trigger
   if (case_id) {
-    return generateAiDraft(case_id);
+    const res = await withTimeout(
+      (signal) =>
+        authFetch(
+          endpoint(`/cases/${encodeURIComponent(case_id)}/email/draft`),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          },
+          signal,
+        ),
+      DEFAULT_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({}));
+      const message = errorBody.detail || res.statusText;
+      throw new Error(`Không thể tạo bản nháp AI: ${message}`);
+    }
+    const data = await res.json();
+    return DraftJobResponseSchema.parse(data);
   }
 
   // Fallback logic for when we only have alert_id (sid)
@@ -1232,34 +1160,6 @@ export async function fetchCaseDetails(
   return CaseDetailsResponseSchema.parse(data);
 }
 
-/**
- * POST /cases/{case_id}/email/draft — trigger async draft generation.
- */
-export async function generateAiDraft(
-  case_id: string,
-  booking_link?: string,
-): Promise<DraftJobResponse> {
-  const res = await withTimeout(
-    (signal) =>
-      authFetch(
-        endpoint(`/cases/${encodeURIComponent(case_id)}/email/draft`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ booking_link }),
-        },
-        signal,
-      ),
-    DEFAULT_TIMEOUT_MS,
-  );
-  if (!res.ok) {
-    const errorBody = await res.json().catch(() => ({}));
-    const message = errorBody.detail || res.statusText;
-    throw new Error(`Không thể tạo bản nháp AI: ${message}`);
-  }
-  const data = await res.json();
-  return DraftJobResponseSchema.parse(data);
-}
 
 /**
  * POST /cases/{case_id}/accept — an advisor accepts to solve a case.
@@ -1315,9 +1215,9 @@ export async function acceptCase(case_id: string): Promise<void> {
   );
 }
 
-export type MeetingMethod = "online" | "in_person";
+type MeetingMethod = "online" | "in_person";
 
-export type ConfirmBookingPayload = {
+type ConfirmBookingPayload = {
   /** ISO 8601 datetime with timezone offset, e.g. "2026-05-15T09:30:00+07:00". */
   appointmentTime: string;
   meetingMethod: MeetingMethod;
@@ -1342,7 +1242,6 @@ export async function confirmBooking(
     meeting_method: payload.meetingMethod,
     notes: payload.notes ?? "null",
   });
-  console.log(requestBody);
   const res = await withTimeout(
     (signal) =>
       authFetch(
@@ -1502,14 +1401,3 @@ export async function submitFeedback(
   throw new Error(`Gửi đánh giá thất bại [${res.status}]: ${detail}`);
 }
 
-/** True when an `NEXT_PUBLIC_API_BASE_URL` was configured at build time or we're in the browser. */
-export function isApiConfigured(): boolean {
-  // If we're in the browser, we assume the default /api/v1 rewrite works.
-  if (typeof window !== "undefined") return true;
-
-  const env =
-    typeof process !== "undefined"
-      ? (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined)
-      : undefined;
-  return Boolean(env && env.trim());
-}
