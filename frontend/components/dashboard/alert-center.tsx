@@ -155,10 +155,14 @@ export function AlertCenter() {
                     isGenerating:
                         r.is_generating || r.draft_status === "generating",
                     interventionStatus: r.intervention_status || null,
-                    appointmentAt:
-                        (r.intervention_status || "").toLowerCase() === "booked"
-                            ? pickRandomAppointment()
-                            : null,
+                    appointmentAt: r.appointment
+                        ? Math.floor(
+                              new Date(r.appointment.appointment_time).getTime() /
+                                  1000,
+                          )
+                        : null,
+                    meetingMethod: r.appointment?.meeting_method || null,
+                    appointmentNotes: r.appointment?.notes || null,
                     goals: localAlertState[r.sid]?.goals || [],
                     studentConcern: r.student_concern
                         ? {

@@ -19,6 +19,38 @@ export const useWebSocketContext = () => useContext(WebSocketContext);
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const queryClient = useQueryClient();
 
+    /**
+     * Surgical update helper for list caches (flat arrays or paged items).
+     * Uses setQueriesData to find and update the specific case across all matching queries.
+     */
+    const updateSurgicalCache = React.useCallback(
+        (queryKey: readonly unknown[], caseId: string, updater: (item: any) => any) => {
+            queryClient.setQueriesData({ queryKey }, (oldData: any) => {
+                if (!oldData) return oldData;
+
+                // 1. Handle Paged Response { items: [...] }
+                if (oldData.items && Array.isArray(oldData.items)) {
+                    return {
+                        ...oldData,
+                        items: oldData.items.map((item: any) =>
+                            item.case_id === caseId ? updater(item) : item
+                        ),
+                    };
+                }
+
+                // 2. Handle Flat Array [...]
+                if (Array.isArray(oldData)) {
+                    return oldData.map((item: any) =>
+                        item.case_id === caseId ? updater(item) : item
+                    );
+                }
+
+                return oldData;
+            });
+        },
+        [queryClient]
+    );
+
     const handleMessage = React.useCallback(
         (message: WebSocketMessage) => {
             const { type, payload } = message;
@@ -28,31 +60,22 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                 case "JOB:COMPLETED":
                     console.log("[WS] Job completed, surgical cache update...", payload);
                     if (payload.case_id) {
-                        // 1. Invalidate broader list queries to ensure the UI updates everywhere
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.all,
-                        });
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.alerts.all,
-                        });
+                        // Surgical update to all lists (Tasks, Open Cases, Alerts, etc.)
+                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, (item) => ({
+                            ...item,
+                            is_generating: false,
+                            draft_status: "completed",
+                        }));
+                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, (item) => ({
+                            ...item,
+                            is_generating: false,
+                            draft_status: "completed",
+                        }));
 
-                        // 2. Invalidate targeted draft query
+                        // Invalidate targeted draft query since it's a single item fetch
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.cases.draft(payload.case_id),
                         });
-
-                        // 3. Surgical update to alerts list cache
-                        queryClient.setQueryData(
-                            queryKeys.alerts.list(),
-                            (oldData: any[] | undefined) => {
-                                if (!oldData) return oldData;
-                                return oldData.map((item) =>
-                                    item.case_id === payload.case_id
-                                        ? { ...item, is_generating: false, draft_status: "completed" }
-                                        : item
-                                );
-                            }
-                        );
                     }
                     toast.success("Draft generation completed!");
                     break;
@@ -60,31 +83,22 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                 case "JOB:FAILED":
                     console.error("[WS] Job failed", payload);
                     if (payload.case_id) {
-                        // 1. Invalidate broader list queries
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.all,
-                        });
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.alerts.all,
-                        });
+                        // Surgical update to all lists
+                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, (item) => ({
+                            ...item,
+                            is_generating: false,
+                            draft_status: "failed",
+                        }));
+                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, (item) => ({
+                            ...item,
+                            is_generating: false,
+                            draft_status: "failed",
+                        }));
 
-                        // 2. Invalidate targeted draft query
+                        // Invalidate targeted draft query
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.cases.draft(payload.case_id),
                         });
-
-                        // 3. Surgical update to alerts list cache
-                        queryClient.setQueryData(
-                            queryKeys.alerts.list(),
-                            (oldData: any[] | undefined) => {
-                                if (!oldData) return oldData;
-                                return oldData.map((item) =>
-                                    item.case_id === payload.case_id
-                                        ? { ...item, is_generating: false, draft_status: "failed" }
-                                        : item
-                                );
-                            }
-                        );
                     }
                     toast.error("Draft generation failed", {
                         description: payload.error || "Unknown error occurred",
@@ -94,31 +108,20 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                 case "CASE:STATUS_UPDATED":
                     console.log("[WS] Case status updated, surgical cache update...", payload);
                     if (payload.case_id) {
-                        // 1. Invalidate broader list queries to ensure the UI updates everywhere
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.all,
-                        });
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.alerts.all,
-                        });
+                        // Surgical update to all lists
+                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, (item) => ({
+                            ...item,
+                            intervention_status: payload.new_status,
+                        }));
+                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, (item) => ({
+                            ...item,
+                            intervention_status: payload.new_status,
+                        }));
 
-                        // 2. Invalidate specific case details
+                        // Invalidate specific case details if any component is listening
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.cases.detail(payload.case_id),
                         });
-
-                        // 3. Surgical update to alerts list cache for immediate feedback
-                        queryClient.setQueryData(
-                            queryKeys.alerts.list(),
-                            (oldData: any[] | undefined) => {
-                                if (!oldData) return oldData;
-                                return oldData.map((item) =>
-                                    item.case_id === payload.case_id
-                                        ? { ...item, intervention_status: payload.new_status }
-                                        : item
-                                );
-                            }
-                        );
                     }
                     break;
 
@@ -127,7 +130,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     console.log("[WS] Unhandled message type:", type);
             }
         },
-        [queryClient]
+        [queryClient, updateSurgicalCache]
     );
 
     const { status } = useWebSocket({ onMessage: handleMessage });

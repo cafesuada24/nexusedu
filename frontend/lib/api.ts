@@ -1,5 +1,4 @@
 import { AdvisorLeaderboard } from "@/components/dashboard/advisor-leaderboard";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { SlotTakenError } from "@/lib/appointments";
@@ -42,6 +41,13 @@ export const BackendInterventionStatusSchema = z.enum([
 export type BackendInterventionStatus = z.infer<
     typeof BackendInterventionStatusSchema
 >;
+export const AppointmentSchema = z.object({
+    appointment_time: z.string(),
+    duration_minutes: z.number(),
+    meeting_method: z.enum(["online", "in_person"]),
+    notes: z.string().nullable().optional(),
+});
+export type Appointment = z.infer<typeof AppointmentSchema>;
 
 export const TaskItemBaseSchema = z.object({
     case_id: z.string(),
@@ -54,6 +60,7 @@ export const TaskItemBaseSchema = z.object({
     current_risk_status: z.string().nullable().optional(),
     intervention_status: z.string().nullable().optional(),
     email: z.any().nullable().optional(),
+    appointment: AppointmentSchema.nullable().optional(),
 });
 
 export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
@@ -78,6 +85,7 @@ export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
         draft_body,
         draft_status,
         points_reward: 0,
+        appointment: data.appointment || null,
     };
 });
 export type TaskItem = z.infer<typeof TaskItemSchema>;
@@ -143,8 +151,10 @@ export const EmailHistoryItemSchema = z.object({
 });
 export type EmailHistoryItem = z.infer<typeof EmailHistoryItemSchema>;
 
+
 export const CaseDetailsResponseSchema = CaseResponseSchema.extend({
     email: EmailHistoryItemSchema.nullable().optional(),
+    appointment: AppointmentSchema.nullable().optional(),
 });
 export type CaseDetailsResponse = z.infer<typeof CaseDetailsResponseSchema>;
 

@@ -5,11 +5,16 @@ from uuid import UUID
 from sqlalchemy import Select, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.dtos.case_dtos import CaseDTO, QueryEmailDTO
+from src.application.dtos.case_dtos import CaseDTO, QueryAppointmentDTO, QueryEmailDTO
 from src.application.dtos.pagination import PagedResponse, PaginationMetadata
 from src.domain.services.gamification import GamificationService
-from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.domain.value_objects.status import (
+    InterventionStatus,
+    MeetingMethod,
+    RiskStatus,
+)
 from src.infrastructure.database.models import Advisor as OrmAdvisor
+from src.infrastructure.database.models import Appointment as OrmAppointment
 from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.models import InterventionEmail as OrmEmail
 from src.infrastructure.database.models import Student as OrmStudent
@@ -58,7 +63,7 @@ class SqlAlchemyCaseQueryService:
         stmt = self._get_base_query()
         return await self._execute_and_map(stmt, limit, offset)
 
-    def _get_base_query(self) -> Select[tuple[OrmCase, OrmAdvisor, OrmEmail]]:
+    def _get_base_query(self) -> Select[tuple[OrmCase, OrmAdvisor, OrmEmail, OrmAppointment]]:
         """Build the base select statement for cases."""
         return (
             select(
@@ -78,16 +83,21 @@ class SqlAlchemyCaseQueryService:
                 OrmEmail.status.label('draft_status'),
                 OrmEmail.email_id,
                 OrmEmail.sent_at,
+                OrmAppointment.appointment_time,
+                OrmAppointment.duration_minutes,
+                OrmAppointment.meeting_method,
+                OrmAppointment.notes,
             )
             .join(OrmStudent, OrmCase.sid == OrmStudent.sid)
             .outerjoin(OrmEmail, OrmCase.case_id == OrmEmail.case_id)
             .outerjoin(OrmAdvisor, OrmCase.assigned_advisor_id == OrmAdvisor.advisor_id)
+            .outerjoin(OrmAppointment, OrmCase.case_id == OrmAppointment.case_id)
             .order_by(desc(OrmCase.created_at))
         )
 
     async def _execute_and_map(
         self,
-        stmt: Select[tuple[OrmCase, OrmAdvisor, OrmEmail]],
+        stmt: Select[tuple[OrmCase, OrmAdvisor, OrmEmail, OrmAppointment]],
         limit: int,
         offset: int,
     ) -> PagedResponse[CaseDTO]:
@@ -142,6 +152,14 @@ class SqlAlchemyCaseQueryService:
                         sent_at=row['sent_at'],
                     )
                     if row['email_id']
+                    else None,
+                    appointment=QueryAppointmentDTO(
+                        appointment_time=row['appointment_time'],
+                        duration_minutes=row['duration_minutes'],
+                        meeting_method=MeetingMethod(row['meeting_method']),
+                        notes=row['notes'],
+                    )
+                    if row['appointment_time']
                     else None,
                 ),
             )

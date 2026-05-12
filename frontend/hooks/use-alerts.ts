@@ -73,6 +73,7 @@ export function useAlerts() {
           draft_body: c.draft_body || null,
           draft_status: c.draft_status || null,
           is_generating: c.draft_status === "generating",
+          appointment: c.appointment || null,
         }));
 
         console.log(

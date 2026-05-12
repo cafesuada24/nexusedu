@@ -46,6 +46,8 @@ export type Alert = {
     interventionStatus?: string | null;
     /** Thời gian cuộc hẹn (Unix seconds) — chỉ có khi đã đặt hẹn. */
     appointmentAt: number | null;
+    meetingMethod?: "online" | "in_person" | null;
+    appointmentNotes?: string | null;
     /** Danh sách mục tiêu can thiệp. */
     goals: Goal[];
     /** Khi sinh viên click "Chưa giải quyết xong" — comment được lưu lại. */

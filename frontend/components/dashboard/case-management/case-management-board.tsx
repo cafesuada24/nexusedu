@@ -111,7 +111,13 @@ function toAlert(row: TaskItem): Alert {
         draftJobId: null,
         draftSubject: row.draft_subject ?? null,
         draftBody: row.draft_body ?? null,
-        appointmentAt: null,
+        appointmentAt: row.appointment
+            ? Math.floor(
+                  new Date(row.appointment.appointment_time).getTime() / 1000,
+              )
+            : null,
+        meetingMethod: row.appointment?.meeting_method || null,
+        appointmentNotes: row.appointment?.notes || null,
         goals: [],
     };
 }
