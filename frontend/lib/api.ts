@@ -255,7 +255,7 @@ const WorkingHoursCreateSchema = z.object({
   end_time: z.string(),
   timezone: z.string().default("UTC"),
 });
-type WorkingHoursCreate = z.infer<typeof WorkingHoursCreateSchema>;
+export type WorkingHoursCreate = z.infer<typeof WorkingHoursCreateSchema>;
 
 const WorkingHoursUpdateSchema = z.object({
   day_of_week: z.number(),
@@ -269,7 +269,7 @@ const DayOffCreateSchema = z.object({
   date: z.string(),
   reason: z.string().nullable().optional(),
 });
-type DayOffCreate = z.infer<typeof DayOffCreateSchema>;
+export type DayOffCreate = z.infer<typeof DayOffCreateSchema>;
 
 
 const KpiStatsSchema = z.object({
@@ -279,14 +279,14 @@ const KpiStatsSchema = z.object({
   dropout_rate: z.number(),
   total_students: z.number(),
 });
-type KpiStats = z.infer<typeof KpiStatsSchema>;
+export type KpiStats = z.infer<typeof KpiStatsSchema>;
 
 const RetentionTrendItemSchema = z.object({
   month: z.string(),
   baseline: z.number(),
   current: z.number(),
 });
-type RetentionTrendItem = z.infer<typeof RetentionTrendItemSchema>;
+export type RetentionTrendItem = z.infer<typeof RetentionTrendItemSchema>;
 
 // Backend GET /cases/{case_id}/email returns QueryEmailDTO shape
 const _QueryEmailDTOSchema = z.object({
