@@ -16,11 +16,13 @@ import {
 interface WorkingHoursCardProps {
   week: WeekSchedule;
   onToggleDay: (key: DayKey, enabled: boolean) => void;
+  disabled?: boolean;
 }
 
 export function WorkingHoursCard({
   week,
   onToggleDay,
+  disabled,
 }: WorkingHoursCardProps) {
   return (
     <Card className="stripe-indigo rounded-2xl border-accent-indigo/15 bg-gradient-to-br from-accent-indigo/22 via-accent-indigo/10 to-card lg:col-span-2">
@@ -84,6 +86,7 @@ export function WorkingHoursCard({
                 <Switch
                   checked={dayConfig.enabled}
                   onCheckedChange={(v) => onToggleDay(key, v)}
+                  disabled={disabled}
                 />
               </div>
             );
