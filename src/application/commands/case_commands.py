@@ -165,7 +165,8 @@ class CaseCommandHandler:
                 )
             except JobNotFoundError:
                 logger.error(
-                    f'Inconsistency: Email {existing_email.email_id} says generating but no job found.',
+                    'Inconsistency: Email says generating but no job found',
+                    email_id=str(existing_email.email_id),
                 )
                 raise
             return TriggerDraftDTO(
@@ -271,7 +272,7 @@ class CaseCommandHandler:
         command: GenerateEmailDraftCommand,
     ) -> None:
         """Execute the generate email draft command (Worker task logic)."""
-        logger.info(f'Generating email draft for case {command.case_id}')
+        logger.info('Generating email draft', case_id=str(command.case_id))
 
         # 1. Fetch case and student info
         case = await self.case_repo.get_by_id(command.case_id)
@@ -307,7 +308,9 @@ class CaseCommandHandler:
             )
         except DraftGenerationError as e:
             logger.warning(
-                f'Draft generation failed for case {command.case_id}: {e}. Falling back to safe template.',
+                'Draft generation failed, falling back to safe template',
+                case_id=str(command.case_id),
+                error=str(e),
             )
             subject = SAFE_SUBJECT
             personalized_body = SAFE_BODY.safe_substitute(

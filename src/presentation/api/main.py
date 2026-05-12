@@ -72,7 +72,11 @@ async def log_requests(
     response = await call_next(request)
     process_time = time.time() - start_time
     logger.info(
-        f'HTTP: {request.method} {request.url.path} - Status: {response.status_code} - Duration: {process_time:.2f}s',
+        'HTTP request processed',
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+        duration=process_time,
     )
     return response
 
@@ -80,7 +84,7 @@ async def log_requests(
 @app.exception_handler(Exception)
 async def global_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     """Catches all unhandled exceptions and returns a sanitized JSON response."""
-    logger.error(f'Unhandled Exception: {exc}', exc_info=True)
+    logger.error('Unhandled exception occurred', error=str(exc), exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
@@ -93,7 +97,7 @@ async def global_exception_handler(_request: Request, exc: Exception) -> JSONRes
 @app.exception_handler(ValueError)
 async def value_error_handler(_request: Request, exc: ValueError) -> JSONResponse:
     """Handles validation errors specifically."""
-    logger.warning(f'Validation Error: {exc}')
+    logger.warning('Validation error occurred', error=str(exc))
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={

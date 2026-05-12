@@ -151,7 +151,7 @@ async def get_advisor_availability(
     except AdvisorNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error fetching availability: {e}', exc_info=True)
+        logger.error('Failed to fetch availability', error=str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
             detail='Failed to fetch availability',
@@ -225,7 +225,7 @@ async def get_my_points(
 #             for m in metrics
 #         ]
 #     except Exception as e:
-#         logger.error(f'Failed to fetch engagement metrics: {e}')
+#         logger.error('Failed to fetch engagement metrics', error=str(e))
 #         raise HTTPException(
 #             status_code=500,
 #             detail='Failed to retrieve engagement metrics',
@@ -366,7 +366,7 @@ async def get_leaderboard(
         )
         return await query_handler.handle_get_leaderboard(query)
     except Exception as e:
-        logger.error(f'Failed to fetch leaderboard: {e}')
+        logger.error('Failed to fetch leaderboard', error=str(e))
         raise HTTPException(
             status_code=500,
             detail='Failed to retrieve leaderboard',

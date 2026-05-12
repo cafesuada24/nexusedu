@@ -93,7 +93,7 @@ async def update_user(
     if idempotency_key:
         idemp_key = UUID(idempotency_key)
         if await idempotency_repo.check_key(idemp_key):
-            logger.info(f'Idempotency hit for update_user: {idemp_key}')
+            logger.info('Idempotency hit for update_user', idempotency_key=str(idemp_key))
             return user
 
     updated_user = await user_manager.update(user_update, user, request=request)

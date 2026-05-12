@@ -41,7 +41,7 @@ async def run_email_draft_task(
 ) -> None:
     """Worker task to generate email draft using AlertCommandHandler."""
     start_time = datetime.now(UTC)
-    logger.info(f'Worker: Starting email draft task for {case_id}')
+    logger.info('Worker: Starting email draft task', case_id=str(case_id))
 
     async for session in get_async_session():
         container = Container(session=session, redis_pool=ctx.get('redis'))
@@ -103,11 +103,9 @@ async def run_email_draft_task(
                     )
 
                 except Exception as ws_err:
-                    logger.error(f'Worker: Failed to publish WS failure: {ws_err}')
+                    logger.error('Worker: Failed to publish WS failure', error=str(ws_err))
 
-            logger.error(
-                f'Worker: Email generated job failed or timed out for case with id {case_id}, error: {e}',
-            )
+            logger.error('Worker: Email generated job failed or timed out', case_id=str(case_id), error=str(e))
             if isinstance(e, asyncio.CancelledError):
                 raise e
 
@@ -130,9 +128,7 @@ async def run_dispatch_email_task(
         assert case.assigned_advisor_id is not None
         email = await email_repo.get_by_case(case_id)
         student = await student_repo.get_by_id(case.sid)
-        logger.info(
-            f'Worker: Dispatching intervention email for case {case_id} to {student.email}',
-        )
+        logger.info('Worker: Dispatching intervention email', case_id=str(case_id), email=student.email)
 
         # Send actual email
         await email_sending_service.send_email(
@@ -164,7 +160,7 @@ async def run_dispatch_email_task(
                     user_id=advisor.user_id,
                 )
         except Exception as ws_err:
-            logger.error(f'Worker: Failed to publish WS status update: {ws_err}')
+            logger.error('Worker: Failed to publish WS status update', error=str(ws_err))
 
         points = gamification_service.calculate_points(
             gamification_service.Action.SEND_EMAIL,
@@ -190,9 +186,7 @@ async def run_dispatch_review_email_task(
     target_email: str,
 ) -> None:
     """Worker task to send a review email to the student."""
-    logger.info(
-        f'Worker: Dispatching review email for case {case_id} to {target_email}',
-    )
+    logger.info('Worker: Dispatching review email', case_id=str(case_id), email=target_email)
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -209,7 +203,7 @@ async def run_dispatch_review_email_task(
 
 async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None:
     """Worker task to evaluate and award achievement badges for an advisor."""
-    logger.info(f'Worker: Evaluating badges for advisor {advisor_id}')
+    logger.info('Worker: Evaluating badges for advisor', advisor_id=str(advisor_id))
 
     async for session in get_async_session():
         try:
@@ -235,11 +229,11 @@ async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None
                 if redis:
                     cache_key = f'advisor_badges:{advisor_id}'
                     await redis.delete(cache_key)
-                    logger.info(f'Worker: Invalidated cache for advisor {advisor_id}')
+                    logger.info('Worker: Invalidated cache for advisor', advisor_id=str(advisor_id))
 
-            logger.info(f'Worker: Badge evaluation completed for {advisor_id}')
+            logger.info('Worker: Badge evaluation completed for advisor', advisor_id=str(advisor_id))
         except Exception as e:
-            logger.error(f'Worker: Failed to evaluate badges: {e}')
+            logger.error('Worker: Failed to evaluate badges', error=str(e))
             raise
         return
 
@@ -251,7 +245,7 @@ async def run_case_accepted_task(
     occurred_at: datetime,
 ) -> None:
     """Worker task to handle CaseAcceptedEvent."""
-    logger.info(f'Worker: Handling CaseAcceptedEvent for case {case_id}')
+    logger.info('Worker: Handling CaseAcceptedEvent', case_id=str(case_id))
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -279,7 +273,7 @@ async def run_case_accepted_task(
         await point_ledger_repo.save(ledger)
         await session.commit()
 
-    logger.info(f'Worker: Finished CaseAcceptedEvent for case {case_id}')
+    logger.info('Worker: Finished CaseAcceptedEvent', case_id=str(case_id))
 
 
 async def run_student_booked_task(
@@ -288,7 +282,7 @@ async def run_student_booked_task(
     occurred_at: datetime,
 ) -> None:
     """Worker task to handle StudentBookedEvent."""
-    logger.info(f'Worker: Handling StudentBookedEvent for case {case_id}')
+    logger.info('Worker: Handling StudentBookedEvent', case_id=str(case_id))
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -318,7 +312,7 @@ async def run_student_booked_task(
         await point_ledger_repo.save(ledger)
         await session.commit()
 
-    logger.info(f'Worker: Finished StudentBookedEvent for case {case_id}')
+    logger.info('Worker: Finished StudentBookedEvent', case_id=str(case_id))
 
 
 async def run_case_resolved_task(
@@ -330,9 +324,7 @@ async def run_case_resolved_task(
     comment: str | None = None,
 ) -> None:
     """Worker task to handle CaseResolvedEvent."""
-    logger.info(
-        f'Worker: Handling CaseResolvedEvent for case {case_id} (Satisfaction: {satisfaction})',
-    )
+    logger.info('Worker: Handling CaseResolvedEvent', case_id=str(case_id), satisfaction=str(satisfaction))
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -362,7 +354,7 @@ async def run_case_resolved_task(
         await point_ledger_repo.save(ledger)
         await session.commit()
 
-    logger.info(f'Worker: Finished CaseResolvedEvent for case {case_id}')
+    logger.info('Worker: Finished CaseResolvedEvent', case_id=str(case_id))
 
 
 async def run_case_failed_task(
@@ -374,9 +366,7 @@ async def run_case_failed_task(
     comment: str | None = None,
 ) -> None:
     """Worker task to handle CaseFailedEvent."""
-    logger.info(
-        f'Worker: Handling CaseFailedEvent for case {case_id} (Satisfaction: {satisfaction})',
-    )
+    logger.info('Worker: Handling CaseFailedEvent', case_id=str(case_id), satisfaction=str(satisfaction))
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -393,7 +383,7 @@ async def run_case_failed_task(
         await point_ledger_repo.save(ledger)
         await session.commit()
 
-    logger.info(f'Worker: Finished CaseFailedEvent for case {case_id}')
+    logger.info('Worker: Finished CaseFailedEvent', case_id=str(case_id))
 
 
 async def run_case_review_requested_task(
@@ -403,7 +393,7 @@ async def run_case_review_requested_task(
     occurred_at: datetime,
 ) -> None:
     """Worker task to handle CaseReviewRequestedEvent."""
-    logger.info(f'Worker: Handling CaseReviewRequestedEvent for case {case_id}')
+    logger.info('Worker: Handling CaseReviewRequestedEvent', case_id=str(case_id))
 
     async for session in get_async_session():
         container = Container(session=session, redis_pool=ctx.get('redis'))
@@ -449,7 +439,7 @@ async def run_case_review_requested_task(
             _defer_by=timedelta(days=7),
         )
 
-    logger.info(f'Worker: Finished CaseReviewRequestedEvent for case {case_id}')
+    logger.info('Worker: Finished CaseReviewRequestedEvent', case_id=str(case_id))
 
 
 async def run_auto_resolve_case_task(
@@ -457,7 +447,7 @@ async def run_auto_resolve_case_task(
     case_id: UUID,
 ) -> None:
     """Task to auto-resolve a case if the student hasn't reviewed it after 7 days."""
-    logger.info(f'Worker: Running auto-resolve check for case {case_id}')
+    logger.info('Worker: Running auto-resolve check', case_id=str(case_id))
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -465,7 +455,7 @@ async def run_auto_resolve_case_task(
         case = await case_repo.get_by_id(case_id)
 
         if case.intervention_status == 'pending_review':
-            logger.info(f'Worker: Auto-resolving case {case_id}')
+            logger.info('Worker: Auto-resolving case', case_id=str(case_id))
             handler = container.get_case_command_handler()
             command = SubmitCaseReviewCommand(
                 case_id=case_id,
@@ -475,9 +465,7 @@ async def run_auto_resolve_case_task(
             await handler.handle_submit_case_review(command)
             await session.commit()
         else:
-            logger.info(
-                f'Worker: Case {case_id} already finalized, skipping auto-resolve.',
-            )
+            logger.info('Worker: Case already finalized, skipping auto-resolve', case_id=str(case_id))
 
 
 async def run_outbox_poller_task(ctx: dict[str, Any]) -> None:
@@ -496,7 +484,7 @@ async def run_advisor_created_task(
     occurred_at: datetime,
 ) -> None:
     """Worker task to set default working hours for a new advisor."""
-    logger.info(f'Worker: Handling AdvisorCreatedEvent for advisor {advisor_id}')
+    logger.info('Worker: Handling AdvisorCreatedEvent', advisor_id=str(advisor_id))
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -523,17 +511,13 @@ async def run_advisor_created_task(
             try:
                 await schedule_handler.handle_add_working_hours(morning_cmd)
                 await schedule_handler.handle_add_working_hours(afternoon_cmd)
-                logger.debug(
-                    f'Worker: Added default hours (morning & afternoon) for advisor {advisor_id} on day {day}'
-                )
+                logger.debug('Worker: Added default hours for advisor on day', advisor_id=str(advisor_id), day=day)
             except Exception as e:
-                logger.error(
-                    f'Worker: Failed to add default hours for advisor {advisor_id} on day {day}: {e}'
-                )
+                logger.error('Worker: Failed to add default hours for advisor on day', advisor_id=str(advisor_id), day=day, error=str(e))
 
         await session.commit()
 
-    logger.info(f'Worker: Finished setting default hours for advisor {advisor_id}')
+    logger.info('Worker: Finished setting default hours for advisor', advisor_id=str(advisor_id))
 
 
 class WorkerSettings:

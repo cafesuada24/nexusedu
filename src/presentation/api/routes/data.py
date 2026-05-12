@@ -39,7 +39,7 @@ async def ingest_data(
         if idempotency_key:
             idemp_key = UUID(idempotency_key)
             if await idempotency_repo.check_key(idemp_key):
-                logger.info(f'Idempotency hit for ingest_data: {idemp_key}')
+                logger.info('Idempotency hit for ingest_data', idemp_key=str(idemp_key))
                 return {
                     'status': 'success',
                     'batch_id': request.batch_id,
@@ -72,5 +72,5 @@ async def ingest_data(
         }
 
     except Exception as e:
-        logger.error(f'Critical error during data ingestion: {e}', exc_info=True)
+        logger.error('Critical error during data ingestion', error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

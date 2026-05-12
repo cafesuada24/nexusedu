@@ -27,7 +27,11 @@ class WebSocketManager:
         if user_id not in self.active_connections:
             self.active_connections[user_id] = []
         self.active_connections[user_id].append(websocket)
-        logger.debug(f'WS: User {user_id} connected. Total users: {len(self.active_connections)}')
+        logger.debug(
+            'WS: User connected',
+            user_id=str(user_id),
+            total_users=len(self.active_connections),
+        )
 
     def disconnect(self, user_id: uuid.UUID, websocket: WebSocket) -> None:
         """Removes a connection from the active connections map."""
@@ -35,7 +39,11 @@ class WebSocketManager:
             self.active_connections[user_id].remove(websocket)
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
-        logger.debug(f'WS: User {user_id} disconnected. Total users: {len(self.active_connections)}')
+        logger.debug(
+            'WS: User disconnected',
+            user_id=str(user_id),
+            total_users=len(self.active_connections),
+        )
 
     async def send_personal_message(self, message: dict[str, Any], user_id: uuid.UUID) -> None:
         """Sends a message to all active connections for a specific user."""
@@ -44,7 +52,11 @@ class WebSocketManager:
                 try:
                     await connection.send_json(message)
                 except Exception as e:
-                    logger.error(f'WS: Failed to send personal message to {user_id}: {e}')
+                    logger.error(
+                        'WS: Failed to send personal message',
+                        user_id=str(user_id),
+                        error=str(e),
+                    )
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         """Sends a message to all active connections across all users."""
@@ -53,7 +65,11 @@ class WebSocketManager:
                 try:
                     await connection.send_json(message)
                 except Exception as e:
-                    logger.error(f'WS: Failed to broadcast message to {user_id}: {e}')
+                    logger.error(
+                        'WS: Failed to broadcast message',
+                        user_id=str(user_id),
+                        error=str(e),
+                    )
 
 
 # Global instance

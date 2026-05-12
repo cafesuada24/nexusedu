@@ -51,7 +51,7 @@ class OutboxProcessor:
         if not events:
             return
 
-        logger.info(f'Outbox: Processing {len(events)} pending/failed events.')
+        logger.info('Processing outbox events', count=len(events))
 
         for event in events:
             # Skip if max retries reached
@@ -64,7 +64,11 @@ class OutboxProcessor:
 
                 event.status = OutboxStatus.PROCESSED
                 event.processed_at = datetime.now(UTC)
-                logger.debug(f'Outbox: Dispatched task {event.task_name} ({event.id})')
+                logger.debug(
+                    'Outbox task dispatched',
+                    task_name=event.task_name,
+                    event_id=event.id,
+                )
             except Exception as e:
                 # Basic retry logic using processed_at as last attempt timestamp
                 current_error = str(e)
@@ -76,14 +80,20 @@ class OutboxProcessor:
                     event.status = OutboxStatus.FAILED
                     event.error = f'Retry attempt {retry_count}: {current_error}'
                     logger.warning(
-                        f'Outbox: Transient failure for {event.id} ({event.task_name}). '
-                        f'Will retry. Error: {current_error}',
+                        'Outbox task transient failure',
+                        event_id=event.id,
+                        task_name=event.task_name,
+                        retry_count=retry_count,
+                        error=current_error,
                     )
                 else:
                     event.status = OutboxStatus.FAILED
                     event.error = f'Retry limit reached ({MAX_RETRIES}): {current_error}'
                     logger.error(
-                        f'Outbox: Permanent failure for {event.id} ({event.task_name}): {current_error}',
+                        'Outbox task permanent failure',
+                        event_id=event.id,
+                        task_name=event.task_name,
+                        error=current_error,
                     )
 
                 event.processed_at = datetime.now(UTC)

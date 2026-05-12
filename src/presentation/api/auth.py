@@ -124,7 +124,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         _: Request | None = None,
     ) -> None:
         """Callback triggered after a user successfully registers."""
-        logger.info(f'User {user.id} has registered.')
+        logger.info('User registered', user_id=user.id)
         await self._user_setting_db.create_user_settings(user.id)
 
         if user.role == UserRole.ADVISOR.value:

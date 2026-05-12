@@ -57,12 +57,12 @@ class GuardrailsEmailDraftingService:
         except (ToxicityDetectedError, TonePolicyViolationError):
             raise
         except Exception as e:
-            logger.error(f'Draft generation error: {e}', exc_info=True)
+            logger.error('Draft generation error', error=str(e), exc_info=True)
             raise DraftGenerationError(f'Failed to generate valid draft: {e}') from e
 
     def _validate_semantic_policy(self, baml_output: EmailDraft) -> None:
         """Run semantic policy checks on the LLM output using local heuristics."""
-        logger.info(f'Validating body tone for: {baml_output.subject}')
+        logger.info('Validating body tone', subject=baml_output.subject)
 
         body_lower = baml_output.body.lower()
         punitive_words = [
@@ -79,7 +79,10 @@ class GuardrailsEmailDraftingService:
 
         for word in punitive_words:
             if word in body_lower:
-                logger.info(f'Tone evaluation failed: Found punitive word "{word}"')
+                logger.info(
+                    'Tone evaluation failed',
+                    punitive_word=word,
+                )
                 raise TonePolicyViolationError(
                     f'Academic shaming or punitive tone detected: "{word}"'
                 )

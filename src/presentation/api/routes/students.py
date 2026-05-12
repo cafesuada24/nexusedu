@@ -33,7 +33,7 @@ async def get_all_students(
         query = GetAllStudentsQuery(limit=limit, offset=offset)
         return await query_handler.handle_get_all_students(query)
     except Exception as e:
-        logger.error(f'Error in get_all_students: {str(e)}', exc_info=True)
+        logger.error('Error fetching students', error=str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail='An unexpected error occurred while fetching students.',
@@ -56,7 +56,7 @@ async def get_student(
             detail=str(e),
         ) from e
     except Exception as e:
-        logger.error(f'Error in get_student: {str(e)}', exc_info=True)
+        logger.error('Error in get_student', error=str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail='An unexpected error occurred while fetching student details.',

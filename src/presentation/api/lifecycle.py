@@ -54,7 +54,7 @@ async def redis_pubsub_listener() -> None:
                     else:
                         await ws_manager.broadcast(data)
                 except Exception as e:
-                    logger.error(f'API Lifecycle: Error processing Pub/Sub message: {e}')
+                    logger.error('API Lifecycle: Error processing Pub/Sub message', error=str(e))
     except redis.ConnectionError:
         logger.info('API Lifecycle: Redis Pub/Sub listener stopping...')
     except asyncio.CancelledError:
@@ -90,7 +90,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info('API Lifecycle: ARQ Redis Pool initialized.')
     except Exception as e:
         logger.warning(
-            f'API Lifecycle: Could not connect to Redis: {e}. Background tasks will be disabled.',
+            'Could not connect to Redis. Background tasks will be disabled.',
+            error=str(e),
         )
         arq_pool = None
 

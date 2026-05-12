@@ -35,7 +35,7 @@ async def rate_limit_middleware(
         rate_limit_store[client_ip] = []
 
     if len(rate_limit_store[client_ip]) >= RATE_LIMIT_CALLS:
-        logger.warning(f'Rate Limit Exceeded for {client_ip}')
+        logger.warning('Rate limit exceeded', client_ip=client_ip)
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             content={'detail': 'Too many requests. Please try again later.'},

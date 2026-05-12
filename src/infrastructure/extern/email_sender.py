@@ -33,7 +33,11 @@ class AioSmtpEmailSender:
         body: str,
     ) -> None:
         """Send an email using aiosmtplib."""
-        logger.info(f'Sending email to {to_email} with subject: {subject}')
+        logger.info(
+            'Sending email',
+            to_email=to_email,
+            subject=subject,
+        )
 
         message = EmailMessage()
         message['From'] = self.from_email
@@ -50,7 +54,11 @@ class AioSmtpEmailSender:
                 username=self.user,
                 password=self.password,
             )
-            logger.info(f'Email sent successfully to {to_email}')
+            logger.info('Email sent successfully', to_email=to_email)
         except Exception as e:
-            logger.error(f'Failed to send email to {to_email}: {e}')
+            logger.error(
+                'Failed to send email',
+                to_email=to_email,
+                error=str(e),
+            )
             raise
