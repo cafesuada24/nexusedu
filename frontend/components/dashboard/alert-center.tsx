@@ -683,7 +683,7 @@ export function AlertCenter() {
                     <div className="relative min-h-0 w-full max-w-full flex-1 overflow-hidden">
                         <div
                             ref={boardScrollRef}
-                            className="hide-scrollbar flex h-full min-w-0 w-full max-w-full items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-transparent pb-1 [-webkit-overflow-scrolling:touch]"
+                            className="hide-scrollbar flex h-full min-w-0 w-full max-w-full items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-transparent pb-1 snap-x snap-mandatory [-webkit-overflow-scrolling:touch]"
                             role="list"
                         >
                             {COLUMNS.map((col) => (
@@ -732,7 +732,7 @@ export function AlertCenter() {
                     variant="ghost"
                     onClick={() => scrollBoardBy("left")}
                     className={cn(
-                        "fixed left-2 top-1/2 z-[100] h-12 w-12 -translate-y-1/2 rounded-full border border-white/20 bg-blue-600/90 text-white shadow-xl shadow-blue-500/40 backdrop-blur-md transition-all duration-200 hover:scale-110 hover:bg-blue-700 hover:opacity-100 hover:shadow-[0_0_18px_rgba(37,99,235,0.45)] dark:bg-blue-500/90 dark:hover:bg-blue-600 md:left-[260px]",
+                        "fixed left-2 top-1/2 z-[100] hidden h-12 w-12 -translate-y-1/2 rounded-full border border-white/20 bg-blue-600/90 text-white shadow-xl shadow-blue-500/40 backdrop-blur-md transition-all duration-200 hover:scale-110 hover:bg-blue-700 hover:opacity-100 hover:shadow-[0_0_18px_rgba(37,99,235,0.45)] dark:bg-blue-500/90 dark:hover:bg-blue-600 md:flex md:left-[260px]",
                         canScrollLeft
                             ? "opacity-95"
                             : "pointer-events-none opacity-0",
@@ -749,7 +749,7 @@ export function AlertCenter() {
                     variant="ghost"
                     onClick={() => scrollBoardBy("right")}
                     className={cn(
-                        "fixed right-5 top-1/2 z-[100] h-12 w-12 -translate-y-1/2 rounded-full border border-white/20 bg-blue-600/90 text-white shadow-xl shadow-blue-500/40 backdrop-blur-md transition-all duration-200 hover:scale-110 hover:bg-blue-700 hover:opacity-100 hover:shadow-[0_0_18px_rgba(37,99,235,0.45)] dark:bg-blue-500/90 dark:hover:bg-blue-600",
+                        "fixed right-5 top-1/2 z-[100] hidden h-12 w-12 -translate-y-1/2 rounded-full border border-white/20 bg-blue-600/90 text-white shadow-xl shadow-blue-500/40 backdrop-blur-md transition-all duration-200 hover:scale-110 hover:bg-blue-700 hover:opacity-100 hover:shadow-[0_0_18px_rgba(37,99,235,0.45)] dark:bg-blue-500/90 dark:hover:bg-blue-600 md:flex",
                         canScrollRight
                             ? "opacity-95"
                             : "pointer-events-none opacity-0",
