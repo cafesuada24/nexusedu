@@ -127,6 +127,10 @@ class AddWorkingHoursCommand:
     end_time: time
     timezone: str = 'UTC'
 
+    def __post_init__(self):
+        if self.start_time >= self.end_time:
+            raise ValueError("start_time must be before end_time")
+
 
 @dataclass(frozen=True)
 class UpdateWorkingHoursCommand:

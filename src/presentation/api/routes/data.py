@@ -3,11 +3,11 @@
 from typing import Annotated, Any
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
-from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
@@ -15,6 +15,8 @@ from src.presentation.dependencies.providers import (
     get_idempotency_repository,
 )
 from src.presentation.schemas.request import CoreDataSource, DataIngestionRequest
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix='/data', tags=['data'])
 
@@ -37,7 +39,7 @@ async def ingest_data(
         if idempotency_key:
             idemp_key = UUID(idempotency_key)
             if await idempotency_repo.check_key(idemp_key):
-                logger.info(f'Idempotency hit for ingest_data: {idemp_key}')
+                logger.info('Idempotency hit for ingest_data', idemp_key=str(idemp_key))
                 return {
                     'status': 'success',
                     'batch_id': request.batch_id,
@@ -70,5 +72,5 @@ async def ingest_data(
         }
 
     except Exception as e:
-        logger.error(f'Critical error during data ingestion: {e}', exc_info=True)
+        logger.error('Critical error during data ingestion', error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

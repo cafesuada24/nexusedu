@@ -4,9 +4,10 @@ import json
 import uuid
 from typing import Any
 
+import structlog
 from arq import ArqRedis
 
-from src.core.logger import logger
+logger = structlog.get_logger(__name__)
 
 
 class WebSocketEventPublisher:
@@ -30,6 +31,13 @@ class WebSocketEventPublisher:
         }
         try:
             await self.redis_pool.publish('ws_updates', json.dumps(message))
-            logger.debug(f'WS Publisher: Published {event_type} to Redis.')
+            logger.debug(
+                'WS message published to Redis',
+                event_type=event_type,
+            )
         except Exception as e:
-            logger.error(f'WS Publisher: Failed to publish {event_type}: {e}')
+            logger.error(
+                'Failed to publish WS message to Redis',
+                event_type=event_type,
+                error=str(e),
+            )

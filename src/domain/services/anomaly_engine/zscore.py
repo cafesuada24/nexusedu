@@ -6,9 +6,12 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import structlog
+
 from src.core.identifiers import EntityID, generate_uuid
-from src.core.logger import logger
 from src.domain.value_objects.status import RiskStatus
+
+logger = structlog.get_logger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

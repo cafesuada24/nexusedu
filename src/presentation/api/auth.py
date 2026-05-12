@@ -9,6 +9,7 @@ from collections.abc import AsyncGenerator, Callable
 from enum import StrEnum
 from typing import Annotated, Any, override
 
+import structlog
 from fastapi import Depends, HTTPException, Request, status
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import (
@@ -22,7 +23,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.interfaces.event_publisher import EventPublisher
 from src.core.config import config
-from src.core.logger import logger
 from src.domain.events.advisor_events import AdvisorCreatedEvent
 from src.domain.repositories.advisor_repository import AdvisorRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
@@ -38,6 +38,7 @@ from src.presentation.dependencies.providers import (
     get_user_settings_repository,
 )
 
+logger = structlog.get_logger(__name__)
 
 class Scope(StrEnum):
     """Granular permissions (capabilities) in the system."""
@@ -123,7 +124,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         _: Request | None = None,
     ) -> None:
         """Callback triggered after a user successfully registers."""
-        logger.info(f'User {user.id} has registered.')
+        logger.info('User registered', user_id=user.id)
         await self._user_setting_db.create_user_settings(user.id)
 
         if user.role == UserRole.ADVISOR.value:

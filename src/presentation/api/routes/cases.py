@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 import jwt
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 
 from src.application.commands.case_commands import (
@@ -33,7 +34,6 @@ from src.application.queries.case_queries import (
     GetUnassignedQuery,
 )
 from src.core.config import config
-from src.core.logger import logger
 from src.domain.exceptions import (
     CaseAlreadyAssignedError,
     CaseNotFoundError,
@@ -54,6 +54,9 @@ from src.presentation.dependencies.providers import (
 )
 from src.presentation.schemas.request import BookAppointmentRequest, UpdateEmailRequest
 
+logger = structlog.get_logger(__name__)
+
+
 router = APIRouter(prefix='/cases', tags=['cases'])
 
 
@@ -69,7 +72,7 @@ async def get_all_cases(
         query = GetAllCasesQuery(user_id=user.id, limit=limit, offset=offset)
         return await query_handler.handle_get_all_cases(query)
     except Exception as e:
-        logger.error(f'Error in get_all_cases: {str(e)}', exc_info=True)
+        logger.error('Failed to get all cases', error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -89,7 +92,7 @@ async def get_open_cases_list(
         query = GetUnassignedQuery(limit=limit, offset=offset)
         return await query_handler.handle_get_open_cases(query)
     except Exception as e:
-        logger.error(f'Error in get_case_list: {str(e)}', exc_info=True)
+        logger.error('Failed to get open cases list', error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -109,7 +112,7 @@ async def get_assigned_cases_list(
         query = GetAssignedQuery(user_id=user.id, limit=limit, offset=offset)
         return await query_handler.handle_get_assigned_cases(query)
     except Exception as e:
-        logger.error(f'Error in get_case_list: {str(e)}', exc_info=True)
+        logger.error('Failed to get assigned cases list', error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -125,7 +128,7 @@ async def get_case_details(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in get_case_details: {str(e)}', exc_info=True)
+        logger.error('Failed to get case details', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -146,7 +149,7 @@ async def trigger_draft(
         if idempotency_key:
             idemp_key = UUID(idempotency_key)
             if await idempotency_repo.check_key(idemp_key):
-                logger.info(f'Idempotency hit for trigger_draft: {idemp_key}')
+                logger.info('Idempotency hit', operation='trigger_draft', idempotency_key=idemp_key)
 
                 # return {
                 #     'status': 'success',
@@ -190,7 +193,7 @@ async def get_email_draft(
     except (CaseNotFoundError, EmailUnavailableError, EmailNotFoundError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in get_email_draft: {str(e)}', exc_info=True)
+        logger.error('Failed to get email draft', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -218,7 +221,7 @@ async def update_email_draft(
     except (InvalidActionError, InvalidStateTransitionError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in update_email_draft: {str(e)}', exc_info=True)
+        logger.error('Failed to update email draft', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -251,9 +254,7 @@ async def send_nudge_email(
             await idempotency_repo.record_key(idemp_key)
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
-        logger.info(
-            f'DISPATCHING EMAIL for case {case_id} to {target_email}...',
-        )
+        logger.info('Dispatching email', case_id=case_id, target_email=target_email)
 
         return {'status': 'success', 'message': f'Email sent to {target_email}'}
 
@@ -262,7 +263,7 @@ async def send_nudge_email(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in send_nudge_email: {str(e)}', exc_info=True)
+        logger.error('Failed to send nudge email', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -295,7 +296,7 @@ async def accept_task(
             detail='Student information not found.',
         ) from e
     except Exception as e:
-        logger.error(f'Error in complete_task: {str(e)}', exc_info=True)
+        logger.error('Failed to accept task', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -325,7 +326,7 @@ async def book_appointment(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in book_appointment: {str(e)}', exc_info=True)
+        logger.error('Failed to book appointment', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -350,7 +351,7 @@ async def start_supporting(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in start_supporting: {str(e)}', exc_info=True)
+        logger.error('Failed to start supporting', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -373,7 +374,7 @@ async def resolve_case(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in resolve_case: {str(e)}', exc_info=True)
+        logger.error('Failed to resolve case', case_id=case_id, error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -410,5 +411,5 @@ async def submit_case_review(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error in submit_case_review: {str(e)}', exc_info=True)
+        logger.error('Failed to submit case review', error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail=str(e)) from e

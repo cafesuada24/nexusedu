@@ -13,14 +13,16 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import redis.asyncio as redis
+import structlog
 from arq import ArqRedis, create_pool
 from arq.connections import RedisSettings
 from fastapi import FastAPI
 
 from src.core.config import config
-from src.core.logger import logger
 from src.infrastructure.extern.presidio_pii_masker import PresidioPiiMasker
 from src.presentation.api.websocket import ws_manager
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -52,7 +54,7 @@ async def redis_pubsub_listener() -> None:
                     else:
                         await ws_manager.broadcast(data)
                 except Exception as e:
-                    logger.error(f'API Lifecycle: Error processing Pub/Sub message: {e}')
+                    logger.error('API Lifecycle: Error processing Pub/Sub message', error=str(e))
     except redis.ConnectionError:
         logger.info('API Lifecycle: Redis Pub/Sub listener stopping...')
     except asyncio.CancelledError:
@@ -88,7 +90,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info('API Lifecycle: ARQ Redis Pool initialized.')
     except Exception as e:
         logger.warning(
-            f'API Lifecycle: Could not connect to Redis: {e}. Background tasks will be disabled.',
+            'Could not connect to Redis. Background tasks will be disabled.',
+            error=str(e),
         )
         arq_pool = None
 

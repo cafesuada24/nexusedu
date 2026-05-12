@@ -1,156 +1,73 @@
-"""Production-grade structured logging for the Agent Assistant."""
+"""Production-grade structured logging using structlog and OpenTelemetry."""
 
-import json
 import logging
 import sys
-from contextvars import ContextVar
-from datetime import UTC, datetime
+from collections.abc import Mapping, MutableMapping
+from typing import TYPE_CHECKING, Any
+
+import structlog
+from opentelemetry import trace
 
 from src.core.config import config
 
-# Global context for correlation IDs (e.g., thread_id, request_id)
-# This allows logs to include context without passing it explicitly to every log call.
-logger_context: ContextVar[dict[str, object] | None] = ContextVar(
-    'logger_context',
-    default=None,
-)
+if TYPE_CHECKING:
+    from structlog.typing import Processor
 
 
-class JSONFormatter(logging.Formatter):
-    """Custom JSON formatter for structured logging."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        """Formats the log record into a JSON string.
-
-        Args:
-            record: The log record to format.
-
-        Returns:
-            A JSON-encoded string containing the log data and context.
-        """
-        context = logger_context.get() or {}
-        payload = {
-            'timestamp': datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
-            'level': record.levelname,
-            'logger': record.name,
-            'message': record.getMessage(),
-            'module': record.module,
-            'funcName': record.funcName,
-            'line': record.lineno,
-            **context,
-        }
-
-        # Add extra fields if they exist
-        if hasattr(record, 'extra_data') and record.extra_data:
-            payload['data'] = record.extra_data
-
-        # Add exception info if it exists
-        if record.exc_info:
-            payload['exception'] = self.formatException(record.exc_info)
-
-        return json.dumps(payload)
+def add_opentelemetry_ids(_, __, event_dict: MutableMapping[str, Any]) -> Mapping[str, Any]:
+    """Processor to add OpenTelemetry Trace and Span IDs to the log event."""
+    span = trace.get_current_span()
+    if span.is_recording():
+        ctx = span.get_span_context()
+        if ctx.is_valid:
+            # OpenTelemetry trace/span IDs are ints, format to hex strings
+            event_dict['trace_id'] = format(ctx.trace_id, '032x')
+            event_dict['span_id'] = format(ctx.span_id, '016x')
+    return event_dict
 
 
-class IndustryLogger:
-    """Production-grade structured logger.
+def configure_logger() -> None:
+    """Initializes structlog with a production-grade pipeline."""
+    # Base logging level from config
+    log_level_str = config.log_level.upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
 
-    Supports:
-    - Contextual logging (correlation IDs) via contextvars.
-    - JSON formatting for both console and file.
-    - Automatic log rotation (simplified).
-    - Environment-based log level control.
-    """
+    # Standard logging configuration for intercepting library logs (e.g., uvicorn, sqlalchemy)
+    # We set it to print to stdout so it gets captured by the same pipe as structlog
+    logging.basicConfig(
+        format='%(message)s',
+        stream=sys.stdout,
+        level=log_level,
+    )
 
-    def __init__(self, name: str = 'AI-Lab-Agent', _log_dir: str = 'logs') -> None:
-        """Initialize the logger.
+    processors: list[Processor] = [
+        # Merges contextvars (bound context) into the log event
+        structlog.contextvars.merge_contextvars,
+        # Adds the log level (info, error, etc.)
+        structlog.processors.add_log_level,
+        # Formats exception info if present
+        structlog.processors.format_exc_info,
+        # Adds an ISO-formatted timestamp
+        structlog.processors.TimeStamper(fmt='iso'),
+        # Adds OpenTelemetry Trace/Span IDs for correlation
+        add_opentelemetry_ids,
+        # Renders the final event as a JSON string
+        structlog.processors.JSONRenderer(),
+    ]
 
-        Args:
-            name: Logger name.
-            _log_dir: Directory for log files (Unused).
-        """
-        self.logger = logging.getLogger(name)
-        # Use env var for log level, default to INFO
-        log_level = config.log_level
-        self.logger.setLevel(getattr(logging, log_level, logging.INFO))
-
-        # Clear existing handlers to avoid duplicates during re-init
-        if self.logger.hasHandlers():
-            self.logger.handlers.clear()
-
-        formatter = JSONFormatter()
-
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)
-
-    @staticmethod
-    def set_context(context: dict[str, object]) -> None:
-        """Sets the current correlation context.
-
-        Args:
-            context: Dictionary of context fields to include in subsequent logs.
-        """
-        current = logger_context.get() or {}
-        current = current.copy()
-        current.update(context)
-        logger_context.set(current)
-
-    @staticmethod
-    def clear_context() -> None:
-        """Clears the correlation context."""
-        logger_context.set({})
-
-    def log_event(self, event_type: str, data: dict[str, object]) -> None:
-        """Logs a specific event with associated data.
-
-        Args:
-            event_type: The type of event to log.
-            data: Key-value pairs of event data.
-        """
-        # We use 'extra' to pass the data to the formatter
-        self.logger.info(f'Event: {event_type}', extra={'extra_data': data})
-
-    def info(self, msg: str, **kwargs: object) -> None:
-        """Logs an INFO level message.
-
-        Args:
-            msg: The message to log.
-            **kwargs: Extra fields to include in the log entry.
-        """
-        self.logger.info(msg, extra={'extra_data': kwargs} if kwargs else None)
-
-    def error(self, msg: str, exc_info: bool = True, **kwargs: object) -> None:
-        """Logs an ERROR level message.
-
-        Args:
-            msg: The message to log.
-            exc_info: Whether to include exception traceback.
-            **kwargs: Extra fields to include in the log entry.
-        """
-        self.logger.error(
-            msg,
-            exc_info=exc_info,
-            extra={'extra_data': kwargs} if kwargs else None,
-        )
-
-    def debug(self, msg: str, **kwargs: object) -> None:
-        """Logs a DEBUG level message.
-
-        Args:
-            msg: The message to log.
-            **kwargs: Extra fields to include in the log entry.
-        """
-        self.logger.debug(msg, extra={'extra_data': kwargs} if kwargs else None)
-
-    def warning(self, msg: str, **kwargs: object) -> None:
-        """Logs a WARNING level message.
-
-        Args:
-            msg: The message to log.
-            **kwargs: Extra fields to include in the log entry.
-        """
-        self.logger.warning(msg, extra={'extra_data': kwargs} if kwargs else None)
+    structlog.configure(
+        processors=processors,
+        # PrintLoggerFactory is fast and straightforward for containerized environments
+        logger_factory=structlog.PrintLoggerFactory(),
+        # Bound logger that filters based on level
+        wrapper_class=structlog.make_filtering_bound_logger(log_level),
+        cache_logger_on_first_use=True,
+    )
 
 
-# Global logger instance
-logger = IndustryLogger()
+# Initialize on import
+configure_logger()
+
+# Global logger instance for convenience
+# Note: Callers can also use structlog.get_logger(__name__) for more granular control
+logger = structlog.get_logger('NexusEdu')

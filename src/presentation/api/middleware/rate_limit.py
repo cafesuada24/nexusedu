@@ -3,10 +3,11 @@
 import time
 from collections.abc import Awaitable, Callable
 
+import structlog
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 
-from src.core.logger import logger
+logger = structlog.get_logger(__name__)
 
 # Note: For multi-worker production, always use Redis.
 # This implementation remains in-memory for this refactor phase
@@ -34,7 +35,7 @@ async def rate_limit_middleware(
         rate_limit_store[client_ip] = []
 
     if len(rate_limit_store[client_ip]) >= RATE_LIMIT_CALLS:
-        logger.warning(f'Rate Limit Exceeded for {client_ip}')
+        logger.warning('Rate limit exceeded', client_ip=client_ip)
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             content={'detail': 'Too many requests. Please try again later.'},

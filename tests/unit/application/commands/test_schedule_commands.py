@@ -117,12 +117,10 @@ async def test_handle_delete_day_off(handler, schedule_repo):
 
 @pytest.mark.asyncio
 async def test_invalid_working_hours_rejected(handler):
-    command = AddWorkingHoursCommand(
-        advisor_id=uuid4(),
-        day_of_week=0,
-        start_time=time(17, 0),
-        end_time=time(9, 0), # Invalid: end before start
-    )
-    
     with pytest.raises(ValueError, match="start_time must be before end_time"):
-        await handler.handle_add_working_hours(command)
+        AddWorkingHoursCommand(
+            advisor_id=uuid4(),
+            day_of_week=0,
+            start_time=time(17, 0),
+            end_time=time(9, 0), # Invalid: end before start
+        )

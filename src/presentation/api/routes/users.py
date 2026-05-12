@@ -1,14 +1,14 @@
 """API routes for user management."""
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.logger import logger
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.presentation.api.auth import (
@@ -30,6 +30,9 @@ from src.presentation.schemas.auth import (
     UserSettingsUpdate,
     UserUpdate,
 )
+
+logger = structlog.get_logger(__name__)
+
 
 router = APIRouter(prefix='/users', tags=['users'])
 
@@ -90,7 +93,7 @@ async def update_user(
     if idempotency_key:
         idemp_key = UUID(idempotency_key)
         if await idempotency_repo.check_key(idemp_key):
-            logger.info(f'Idempotency hit for update_user: {idemp_key}')
+            logger.info('Idempotency hit for update_user', idempotency_key=str(idemp_key))
             return user
 
     updated_user = await user_manager.update(user_update, user, request=request)

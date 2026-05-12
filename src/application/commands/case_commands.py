@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from string import Template
 from typing import Any
 
+import structlog
+
 from src.application.dtos.case_dtos import (
     AcceptCaseCommand,
     BookAppointmentCommand,
@@ -21,7 +23,6 @@ from src.application.interfaces.event_publisher import EventPublisher
 from src.application.services.websocket_publisher import WebSocketEventPublisher
 from src.core.config import config
 from src.core.identifiers import EntityID, generate_uuid
-from src.core.logger import logger
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
 from src.domain.exceptions import (
@@ -46,6 +47,7 @@ from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.value_objects.status import InterventionStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
+logger = structlog.get_logger(__name__)
 # Application-level safe fallbacks
 SAFE_SUBJECT = 'Checking in on your academic progress'
 SAFE_BODY = Template(
@@ -163,7 +165,8 @@ class CaseCommandHandler:
                 )
             except JobNotFoundError:
                 logger.error(
-                    f'Inconsistency: Email {existing_email.email_id} says generating but no job found.',
+                    'Inconsistency: Email says generating but no job found',
+                    email_id=str(existing_email.email_id),
                 )
                 raise
             return TriggerDraftDTO(
@@ -269,7 +272,7 @@ class CaseCommandHandler:
         command: GenerateEmailDraftCommand,
     ) -> None:
         """Execute the generate email draft command (Worker task logic)."""
-        logger.info(f'Generating email draft for case {command.case_id}')
+        logger.info('Generating email draft', case_id=str(command.case_id))
 
         # 1. Fetch case and student info
         case = await self.case_repo.get_by_id(command.case_id)
@@ -305,7 +308,9 @@ class CaseCommandHandler:
             )
         except DraftGenerationError as e:
             logger.warning(
-                f'Draft generation failed for case {command.case_id}: {e}. Falling back to safe template.',
+                'Draft generation failed, falling back to safe template',
+                case_id=str(command.case_id),
+                error=str(e),
             )
             subject = SAFE_SUBJECT
             personalized_body = SAFE_BODY.safe_substitute(

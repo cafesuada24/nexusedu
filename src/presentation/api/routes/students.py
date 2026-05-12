@@ -3,6 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.application.dtos.pagination import PagedResponse
@@ -12,9 +13,10 @@ from src.application.dtos.student_dtos import (
     StudentDTO,
 )
 from src.application.queries.student_queries import StudentQueryHandler
-from src.core.logger import logger
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import get_student_query_handler
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix='/students', tags=['students'])
 
@@ -31,7 +33,7 @@ async def get_all_students(
         query = GetAllStudentsQuery(limit=limit, offset=offset)
         return await query_handler.handle_get_all_students(query)
     except Exception as e:
-        logger.error(f'Error in get_all_students: {str(e)}', exc_info=True)
+        logger.error('Error fetching students', error=str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail='An unexpected error occurred while fetching students.',
@@ -54,7 +56,7 @@ async def get_student(
             detail=str(e),
         ) from e
     except Exception as e:
-        logger.error(f'Error in get_student: {str(e)}', exc_info=True)
+        logger.error('Error in get_student', error=str(e), exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail='An unexpected error occurred while fetching student details.',

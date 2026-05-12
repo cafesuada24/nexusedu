@@ -27,6 +27,7 @@ def mock_repos():
         'job_repo': AsyncMock(),
         'task_queue': AsyncMock(),
         'event_publisher': AsyncMock(),
+        'websocket_publisher': AsyncMock(),
         'availability_service': MagicMock(),
         'email_drafting_service': AsyncMock(),
     }

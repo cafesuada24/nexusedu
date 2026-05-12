@@ -4,6 +4,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.application.commands.schedule_commands import ScheduleCommandHandler
@@ -29,7 +30,6 @@ from src.application.dtos.pagination import PagedResponse
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
 )
-from src.core.logger import logger
 from src.domain.exceptions import AdvisorNotFoundError, UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.domain.value_objects.gamification import RankingType
@@ -46,6 +46,8 @@ from src.presentation.schemas.advisor import (
     WorkingHoursCreate,
     WorkingHoursUpdate,
 )
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix='/advisors', tags=['advisors'])
 
@@ -149,7 +151,7 @@ async def get_advisor_availability(
     except AdvisorNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error(f'Error fetching availability: {e}', exc_info=True)
+        logger.error('Failed to fetch availability', error=str(e), exc_info=True)
         raise HTTPException(
             status_code=500,
             detail='Failed to fetch availability',
@@ -223,7 +225,7 @@ async def get_my_points(
 #             for m in metrics
 #         ]
 #     except Exception as e:
-#         logger.error(f'Failed to fetch engagement metrics: {e}')
+#         logger.error('Failed to fetch engagement metrics', error=str(e))
 #         raise HTTPException(
 #             status_code=500,
 #             detail='Failed to retrieve engagement metrics',
@@ -364,7 +366,7 @@ async def get_leaderboard(
         )
         return await query_handler.handle_get_leaderboard(query)
     except Exception as e:
-        logger.error(f'Failed to fetch leaderboard: {e}')
+        logger.error('Failed to fetch leaderboard', error=str(e))
         raise HTTPException(
             status_code=500,
             detail='Failed to retrieve leaderboard',
