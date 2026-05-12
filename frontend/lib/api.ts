@@ -29,8 +29,8 @@ import { SlotTakenError } from "@/lib/appointments";
 /* ----------------------------------------------------------------------- */
 
 export const BackendInterventionStatusSchema = z.enum([
-  "none",
-  "notified",
+  "new",
+  "accepted",
   "booked",
   "sent",
   "supporting",
