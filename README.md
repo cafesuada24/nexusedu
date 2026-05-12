@@ -1,81 +1,160 @@
-# Starter Code App
+# NexusEdu: AI-Powered Student Support System
 
-A template for building AI Agents in Python.
+**NexusEdu** is a next-generation platform designed to empower academic advisors with AI-driven insights, automated workflows, and comprehensive student tracking. By bridging the gap between raw institutional data (SIS/LMS) and actionable interventions, NexusEdu ensures no student falls through the cracks.
 
-## Structure
+---
 
-```
+## Key Features
+
+### AI-Driven Intelligence
+- **Automated Case Analysis**: Utilizes specialized algorithms to identify at-risk students based on indicators such as low grades or high absenteeism rates.
+- **Smart Email Drafting**: Generates personalized, tone-aware intervention emails with PII masking for data security.
+- **Tone Evaluation**: Analyzes and refines advisor communications to ensure the most effective outreach.
+- **Deterministic Prompt Chains**: High-performance AI processing refactored from complex graph models for maximum reliability.
+
+### Advisor Workflow (Kanban)
+- **Centralized Alert Center**: Manage student cases through a responsive, localized (Vietnamese) Kanban board.
+- **Unified Student Profiles**: View academic history, engagement trends, and contact logs in a single, modal-driven interface.
+- **Real-time Synchronization**: Instant updates via WebSockets (Redis PubSub) when case statuses change.
+
+### Scheduling & Appointments
+- **Availability Management**: Advisors can manage working hours and time-off with automatic slot calculation.
+- **Conflict-Free Booking**: Students can book appointments through a public-facing portal with built-in conflict detection.
+
+### Gamification
+- **Point Ledger System**: Advisors earn points for successful student interventions and milestones.
+- **Leaderboard**: Track and reward top-performing advisors based on impact and engagement.
+
+---
+
+## Tech Stack
+
+### Frontend
+- **Framework**: [Next.js 16](https://nextjs.org/) (React 19, TypeScript)
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/), [Shadcn UI](https://ui.shadcn.com/)
+- **State Management**: [TanStack Query v5](https://tanstack.com/query)
+- **Charts**: [Recharts](https://recharts.org/)
+- **Real-time**: WebSockets (Redis PubSub)
+
+### Backend
+- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.12)
+- **Database**: [SQLite](https://www.sqlite.org/) (default local) / [PostgreSQL](https://www.postgresql.org/) (production ready)
+- **Analytics**: [DuckDB](https://duckdb.org/) for local ingestion and data analysis
+- **ORM**: [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
+- **Background Tasks**: [ARQ](https://github.com/samuelcolvin/arq) (Redis-backed)
+- **Migrations**: [Alembic](https://alembic.sqlalchemy.org/)
+- **Package Manager**: [uv](https://github.com/astral-sh/uv)
+
+### AI & Security
+- **Interfacing**: [BAML](https://www.boundaryml.com/)
+- **Security**: [Presidio](https://microsoft.github.io/presidio/) (PII Masking), JWT Authentication
+- **Models**: gemini-3.1-flash-lite
+
+---
+
+## Project Structure
+
+```bash
 ├── src/
-│   ├── agent.py        # Main agent loop
-│   ├── tools.py        # Tool definitions
-│   └── config.py       # Configuration
-├── scripts/
-│   ├── setup_hooks.sh  # One-time hook installer
-│   ├── log_hook.py     # AI tool hook handler
-│   └── submit_log.py   # Submits logs on git push
-├── requirements.txt
-├── .env.example
-├── AGENTS.md           # Rules for using AI coding agents
-├── JOURNAL.md          # Weekly journal — product journey & learnings
-└── WORKLOG.md          # Technical decisions, task assignments, brainstorming
+│   ├── application/    # CQRS Handlers, DTOs, and Interfaces
+│   ├── core/           # Configs, logging, and centralized constants
+│   ├── domain/         # Core entities, value objects, and exceptions (DDD)
+│   ├── infrastructure/ # Persistence, Redis, and external adapters
+│   ├── presentation/   # FastAPI entry points, schemas, and DI
+│   └── worker.py       # Background task processor (ARQ)
+├── frontend/
+│   ├── app/            # Next.js App Router (pages & actions)
+│   ├── components/     # Reusable UI components
+│   ├── hooks/          # React Query and specialized hooks
+│   ├── lib/            # Shared logic, API client, and constants
+│   ├── public/         # Static assets (logos, icons)
+│   └── styles/         # Global styles and Tailwind configuration
+├── scripts/            # CLI tools for dev (seeding, user creation)
+├── alembic/            # Database migration history
+├── data/               # Sample institutional datasets (SIS/LMS)
+├── docs/               # System architecture and product documentation
+├── JOURNAL.md          # Reconstructed 6-week project journey
+└── WORKLOG.md          # Technical decisions and task assignments
 ```
+
+---
 
 ## Getting Started
 
-### 1. Clone and setup
+### Prerequisites
+- Python 3.12+ (managed by `uv`)
+- Node.js 20+
+- Docker (required for Redis and Mailpit via `manage_app.sh`)
 
+### 1. Repository Setup
 ```bash
-git clone <repo-url>
-cd <repo>
+git clone https://github.com/a20-ai-thuc-chien/A20-App-007.git
+cd A20-App-007
 
-# Install git pre-push hook (required, run once)
-bash scripts/setup_hooks.sh
-```
+# Create a virtual environment with Python 3.12
+uv venv --python 3.12
 
-### 2. Configure environment
+# Activate the virtual environment
+source .venv/bin/active
 
-```bash
+# Install backend dependencies
+uv sync
+
+# Configure environment
 cp .env.example .env
 ```
 
-Open `.env` and fill in your `ANTHROPIC_API_KEY`. The `AI_LOG_*` variables are pre-filled.
-
-### 3. Run
-
+### 2. Database Initialization
 ```bash
-python -m venv venv
-source venv/bin/activate       # Linux/Mac
-# or: venv\Scripts\activate    # Windows
+# Initialize database schema and seed default users
+uv run alembic upgrade head
 
-pip install -r requirements.txt
-python -m src.agent
+# WARNING: This resets the database (deletes data/app.db) and seeds default accounts:
+# - Admin: dev@gmail.com / dev
+# - Advisor: adv@gmail.com / adv
+uv run scripts/reset.sh
 ```
 
-## Weekly Journal
+### 3. Frontend Setup
+```bash
+cd frontend
 
-Update **[JOURNAL.md](./JOURNAL.md)** at the end of every week to document your product-building journey:
+# Install project dependencies
+npm install
+```
 
-- Features shipped
-- AI tools used and how they helped
-- Hardest problem of the week and how you solved it
-- What you'd do differently
-- Plan for next week
+---
 
-> JOURNAL.md **must be updated** before each PR. It is your learning record for the course.
+## Running the Application
 
-## Worklog
+### Backend
+```bash
+# Start all backend services
+make start
 
-Update **[WORKLOG.md](./WORKLOG.md)** whenever your team makes a technical decision or changes direction:
+# Stop all services
+make stop
+```
 
-- **Technical decisions** — why did you choose this approach over alternatives?
-- **Task assignments** — who does what, by when
-- **Brainstorming** — options considered, pros/cons, conclusion
-- **Important bugs** — root cause and fix
+### Frontend
+```bash
+cd frontend
 
-See each file for the format and examples.
+# Start the development server
+npm run dev
+```
 
-## AI Logging
+---
 
-Prompts and tool calls are **automatically logged** when you use any supported AI tool (Claude Code, Cursor, Codex, Gemini, Copilot). No manual steps needed after running `setup_hooks.sh`.
+## Documentation
+- **[JOURNAL.md](./JOURNAL.md)**: Follow the product journey and weekly milestones.
+- **[WORKLOG.md](./WORKLOG.md)**: Review technical decisions (ADRs) and architectural changes.
+- **[Architecture](./docs/system_architecture.md)**: Deep dive into the DDD and CQRS implementation.
 
-See [AGENTS.md](./AGENTS.md) for details.
+---
+
+## Team
+- **Hồ Sỹ Minh Hà**: Backend & AI Lead
+- **Đặng Hồ Hải & Trịnh Đức An**: Frontend & UX Specialist
+
+---
