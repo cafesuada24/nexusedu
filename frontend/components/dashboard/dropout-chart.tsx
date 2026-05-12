@@ -20,7 +20,7 @@ export function DropoutChart() {
 
   if (isLoading) {
     return (
-      <div className="flex h-[280px] w-full items-center justify-center">
+      <div className="flex min-h-[300px] sm:h-[350px] w-full items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     )
@@ -28,7 +28,7 @@ export function DropoutChart() {
 
   if (error) {
     return (
-      <div className="flex h-[280px] w-full items-center justify-center text-sm text-destructive">
+      <div className="flex min-h-[300px] sm:h-[350px] w-full items-center justify-center text-sm text-destructive">
         Không thể tải dữ liệu biểu đồ.
       </div>
     )
@@ -36,23 +36,30 @@ export function DropoutChart() {
 
   if (!data || data.length === 0) {
     return (
-      <div className="flex h-[280px] w-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex min-h-[300px] sm:h-[350px] w-full items-center justify-center text-sm text-muted-foreground">
         Chưa có dữ liệu xu hướng.
       </div>
     )
   }
 
   return (
-    <ChartContainer config={config} className="h-[280px] w-full">
-      <LineChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
+    <ChartContainer config={config} className="min-h-[300px] sm:h-[350px] w-full">
+      <LineChart data={data} margin={{ top: 8, right: 8, left: 20, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
-        <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-        <YAxis
+        <XAxis
+          dataKey="month"
           tickLine={false}
           axisLine={false}
           tickMargin={8}
+          minTickGap={32}
+          tick={{ fontSize: 12 }}
+        />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          tickMargin={12}
           domain={[0, 100]}
-          width={32}
+          width={45}
           tickFormatter={(v) => `${v}%`}
         />
         <ChartTooltip content={<ChartTooltipContent />} />
