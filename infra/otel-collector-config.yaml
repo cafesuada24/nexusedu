@@ -34,7 +34,7 @@ connectors:
 
 exporters:
   otlp/jaeger:
-    endpoint: jaeger007:4317
+    endpoint: jaeger:4317
     tls:
       insecure: true
   prometheus:
@@ -42,7 +42,11 @@ exporters:
     resource_to_telemetry_conversion:
       enabled: true
 
+extensions:
+  health_check:
+
 service:
+  extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]
