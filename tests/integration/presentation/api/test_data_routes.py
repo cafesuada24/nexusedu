@@ -68,11 +68,11 @@ async def test_ingest_data_success(client: TestClient, test_db_session: AsyncSes
     assert res2.scalar_one_or_none() is not None
 
 
-async def test_ingest_ignore_duplicates(
+async def test_ingest_upsert_behavior(
     client: TestClient,
     test_db_session: AsyncSession,
 ) -> None:
-    """Verify that duplicate students (by SID) are ignored during ingestion."""
+    """Verify that duplicate students (by SID) are updated (upsert) during ingestion."""
     # 1. Ingest initial student
     initial_payload = {
         'batch_id': str(uuid4()),
@@ -103,8 +103,8 @@ async def test_ingest_ignore_duplicates(
                 'records': [
                     {
                         'sid': str(s1),
-                        'student_name': 'Duplicate Name',
-                        'email': 'duplicate@ex.com',
+                        'student_name': 'Updated Name',
+                        'email': 'updated@ex.com',
                     },
                 ],
             },
@@ -113,10 +113,9 @@ async def test_ingest_ignore_duplicates(
     resp2 = client.post('/api/v1/data/ingest', json=duplicate_payload)
     assert resp2.status_code == 200
 
-    # 3. Verify original data is preserved (Duplicate ignored)
+    # 3. Verify data is updated (Upsert)
     stmt = select(Student).where(Student.sid == s1)
     res = await test_db_session.execute(stmt)
     student = res.scalar_one()
-    assert student.student_name == 'Original Name'
-    assert student.email == 'original@ex.com'
-
+    assert student.student_name == 'Updated Name'
+    assert student.email == 'updated@ex.com'

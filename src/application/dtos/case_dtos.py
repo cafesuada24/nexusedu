@@ -162,6 +162,12 @@ class QueryAppointmentDTO(BaseModel):
     meeting_method: MeetingMethod
     notes: str | None
 
+class CaseOverviewDTO(BaseModel):
+    """DTO for AI-generated academic overview of a case."""
+
+    academic_summary: str
+    action_keys: list[str]
+
 class CaseDTO(BaseModel):
     """Schema for a student case."""
 
@@ -180,3 +186,4 @@ class CaseDTO(BaseModel):
 
     email: QueryEmailDTO | None
     appointment: QueryAppointmentDTO | None = None
+    ai_overview: CaseOverviewDTO | None = None

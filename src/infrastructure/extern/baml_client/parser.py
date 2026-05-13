@@ -35,6 +35,12 @@ class LlmResponseParser:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="EvaluateDraftTone", llm_response=llm_response, mode="request")
         return typing.cast(types.ToneEvaluation, __result__)
 
+    def GenerateCaseOverview(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> types.CaseOverview:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateCaseOverview", llm_response=llm_response, mode="request")
+        return typing.cast(types.CaseOverview, __result__)
+
     def GenerateDraftEmail(
         self, llm_response: str, baml_options: BamlCallOptions = {},
     ) -> types.EmailDraft:
@@ -84,6 +90,12 @@ class LlmStreamParser:
     ) -> types.ToneEvaluation:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="EvaluateDraftTone", llm_response=llm_response, mode="stream")
         return typing.cast(types.ToneEvaluation, __result__)
+
+    def GenerateCaseOverview(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> stream_types.CaseOverview:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateCaseOverview", llm_response=llm_response, mode="stream")
+        return typing.cast(stream_types.CaseOverview, __result__)
 
     def GenerateDraftEmail(
         self, llm_response: str, baml_options: BamlCallOptions = {},

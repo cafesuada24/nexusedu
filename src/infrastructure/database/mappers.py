@@ -211,6 +211,8 @@ class DataMapper:
             closed_at=orm_case.closed_at,
             assigned_at=orm_case.assigned_at,
             assigned_advisor_id=orm_case.assigned_advisor_id,
+            academic_summary=orm_case.academic_summary,
+            action_keys=orm_case.action_keys,
             version=orm_case.version,
             appointment=DataMapper.to_domain_appointment(orm_case.appointment)
             if orm_case.appointment
@@ -227,6 +229,8 @@ class DataMapper:
             created_at=domain_case.created_at,
             assigned_at=domain_case.assigned_at,
             closed_at=domain_case.closed_at,
+            academic_summary=domain_case.academic_summary,
+            action_keys=domain_case.action_keys,
             version=domain_case.version,
             assigned_advisor_id=domain_case.assigned_advisor_id,
             appointment=DataMapper.to_orm_appointment(domain_case.appointment)

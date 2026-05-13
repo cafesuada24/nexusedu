@@ -16,6 +16,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     LargeBinary,
     MetaData,
     String,
@@ -505,6 +506,8 @@ class Case(Base):
         default=None,
         index=True,
     )
+    academic_summary: Mapped[str | None] = mapped_column(Text)
+    action_keys: Mapped[list[str] | None] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         default=func.now(),

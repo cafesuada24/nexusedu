@@ -65,13 +65,13 @@ async def get_student(
         ) from e
 
 
-@router.get('/{sid}/metrics/terms', response_model=StudentTermMetricsDTO)
+@router.get('/{sid}/metrics/terms')
 async def get_student_term_metrics(
     sid: UUID,
     query_handler: Annotated[StudentQueryHandler, Depends(get_student_query_handler)],
     _: Annotated[User, Depends(require_scope(Scope.STUDENTS_READ))],
-    academic_year: int | None = Query(None, description='Filter by academic year.'),
-    semester: int | None = Query(None, description='Filter by semester.'),
+    academic_year: Annotated[int | None, Query(description='Filter by academic year.')] = None,
+    semester: Annotated[int | None, Query(description='Filter by semester.')] = None,
 ) -> StudentTermMetricsDTO:
     """Retrieve deep term metrics for a student, including course-level data."""
     try:

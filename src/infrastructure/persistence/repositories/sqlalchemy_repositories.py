@@ -23,6 +23,7 @@ from sqlalchemy import (
     text,
     update,
 )
+from uuid6 import uuid7
 
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
@@ -208,7 +209,7 @@ class SqlAlchemyActivityRepository:
                 week = record.get('week', '')
 
                 name = f'{sid}-{course_id}-{test_type}-{year}-{sem}-{week}'
-                record['activity_id'] = uuid.uuid5(LMS_ACTIVITY_NAMESPACE, name)
+                record['activity_id'] = uuid7(LMS_ACTIVITY_NAMESPACE, name)
             elif isinstance(record['activity_id'], str):
                 record['activity_id'] = uuid.UUID(record['activity_id'])
 
@@ -263,90 +264,6 @@ class SqlAlchemyActivityRepository:
         )
         res = await self.session.execute(stmt)
         return [dict(r._mapping) for r in res.all()]
-
-    async def get_student_term_metrics(
-        self,
-        sid: EntityID,
-        academic_year: int | None = None,
-        semester: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """Retrieve term-based metrics and course details for a student."""
-        # 1. Identify all terms for the student
-        term_stmt = (
-            select(
-                Activity.academic_year,
-                Activity.semester,
-            )
-            .where(Activity.sid == sid)
-            .distinct()
-        )
-        if academic_year:
-            term_stmt = term_stmt.where(Activity.academic_year == academic_year)
-        if semester:
-            term_stmt = term_stmt.where(Activity.semester == semester)
-
-        term_stmt = term_stmt.order_by(
-            Activity.academic_year.desc(),
-            Activity.semester.desc(),
-        )
-
-        terms_res = await self.session.execute(term_stmt)
-        terms = terms_res.all()
-
-        results = []
-        for t_yr, t_sem in terms:
-            # 2. Get term average
-            term_avg_stmt = select(func.avg(Activity.score)).where(
-                Activity.sid == sid,
-                Activity.academic_year == t_yr,
-                Activity.semester == t_sem,
-            )
-            term_avg = (await self.session.execute(term_avg_stmt)).scalar() or 0.0
-
-            # 3. Get previous terms average
-            prev_avg_stmt = select(func.avg(Activity.score)).where(
-                Activity.sid == sid,
-                (Activity.academic_year < t_yr)
-                | ((Activity.academic_year == t_yr) & (Activity.semester < t_sem)),
-            )
-            prev_avg = (await self.session.execute(prev_avg_stmt)).scalar()
-
-            # 4. Get courses in this term
-            courses_stmt = (
-                select(
-                    Activity.course_id,
-                    Activity.course_name,
-                    func.avg(Activity.score).label('avg_score'),
-                )
-                .where(
-                    Activity.sid == sid,
-                    Activity.academic_year == t_yr,
-                    Activity.semester == t_sem,
-                )
-                .group_by(Activity.course_id, Activity.course_name)
-            )
-            courses_res = await self.session.execute(courses_stmt)
-            courses = [
-                {
-                    'course_id': c.course_id,
-                    'course_name': c.course_name,
-                    'avg_score': c.avg_score,
-                }
-                for c in courses_res.all()
-            ]
-
-            results.append(
-                {
-                    'academic_year': t_yr,
-                    'semester': t_sem,
-                    'term_avg_score': term_avg,
-                    'previous_terms_avg_score': prev_avg,
-                    'courses': courses,
-                },
-            )
-
-        return results
-
 
 
 class SqlAlchemyStatusHistoryRepository:
@@ -759,6 +676,8 @@ class SqlAlchemyCaseRepository:
             created_at=case.created_at,
             assigned_at=case.assigned_at,
             closed_at=case.closed_at,
+            academic_summary=case.academic_summary,
+            action_keys=case.action_keys,
             version=case.version,
             assigned_advisor_id=case.assigned_advisor_id,
         )
@@ -798,6 +717,8 @@ class SqlAlchemyCaseRepository:
                 intervention_status=case.intervention_status,
                 assigned_at=case.assigned_at,
                 closed_at=case.closed_at,
+                academic_summary=case.academic_summary,
+                action_keys=case.action_keys,
                 version=case.version + 1,
             )
         )

@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, NonNegativeFloat
 
 from src.core.identifiers import EntityID
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
@@ -61,7 +62,7 @@ class TermCourseMetricsDTO(BaseModel):
 
     course_id: str
     course_name: str
-    avg_score: float
+    avg_score: NonNegativeFloat
 
 
 class TermMetricsDTO(BaseModel):

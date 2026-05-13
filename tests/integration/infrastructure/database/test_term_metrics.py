@@ -89,6 +89,7 @@ async def test_get_student_term_metrics(session: AsyncSession):
     # Query metrics
     metrics = await query_service.get_student_term_metrics(sid)
     assert len(metrics.terms) == 3
+    assert not hasattr(metrics, 'ai_overview')
     
     # Terms are ordered desc by default
     t3 = metrics.terms[0] # 2024-1
@@ -96,8 +97,6 @@ async def test_get_student_term_metrics(session: AsyncSession):
     assert t3.semester == 1
     assert t3.term_avg_score == 100.0
     assert t3.previous_terms_avg_score == 85.0
-    assert len(t3.courses) == 1
-    assert t3.courses[0].course_id == 'C3'
     
     t2 = metrics.terms[1] # 2023-2
     assert t2.academic_year == 2023

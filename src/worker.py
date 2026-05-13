@@ -11,6 +11,8 @@ from arq import cron
 from arq.connections import RedisSettings
 from opentelemetry import trace
 
+from sqlalchemy import select
+
 from src.application.commands.case_commands import (
     GenerateEmailDraftCommand,
     SubmitCaseReviewCommand,
@@ -19,8 +21,10 @@ from src.application.commands.schedule_commands import AddWorkingHoursCommand
 from src.core.config import config
 from src.core.container import Container
 from src.core.otel import setup_otel
-from src.domain.value_objects.status import JobStatus
+from src.domain.value_objects.status import InterventionStatus, JobStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
+from src.infrastructure.database.mappers import DataMapper
+from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.extern.baml_client.async_client import b
 
@@ -490,6 +494,63 @@ async def run_auto_resolve_case_task(
             logger.info('Worker: Case already finalized, skipping auto-resolve', case_id=str(case_id))
 
 
+async def run_batch_case_overviews_task(ctx: dict[str, Any]) -> None:
+    """Cron task to generate AI academic overviews for NEW cases."""
+    logger.info('Worker: Starting batch AI overview generation task')
+
+    async for session in get_async_session():
+        container = Container(session=session, redis_pool=ctx.get('redis'))
+        case_repo = container.case_repo
+        student_query_service = container.student_query_service
+
+        # 1. Fetch NEW cases that missing an AI overview
+        stmt = select(OrmCase).where(
+            OrmCase.intervention_status == InterventionStatus.NEW,
+            OrmCase.academic_summary.is_(None),
+        )
+        result = await session.execute(stmt)
+        orm_cases = list(result.scalars().all())
+
+        if not orm_cases:
+            logger.debug('Worker: No NEW cases without AI overview found.')
+            return
+
+        logger.info(f'Worker: Found {len(orm_cases)} NEW cases for AI overview generation.')
+
+        for orm_case in orm_cases:
+            try:
+                # 2. Fetch student metrics to provide context to AI
+                metrics = await student_query_service.get_student_term_metrics(sid=orm_case.sid)
+
+                # 3. Generate overview via BAML Gemini 3.1 Flash Lite
+                # Simple serialization for context
+                metrics_context = metrics.model_dump_json()
+
+                overview = await b.GenerateCaseOverview(performance_data=metrics_context)
+
+                # 4. Update the case domain entity (enforces max 3 action keys)
+                case_domain = DataMapper.to_domain_case(orm_case)
+                case_domain.set_ai_overview(
+                    summary=overview.academic_summary,
+                    keys=overview.action_keys,
+                )
+
+                # 5. Persist the change
+                await case_repo.save(case_domain)
+                logger.info('Worker: AI overview generated for case', case_id=str(orm_case.case_id))
+
+            except Exception as e:
+                logger.error(
+                    'Worker: AI overview generation failed for case',
+                    case_id=str(orm_case.case_id),
+                    error=str(e),
+                )
+                continue
+
+        await session.commit()
+    logger.info('Worker: Finished batch AI overview generation task')
+
+
 async def run_outbox_poller_task(ctx: dict[str, Any]) -> None:
     """Cron task to poll the transactional outbox and dispatch to ARQ."""
     with tracer.start_as_current_span('cron.outbox_poller'):
@@ -558,6 +619,7 @@ class WorkerSettings:
         run_case_failed_task,
         run_case_review_requested_task,
         run_auto_resolve_case_task,
+        run_batch_case_overviews_task,
         run_outbox_poller_task,
         run_advisor_created_task,
     ]

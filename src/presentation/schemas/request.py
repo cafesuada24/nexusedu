@@ -48,6 +48,7 @@ class SISRecord(BaseModel):
         description='Current risk status.',
     )
     last_notified_timestamp: AwareDatetime | None = Field(
+        default=None,
         description='Timestamp of last nudge.',
     )
     last_notified_satisfaction: int | None = Field(
