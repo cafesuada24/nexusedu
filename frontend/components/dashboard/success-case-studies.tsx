@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Quote,
   TrendingUp,
+  XCircle,
   type LucideIcon,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -35,12 +36,13 @@ type MiniStat = {
   icon: LucideIcon
   value: string
   label: string
-  tone: "success" | "primary"
+  tone: "success" | "primary" | "destructive" | "warning"
 }
 
 const MINI_STATS: MiniStat[] = [
   { icon: Mail, value: "89%", label: "Phản hồi <24h", tone: "success" },
-  { icon: CheckCircle2, value: "23", label: "Đã đóng", tone: "success" },
+  { icon: CheckCircle2, value: "18", label: "Thành công", tone: "success" },
+  { icon: XCircle, value: "5", label: "Thất bại", tone: "destructive" },
 ]
 
 export function ImpactHero() {
@@ -108,9 +110,19 @@ export function ImpactHero() {
             const tint =
               s.tone === "success"
                 ? "bg-success/10 text-success"
+                : s.tone === "destructive"
+                ? "bg-destructive/10 text-destructive"
+                : s.tone === "warning"
+                ? "bg-warning/10 text-warning"
                 : "bg-primary/10 text-primary"
             const valueTone =
-              s.tone === "success" ? "text-success" : "text-primary"
+              s.tone === "success"
+                ? "text-success"
+                : s.tone === "destructive"
+                ? "text-destructive"
+                : s.tone === "warning"
+                ? "text-warning"
+                : "text-primary"
             return (
               <li
                 key={s.label}
