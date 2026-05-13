@@ -10,7 +10,9 @@ from src.application.dtos.pagination import PagedResponse
 from src.application.dtos.student_dtos import (
     GetAllStudentsQuery,
     GetStudentQuery,
+    GetStudentTermMetricsQuery,
     StudentDTO,
+    StudentTermMetricsDTO,
 )
 from src.application.queries.student_queries import StudentQueryHandler
 from src.presentation.api.auth import Scope, User, require_scope
@@ -60,4 +62,28 @@ async def get_student(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail='An unexpected error occurred while fetching student details.',
+        ) from e
+
+
+@router.get('/{sid}/metrics/terms', response_model=StudentTermMetricsDTO)
+async def get_student_term_metrics(
+    sid: UUID,
+    query_handler: Annotated[StudentQueryHandler, Depends(get_student_query_handler)],
+    _: Annotated[User, Depends(require_scope(Scope.STUDENTS_READ))],
+    academic_year: int | None = Query(None, description='Filter by academic year.'),
+    semester: int | None = Query(None, description='Filter by semester.'),
+) -> StudentTermMetricsDTO:
+    """Retrieve deep term metrics for a student, including course-level data."""
+    try:
+        query = GetStudentTermMetricsQuery(
+            sid=sid,
+            academic_year=academic_year,
+            semester=semester,
+        )
+        return await query_handler.handle_get_student_term_metrics(query)
+    except Exception as e:
+        logger.error('Error fetching student term metrics', error=str(e), exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail='An unexpected error occurred while fetching term metrics.',
         ) from e
