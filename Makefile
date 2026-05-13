@@ -1,14 +1,21 @@
-.PHONY: generate_baml test lint start stop restart
+.PHONY: generate_baml test lint start stop restart logs migrate makemigrations
 
 start:
-	./scripts/manage_app.sh start
+	docker compose up --build -d
 
 stop:
-	./scripts/manage_app.sh stop
+	docker compose down
 
 restart: stop start
 
-run_dev: start
+logs:
+	docker compose logs -f
+
+migrate:
+	docker compose exec api alembic upgrade head
+
+makemigrations:
+	docker compose exec api alembic revision --autogenerate -m "$(m)"
 
 test:
 	PYTHONPATH=. uv run pytest tests/ -v
@@ -18,8 +25,5 @@ generate_baml:
 
 lint:
 	uv run ruff check src/ --exclude ./src/infrastructure/extern/baml_client/ --fix
-
-run_redis:
-	docker run -d --name arppool007 -p 6379:6379 redis
 
 
