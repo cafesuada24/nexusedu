@@ -3,19 +3,19 @@
 import os
 from typing import Annotated, Literal
 
+from dotenv import load_dotenv
 from pydantic import AnyHttpUrl, Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# from dotenv import load_dotenv
-# load_dotenv()
+load_dotenv()
 
 
 class AppConfig(BaseSettings):
     """Application config."""
 
     model_config = SettingsConfigDict(
-        env_file='.env',
-        env_file_encoding='utf-8',
+        # env_file='.env',
+        # env_file_encoding='utf-8',
         extra='ignore',
     )
 
@@ -47,7 +47,7 @@ class DevConfig(AppConfig):
     environment: Literal['production', 'development', 'test'] = 'development'
     log_level: Literal['INFO', 'WARNING', 'ERROR', 'DEBUG'] = 'DEBUG'
     jwt_secret: str = 'SET_ME_IN_PRODUCTION_HEHEHE'
-    database_url: str = 'sqlite+aiosqlite:///./data/app.db'
+    database_url: str = 'postgresql+psycopg://myuser:mypassword@localhost:5432/a20app'
     db_ingest_chunk_size: PositiveInt = 50
     worker_max_jobs: PositiveInt = 5
     worker_job_timeout_sec: PositiveInt = 60
