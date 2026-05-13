@@ -9,6 +9,7 @@ import jwt
 import structlog
 from arq import cron
 from arq.connections import RedisSettings
+from opentelemetry import trace
 
 from src.application.commands.case_commands import (
     GenerateEmailDraftCommand,
@@ -23,7 +24,7 @@ from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 from src.infrastructure.database.session import get_async_session
 
 logger = structlog.get_logger(__name__)
-
+tracer = trace.get_tracer(__name__)
 
 
 async def on_startup(_ctx: dict[str, Any]) -> None:
@@ -470,9 +471,10 @@ async def run_auto_resolve_case_task(
 
 async def run_outbox_poller_task(ctx: dict[str, Any]) -> None:
     """Cron task to poll the transactional outbox and dispatch to ARQ."""
-    async for session in get_async_session():
-        container = Container(session=session, redis_pool=ctx.get('redis'))
-        await container.outbox_processor.process_pending_events()
+    with tracer.start_as_current_span('cron.outbox_poller'):
+        async for session in get_async_session():
+            container = Container(session=session, redis_pool=ctx.get('redis'))
+            await container.outbox_processor.process_pending_events()
         # session.commit() is automatically handled by get_async_session()
 
 
