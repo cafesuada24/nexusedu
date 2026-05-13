@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.pagination import PagedResponse, PaginationMetadata
 from src.application.dtos.student_dtos import (
-    CaseOverviewDTO,
     StudentDTO,
     StudentTermMetricsDTO,
     TermCourseMetricsDTO,
@@ -25,36 +24,6 @@ class SqlAlchemyStudentQueryService:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
-
-    async def _get_active_case_overview(self, sid: UUID) -> CaseOverviewDTO | None:
-        """Helper to fetch AI overview from the student's latest active case."""
-        stmt = (
-            select(OrmCase.academic_summary, OrmCase.action_keys)
-            .where(
-                OrmCase.sid == sid,
-                OrmCase.intervention_status.in_(
-                    [
-                        InterventionStatus.NEW,
-                        InterventionStatus.ACCEPTED,
-                        InterventionStatus.SENT,
-                        InterventionStatus.BOOKED,
-                        InterventionStatus.SUPPORTING,
-                        InterventionStatus.PENDING_REVIEW,
-                    ],
-                ),
-            )
-            .order_by(OrmCase.created_at.desc())
-            .limit(1)
-        )
-        result = await self.session.execute(stmt)
-        row = result.first()
-
-        if row and row.academic_summary:
-            return CaseOverviewDTO(
-                academic_summary=row.academic_summary,
-                action_keys=row.action_keys or [],
-            )
-        return None
 
     async def get_all_students(
         self,
@@ -279,10 +248,7 @@ class SqlAlchemyStudentQueryService:
             for m in term_metrics_rows
         ]
 
-        ai_overview = await self._get_active_case_overview(sid)
-
         return StudentTermMetricsDTO(
             sid=sid,
             terms=term_dtos,
-            ai_overview=ai_overview,
         )

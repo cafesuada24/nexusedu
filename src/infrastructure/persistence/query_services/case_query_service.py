@@ -5,7 +5,12 @@ from uuid import UUID
 from sqlalchemy import Select, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.application.dtos.case_dtos import CaseDTO, QueryAppointmentDTO, QueryEmailDTO
+from src.application.dtos.case_dtos import (
+    CaseDTO,
+    CaseOverviewDTO,
+    QueryAppointmentDTO,
+    QueryEmailDTO,
+)
 from src.application.dtos.pagination import PagedResponse, PaginationMetadata
 from src.domain.services.gamification import GamificationService
 from src.domain.value_objects.status import (
@@ -72,6 +77,8 @@ class SqlAlchemyCaseQueryService:
                 OrmCase.created_at,
                 OrmCase.assigned_advisor_id,
                 OrmCase.intervention_status,
+                OrmCase.academic_summary,
+                OrmCase.action_keys,
                 OrmAdvisor.name.label('assigned_to'),
                 OrmStudent.student_name,
                 OrmStudent.major,
@@ -160,6 +167,12 @@ class SqlAlchemyCaseQueryService:
                         notes=row['notes'],
                     )
                     if row['appointment_time']
+                    else None,
+                    ai_overview=CaseOverviewDTO(
+                        academic_summary=row['academic_summary'],
+                        action_keys=row['action_keys'] or [],
+                    )
+                    if row['academic_summary']
                     else None,
                 ),
             )

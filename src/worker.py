@@ -501,7 +501,7 @@ async def run_batch_case_overviews_task(ctx: dict[str, Any]) -> None:
     async for session in get_async_session():
         container = Container(session=session, redis_pool=ctx.get('redis'))
         case_repo = container.case_repo
-        student_query_service = container.get_student_query_service()
+        student_query_service = container.student_query_service
 
         # 1. Fetch NEW cases that missing an AI overview
         stmt = select(OrmCase).where(

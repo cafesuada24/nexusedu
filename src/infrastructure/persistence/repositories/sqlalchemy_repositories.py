@@ -23,6 +23,7 @@ from sqlalchemy import (
     text,
     update,
 )
+from uuid6 import uuid7
 
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
@@ -208,7 +209,7 @@ class SqlAlchemyActivityRepository:
                 week = record.get('week', '')
 
                 name = f'{sid}-{course_id}-{test_type}-{year}-{sem}-{week}'
-                record['activity_id'] = uuid.uuid5(LMS_ACTIVITY_NAMESPACE, name)
+                record['activity_id'] = uuid7(LMS_ACTIVITY_NAMESPACE, name)
             elif isinstance(record['activity_id'], str):
                 record['activity_id'] = uuid.UUID(record['activity_id'])
 
