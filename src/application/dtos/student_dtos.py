@@ -74,8 +74,16 @@ class TermMetricsDTO(BaseModel):
     courses: list[TermCourseMetricsDTO]
 
 
+class CaseOverviewDTO(BaseModel):
+    """DTO for AI-generated academic overview of a case."""
+
+    academic_summary: str
+    action_keys: list[str]
+
+
 class StudentTermMetricsDTO(BaseModel):
     """DTO for student term metrics response."""
 
     sid: EntityID
     terms: list[TermMetricsDTO]
+    ai_overview: CaseOverviewDTO | None = None
