@@ -13,6 +13,7 @@ import { type StudentRow } from "@/lib/csv";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { X, Calendar, MapPin, MessageSquareText } from "lucide-react";
+import { useStudent } from "@/hooks/use-student-query";
 
 type StudentDetailModalProps = {
     open: boolean;
@@ -31,23 +32,20 @@ const severityTone: Record<Alert["severity"], string> = {
     medium: "bg-warning/15 text-warning ring-warning/25",
 };
 
-function formatUnix(seconds: number | null): string {
-    if (!seconds) return "Chưa có";
-    return new Date(seconds * 1000).toLocaleString("vi-VN");
-}
-
 export const StudentDetailModal = React.memo(function StudentDetailModal({
     open,
     onOpenChange,
     alert,
     studentProfile,
 }: StudentDetailModalProps) {
+    const { data: student, isLoading } = useStudent(alert?.id || undefined, open);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent showCloseButton={false} className="max-w-4xl overflow-hidden rounded-xl border-border/60 bg-background p-0 shadow-2xl">
                 <DialogHeader className="flex flex-row items-center justify-between border-b border-border/60 p-6 pb-6 bg-white">
                     <DialogTitle className="text-2xl font-bold tracking-tight text-slate-900">
-                        {alert ? alert.name : "Hồ sơ sinh viên"}
+                        {student?.student_name || alert?.name || "Hồ sơ sinh viên"}
                     </DialogTitle>
                     <div className="flex items-center gap-6">
                         {alert && (
@@ -93,15 +91,23 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                     </div>
                                     <div className="grid grid-cols-[30%_1fr] items-center border-b border-border/10 pb-4">
                                         <span className="text-gray-500">Địa chỉ Email</span>
-                                        <span className="font-medium text-gray-900 text-right">{alert.email || "—"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-[30%_1fr] items-center border-b border-border/10 pb-4">
-                                        <span className="text-gray-500">Năm học hiện tại</span>
-                                        <span className="font-medium text-gray-900 text-right">{studentProfile?.academicYear ?? "—"}</span>
+                                        <span className="font-medium text-gray-900 text-right">
+                                            {isLoading ? (
+                                                <div className="h-4 w-32 bg-slate-100 animate-pulse rounded ml-auto" />
+                                            ) : (
+                                                student?.email || alert.email || "—"
+                                            )}
+                                        </span>
                                     </div>
                                     <div className="grid grid-cols-[30%_1fr] items-center">
-                                        <span className="text-gray-500">Lần liên hệ gần nhất</span>
-                                        <span className="font-medium text-gray-900 text-right">{formatUnix(studentProfile?.lastContactedAt ?? null)}</span>
+                                        <span className="text-gray-500">Chuyên ngành</span>
+                                        <span className="font-medium text-gray-900 text-right">
+                                            {isLoading ? (
+                                                <div className="h-4 w-24 bg-slate-100 animate-pulse rounded ml-auto" />
+                                            ) : (
+                                                student?.major || "—"
+                                            )}
+                                        </span>
                                     </div>
                                 </div>
                             </section>
