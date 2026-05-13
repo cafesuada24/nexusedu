@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import cast, desc, func, select, Double
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.pagination import PagedResponse, PaginationMetadata
@@ -182,79 +182,102 @@ class SqlAlchemyStudentQueryService:
         semester: int | None = None,
     ) -> StudentTermMetricsDTO:
         """Retrieve term-based metrics and course details for a student."""
-        # 1. Identify all terms for the student
-        term_stmt = (
+        # 1. Term-level aggregation with window functions for previous averages
+        # Subquery to aggregate by term first
+        term_agg = (
             select(
                 Activity.academic_year,
                 Activity.semester,
+                func.avg(Activity.score).label('term_avg'),
+                func.sum(Activity.score).label('term_sum'),
+                func.count(Activity.score).label('term_cnt'),
             )
             .where(Activity.sid == sid)
-            .distinct()
+            .group_by(Activity.academic_year, Activity.semester)
+            .cte('term_agg')
+        )
+
+        # Window functions for cumulative previous sum and count
+        prev_sum = func.sum(term_agg.c.term_sum).over(
+            order_by=[term_agg.c.academic_year, term_agg.c.semester],
+            rows=(None, -1),  # UNBOUNDED PRECEDING AND 1 PRECEDING
+        )
+        prev_cnt = func.sum(term_agg.c.term_cnt).over(
+            order_by=[term_agg.c.academic_year, term_agg.c.semester],
+            rows=(None, -1),
+        )
+
+        metrics_stmt = select(
+            term_agg.c.academic_year,
+            term_agg.c.semester,
+            term_agg.c.term_avg,
+            (prev_sum / cast(prev_cnt, Double)).label('prev_avg'),
+        )
+
+        if academic_year:
+            metrics_stmt = metrics_stmt.where(term_agg.c.academic_year == academic_year)
+        if semester:
+            metrics_stmt = metrics_stmt.where(term_agg.c.semester == semester)
+
+        metrics_stmt = metrics_stmt.order_by(
+            term_agg.c.academic_year.desc(),
+            term_agg.c.semester.desc(),
+        )
+
+        metrics_res = await self.session.execute(metrics_stmt)
+        term_metrics_rows = metrics_res.all()
+
+        # 2. Get course metrics for all relevant terms in one query
+        courses_stmt = (
+            select(
+                Activity.academic_year,
+                Activity.semester,
+                Activity.course_id,
+                Activity.course_name,
+                func.avg(Activity.score).label('avg_score'),
+            )
+            .where(Activity.sid == sid)
         )
         if academic_year:
-            term_stmt = term_stmt.where(Activity.academic_year == academic_year)
+            courses_stmt = courses_stmt.where(Activity.academic_year == academic_year)
         if semester:
-            term_stmt = term_stmt.where(Activity.semester == semester)
+            courses_stmt = courses_stmt.where(Activity.semester == semester)
 
-        term_stmt = term_stmt.order_by(
-            Activity.academic_year.desc(),
-            Activity.semester.desc(),
+        courses_stmt = courses_stmt.group_by(
+            Activity.academic_year,
+            Activity.semester,
+            Activity.course_id,
+            Activity.course_name,
         )
 
-        terms_res = await self.session.execute(term_stmt)
-        terms = terms_res.all()
+        courses_res = await self.session.execute(courses_stmt)
+        course_rows = courses_res.all()
 
-        term_dtos: list[TermMetricsDTO] = []
-        for t_yr, t_sem in terms:
-            # 2. Get term average
-            term_avg_stmt = select(func.avg(Activity.score)).where(
-                Activity.sid == sid,
-                Activity.academic_year == t_yr,
-                Activity.semester == t_sem,
-            )
-            term_avg = (await self.session.execute(term_avg_stmt)).scalar() or 0.0
-
-            # 3. Get previous terms average
-            prev_avg_stmt = select(func.avg(Activity.score)).where(
-                Activity.sid == sid,
-                (Activity.academic_year < t_yr)
-                | ((Activity.academic_year == t_yr) & (Activity.semester < t_sem)),
-            )
-            prev_avg = (await self.session.execute(prev_avg_stmt)).scalar()
-
-            # 4. Get courses in this term
-            courses_stmt = (
-                select(
-                    Activity.course_id,
-                    Activity.course_name,
-                    func.avg(Activity.score).label('avg_score'),
-                )
-                .where(
-                    Activity.sid == sid,
-                    Activity.academic_year == t_yr,
-                    Activity.semester == t_sem,
-                )
-                .group_by(Activity.course_id, Activity.course_name)
-            )
-            courses_res = await self.session.execute(courses_stmt)
-            course_dtos = [
+        # Group courses by term for easy lookup
+        courses_by_term: dict[tuple[int, int], list[TermCourseMetricsDTO]] = {}
+        for c in course_rows:
+            key = (c.academic_year, c.semester)
+            if key not in courses_by_term:
+                courses_by_term[key] = []
+            courses_by_term[key].append(
                 TermCourseMetricsDTO(
                     course_id=c.course_id,
                     course_name=c.course_name,
                     avg_score=c.avg_score,
-                )
-                for c in courses_res.all()
-            ]
-
-            term_dtos.append(
-                TermMetricsDTO(
-                    academic_year=t_yr,
-                    semester=t_sem,
-                    term_avg_score=term_avg,
-                    previous_terms_avg_score=prev_avg,
-                    courses=course_dtos,
                 ),
             )
+
+        # Assemble DTOs
+        term_dtos: list[TermMetricsDTO] = [
+            TermMetricsDTO(
+                academic_year=m.academic_year,
+                semester=m.semester,
+                term_avg_score=m.term_avg,
+                previous_terms_avg_score=m.prev_avg,
+                courses=courses_by_term.get((m.academic_year, m.semester), []),
+            )
+            for m in term_metrics_rows
+        ]
 
         ai_overview = await self._get_active_case_overview(sid)
 
