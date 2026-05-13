@@ -69,12 +69,14 @@ export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
   let draft_subject = null;
   let draft_body = null;
   let draft_status = null;
+  let sent_at = null;
 
   if (data.email && typeof data.email === "object") {
     emailStr = data.email.recipent || data.email.recipient || "";
     draft_subject = data.email.subject || null;
     draft_body = data.email.body || null;
     draft_status = data.email.status || null;
+    sent_at = data.email.sent_at || null;
   } else if (typeof data.email === "string") {
     emailStr = data.email;
   }
@@ -85,6 +87,7 @@ export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
     draft_subject,
     draft_body,
     draft_status,
+    sent_at,
     points_reward: 0,
     appointment: data.appointment || null,
   };
