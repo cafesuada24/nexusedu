@@ -57,7 +57,8 @@ class ZScore:
         )
 
         logger.info(
-            f'ZScore: Calculation completed. Found {len(new_history_records)} new anomalies.',
+            'ZScore: Calculation completed',
+            anomaly_count=len(new_history_records),
         )
         return new_history_records, risk_statuses
 
