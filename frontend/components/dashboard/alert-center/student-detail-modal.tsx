@@ -142,7 +142,7 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                 {/* Left Column (4/10): SIS Profile */}
                                 <div className="col-span-4 flex flex-col gap-6">
                                     <section className="flex flex-col h-full rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                                        <div className="mb-4 flex items-center justify-between">
+                                        <div className="mb-6 flex items-center justify-between">
                                             <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600">
                                                 SIS Profile
                                             </h4>
@@ -153,41 +153,43 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                                 Cơ bản
                                             </Badge>
                                         </div>
-                                        <div className="flex flex-col gap-2 text-sm">
-                                            <div className="flex items-baseline border-b border-slate-50 pb-2">
-                                                <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
-                                                    Mã số sinh viên
-                                                </span>
-                                                <span className="font-mono font-semibold text-slate-900">
-                                                    {alert.mssv}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-baseline border-b border-slate-50 pb-2">
-                                                <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
-                                                    Địa chỉ Email
-                                                </span>
-                                                <span className="font-semibold text-slate-900 truncate">
-                                                    {isLoading ? (
-                                                        <div className="h-4 w-32 bg-slate-100 animate-pulse rounded" />
-                                                    ) : (
-                                                        student?.email ||
-                                                        alert.email ||
-                                                        "—"
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-baseline">
-                                                <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
-                                                    Chuyên ngành
-                                                </span>
-                                                <span className="font-semibold text-slate-900">
-                                                    {isLoading ? (
-                                                        <div className="h-4 w-24 bg-slate-100 animate-pulse rounded" />
-                                                    ) : (
-                                                        student?.major ||
-                                                        "Công nghệ Thông tin"
-                                                    )}
-                                                </span>
+                                        <div className="overflow-hidden rounded-lg border border-slate-100">
+                                            <div className="flex flex-col divide-y divide-slate-50 text-sm">
+                                                <div className="flex items-center px-4 py-3">
+                                                    <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
+                                                        Mã số sinh viên
+                                                    </span>
+                                                    <span className="font-mono font-semibold text-slate-900">
+                                                        {alert.mssv}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center px-4 py-3">
+                                                    <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
+                                                        Địa chỉ Email
+                                                    </span>
+                                                    <span className="font-semibold text-slate-900 truncate">
+                                                        {isLoading ? (
+                                                            <div className="h-4 w-32 bg-slate-100 animate-pulse rounded" />
+                                                        ) : (
+                                                            student?.email ||
+                                                            alert.email ||
+                                                            "—"
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center px-4 py-3">
+                                                    <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
+                                                        Chuyên ngành
+                                                    </span>
+                                                    <span className="font-semibold text-slate-900">
+                                                        {isLoading ? (
+                                                            <div className="h-4 w-24 bg-slate-100 animate-pulse rounded" />
+                                                        ) : (
+                                                            student?.major ||
+                                                            "Công nghệ Thông tin"
+                                                        )}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     </section>
