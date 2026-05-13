@@ -48,22 +48,22 @@ export default function OverviewPage() {
                   Full Reports
                 </Link>
               </Button>
+              <Button asChild size="sm" className="rounded-xl">
+                <Link href="/dashboard/import">
+                  <Upload className="size-4" />
+                  Nhập CSV
+                </Link>
+              </Button>
               <Badge variant="outline" className="rounded-xl border-primary/20 bg-primary/5 px-3 py-1 text-primary">
                 HK2 · 2025–2026
               </Badge>
             </>
           ) : (
             <>
-              <Button asChild variant="outline" size="sm" className="rounded-xl">
-                <Link href="/dashboard/alerts" aria-label="Cảnh báo">
+              <Button asChild variant="destructive" size="sm" className="rounded-xl bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/20 ring-red-500/50 border-none">
+                <Link href="/dashboard/alerts" aria-label="Cảnh báo" className="flex items-center gap-2">
                   <BellRing className="size-4" />
                   Cảnh báo
-                </Link>
-              </Button>
-              <Button asChild size="sm" className="rounded-xl">
-                <Link href="/dashboard/import">
-                  <Upload className="size-4" />
-                  Nhập CSV
                 </Link>
               </Button>
             </>
