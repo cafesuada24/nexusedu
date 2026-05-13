@@ -10,7 +10,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-import core.config
+import src.core.config
 from src.core.logger import logger
 
 
