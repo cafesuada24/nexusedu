@@ -155,6 +155,15 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - nexusedu-net
+    restart: unless-stopped
+
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
