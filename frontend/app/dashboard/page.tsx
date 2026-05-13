@@ -54,9 +54,6 @@ export default function OverviewPage() {
                   Nhập CSV
                 </Link>
               </Button>
-              <Badge variant="outline" className="rounded-xl border-primary/20 bg-primary/5 px-3 py-1 text-primary">
-                HK2 · 2025–2026
-              </Badge>
             </>
           ) : (
             <>

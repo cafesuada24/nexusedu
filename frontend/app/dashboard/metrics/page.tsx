@@ -117,9 +117,6 @@ export default function MetricsPage() {
             Báo cáo BGH
           </h1>
         </div>
-        <Badge variant="outline" className="rounded-md font-mono text-[11px]">
-          HK2 · 2025–2026
-        </Badge>
       </div>
 
       {/* KPI tiles */}
