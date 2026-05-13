@@ -42,6 +42,27 @@ export const BackendInterventionStatusSchema = z.enum([
 export type BackendInterventionStatus = z.infer<
   typeof BackendInterventionStatusSchema
 >;
+
+export const RiskStatusSchema = z.enum([
+  "Normal",
+  "Elevated",
+  "Critical",
+  "Unknown",
+]);
+export type RiskStatus = z.infer<typeof RiskStatusSchema>;
+
+export const StudentDTOSchema = z.object({
+  sid: z.string(),
+  student_name: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  major: z.string(),
+  current_risk_status: RiskStatusSchema,
+  intervention_status: BackendInterventionStatusSchema.nullable().optional(),
+  last_notified_at: z.string().nullable().optional(),
+  is_generating: z.boolean().default(false),
+  active_case_id: z.string().nullable().optional(),
+});
+export type StudentDTO = z.infer<typeof StudentDTOSchema>;
 export const AppointmentSchema = z.object({
   appointment_time: z.string(),
   duration_minutes: z.number(),
@@ -1056,6 +1077,18 @@ export async function fetchCaseDetails(
     { method: "GET" },
     CaseDetailsResponseSchema,
     "Không thể lấy chi tiết case",
+  );
+}
+
+/**
+ * GET /students/{sid} — returns details for a specific student.
+ */
+export async function fetchStudent(sid: string): Promise<StudentDTO> {
+  return apiCall(
+    endpoint(`/students/${encodeURIComponent(sid)}`),
+    { method: "GET" },
+    StudentDTOSchema,
+    "Không thể lấy thông tin sinh viên",
   );
 }
 
