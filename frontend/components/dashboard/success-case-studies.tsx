@@ -27,10 +27,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useAlerts } from "@/hooks/use-alerts"
 import { cn } from "@/lib/utils"
-
-const STUDENTS_HELPED = 47
-const PERIOD_TOTAL = 50
 
 type MiniStat = {
   icon: LucideIcon
@@ -39,16 +37,36 @@ type MiniStat = {
   tone: "success" | "primary" | "destructive" | "warning"
 }
 
-const MINI_STATS: MiniStat[] = [
-  { icon: Mail, value: "89%", label: "Phản hồi <24h", tone: "success" },
-  { icon: CheckCircle2, value: "18", label: "Thành công", tone: "success" },
-  { icon: XCircle, value: "5", label: "Thất bại", tone: "destructive" },
-]
-
 export function ImpactHero() {
+  const { data: alerts = [] } = useAlerts()
+
+  const successCount = alerts.filter(
+    (a) => a.intervention_status === "resolved",
+  ).length
+  const failedCount = alerts.filter(
+    (a) => a.intervention_status === "failed",
+  ).length
+  const totalCount = alerts.length || 1
+
+  const stats: MiniStat[] = [
+    { icon: Mail, value: "89%", label: "Phản hồi <24h", tone: "success" },
+    {
+      icon: CheckCircle2,
+      value: String(successCount),
+      label: "Thành công",
+      tone: "success",
+    },
+    {
+      icon: XCircle,
+      value: String(failedCount),
+      label: "Thất bại",
+      tone: "destructive",
+    },
+  ]
+
   const progress = Math.min(
     100,
-    Math.round((STUDENTS_HELPED / PERIOD_TOTAL) * 100),
+    Math.round((successCount / totalCount) * 100),
   )
 
   return (
@@ -65,10 +83,10 @@ export function ImpactHero() {
 
           <div className="flex items-baseline gap-2">
             <span className="font-serif text-6xl font-bold tabular-nums text-success">
-              {STUDENTS_HELPED}
+              {successCount}
             </span>
             <span className="text-sm text-muted-foreground">
-              / {PERIOD_TOTAL} SV
+              / {totalCount} SV
             </span>
           </div>
 
@@ -89,7 +107,7 @@ export function ImpactHero() {
             <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium">
               <span className="font-mono text-success">{progress}%</span>
               <span className="text-muted-foreground">
-                {STUDENTS_HELPED}/{PERIOD_TOTAL}
+                {successCount}/{totalCount}
               </span>
             </div>
           </div>
@@ -105,7 +123,7 @@ export function ImpactHero() {
 
         {/* Mini stats — icons + numbers only */}
         <ul role="list" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-          {MINI_STATS.map((s) => {
+          {stats.map((s) => {
             const Icon = s.icon
             const tint =
               s.tone === "success"
