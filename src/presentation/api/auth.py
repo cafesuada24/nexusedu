@@ -77,6 +77,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[Scope]] = {
         Scope.ALERTS_READ,
         Scope.ALERTS_WRITE,
         Scope.ADVISORS_READ,
+        Scope.ADVISORS_WRITE,
         Scope.JOBS_READ,
         Scope.QUERY_EXECUTE,
         Scope.CASE_ACCEPT,
