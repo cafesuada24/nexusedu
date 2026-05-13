@@ -9,8 +9,8 @@ import {
   Mail,
   MessageSquare,
   Quote,
-  Timer,
   TrendingUp,
+  XCircle,
   type LucideIcon,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -27,28 +27,43 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useAlerts } from "@/hooks/use-alerts"
 import { cn } from "@/lib/utils"
-
-const STUDENTS_HELPED = 47
-const PERIOD_TOTAL = 50
 
 type MiniStat = {
   icon: LucideIcon
   value: string
   label: string
-  tone: "success" | "primary"
+  tone: "success" | "primary" | "destructive" | "warning"
 }
 
-const MINI_STATS: MiniStat[] = [
-  { icon: Timer, value: "12h", label: "Tiết kiệm", tone: "primary" },
-  { icon: Mail, value: "89%", label: "Phản hồi <24h", tone: "success" },
-  { icon: CheckCircle2, value: "23", label: "Đã đóng", tone: "success" },
-]
-
 export function ImpactHero() {
+  const { data: alerts = [] } = useAlerts()
+
+  const successCount = alerts.filter(
+    (a) => a.intervention_status === "resolved",
+  ).length
+  const failedCount = alerts.filter(
+    (a) => a.intervention_status === "failed",
+  ).length
+  const totalCompleted = successCount + failedCount
+  const successRate =
+    totalCompleted > 0 ? Math.round((successCount / totalCompleted) * 100) : 0
+  const totalCount = alerts.length || 1
+
+  const stats: MiniStat[] = [
+    { icon: Mail, value: "89%", label: "Phản hồi <24h", tone: "success" },
+    {
+      icon: CheckCircle2,
+      value: `${successRate}%`,
+      label: "Tỷ lệ thành công",
+      tone: "success",
+    },
+  ]
+
   const progress = Math.min(
     100,
-    Math.round((STUDENTS_HELPED / PERIOD_TOTAL) * 100),
+    Math.round((successCount / totalCount) * 100),
   )
 
   return (
@@ -65,10 +80,10 @@ export function ImpactHero() {
 
           <div className="flex items-baseline gap-2">
             <span className="font-serif text-6xl font-bold tabular-nums text-success">
-              {STUDENTS_HELPED}
+              {successCount}
             </span>
             <span className="text-sm text-muted-foreground">
-              / {PERIOD_TOTAL} SV
+              / {totalCount} SV
             </span>
           </div>
 
@@ -89,7 +104,7 @@ export function ImpactHero() {
             <div className="mt-1.5 flex items-center justify-between text-[11px] font-medium">
               <span className="font-mono text-success">{progress}%</span>
               <span className="text-muted-foreground">
-                {STUDENTS_HELPED}/{PERIOD_TOTAL}
+                {successCount}/{totalCount}
               </span>
             </div>
           </div>
@@ -104,19 +119,32 @@ export function ImpactHero() {
         </div>
 
         {/* Mini stats — icons + numbers only */}
-        <ul role="list" className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-          {MINI_STATS.map((s) => {
+        <ul
+          role="list"
+          className="flex flex-col justify-center gap-3 lg:h-full"
+        >
+          {stats.map((s) => {
             const Icon = s.icon
             const tint =
               s.tone === "success"
                 ? "bg-success/10 text-success"
+                : s.tone === "destructive"
+                ? "bg-destructive/10 text-destructive"
+                : s.tone === "warning"
+                ? "bg-warning/10 text-warning"
                 : "bg-primary/10 text-primary"
             const valueTone =
-              s.tone === "success" ? "text-success" : "text-primary"
+              s.tone === "success"
+                ? "text-success"
+                : s.tone === "destructive"
+                ? "text-destructive"
+                : s.tone === "warning"
+                ? "text-warning"
+                : "text-primary"
             return (
               <li
                 key={s.label}
-                className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3"
+                className="flex flex-1 items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-4"
               >
                 <span
                   className={cn(

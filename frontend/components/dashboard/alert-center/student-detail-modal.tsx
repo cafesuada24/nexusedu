@@ -12,7 +12,17 @@ import { type Alert } from "@/lib/alerts";
 import { type StudentRow } from "@/lib/csv";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { X, Calendar, MapPin, MessageSquareText } from "lucide-react";
+import {
+    X,
+    Calendar,
+    MapPin,
+    MessageSquareText,
+    TrendingUp,
+    TrendingDown,
+    BrainCircuit,
+    Info,
+} from "lucide-react";
+import { useStudent } from "@/hooks/use-student-query";
 
 type StudentDetailModalProps = {
     open: boolean;
@@ -20,6 +30,14 @@ type StudentDetailModalProps = {
     alert: Alert | null;
     studentProfile?: StudentRow;
 };
+
+const mockLmsData = [
+    { course: "Toán giải tích", prev: 3.2, current: 3.8 },
+    { course: "Lập trình hướng đối tượng", prev: 3.5, current: 3.3 },
+    { course: "Cấu trúc dữ liệu & Giải thuật", prev: 2.8, current: 3.4 },
+    { course: "Cơ sở dữ liệu", prev: 3.0, current: 3.0 },
+    { course: "Mạng máy tính", prev: 3.6, current: 3.2 },
+];
 
 const severityLabel: Record<Alert["severity"], string> = {
     high: "Nguy cơ cao",
@@ -31,10 +49,32 @@ const severityTone: Record<Alert["severity"], string> = {
     medium: "bg-warning/15 text-warning ring-warning/25",
 };
 
-function formatUnix(seconds: number | null): string {
-    if (!seconds) return "Chưa có";
-    return new Date(seconds * 1000).toLocaleString("vi-VN");
-}
+const TrendIndicator = ({
+    prev,
+    current,
+}: {
+    prev: number;
+    current: number;
+}) => {
+    const diff = current - prev;
+    if (diff > 0) {
+        return (
+            <div className="inline-flex items-center justify-center gap-1 text-emerald-600 font-medium">
+                <TrendingUp className="size-3.5" />
+                <span>+{diff.toFixed(1)}</span>
+            </div>
+        );
+    }
+    if (diff < 0) {
+        return (
+            <div className="inline-flex items-center justify-center gap-1 text-destructive font-medium">
+                <TrendingDown className="size-3.5" />
+                <span>{diff.toFixed(1)}</span>
+            </div>
+        );
+    }
+    return <span className="text-muted-foreground">—</span>;
+};
 
 export const StudentDetailModal = React.memo(function StudentDetailModal({
     open,
@@ -42,12 +82,22 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
     alert,
     studentProfile,
 }: StudentDetailModalProps) {
+    const { data: student, isLoading } = useStudent(
+        alert?.id || undefined,
+        open,
+    );
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent showCloseButton={false} className="max-w-4xl overflow-hidden rounded-xl border-border/60 bg-background p-0 shadow-2xl">
+            <DialogContent
+                showCloseButton={false}
+                className="sm:max-w-5xl overflow-hidden rounded-xl border-border/60 bg-background p-0 shadow-2xl"
+            >
                 <DialogHeader className="flex flex-row items-center justify-between border-b border-border/60 p-6 pb-6 bg-white">
                     <DialogTitle className="text-2xl font-bold tracking-tight text-slate-900">
-                        {alert ? alert.name : "Hồ sơ sinh viên"}
+                        {student?.student_name ||
+                            alert?.name ||
+                            "Hồ sơ sinh viên"}
                     </DialogTitle>
                     <div className="flex items-center gap-6">
                         {alert && (
@@ -59,9 +109,16 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                     {severityLabel[alert.severity]}
                                 </Badge>
                                 {alert.summary &&
-                                    alert.summary !== severityLabel[alert.severity] &&
-                                    alert.summary !== (alert.severity === "high" ? "Critical" : "Elevated") && (
-                                        <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-0.5">
+                                    alert.summary !==
+                                        severityLabel[alert.severity] &&
+                                    alert.summary !==
+                                        (alert.severity === "high"
+                                            ? "Critical"
+                                            : "Elevated") && (
+                                        <Badge
+                                            variant="outline"
+                                            className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-0.5"
+                                        >
                                             {alert.summary}
                                         </Badge>
                                     )}
@@ -78,124 +135,269 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                     </div>
                 </DialogHeader>
 
-                <ScrollArea className="max-h-[75vh] bg-slate-50 hide-scrollbar">
+                <ScrollArea className="max-h-[85vh] bg-slate-50/50 hide-scrollbar">
                     {alert ? (
-                        <div className="flex flex-col gap-8 p-8">
-                            {/* SIS Profile Card */}
-                            <section className="rounded-xl border border-slate-100 bg-white p-8 shadow-sm">
-                                <h4 className="mb-8 text-xs font-bold uppercase tracking-widest text-blue-600">
-                                    SIS Profile
-                                </h4>
-                                <div className="grid gap-5 text-sm">
-                                    <div className="grid grid-cols-[30%_1fr] items-center border-b border-border/10 pb-4">
-                                        <span className="text-gray-500">Mã số sinh viên</span>
-                                        <span className="font-mono font-medium text-gray-900 text-right">{alert.mssv}</span>
+                        <div className="flex flex-col gap-6 p-6">
+                            <div className="grid grid-cols-10 gap-6">
+                                {/* Left Column (4/10): SIS Profile */}
+                                <div className="col-span-4 flex flex-col gap-6">
+                                    <section className="flex flex-col h-full rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                                        <div className="mb-6 flex items-center justify-between">
+                                            <h4 className="text-xs font-bold uppercase tracking-widest text-blue-600">
+                                                SIS Profile
+                                            </h4>
+                                            <Badge
+                                                variant="secondary"
+                                                className="bg-blue-50 text-blue-700 hover:bg-blue-50"
+                                            >
+                                                Cơ bản
+                                            </Badge>
+                                        </div>
+                                        <div className="overflow-hidden rounded-lg border border-slate-100">
+                                            <div className="flex flex-col divide-y divide-slate-50 text-sm">
+                                                <div className="flex items-center px-4 py-3">
+                                                    <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
+                                                        Mã số sinh viên
+                                                    </span>
+                                                    <span className="font-mono font-semibold text-slate-900">
+                                                        {alert.mssv}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center px-4 py-3">
+                                                    <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
+                                                        Địa chỉ Email
+                                                    </span>
+                                                    <span className="font-semibold text-slate-900 truncate">
+                                                        {isLoading ? (
+                                                            <div className="h-4 w-32 bg-slate-100 animate-pulse rounded" />
+                                                        ) : (
+                                                            student?.email ||
+                                                            alert.email ||
+                                                            "—"
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center px-4 py-3">
+                                                    <span className="w-32 shrink-0 text-[10px] font-bold uppercase text-slate-500">
+                                                        Chuyên ngành
+                                                    </span>
+                                                    <span className="font-semibold text-slate-900">
+                                                        {isLoading ? (
+                                                            <div className="h-4 w-24 bg-slate-100 animate-pulse rounded" />
+                                                        ) : (
+                                                            student?.major ||
+                                                            "Công nghệ Thông tin"
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    {/* Appointment Info Card if exists */}
+                                    {alert.appointmentAt && (
+                                        <section className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-6 shadow-sm">
+                                            <div className="flex items-center gap-2 mb-6">
+                                                <div className="p-1.5 bg-emerald-100 rounded-lg text-emerald-600">
+                                                    <Calendar className="size-4" />
+                                                </div>
+                                                <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-600">
+                                                    Lịch hẹn
+                                                </h4>
+                                            </div>
+                                            <div className="grid gap-4 text-sm">
+                                                <div className="flex flex-col gap-1 border-b border-emerald-100/50 pb-3">
+                                                    <span className="text-[10px] font-bold uppercase text-emerald-700/60">
+                                                        Thời gian
+                                                    </span>
+                                                    <span className="font-medium text-emerald-900">
+                                                        {new Date(
+                                                            alert.appointmentAt *
+                                                                1000,
+                                                        ).toLocaleString(
+                                                            "vi-VN",
+                                                            {
+                                                                weekday: "long",
+                                                                year: "numeric",
+                                                                month: "long",
+                                                                day: "numeric",
+                                                                hour: "2-digit",
+                                                                minute: "2-digit",
+                                                            },
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] font-bold uppercase text-emerald-700/60">
+                                                        Hình thức
+                                                    </span>
+                                                    <span className="font-medium text-emerald-900">
+                                                        {alert.meetingMethod ===
+                                                        "online"
+                                                            ? "Trực tuyến (Zoom/Meet)"
+                                                            : "Trực tiếp tại văn phòng"}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </section>
+                                    )}
+                                </div>
+
+                                {/* Right Column (6/10): LMS Overview */}
+                                <div className="col-span-6">
+                                    <section className="h-full rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                                        <div className="mb-6 flex items-center justify-between">
+                                            <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-600">
+                                                LMS Overview
+                                            </h4>
+                                            <div className="flex items-center gap-2 text-[10px] font-medium text-slate-400">
+                                                <Info className="size-3" />
+                                                Dữ liệu học kỳ 2023.2
+                                            </div>
+                                        </div>
+
+                                        <div className="overflow-hidden rounded-lg border border-slate-100">
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold">
+                                                    <tr>
+                                                        <th className="px-4 py-3">
+                                                            Học phần
+                                                        </th>
+                                                        <th className="px-4 py-3 text-center">
+                                                            Điểm
+                                                        </th>
+                                                        <th className="px-4 py-3 text-center">
+                                                            Trend
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-50">
+                                                    {mockLmsData.map(
+                                                        (item, idx) => (
+                                                            <tr
+                                                                key={idx}
+                                                                className="hover:bg-slate-50/50 transition-colors"
+                                                            >
+                                                                <td className="px-4 py-3 font-medium text-slate-700">
+                                                                    {
+                                                                        item.course
+                                                                    }
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center font-bold text-slate-900 font-mono">
+                                                                    {item.current.toFixed(
+                                                                        1,
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center">
+                                                                    <TrendIndicator
+                                                                        prev={
+                                                                            item.prev
+                                                                        }
+                                                                        current={
+                                                                            item.current
+                                                                        }
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        ),
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="mt-6 grid grid-cols-2 gap-4">
+                                            <div className="rounded-lg bg-slate-50 p-4 text-center ring-1 ring-slate-100 flex flex-col justify-center">
+                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
+                                                    GPA
+                                                </p>
+                                                <div className="grid grid-cols-[1fr_auto_1fr] items-baseline w-full">
+                                                    <div />
+                                                    <p className="text-2xl font-black text-indigo-600">
+                                                        3.4
+                                                    </p>
+                                                    <div className="flex justify-start pl-2">
+                                                        <div className="flex items-center gap-0.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                                            <TrendingUp className="size-3" />
+                                                            +0.2
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-lg bg-slate-50 p-4 text-center ring-1 ring-slate-100 flex flex-col justify-center">
+                                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
+                                                    Hạng
+                                                </p>
+                                                <div className="grid grid-cols-[1fr_auto_1fr] items-baseline w-full">
+                                                    <div />
+                                                    <p className="text-2xl font-black text-slate-800">
+                                                        15/40
+                                                    </p>
+                                                    <div className="flex justify-start pl-2">
+                                                        <div className="flex items-center gap-0.5 text-xs font-bold text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">
+                                                            <TrendingDown className="size-3" />
+                                                            -5
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+                            </div>
+
+                            {/* AI Overview Section (Full Width) */}
+                            <section className="rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50/50 to-indigo-50/30 p-6 shadow-sm">
+                                <div className="mb-4 flex items-center gap-2">
+                                    <div className="p-1.5 bg-purple-100 rounded-lg text-purple-600">
+                                        <BrainCircuit className="size-4" />
                                     </div>
-                                    <div className="grid grid-cols-[30%_1fr] items-center border-b border-border/10 pb-4">
-                                        <span className="text-gray-500">Địa chỉ Email</span>
-                                        <span className="font-medium text-gray-900 text-right">{alert.email || "—"}</span>
+                                    <h4 className="text-xs font-bold uppercase tracking-widest text-purple-700">
+                                        AI Insights & Recommendations
+                                    </h4>
+                                </div>
+                                <div className="grid grid-cols-3 gap-6">
+                                    <div className="col-span-2 space-y-4">
+                                        <div className="rounded-lg bg-white/60 p-4 ring-1 ring-purple-100">
+                                            <p className="text-sm font-semibold text-slate-900 mb-1">
+                                                Phân tích rủi ro
+                                            </p>
+                                            <p className="text-sm text-slate-600 leading-relaxed">
+                                                Sinh viên có dấu hiệu sụt giảm
+                                                kết quả ở các môn chuyên ngành
+                                                (Mạng máy tính, Lập trình). Tuy
+                                                nhiên, các môn lý thuyết tính
+                                                toán có sự cải thiện rõ rệt. Cần
+                                                chú trọng hỗ trợ kỹ năng thực
+                                                hành.
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-indigo-200">
+                                                Cần tư vấn môn chuyên ngành
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-[30%_1fr] items-center border-b border-border/10 pb-4">
-                                        <span className="text-gray-500">Năm học hiện tại</span>
-                                        <span className="font-medium text-gray-900 text-right">{studentProfile?.academicYear ?? "—"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-[30%_1fr] items-center">
-                                        <span className="text-gray-500">Lần liên hệ gần nhất</span>
-                                        <span className="font-medium text-gray-900 text-right">{formatUnix(studentProfile?.lastContactedAt ?? null)}</span>
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] font-bold uppercase text-purple-400">
+                                            Khuyến nghị hành động
+                                        </p>
+                                        <ul className="space-y-2">
+                                            {[
+                                                "Đăng ký phụ đạo môn Mạng",
+                                                "Gặp cố vấn học tập tuần 12",
+                                                "Tham gia Lab thực hành bổ sung",
+                                            ].map((action, i) => (
+                                                <li
+                                                    key={i}
+                                                    className="flex items-start gap-2 text-xs text-slate-700"
+                                                >
+                                                    <div className="mt-1 size-1.5 rounded-full bg-purple-400 shrink-0" />
+                                                    {action}
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
                                 </div>
-                            </section>
-
-                            {/* Appointment Info Card */}
-                            {alert.appointmentAt && (
-                                <section className="rounded-xl border border-emerald-100 bg-emerald-50/30 p-8 shadow-sm">
-                                    <div className="flex items-center gap-2 mb-8">
-                                        <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
-                                            <Calendar className="size-4" />
-                                        </div>
-                                        <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-                                            Thông tin đặt hẹn
-                                        </h4>
-                                    </div>
-                                    <div className="grid gap-5 text-sm">
-                                        <div className="grid grid-cols-[30%_1fr] items-center border-b border-emerald-100/50 pb-4">
-                                            <div className="flex items-center gap-2 text-emerald-700/70">
-                                                <Calendar className="size-3.5" />
-                                                <span>Thời gian</span>
-                                            </div>
-                                            <span className="font-medium text-emerald-900 text-right">
-                                                {new Date(alert.appointmentAt * 1000).toLocaleString("vi-VN", {
-                                                    weekday: "long",
-                                                    year: "numeric",
-                                                    month: "long",
-                                                    day: "numeric",
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                })}
-                                            </span>
-                                        </div>
-                                        <div className="grid grid-cols-[30%_1fr] items-center border-b border-emerald-100/50 pb-4">
-                                            <div className="flex items-center gap-2 text-emerald-700/70">
-                                                <MapPin className="size-3.5" />
-                                                <span>Hình thức</span>
-                                            </div>
-                                            <span className="font-medium text-emerald-900 text-right">
-                                                {alert.meetingMethod === "online" ? "Trực tuyến" : "Trực tiếp"}
-                                            </span>
-                                        </div>
-                                        {alert.appointmentNotes && alert.appointmentNotes !== "null" && (
-                                            <div className="grid grid-cols-[30%_1fr] items-start">
-                                                <div className="flex items-center gap-2 text-emerald-700/70 pt-0.5">
-                                                    <MessageSquareText className="size-3.5" />
-                                                    <span>Ghi chú</span>
-                                                </div>
-                                                <span className="font-medium text-emerald-900 text-right italic leading-relaxed">
-                                                    "{alert.appointmentNotes}"
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* LMS Overview Card */}
-                            <section className="rounded-xl border border-slate-100 bg-white p-8 shadow-sm">
-                                <h4 className="mb-8 text-xs font-bold uppercase tracking-widest text-indigo-600">
-                                    LMS Overview
-                                </h4>
-                                {studentProfile ? (
-                                    <div className="flex flex-col justify-between">
-                                        <div className="grid grid-cols-3 gap-8 mb-8">
-                                            <div className="flex flex-col items-center rounded-xl bg-slate-50/50 p-5 text-center ring-1 ring-border/5">
-                                                <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">GPA</p>
-                                                <p className="mt-1 text-2xl font-black text-primary">
-                                                    {studentProfile.averageScore.toFixed(1)}
-                                                </p>
-                                            </div>
-                                            <div className="flex flex-col items-center rounded-xl bg-slate-50/50 p-5 text-center ring-1 ring-border/5">
-                                                <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Tests</p>
-                                                <p className="mt-1 text-2xl font-black text-gray-900">
-                                                    {studentProfile.tests.length}
-                                                </p>
-                                            </div>
-                                            <div className="flex flex-col items-center rounded-xl bg-slate-50/50 p-5 text-center ring-1 ring-border/5">
-                                                <p className="text-[10px] font-bold uppercase text-gray-400 tracking-wider">Fail</p>
-                                                <p className="mt-1 text-2xl font-black text-destructive">
-                                                    {studentProfile.failedCount}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground leading-relaxed italic">
-                                            * Dữ liệu được tổng hợp từ kết quả học tập trong học kỳ hiện tại.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="flex h-40 items-center justify-center rounded-xl border-2 border-dashed border-gray-100 bg-slate-50/20">
-                                        <p className="text-sm text-muted-foreground italic text-center">
-                                            Chưa có dữ liệu LMS đồng bộ.
-                                        </p>
-                                    </div>
-                                )}
                             </section>
                         </div>
                     ) : null}

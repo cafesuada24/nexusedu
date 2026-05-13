@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     "student success",
     "advisor booking",
   ],
+  icons: {
+    icon: "/logos/logo.png",
+  },
 };
 
 export const viewport: Viewport = {

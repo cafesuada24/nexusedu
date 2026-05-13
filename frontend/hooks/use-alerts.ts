@@ -75,6 +75,8 @@ export function useAlerts() {
           draft_status: c.draft_status || null,
           is_generating: c.draft_status === "generating",
           appointment: c.appointment || null,
+          created_at: c.created_at,
+          sent_at: c.sent_at || null,
         }));
 
         console.log(

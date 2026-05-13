@@ -42,6 +42,27 @@ export const BackendInterventionStatusSchema = z.enum([
 export type BackendInterventionStatus = z.infer<
   typeof BackendInterventionStatusSchema
 >;
+
+export const RiskStatusSchema = z.enum([
+  "Normal",
+  "Elevated",
+  "Critical",
+  "Unknown",
+]);
+export type RiskStatus = z.infer<typeof RiskStatusSchema>;
+
+export const StudentDTOSchema = z.object({
+  sid: z.string(),
+  student_name: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  major: z.string(),
+  current_risk_status: RiskStatusSchema,
+  intervention_status: BackendInterventionStatusSchema.nullable().optional(),
+  last_notified_at: z.string().nullable().optional(),
+  is_generating: z.boolean().default(false),
+  active_case_id: z.string().nullable().optional(),
+});
+export type StudentDTO = z.infer<typeof StudentDTOSchema>;
 export const AppointmentSchema = z.object({
   appointment_time: z.string(),
   duration_minutes: z.number(),
@@ -69,12 +90,14 @@ export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
   let draft_subject = null;
   let draft_body = null;
   let draft_status = null;
+  let sent_at = null;
 
   if (data.email && typeof data.email === "object") {
     emailStr = data.email.recipent || data.email.recipient || "";
     draft_subject = data.email.subject || null;
     draft_body = data.email.body || null;
     draft_status = data.email.status || null;
+    sent_at = data.email.sent_at || null;
   } else if (typeof data.email === "string") {
     emailStr = data.email;
   }
@@ -85,6 +108,7 @@ export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
     draft_subject,
     draft_body,
     draft_status,
+    sent_at,
     points_reward: 0,
     appointment: data.appointment || null,
   };
@@ -1053,6 +1077,18 @@ export async function fetchCaseDetails(
     { method: "GET" },
     CaseDetailsResponseSchema,
     "Không thể lấy chi tiết case",
+  );
+}
+
+/**
+ * GET /students/{sid} — returns details for a specific student.
+ */
+export async function fetchStudent(sid: string): Promise<StudentDTO> {
+  return apiCall(
+    endpoint(`/students/${encodeURIComponent(sid)}`),
+    { method: "GET" },
+    StudentDTOSchema,
+    "Không thể lấy thông tin sinh viên",
   );
 }
 

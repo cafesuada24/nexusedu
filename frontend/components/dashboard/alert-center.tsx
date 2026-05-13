@@ -131,6 +131,12 @@ export function AlertCenter() {
                         ? "accepted"
                         : baseStatus;
 
+                const movedAt = r.sent_at
+                    ? Math.floor(new Date(r.sent_at).getTime() / 1000)
+                    : r.created_at
+                      ? Math.floor(new Date(r.created_at).getTime() / 1000)
+                      : now;
+
                 return {
                     id: r.sid || `missing-${Math.random()}`,
                     caseId: r.case_id || r.active_case_id || null,
@@ -148,7 +154,7 @@ export function AlertCenter() {
                     body: "",
                     lastContactedAt: null,
                     status: status,
-                    movedAt: now,
+                    movedAt: movedAt,
                     draftJobId: null,
                     draftSubject: r.draft_subject || null,
                     draftBody: r.draft_body || null,

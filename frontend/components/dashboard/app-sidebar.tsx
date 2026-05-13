@@ -103,6 +103,7 @@ export function AppSidebar() {
         if (item.href === "/dashboard/advisors") return isAdmin;
         if (item.href === "/dashboard/cases") return isAdmin;
         if (item.href === "/dashboard/alerts") return isAdvisor;
+        if (item.href === "/dashboard/schedule") return isAdvisor;
         return true;
     });
 
