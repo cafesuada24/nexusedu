@@ -435,6 +435,13 @@ function CardActions({
             </div>
         );
     }
+    if (a.interventionStatus === "failed") {
+        return (
+            <p className="mt-3 text-[12px] italic text-destructive">
+                ✗ Chưa giải quyết xong · {relativeTime(a.movedAt)}
+            </p>
+        );
+    }
     return (
         <p className="mt-3 text-[12px] italic text-success">
             ✓ Đã giải quyết xong · {relativeTime(a.movedAt)}
