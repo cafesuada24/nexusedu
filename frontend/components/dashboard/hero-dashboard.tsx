@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { useAlerts } from "@/hooks/use-alerts"
+import { fromBackendStatus } from "@/lib/alerts"
 
 const ACTIVATION_DATA = [
   { day: "M", value: 20 },
@@ -46,6 +48,23 @@ const XP_DATA = [
 ]
 
 export function HeroDashboard() {
+  const { data: alerts = [] } = useAlerts()
+
+  const priorityCount = React.useMemo(() => {
+    return alerts.filter((alert) => {
+      // Logic: Only count alerts in the 'New' column that are also 'High Risk'
+      // A case is truly 'new' only if it hasn't been assigned to an advisor yet.
+      if ((alert.intervention_status || "").toLowerCase() === "dismissed") return false
+      
+      const baseStatus = fromBackendStatus(alert.intervention_status)
+      const isNew = baseStatus === "new" && !alert.assigned_advisor_id
+      
+      const isHighRisk = !(alert.current_risk_status || "").toLowerCase().includes("elevated")
+      
+      return isNew && isHighRisk
+    }).length
+  }, [alerts])
+
   return (
     <div className="flex flex-col gap-6">
       {/* 1. The Urgent Pulse Section */}
@@ -77,7 +96,9 @@ export function HeroDashboard() {
                 <div className="flex flex-col">
                   <span className="text-xs font-bold tracking-widest text-destructive uppercase">Priority Queue</span>
                   <div className="flex items-baseline gap-2">
-                    <span className="font-serif text-5xl font-black text-destructive">5</span>
+                    <span className="font-serif text-5xl font-black text-destructive">
+                      {priorityCount}
+                    </span>
                     <span className="text-sm font-medium text-destructive/80 italic">Students Waiting</span>
                   </div>
                 </div>
