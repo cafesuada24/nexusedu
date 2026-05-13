@@ -70,7 +70,7 @@ export function HeroDashboard() {
       {/* 1. The Urgent Pulse Section */}
       <section className="flex flex-col gap-4">
         <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
-          The Urgent Pulse
+          SINH VIÊN KHẨN CẤP
         </h2>
         <div className="grid gap-4 md:grid-cols-2">
           {/* Card 1: Priority Queue */}
@@ -94,19 +94,19 @@ export function HeroDashboard() {
                   <BellRing className="size-6" />
                 </motion.div>
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold tracking-widest text-destructive uppercase">Priority Queue</span>
+                  <span className="text-xs font-bold tracking-widest text-destructive uppercase">HÀNG ĐỢI ƯU TIÊN</span>
                   <div className="flex items-baseline gap-2">
                     <span className="font-serif text-5xl font-black text-destructive">
                       {priorityCount}
                     </span>
-                    <span className="text-sm font-medium text-destructive/80 italic">Students Waiting</span>
+                    <span className="text-sm font-medium text-destructive/80 italic">Sinh viên đang chờ</span>
                   </div>
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground">At-Risk students not yet processed. High urgency detected.</p>
+              <p className="text-sm text-muted-foreground">Sinh viên có nguy cơ chưa được xử lý. Phát hiện mức độ khẩn cấp cao.</p>
               <Button asChild size="sm" className="w-fit rounded-xl bg-destructive hover:bg-destructive/90 text-white shadow-lg shadow-destructive/20">
                 <Link href="/dashboard/alerts" className="flex items-center gap-2">
-                  Open list <ArrowRight className="size-4" />
+                  Mở danh sách <ArrowRight className="size-4" />
                 </Link>
               </Button>
             </CardContent>
@@ -120,21 +120,21 @@ export function HeroDashboard() {
                   <Timer className="size-6" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold tracking-widest text-success uppercase">Response Time (KPI &lt; 4h)</span>
+                  <span className="text-xs font-bold tracking-widest text-success uppercase">THỜI GIAN PHẢN HỒI (KPI &lt; 4h)</span>
                   <div className="flex items-baseline gap-2">
                     <span className="font-serif text-4xl font-bold text-success">3.2</span>
-                    <span className="text-xl font-bold text-success/80">hours</span>
+                    <span className="text-xl font-bold text-success/80">giờ</span>
                   </div>
                 </div>
               </div>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs font-medium">
-                  <span className="text-success">Excellent Pace</span>
-                  <span className="text-muted-foreground">Target: 4.0h</span>
+                  <span className="text-success">Tốc độ tuyệt vời</span>
+                  <span className="text-muted-foreground">Mục tiêu: 4.0h</span>
                 </div>
                 <Progress value={80} className="h-2 bg-success/10" indicatorClassName="bg-success" />
               </div>
-              <p className="text-xs text-muted-foreground italic">KPI target is being met. Keeping student engagement high.</p>
+              <p className="text-xs text-muted-foreground italic">Đang đạt mục tiêu KPI. Giữ mức độ tương tác của sinh viên ở mức cao.</p>
             </CardContent>
           </Card>
         </div>
@@ -143,7 +143,7 @@ export function HeroDashboard() {
       {/* 2. Business Core Metrics Section */}
       <section className="flex flex-col gap-4">
         <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
-          Impact Results
+          KẾT QUẢ TÁC ĐỘNG
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Card 3: Activation Rate */}
@@ -155,7 +155,7 @@ export function HeroDashboard() {
                     <div className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
                       <MailOpen className="size-4" />
                     </div>
-                    <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">Activation Rate</span>
+                    <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">TỶ LỆ KÍCH HOẠT</span>
                   </div>
                   <span className="font-serif text-3xl font-bold text-primary">35%</span>
                 </div>
@@ -181,7 +181,7 @@ export function HeroDashboard() {
               </div>
               
               <p className="text-[11px] text-muted-foreground">
-                Appointment booked within 48h after Nudge.
+                Lịch hẹn được đặt trong vòng 48 giờ sau khi nhắc nhở.
               </p>
             </CardContent>
           </Card>
@@ -194,21 +194,21 @@ export function HeroDashboard() {
                   <div className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
                     <LifeBuoy className="size-4" />
                   </div>
-                  <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">Rescue Rate</span>
+                  <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">TỶ LỆ GIẢI CỨU</span>
                 </div>
                 <span className="font-serif text-3xl font-bold text-primary">65%</span>
               </div>
               
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-primary uppercase tracking-tighter">Stability Achieved</span>
+                  <span className="text-primary uppercase tracking-tighter">ĐÃ ĐẠT ỔN ĐỊNH</span>
                   <span className="text-muted-foreground">130/200 SV</span>
                 </div>
                 <Progress value={65} className="h-2.5 bg-primary/10" indicatorClassName="bg-primary shadow-[0_0_8px_rgba(37,99,235,0.3)]" />
               </div>
               
               <p className="text-[11px] text-muted-foreground">
-                Switched to Stable status after intervention.
+                Đã chuyển sang trạng thái Ổn định sau khi can thiệp.
               </p>
             </CardContent>
           </Card>
@@ -222,7 +222,7 @@ export function HeroDashboard() {
                     <div className="grid size-8 place-items-center rounded-lg bg-warning/15 text-warning ring-1 ring-warning/20">
                       <Trophy className="size-4" />
                     </div>
-                    <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">Impact Points (XP)</span>
+                    <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">ĐIỂM TÁC ĐỘNG (XP)</span>
                   </div>
                   <div className="flex items-baseline gap-1">
                     <span className="font-serif text-3xl font-black text-warning">450</span>
@@ -231,7 +231,7 @@ export function HeroDashboard() {
                 </div>
                 <div className="flex flex-col items-end gap-0.5">
                   <span className="text-[10px] font-bold text-warning uppercase">Top 3</span>
-                  <span className="text-[9px] text-muted-foreground">Leaderboard</span>
+                  <span className="text-[9px] text-muted-foreground">Bảng xếp hạng</span>
                 </div>
               </div>
 
@@ -252,8 +252,8 @@ export function HeroDashboard() {
               </div>
 
               <div className="flex items-center justify-between border-t border-border/40 pt-2 text-[10px] font-medium">
-                <span className="text-muted-foreground">Weekly Goal: 500 XP</span>
-                <span className="text-warning font-bold">90% Complete</span>
+                <span className="text-muted-foreground">Mục tiêu tuần: 500 XP</span>
+                <span className="text-warning font-bold">90% Hoàn thành</span>
               </div>
             </CardContent>
           </Card>
