@@ -44,6 +44,7 @@ import {
 import { Kbd } from "@/components/ui/kbd"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth"
 
 /* ────────────────────────────────────────────────────────────────
  * Topic taxonomy — color + icon, no extra prose
@@ -166,6 +167,9 @@ const faqs: Faq[] = [
  * ──────────────────────────────────────────────────────────────── */
 
 export function SupportView() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
+
   const [query, setQuery] = React.useState("")
   const [activeTopic, setActiveTopic] = React.useState<TopicKey | "all">("all")
   const [copiedLabel, setCopiedLabel] = React.useState<string | null>(null)
@@ -179,7 +183,15 @@ export function SupportView() {
     setTimeout(() => setCopiedLabel(null), 2000)
   }
 
+  const filteredQuickLinks = quickLinks.filter((l) => {
+    if (l.title === "Nhập CSV" || l.title === "Báo cáo BGH") return isAdmin
+    return true
+  })
+
   const filteredFaqs = faqs.filter((f) => {
+    if (f.q === "Làm sao để thêm sinh viên mới?" || f.q === "Tôi xuất báo cáo cho BGH thế nào?") {
+      if (!isAdmin) return false
+    }
     const matchesTopic = activeTopic === "all" || f.topic === activeTopic
     const q = query.trim().toLowerCase()
     const matchesQuery =
@@ -223,7 +235,7 @@ export function SupportView() {
             </Button>
           </CardHeader>
           <CardContent className="grid gap-2 sm:grid-cols-3">
-            {quickLinks.map((l) => {
+            {filteredQuickLinks.map((l) => {
               const t = TOPICS[l.topic]
               return (
                 <Link
