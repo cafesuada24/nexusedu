@@ -1,47 +1,97 @@
 "use client"
 
 import Link from "next/link"
-import { Upload, LayoutDashboard, BellRing } from "lucide-react"
-import { SuccessCaseStudies } from "@/components/dashboard/success-case-studies"
+import { Upload, LayoutDashboard, BellRing, ShieldAlert, BarChartHorizontal } from "lucide-react"
+import { HeroDashboard } from "@/components/dashboard/hero-dashboard"
+import { ThankYouNotes } from "@/components/dashboard/thank-you-notes"
+import { AdminDashboard } from "@/components/dashboard/admin-dashboard"
+import { AdminSummaryReport } from "@/components/dashboard/admin-summary-report"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/hooks/use-auth"
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 
 export default function OverviewPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
+
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-sm shadow-primary/10">
-            <LayoutDashboard className="size-5" />
+          <div className={cn(
+            "grid size-10 place-items-center rounded-xl ring-1 shadow-sm",
+            isAdmin 
+              ? "bg-primary/10 text-primary ring-primary/20 shadow-primary/10" 
+              : "bg-primary/10 text-primary ring-primary/20 shadow-primary/10"
+          )}>
+            {isAdmin ? <BarChartHorizontal className="size-5" /> : <LayoutDashboard className="size-5" />}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col">
             <h1 className="font-serif text-2xl font-bold tracking-tight md:text-3xl">
-              Tổng quan
+              {isAdmin ? "Strategic Overview" : "Tổng quan"}
             </h1>
+            {isAdmin && (
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                School Board Control Center
+              </p>
+            )}
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm" className="rounded-xl">
-            <Link href="/dashboard/alerts" aria-label="Cảnh báo">
-              <BellRing className="size-4" />
-              Cảnh báo
-            </Link>
-          </Button>
-          <Button asChild size="sm" className="rounded-xl">
-            <Link href="/dashboard/import">
-              <Upload className="size-4" />
-              Nhập CSV
-            </Link>
-          </Button>
+          {isAdmin ? (
+            <>
+              <Button asChild variant="outline" size="sm" className="rounded-xl border-primary/20 text-primary">
+                <Link href="/dashboard/metrics" className="gap-2">
+                  <BarChartHorizontal className="size-4" />
+                  Full Reports
+                </Link>
+              </Button>
+              <Badge variant="outline" className="rounded-xl border-primary/20 bg-primary/5 px-3 py-1 text-primary">
+                HK2 · 2025–2026
+              </Badge>
+            </>
+          ) : (
+            <>
+              <Button asChild variant="outline" size="sm" className="rounded-xl">
+                <Link href="/dashboard/alerts" aria-label="Cảnh báo">
+                  <BellRing className="size-4" />
+                  Cảnh báo
+                </Link>
+              </Button>
+              <Button asChild size="sm" className="rounded-xl">
+                <Link href="/dashboard/import">
+                  <Upload className="size-4" />
+                  Nhập CSV
+                </Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       <div
         aria-hidden
-        className="h-px w-full bg-gradient-to-r from-primary/40 via-primary/10 to-transparent"
+        className={cn(
+          "h-px w-full",
+          isAdmin 
+            ? "bg-gradient-to-r from-primary/60 via-primary/20 to-transparent"
+            : "bg-gradient-to-r from-primary/40 via-primary/10 to-transparent"
+        )}
       />
 
-      <SuccessCaseStudies />
+      {isAdmin ? (
+        <>
+          <AdminDashboard />
+          <AdminSummaryReport />
+        </>
+      ) : (
+        <>
+          <HeroDashboard />
+          <ThankYouNotes />
+        </>
+      )}
     </div>
   )
 }
