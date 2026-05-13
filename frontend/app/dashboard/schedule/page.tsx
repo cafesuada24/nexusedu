@@ -1,7 +1,32 @@
-import { CalendarClock } from "lucide-react"
+"use client"
+
+import * as React from "react"
+import { useRouter } from "next/navigation"
+import { CalendarClock, Loader2 } from "lucide-react"
 import { ScheduleView } from "@/components/dashboard/schedule-view"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function SchedulePage() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  React.useEffect(() => {
+    if (!loading && user && user.role === "admin") {
+      router.replace("/dashboard")
+    }
+  }, [user, loading, router])
+
+  if (loading || (user && user.role === "admin")) {
+    return (
+      <div className="flex min-h-[400px] w-full flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
+        <p className="text-sm font-medium text-muted-foreground animate-pulse">
+          Đang xác thực quyền truy cập...
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
       <div className="flex items-center gap-3">
