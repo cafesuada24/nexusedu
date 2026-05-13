@@ -4,7 +4,9 @@ from src.application.dtos.pagination import PagedResponse
 from src.application.dtos.student_dtos import (
     GetAllStudentsQuery,
     GetStudentQuery,
+    GetStudentTermMetricsQuery,
     StudentDTO,
+    StudentTermMetricsDTO,
 )
 from src.application.interfaces.student_query_service import StudentQueryService
 
@@ -35,3 +37,14 @@ class StudentQueryHandler:
     ) -> StudentDTO:
         """Execute the get student query."""
         return await self._student_query_service.get_student(sid=query.sid)
+
+    async def handle_get_student_term_metrics(
+        self,
+        query: GetStudentTermMetricsQuery,
+    ) -> StudentTermMetricsDTO:
+        """Execute the get student term metrics query."""
+        return await self._student_query_service.get_student_term_metrics(
+            sid=query.sid,
+            academic_year=query.academic_year,
+            semester=query.semester,
+        )
