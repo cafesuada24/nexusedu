@@ -25,7 +25,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
 import {
     Select,
     SelectContent,
@@ -33,8 +32,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { useDataset } from "@/hooks/use-dataset";
-import { reclassifyStudentsAndStats } from "@/lib/csv";
 import { useTheme } from "next-themes";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -92,27 +89,6 @@ const sessions = [
 ];
 
 export function SettingsView() {
-    // Persisted risk threshold (array used by Slider component)
-    const [riskThreshold, setRiskThreshold] = React.useState<number[]>(() => {
-        try {
-            if (typeof window === "undefined") return [70];
-            const raw = window.localStorage.getItem("nexusedu:riskThreshold");
-            if (!raw) return [70];
-            const parsed = JSON.parse(raw);
-            // Expect an array of numbers; fall back to [70] on mismatch
-            if (
-                Array.isArray(parsed) &&
-                parsed.length > 0 &&
-                typeof parsed[0] === "number"
-            ) {
-                return parsed as number[];
-            }
-        } catch {
-            // ignore parse errors
-        }
-        return [70];
-    });
-
     const [tone, setTone] = React.useState("warm");
 
     const { theme, setTheme } = useTheme();
@@ -122,23 +98,6 @@ export function SettingsView() {
         setMounted(true);
     }, []);
 
-    // Save to localStorage whenever riskThreshold changes
-    React.useEffect(() => {
-        try {
-            if (typeof window !== "undefined") {
-                window.localStorage.setItem(
-                    "nexusedu:riskThreshold",
-                    JSON.stringify(riskThreshold),
-                );
-            }
-        } catch {
-            // ignore storage errors
-        }
-    }, [riskThreshold]);
-
-    // Reclassify existing dataset when the risk threshold changes so Alert Center updates.
-    const { dataset, setDataset } = useDataset();
-    
     const queryClient = useQueryClient();
     const { data: profile, isLoading: isProfileLoading } = useQuery({
         queryKey: ["advisor-profile"],
@@ -192,53 +151,6 @@ export function SettingsView() {
     const profileInputClass =
         "h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-900 placeholder:text-slate-400 shadow-sm shadow-slate-200/45 focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100 dark:placeholder:text-slate-500 dark:shadow-none dark:focus-visible:border-blue-500 dark:focus-visible:ring-blue-500/40";
     const profileLabelClass = "text-slate-700 font-semibold dark:text-slate-300";
-
-    React.useEffect(() => {
-        if (!dataset) return;
-        try {
-            const stats = reclassifyStudentsAndStats(dataset.students);
-
-            // Only write back to dataset if any of the aggregated stats actually changed.
-            // This prevents an update loop where setDataset -> dataset changes -> effect runs again.
-            const hasChanged =
-                stats.totalStudents !== dataset.totalStudents ||
-                stats.totalTests !== dataset.totalTests ||
-                Math.abs(
-                    (stats.averageScore || 0) - (dataset.averageScore || 0),
-                ) > 1e-6 ||
-                stats.highRisk !== dataset.highRisk ||
-                stats.mediumRisk !== dataset.mediumRisk ||
-                stats.lowRisk !== dataset.lowRisk ||
-                stats.draftEmails !== dataset.draftEmails ||
-                // shallow compare problemCounts by keys we care about
-                (stats.problemCounts.failed_final || 0) !==
-                    (dataset.problemCounts?.failed_final || 0) ||
-                (stats.problemCounts.failed_midterm || 0) !==
-                    (dataset.problemCounts?.failed_midterm || 0) ||
-                (stats.problemCounts.low_average || 0) !==
-                    (dataset.problemCounts?.low_average || 0);
-
-            if (hasChanged) {
-                setDataset({
-                    ...dataset,
-                    students: stats.students,
-                    totalStudents: stats.totalStudents,
-                    totalTests: stats.totalTests,
-                    averageScore: stats.averageScore,
-                    highRisk: stats.highRisk,
-                    mediumRisk: stats.mediumRisk,
-                    lowRisk: stats.lowRisk,
-                    draftEmails: stats.draftEmails,
-                    problemCounts: stats.problemCounts,
-                    yearRisk: stats.yearRisk,
-                });
-            }
-        } catch (e) {
-            // swallow to avoid breaking settings UI
-            // eslint-disable-next-line no-console
-            console.warn("[settings] reclassify failed", e);
-        }
-    }, [riskThreshold, dataset, setDataset]);
 
     return (
         <Tabs defaultValue="profile" className="gap-6">
@@ -464,33 +376,10 @@ export function SettingsView() {
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2">
                             <Sparkles className="size-4 text-primary" />
-                            Ngưỡng cảnh báo
+                            Quy tắc AI
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-6">
-                        <div className="grid gap-3">
-                            <div className="flex items-center justify-between">
-                                <Label>Ngưỡng &ldquo;Nguy cơ cao&rdquo;</Label>
-                                <Badge className="rounded-md bg-primary/15 text-primary hover:bg-primary/20">
-                                    {riskThreshold[0]} điểm
-                                </Badge>
-                            </div>
-                            <Slider
-                                value={riskThreshold}
-                                onValueChange={setRiskThreshold}
-                                min={40}
-                                max={95}
-                                step={1}
-                                className="py-2"
-                            />
-                            <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Nhạy hơn (nhiều alert)</span>
-                                <span>Chặt hơn (ít alert)</span>
-                            </div>
-                        </div>
-
-                        <Separator />
-
                         <div className="grid gap-1.5">
                             <Label htmlFor="tone">Giọng văn AI</Label>
                             <Select value={tone} onValueChange={setTone}>
