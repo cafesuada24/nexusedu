@@ -9,7 +9,6 @@ import {
   Mail,
   MessageSquare,
   Quote,
-  Timer,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react"
@@ -40,7 +39,6 @@ type MiniStat = {
 }
 
 const MINI_STATS: MiniStat[] = [
-  { icon: Timer, value: "12h", label: "Tiết kiệm", tone: "primary" },
   { icon: Mail, value: "89%", label: "Phản hồi <24h", tone: "success" },
   { icon: CheckCircle2, value: "23", label: "Đã đóng", tone: "success" },
 ]
@@ -104,7 +102,7 @@ export function ImpactHero() {
         </div>
 
         {/* Mini stats — icons + numbers only */}
-        <ul role="list" className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+        <ul role="list" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
           {MINI_STATS.map((s) => {
             const Icon = s.icon
             const tint =
