@@ -16,6 +16,9 @@ from . import stream_types
 
 type_map = {
 
+    "types.CaseOverview": types.CaseOverview,
+    "stream_types.CaseOverview": stream_types.CaseOverview,
+
     "types.DiscoveryRequest": types.DiscoveryRequest,
     "stream_types.DiscoveryRequest": stream_types.DiscoveryRequest,
 

@@ -23,8 +23,12 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
     value: StreamStateValueT
     state: typing_extensions.Literal["Pending", "Incomplete", "Complete"]
 # #########################################################################
-# Generated classes (6)
+# Generated classes (7)
 # #########################################################################
+
+class CaseOverview(BaseModel):
+    academic_summary: typing.Optional[str] = Field(default=None, description='A concise summary of the student\'s academic performance and risks based on the provided metrics.')
+    action_keys: typing.List[str] = Field(description='Exactly 3 concise action keys (short phrases) for the advisor to focus on.')
 
 class DiscoveryRequest(BaseModel):
     tool_name: typing.Optional[typing.Union[typing_extensions.Literal['get_db_list'], typing_extensions.Literal['list_tables'], typing_extensions.Literal['describe_table']]] = Field(default=None, description='The name of the discovery tool to call."')
