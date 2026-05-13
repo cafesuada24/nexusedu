@@ -22,7 +22,8 @@ import {
     BrainCircuit,
     Info,
 } from "lucide-react";
-import { useStudent } from "@/hooks/use-student-query";
+import { useStudent, useStudentMetrics } from "@/hooks/use-student-query";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type StudentDetailModalProps = {
     open: boolean;
@@ -30,14 +31,6 @@ type StudentDetailModalProps = {
     alert: Alert | null;
     studentProfile?: StudentRow;
 };
-
-const mockLmsData = [
-    { course: "Toán giải tích", prev: 3.2, current: 3.8 },
-    { course: "Lập trình hướng đối tượng", prev: 3.5, current: 3.3 },
-    { course: "Cấu trúc dữ liệu & Giải thuật", prev: 2.8, current: 3.4 },
-    { course: "Cơ sở dữ liệu", prev: 3.0, current: 3.0 },
-    { course: "Mạng máy tính", prev: 3.6, current: 3.2 },
-];
 
 const severityLabel: Record<Alert["severity"], string> = {
     high: "Nguy cơ cao",
@@ -53,9 +46,10 @@ const TrendIndicator = ({
     prev,
     current,
 }: {
-    prev: number;
+    prev: number | null;
     current: number;
 }) => {
+    if (prev === null) return <span className="text-muted-foreground">—</span>;
     const diff = current - prev;
     if (diff > 0) {
         return (
@@ -86,6 +80,13 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
         alert?.id || undefined,
         open,
     );
+
+    const { data: metricsData, isLoading: isMetricsLoading } = useStudentMetrics(
+        alert?.id || undefined,
+        open,
+    );
+
+    const latestTerm = metricsData?.terms?.[0];
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -252,7 +253,13 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                             </h4>
                                             <div className="flex items-center gap-2 text-[10px] font-medium text-slate-400">
                                                 <Info className="size-3" />
-                                                Dữ liệu học kỳ 2023.2
+                                                {isMetricsLoading ? (
+                                                    <Skeleton className="h-3 w-32" />
+                                                ) : latestTerm ? (
+                                                    `Dữ liệu học kỳ ${latestTerm.academic_year}.${latestTerm.semester}`
+                                                ) : (
+                                                    "Không có dữ liệu học kỳ"
+                                                )}
                                             </div>
                                         </div>
 
@@ -272,58 +279,103 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-50">
-                                                    {mockLmsData.map(
-                                                        (item, idx) => (
-                                                            <tr
-                                                                key={idx}
-                                                                className="hover:bg-slate-50/50 transition-colors"
-                                                            >
-                                                                <td className="px-4 py-3 font-medium text-slate-700">
-                                                                    {
-                                                                        item.course
-                                                                    }
+                                                    {isMetricsLoading ? (
+                                                        Array.from({
+                                                            length: 5,
+                                                        }).map((_, idx) => (
+                                                            <tr key={idx}>
+                                                                <td className="px-4 py-3">
+                                                                    <Skeleton className="h-4 w-32" />
                                                                 </td>
-                                                                <td className="px-4 py-3 text-center font-bold text-slate-900 font-mono">
-                                                                    {item.current.toFixed(
-                                                                        1,
-                                                                    )}
+                                                                <td className="px-4 py-3">
+                                                                    <Skeleton className="h-4 w-8 mx-auto" />
                                                                 </td>
-                                                                <td className="px-4 py-3 text-center">
-                                                                    <TrendIndicator
-                                                                        prev={
-                                                                            item.prev
-                                                                        }
-                                                                        current={
-                                                                            item.current
-                                                                        }
-                                                                    />
+                                                                <td className="px-4 py-3">
+                                                                    <Skeleton className="h-4 w-12 mx-auto" />
                                                                 </td>
                                                             </tr>
-                                                        ),
+                                                        ))
+                                                    ) : latestTerm?.courses &&
+                                                      latestTerm.courses
+                                                          .length > 0 ? (
+                                                        latestTerm.courses.map(
+                                                            (item, idx) => (
+                                                                <tr
+                                                                    key={idx}
+                                                                    className="hover:bg-slate-50/50 transition-colors"
+                                                                >
+                                                                    <td className="px-4 py-3 font-medium text-slate-700">
+                                                                        {
+                                                                            item.course_name
+                                                                        }
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-center font-bold text-slate-900 font-mono">
+                                                                        {item.avg_score.toFixed(
+                                                                            1,
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-center">
+                                                                        <TrendIndicator
+                                                                            prev={
+                                                                                latestTerm.previous_terms_avg_score
+                                                                            }
+                                                                            current={
+                                                                                item.avg_score
+                                                                            }
+                                                                        />
+                                                                    </td>
+                                                                </tr>
+                                                            ),
+                                                        )
+                                                    ) : (
+                                                        <tr>
+                                                            <td
+                                                                colSpan={3}
+                                                                className="px-4 py-8 text-center text-muted-foreground italic"
+                                                            >
+                                                                Chưa có dữ liệu
+                                                                điểm học phần.
+                                                            </td>
+                                                        </tr>
                                                     )}
                                                 </tbody>
                                             </table>
                                         </div>
 
                                         <div className="mt-6 grid grid-cols-2 gap-4">
-                                            <div className="rounded-lg bg-slate-50 p-4 text-center ring-1 ring-slate-100 flex flex-col justify-center">
+                                            <div className="rounded-lg bg-slate-50 p-4 text-center ring-1 ring-slate-100 flex flex-col justify-center min-h-[80px]">
                                                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
                                                     GPA
                                                 </p>
-                                                <div className="grid grid-cols-[1fr_auto_1fr] items-baseline w-full">
-                                                    <div />
-                                                    <p className="text-2xl font-black text-indigo-600">
-                                                        3.4
-                                                    </p>
-                                                    <div className="flex justify-start pl-2">
-                                                        <div className="flex items-center gap-0.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                                                            <TrendingUp className="size-3" />
-                                                            +0.2
+                                                {isMetricsLoading ? (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <Skeleton className="h-8 w-12" />
+                                                        <Skeleton className="h-4 w-16" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-[1fr_auto_1fr] items-baseline w-full">
+                                                        <div />
+                                                        <p className="text-2xl font-black text-indigo-600">
+                                                            {latestTerm?.term_avg_score.toFixed(
+                                                                1,
+                                                            ) || "0.0"}
+                                                        </p>
+                                                        <div className="flex justify-start pl-2">
+                                                            <TrendIndicator
+                                                                prev={
+                                                                    latestTerm?.previous_terms_avg_score ??
+                                                                    null
+                                                                }
+                                                                current={
+                                                                    latestTerm?.term_avg_score ??
+                                                                    0
+                                                                }
+                                                            />
                                                         </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
-                                            <div className="rounded-lg bg-slate-50 p-4 text-center ring-1 ring-slate-100 flex flex-col justify-center">
+                                            <div className="rounded-lg bg-slate-50 p-4 text-center ring-1 ring-slate-100 flex flex-col justify-center min-h-[80px]">
                                                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
                                                     Hạng
                                                 </p>
