@@ -34,4 +34,7 @@ export const queryKeys = {
   jobs: {
     status: (jobId: string) => ["jobs", "status", jobId] as const,
   },
+  students: {
+    detail: (sid: string) => ["students", "detail", sid] as const,
+  },
 };
