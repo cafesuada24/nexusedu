@@ -13,7 +13,11 @@ from src.domain.events.case_events import (
     CaseReviewRequestedEvent,
     StudentBookedEvent,
 )
-from src.domain.exceptions import CaseAlreadyAssignedError, InvalidStateTransitionError
+from src.domain.exceptions import (
+    CaseAlreadyAssignedError,
+    InvalidStateTransitionError,
+    ValidationError,
+)
 from src.domain.value_objects.status import InterventionStatus, MeetingMethod
 
 _INTERVENTION_STATUS_TRANSITION = {
@@ -58,6 +62,8 @@ class Case:
     closed_at: datetime | None = None
     assigned_advisor_id: EntityID | None = None
     appointment: Appointment | None = None
+    academic_summary: str | None = None
+    action_keys: list[str] | None = None
     version: int = field(default=0)
     _domain_events: list[DomainEvent] = field(
         default_factory=list[DomainEvent],
@@ -205,6 +211,14 @@ class Case:
                     comment=comment,
                 ),
             )
+
+    def set_ai_overview(self, summary: str, keys: list[str]) -> None:
+        """Enrich the case with an AI-generated academic overview."""
+        if len(keys) > 3:
+            raise ValidationError('Action keys cannot exceed 3 items.')
+
+        self.academic_summary = summary
+        self.action_keys = keys
 
     def _transition_to(self, next_status: InterventionStatus) -> None:
         """The 'Bouncer' that enforces the matrix."""
