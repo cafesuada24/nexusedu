@@ -1080,6 +1080,41 @@ export async function fetchCaseDetails(
   );
 }
 
+export const StudentCourseSchema = z.object({
+  course_name: z.string(),
+  avg_score: z.number(),
+});
+
+export const StudentTermMetricsSchema = z.object({
+  academic_year: z.number(),
+  semester: z.number(),
+  term_avg_score: z.number(),
+  previous_terms_avg_score: z.number().nullable(),
+  courses: z.array(StudentCourseSchema),
+});
+
+export const StudentMetricsResponseSchema = z.object({
+  terms: z.array(StudentTermMetricsSchema),
+});
+
+export type StudentMetricsResponse = z.infer<typeof StudentMetricsResponseSchema>;
+
+
+/**
+ * GET /students/{sid}/metrics/terms — returns academic metrics by term.
+ */
+export async function fetchStudentMetrics(
+  sid: string,
+): Promise<StudentMetricsResponse> {
+  return apiCall(
+    endpoint(`/students/${encodeURIComponent(sid)}/metrics/terms`),
+    { method: "GET" },
+    StudentMetricsResponseSchema,
+    "Không thể lấy dữ liệu học tập",
+  );
+}
+
+
 /**
  * GET /students/{sid} — returns details for a specific student.
  */

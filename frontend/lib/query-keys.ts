@@ -36,5 +36,6 @@ export const queryKeys = {
   },
   students: {
     detail: (sid: string) => ["students", "detail", sid] as const,
+    metrics: (sid: string) => ["students", "metrics", sid] as const,
   },
 };
