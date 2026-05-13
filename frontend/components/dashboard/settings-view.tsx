@@ -9,7 +9,6 @@ import {
     ShieldCheck,
     Palette,
     Check,
-    Smartphone,
     Upload,
     KeyRound,
     Monitor,
@@ -118,8 +117,6 @@ export function SettingsView() {
 
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
-    const [lang, setLang] = React.useState("vi");
-    const [motion, setMotion] = React.useState(true);
 
     React.useEffect(() => {
         setMounted(true);
@@ -749,7 +746,7 @@ export function SettingsView() {
                             Giao diện
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="grid gap-6">
+                    <CardContent className="grid gap-6 pb-8 pt-2">
                         <div className="grid gap-3">
                             <Label>Chủ đề</Label>
                             <div className="grid gap-3 sm:grid-cols-3">
@@ -786,40 +783,6 @@ export function SettingsView() {
                                     );
                                 })}
                             </div>
-                        </div>
-
-                        <Separator />
-
-                        <div className="grid gap-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="lang">Ngôn ngữ</Label>
-                                <Select value={lang} onValueChange={setLang}>
-                                    <SelectTrigger
-                                        id="lang"
-                                        className="rounded-lg"
-                                    >
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="vi">
-                                            Tiếng Việt
-                                        </SelectItem>
-                                        <SelectItem value="en">
-                                            English
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/30 px-4 py-3">
-                            <p className="text-sm font-medium">
-                                Hiệu ứng chuyển động
-                            </p>
-                            <Switch
-                                checked={motion}
-                                onCheckedChange={setMotion}
-                            />
                         </div>
                     </CardContent>
                 </Card>
