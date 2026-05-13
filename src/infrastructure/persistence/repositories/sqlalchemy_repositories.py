@@ -759,6 +759,8 @@ class SqlAlchemyCaseRepository:
             created_at=case.created_at,
             assigned_at=case.assigned_at,
             closed_at=case.closed_at,
+            academic_summary=case.academic_summary,
+            action_keys=case.action_keys,
             version=case.version,
             assigned_advisor_id=case.assigned_advisor_id,
         )
@@ -798,6 +800,8 @@ class SqlAlchemyCaseRepository:
                 intervention_status=case.intervention_status,
                 assigned_at=case.assigned_at,
                 closed_at=case.closed_at,
+                academic_summary=case.academic_summary,
+                action_keys=case.action_keys,
                 version=case.version + 1,
             )
         )

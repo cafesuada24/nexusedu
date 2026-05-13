@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from src.application.dtos.data_dtos import DataIngestionCommand
+from src.application.interfaces.background_queue import BackgroundTaskQueue
 from src.core.identifiers import EntityID
 from src.domain.entities.case import Case
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -27,6 +28,7 @@ class DataCommandHandler:
         case_repo: CaseRepository,
         job_repo: JobRepository,
         anomaly_engine: AnomalyEngine,
+        task_queue: BackgroundTaskQueue,
     ):
         self.student_repo = student_repo
         self.activity_repo = activity_repo
@@ -34,6 +36,7 @@ class DataCommandHandler:
         self.case_repo = case_repo
         self.job_repo = job_repo
         self.anomaly_engine = anomaly_engine
+        self.task_queue = task_queue
 
     async def handle_ingest_data(self, command: DataIngestionCommand) -> Mapping[str, Any]:
         """Execute the data ingestion command with orchestration."""
@@ -110,5 +113,8 @@ class DataCommandHandler:
                 case_id = active_case.case_id
 
             new_at_risk_sids.append((sid, case_id))
+
+        if new_at_risk_sids:
+            await self.task_queue.enqueue('run_batch_case_overviews_task')
 
         return new_at_risk_sids

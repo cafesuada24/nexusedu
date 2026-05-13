@@ -312,6 +312,7 @@ class Container:
             self.case_repo,
             self.job_repo,
             self.anomaly_engine,
+            self.task_queue,
         )
 
     # Query Handlers
