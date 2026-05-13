@@ -35,7 +35,7 @@ class OutboxProcessor:
                 | (
                     OutboxEvent.processed_at
                     <= datetime.now(UTC) - timedelta(seconds=RETRY_DELAY_SECONDS)
-                )
+                ),
             )
             .order_by(OutboxEvent.created_at)
             .limit(limit)
@@ -51,7 +51,7 @@ class OutboxProcessor:
         if not events:
             return
 
-        logger.info('Processing outbox events', count=len(events))
+        logger.debug('Processing outbox events', count=len(events))
 
         for event in events:
             # Skip if max retries reached

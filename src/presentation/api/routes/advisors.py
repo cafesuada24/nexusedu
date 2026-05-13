@@ -334,7 +334,7 @@ async def add_day_off(
 async def delete_day_off(
     do_id: UUID,
     command_handler: Annotated[
-        ScheduleCommandHandler, Depends(get_schedule_command_handler)
+        ScheduleCommandHandler, Depends(get_schedule_command_handler),
     ],
     _: Annotated[User, Depends(require_scope(Scope.ADVISORS_WRITE))],
 ) -> dict[str, str]:

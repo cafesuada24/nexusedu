@@ -1,7 +1,5 @@
 """OpenTelemetry configuration and instrumentation."""
 
-import logging
-
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -12,7 +10,8 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from src.core.config import config
+import core.config
+from src.core.logger import logger
 
 
 def setup_otel(app: FastAPI | None = None) -> None:
@@ -25,7 +24,7 @@ def setup_otel(app: FastAPI | None = None) -> None:
     resource = Resource(
         attributes={
             SERVICE_NAME: 'nexusedu',
-        }
+        },
     )
 
     # Initialize TracerProvider
@@ -49,4 +48,4 @@ def setup_otel(app: FastAPI | None = None) -> None:
     # Instrument Redis
     RedisInstrumentor().instrument()
 
-    logging.info('OpenTelemetry instrumentation completed.')
+    logger.info('OpenTelemetry instrumentation completed.')

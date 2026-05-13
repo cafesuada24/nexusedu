@@ -1073,14 +1073,14 @@ class SqlAlchemyScheduleRepository:
         self.session = session
 
     async def get_working_hours(
-        self, advisor_id: uuid.UUID
+        self, advisor_id: uuid.UUID,
     ) -> list[DomainWorkingHours]:
         """Fetch all recurring working hour blocks for an advisor."""
         stmt = (
             select(OrmWorkingHours)
             .where(OrmWorkingHours.advisor_id == advisor_id)
             .order_by(
-                OrmWorkingHours.day_of_week.asc(), OrmWorkingHours.start_time.asc()
+                OrmWorkingHours.day_of_week.asc(), OrmWorkingHours.start_time.asc(),
             )
         )
         result = await self.session.execute(stmt)
