@@ -4,7 +4,7 @@ import os
 from typing import Annotated, Literal
 
 from dotenv import load_dotenv
-from pydantic import AnyHttpUrl, Field, PositiveInt
+from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
@@ -28,6 +28,7 @@ class AppConfig(BaseSettings):
     worker_job_timeout_sec: PositiveInt
     redis_host: str
     redis_port: Annotated[int, Field(ge=1, le=65535)]
+    redis_password: str | None = None
     allowed_origins: str
 
     booking_url_template: str
@@ -53,6 +54,7 @@ class DevConfig(AppConfig):
     worker_job_timeout_sec: PositiveInt = 60
     redis_host: str = 'localhost'
     redis_port: Annotated[int, Field(ge=1, le=65535)] = 6379
+    redis_password: str | None = None
     allowed_origins: str = ''
 
     booking_url_template: str = 'http://localhost:3000/booking?cid={cid}'
@@ -78,6 +80,7 @@ class ProdConfig(AppConfig):
     worker_job_timeout_sec: PositiveInt
     redis_host: str
     redis_port: Annotated[int, Field(ge=1, le=65535)]
+    redis_password: str
     allowed_origins: str
 
     booking_url_template: str

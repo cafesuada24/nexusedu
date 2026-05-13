@@ -34,12 +34,19 @@ class AppState:
 
 async def redis_pubsub_listener() -> None:
     """Listens to Redis Pub/Sub and broadcasts messages to WebSockets."""
-    r = redis.Redis(host=config.redis_host, port=config.redis_port, decode_responses=True)
+    r = redis.Redis(
+        host=config.redis_host,
+        port=config.redis_port,
+        decode_responses=True,
+        password=config.redis_password,
+    )
     pubsub = r.pubsub()
 
     try:
         await pubsub.subscribe('ws_updates')
-        logger.info('API Lifecycle: Redis Pub/Sub listener started on channel "ws_updates".')
+        logger.info(
+            'API Lifecycle: Redis Pub/Sub listener started on channel "ws_updates".'
+        )
         async for message in pubsub.listen():
             if message['type'] == 'message':
                 try:
@@ -54,7 +61,9 @@ async def redis_pubsub_listener() -> None:
                     else:
                         await ws_manager.broadcast(data)
                 except Exception as e:
-                    logger.error('API Lifecycle: Error processing Pub/Sub message', error=str(e))
+                    logger.error(
+                        'API Lifecycle: Error processing Pub/Sub message', error=str(e)
+                    )
     except redis.ConnectionError:
         logger.info('API Lifecycle: Redis Pub/Sub listener stopping...')
     except asyncio.CancelledError:
@@ -85,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             RedisSettings(
                 host=config.redis_host,
                 port=config.redis_port,
+                password=config.redis_password,
             ),
         )
         logger.info('API Lifecycle: ARQ Redis Pool initialized.')

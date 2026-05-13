@@ -546,6 +546,7 @@ class WorkerSettings:
     redis_settings = RedisSettings(
         host=config.redis_host,
         port=config.redis_port,
+        password=config.redis_password,
     )
     max_jobs = config.worker_max_jobs
     job_timeout = config.worker_job_timeout_sec
