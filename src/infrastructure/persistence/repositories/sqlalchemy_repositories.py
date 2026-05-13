@@ -175,6 +175,10 @@ class SqlAlchemyStudentRepository:
             await self.session.execute(stmt)
 
 
+# Namespace for deterministic UUIDs for LMS activities
+LMS_ACTIVITY_NAMESPACE = uuid.UUID('9e40d045-8f2e-4b72-87a4-9e79496735e5')
+
+
 class SqlAlchemyActivityRepository:
     """SQLAlchemy implementation of the ActivityRepository."""
 
@@ -189,13 +193,24 @@ class SqlAlchemyActivityRepository:
             return
         # Ensure UUID fields are actual UUID objects (SQLAlchemy Uuid type requirement)
         for record in records:
-            if not record.get('activity_id'):
-                record['activity_id'] = generate_uuid()
-            elif isinstance(record['activity_id'], str):
-                record['activity_id'] = uuid.UUID(record['activity_id'])
-
             if 'sid' in record and isinstance(record['sid'], str):
                 record['sid'] = uuid.UUID(record['sid'])
+
+            if not record.get('activity_id'):
+                # Generate deterministic UUID if activity_id is missing
+                # Format: sid-course_id-test_type-year-sem-week
+                # Ensures re-uploading the same term data updates existing records.
+                sid = record.get('sid', '')
+                course_id = record.get('course_id', '')
+                test_type = record.get('test_type', '')
+                year = record.get('academic_year', '')
+                sem = record.get('semester', '')
+                week = record.get('week', '')
+
+                name = f'{sid}-{course_id}-{test_type}-{year}-{sem}-{week}'
+                record['activity_id'] = uuid.uuid5(LMS_ACTIVITY_NAMESPACE, name)
+            elif isinstance(record['activity_id'], str):
+                record['activity_id'] = uuid.UUID(record['activity_id'])
 
         # Manual Chunking to avoid "too many variables" error (SQLite limit is ~999)
         # Configurable via DB_INGEST_CHUNK_SIZE env var.
@@ -208,6 +223,17 @@ class SqlAlchemyActivityRepository:
                 table=Activity,
                 records=batch,
                 index_elements=['activity_id'],
+                update_cols=[
+                    'sid',
+                    'course_id',
+                    'course_name',
+                    'test_type',
+                    'score',
+                    'timestamp',
+                    'academic_year',
+                    'semester',
+                    'week',
+                ],
             )
 
             await self.session.execute(stmt)
@@ -235,8 +261,92 @@ class SqlAlchemyActivityRepository:
                 Activity.week,
             )
         )
-        result = await self.session.execute(stmt)
-        return [dict(row) for row in result.mappings().all()]
+        res = await self.session.execute(stmt)
+        return [dict(r._mapping) for r in res.all()]
+
+    async def get_student_term_metrics(
+        self,
+        sid: EntityID,
+        academic_year: int | None = None,
+        semester: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Retrieve term-based metrics and course details for a student."""
+        # 1. Identify all terms for the student
+        term_stmt = (
+            select(
+                Activity.academic_year,
+                Activity.semester,
+            )
+            .where(Activity.sid == sid)
+            .distinct()
+        )
+        if academic_year:
+            term_stmt = term_stmt.where(Activity.academic_year == academic_year)
+        if semester:
+            term_stmt = term_stmt.where(Activity.semester == semester)
+
+        term_stmt = term_stmt.order_by(
+            Activity.academic_year.desc(),
+            Activity.semester.desc(),
+        )
+
+        terms_res = await self.session.execute(term_stmt)
+        terms = terms_res.all()
+
+        results = []
+        for t_yr, t_sem in terms:
+            # 2. Get term average
+            term_avg_stmt = select(func.avg(Activity.score)).where(
+                Activity.sid == sid,
+                Activity.academic_year == t_yr,
+                Activity.semester == t_sem,
+            )
+            term_avg = (await self.session.execute(term_avg_stmt)).scalar() or 0.0
+
+            # 3. Get previous terms average
+            prev_avg_stmt = select(func.avg(Activity.score)).where(
+                Activity.sid == sid,
+                (Activity.academic_year < t_yr)
+                | ((Activity.academic_year == t_yr) & (Activity.semester < t_sem)),
+            )
+            prev_avg = (await self.session.execute(prev_avg_stmt)).scalar()
+
+            # 4. Get courses in this term
+            courses_stmt = (
+                select(
+                    Activity.course_id,
+                    Activity.course_name,
+                    func.avg(Activity.score).label('avg_score'),
+                )
+                .where(
+                    Activity.sid == sid,
+                    Activity.academic_year == t_yr,
+                    Activity.semester == t_sem,
+                )
+                .group_by(Activity.course_id, Activity.course_name)
+            )
+            courses_res = await self.session.execute(courses_stmt)
+            courses = [
+                {
+                    'course_id': c.course_id,
+                    'course_name': c.course_name,
+                    'avg_score': c.avg_score,
+                }
+                for c in courses_res.all()
+            ]
+
+            results.append(
+                {
+                    'academic_year': t_yr,
+                    'semester': t_sem,
+                    'term_avg_score': term_avg,
+                    'previous_terms_avg_score': prev_avg,
+                    'courses': courses,
+                },
+            )
+
+        return results
+
 
 
 class SqlAlchemyStatusHistoryRepository:

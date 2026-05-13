@@ -26,12 +26,21 @@ class GetStudentQuery:
     sid: EntityID
 
 
+@dataclass(frozen=True)
+class GetStudentTermMetricsQuery:
+    """Query to retrieve term metrics for a single student."""
+
+    sid: EntityID
+    academic_year: int | None = None
+    semester: int | None = None
+
+
 class StudentDTO(BaseModel):
     """DTO for student data."""
 
     sid: EntityID
-    student_name: str | None
-    email: str | None
+    student_name: str
+    email: str
     major: str
     current_risk_status: RiskStatus
     intervention_status: InterventionStatus | None = None
@@ -45,3 +54,28 @@ class AlertDTO(BaseModel):
 
     student: StudentDTO
     alert_details: dict[str, Any]
+
+
+class TermCourseMetricsDTO(BaseModel):
+    """DTO for course metrics in a term."""
+
+    course_id: str
+    course_name: str
+    avg_score: float
+
+
+class TermMetricsDTO(BaseModel):
+    """DTO for student performance in a specific term."""
+
+    academic_year: int
+    semester: int
+    term_avg_score: float
+    previous_terms_avg_score: float | None
+    courses: list[TermCourseMetricsDTO]
+
+
+class StudentTermMetricsDTO(BaseModel):
+    """DTO for student term metrics response."""
+
+    sid: EntityID
+    terms: list[TermMetricsDTO]
