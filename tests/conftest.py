@@ -61,11 +61,11 @@ def mock_baml(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Mock BAML client to avoid live LLM calls during tests."""
     mock_b = MagicMock()
     mock_b.Respond.return_value = 'OK'
+    mock_b.CheckHealth = AsyncMock(return_value='OK')
     mock_b.GenerateDraftEmail = AsyncMock(return_value='AI Draft content')
     mock_b.GenerateSQL.return_value = MagicMock(sql='SELECT 1')
 
     # Core API and Infrastructure components
-    monkeypatch.setattr('src.presentation.api.routes.health.b', mock_b)
     monkeypatch.setattr('src.infrastructure.extern.guardrails_drafting_service.b_async', mock_b)
 
     return mock_b
@@ -76,8 +76,15 @@ def mock_arq_pool(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """Mock ARQ Redis pool creation."""
     mock_pool = AsyncMock()
     mock_pool.enqueue_job = AsyncMock(return_value=MagicMock(job_id='test_job_id'))
-    mock_pool.get = AsyncMock(return_value=None)
+
+    async def mock_get(key):
+        if key == 'ai_health_status':
+            return b'healthy'
+        return None
+
+    mock_pool.get = AsyncMock(side_effect=mock_get)
     mock_pool.setex = AsyncMock(return_value=True)
+    mock_pool.ping = AsyncMock(return_value=True)
 
     monkeypatch.setattr(
         'src.presentation.api.lifecycle.create_pool',

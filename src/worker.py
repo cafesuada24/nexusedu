@@ -22,6 +22,7 @@ from src.core.otel import setup_otel
 from src.domain.value_objects.status import JobStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 from src.infrastructure.database.session import get_async_session
+from src.infrastructure.extern.baml_client.async_client import b
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
@@ -31,6 +32,26 @@ async def on_startup(_ctx: dict[str, Any]) -> None:
     """Initializes observability and other resources on worker startup."""
     setup_otel()
     logger.info('Worker: OpenTelemetry initialized.')
+
+
+async def run_ai_health_check_task(ctx: dict[str, Any]) -> None:
+    """Task to check AI provider health and cache the result in Redis."""
+    redis = ctx.get('redis')
+    if not redis:
+        logger.error('Worker: Redis not found in context, skipping AI health check')
+        return
+
+    try:
+        # Call the lightweight health check BAML function
+        await b.CheckHealth()
+        ai_status = 'healthy'
+    except Exception as e:
+        ai_status = f'unhealthy: {str(e)}'
+        logger.error('Worker: AI health check failed', error=str(e))
+
+    # Cache the result for 5 minutes (300 seconds)
+    await redis.set('ai_health_status', ai_status, ex=300)
+    logger.debug('Worker: AI health check status cached', status=ai_status)
 
 
 async def run_email_draft_task(
@@ -526,6 +547,7 @@ class WorkerSettings:
     """ARQ Worker configuration."""
 
     functions = [
+        run_ai_health_check_task,
         run_email_draft_task,
         run_dispatch_email_task,
         run_dispatch_review_email_task,
@@ -542,6 +564,7 @@ class WorkerSettings:
     on_startup = on_startup
     cron_jobs = [
         cron(run_outbox_poller_task, second=set(range(0, 60, 5))),
+        cron(run_ai_health_check_task, minute=set(range(0, 60))),
     ]
     redis_settings = RedisSettings(
         host=config.redis_host,

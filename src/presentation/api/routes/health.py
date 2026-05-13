@@ -9,7 +9,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.database.session import get_async_session
-from src.infrastructure.extern.baml_client import b
 from src.presentation.dependencies.providers import get_arq_pool
 
 router = APIRouter(tags=['monitoring'])
@@ -25,13 +24,16 @@ async def health_check(
     Returns:
         A dictionary containing the status of various system components.
     """
-    # 1. Check AI Connectivity (BAML/LLM)
-    try:
-        # This ensures the API key and provider are actually working.
-        test_call = b.Respond("Connectivity test. Reply with 'OK'.")
-        ai_status = 'healthy' if test_call else 'unhealthy: empty response'
-    except Exception as e:
-        ai_status = f'unhealthy: {str(e)}'
+    # 1. Check AI Connectivity (Cached result from background worker)
+    if arq_pool:
+        cached_status = await arq_pool.get('ai_health_status')
+        if cached_status:
+            # arq returns bytes, so we decode it
+            ai_status = cached_status.decode('utf-8') if isinstance(cached_status, bytes) else str(cached_status)
+        else:
+            ai_status = 'unhealthy: pending first background check'
+    else:
+        ai_status = 'unhealthy: cache pool not initialized'
 
     # 2. Check Database Connectivity
     try:

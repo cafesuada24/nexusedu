@@ -23,6 +23,12 @@ class LlmResponseParser:
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
 
+    def CheckHealth(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> str:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="CheckHealth", llm_response=llm_response, mode="request")
+        return typing.cast(str, __result__)
+
     def EvaluateDraftTone(
         self, llm_response: str, baml_options: BamlCallOptions = {},
     ) -> types.ToneEvaluation:
@@ -66,6 +72,12 @@ class LlmStreamParser:
 
     def __init__(self, options: DoNotUseDirectlyCallManager):
         self.__options = options
+
+    def CheckHealth(
+        self, llm_response: str, baml_options: BamlCallOptions = {},
+    ) -> str:
+        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="CheckHealth", llm_response=llm_response, mode="stream")
+        return typing.cast(str, __result__)
 
     def EvaluateDraftTone(
         self, llm_response: str, baml_options: BamlCallOptions = {},
