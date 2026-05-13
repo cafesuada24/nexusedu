@@ -46,21 +46,18 @@ export function ImpactHero() {
   const failedCount = alerts.filter(
     (a) => a.intervention_status === "failed",
   ).length
+  const totalCompleted = successCount + failedCount
+  const successRate =
+    totalCompleted > 0 ? Math.round((successCount / totalCompleted) * 100) : 0
   const totalCount = alerts.length || 1
 
   const stats: MiniStat[] = [
     { icon: Mail, value: "89%", label: "Phản hồi <24h", tone: "success" },
     {
       icon: CheckCircle2,
-      value: String(successCount),
-      label: "Thành công",
+      value: `${successRate}%`,
+      label: "Tỷ lệ thành công",
       tone: "success",
-    },
-    {
-      icon: XCircle,
-      value: String(failedCount),
-      label: "Thất bại",
-      tone: "destructive",
     },
   ]
 
@@ -122,7 +119,10 @@ export function ImpactHero() {
         </div>
 
         {/* Mini stats — icons + numbers only */}
-        <ul role="list" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+        <ul
+          role="list"
+          className="flex flex-col justify-center gap-3 lg:h-full"
+        >
           {stats.map((s) => {
             const Icon = s.icon
             const tint =
@@ -144,7 +144,7 @@ export function ImpactHero() {
             return (
               <li
                 key={s.label}
-                className="flex items-center gap-3 rounded-xl border border-border/60 bg-card/60 p-3"
+                className="flex flex-1 items-center gap-4 rounded-xl border border-border/60 bg-card/60 p-4"
               >
                 <span
                   className={cn(
