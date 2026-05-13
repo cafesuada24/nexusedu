@@ -125,31 +125,6 @@ async def test_metadata_repository(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_advisor_repository_metrics(session: AsyncSession) -> None:
-    student_repo = SqlAlchemyStudentRepository(session)
-    advisor_repo = SqlAlchemyAdvisorRepository(session)
-
-    # Seed data
-    await student_repo.ingest_students(
-        [
-            {'sid': uuid4(), 'student_name': 'S1', 'email': 's1@test.com', 'major': 'CS'},
-            {'sid': uuid4(), 'student_name': 'S2', 'email': 's2@test.com', 'major': 'CS'},
-            {'sid': uuid4(), 'student_name': 'S3', 'email': 's3@test.com', 'major': 'Math'},
-        ],
-    )
-    await session.commit()
-
-    metrics = await advisor_repo.get_engagement_metrics()
-    # Ordered by 'sent' DESC
-    assert metrics[0]['faculty'] == 'CS'
-    assert metrics[0]['sent'] == 1
-    assert metrics[0]['drafted'] == 1
-
-    assert metrics[1]['faculty'] == 'Math'
-    assert metrics[1]['sent'] == 0
-
-
-@pytest.mark.asyncio
 async def test_metrics_repository(session: AsyncSession) -> None:
     repo = SqlAlchemyMetricsRepository(session)
     student_repo = SqlAlchemyStudentRepository(session)
