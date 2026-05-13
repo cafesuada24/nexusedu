@@ -41,7 +41,7 @@ class SqlAlchemyAdvisorAvailabilityQueryService(AdvisorAvailabilityQueryService)
         """Directly calculate available UTC timeslots."""
         # 1. Fetch Working Hours
         wh_stmt = select(AdvisorWorkingHours).where(
-            AdvisorWorkingHours.advisor_id == advisor_id
+            AdvisorWorkingHours.advisor_id == advisor_id,
         )
         wh_result = await self.session.execute(wh_stmt)
         working_hours = wh_result.scalars().all()
@@ -105,7 +105,7 @@ class SqlAlchemyAdvisorAvailabilityQueryService(AdvisorAvailabilityQueryService)
                 while cursor + timedelta(minutes=slot_duration_minutes) <= local_end:
                     utc_slot_start = cursor.astimezone(UTC)
                     utc_slot_end = utc_slot_start + timedelta(
-                        minutes=slot_duration_minutes
+                        minutes=slot_duration_minutes,
                     )
 
                     if utc_slot_start > now_utc:
@@ -131,7 +131,7 @@ class SqlAlchemyAdvisorAvailabilityQueryService(AdvisorAvailabilityQueryService)
         """Fetch the full schedule directly from the database."""
         # 1. Fetch Working Hours
         wh_stmt = select(AdvisorWorkingHours).where(
-            AdvisorWorkingHours.advisor_id == advisor_id
+            AdvisorWorkingHours.advisor_id == advisor_id,
         )
         wh_result = await self.session.execute(wh_stmt)
         working_hours = wh_result.scalars().all()

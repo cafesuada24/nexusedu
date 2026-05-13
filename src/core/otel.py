@@ -1,7 +1,5 @@
 """OpenTelemetry configuration and instrumentation."""
 
-import logging
-
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -10,9 +8,10 @@ from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from src.core.config import config
+import core.config
+from src.core.logger import logger
 
 
 def setup_otel(app: FastAPI | None = None) -> None:
@@ -22,20 +21,18 @@ def setup_otel(app: FastAPI | None = None) -> None:
         app: Optional FastAPI application instance to instrument.
     """
     # Define the service resource
-    resource = Resource(attributes={
-        SERVICE_NAME: "nexusedu",
-    })
+    resource = Resource(
+        attributes={
+            SERVICE_NAME: 'nexusedu',
+        },
+    )
 
     # Initialize TracerProvider
     provider = TracerProvider(resource=resource)
 
-    # Decide on exporter based on environment
-    if config.environment == "production":
-        # In production, we typically send to an OTLP collector
-        exporter = OTLPSpanExporter()
-    else:
-        # In development, console output is helpful
-        exporter = ConsoleSpanExporter()
+    # Use the default OTLPSpanExporter. It automatically respects standard OTel
+    # environment variables like OTEL_EXPORTER_OTLP_ENDPOINT.
+    exporter = OTLPSpanExporter()
 
     processor = BatchSpanProcessor(exporter)
     provider.add_span_processor(processor)
@@ -51,5 +48,4 @@ def setup_otel(app: FastAPI | None = None) -> None:
     # Instrument Redis
     RedisInstrumentor().instrument()
 
-
-    logging.info("OpenTelemetry instrumentation completed.")
+    logger.info('OpenTelemetry instrumentation completed.')

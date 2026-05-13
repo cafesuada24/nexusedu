@@ -84,7 +84,7 @@ class GuardrailsEmailDraftingService:
                     punitive_word=word,
                 )
                 raise TonePolicyViolationError(
-                    f'Academic shaming or punitive tone detected: "{word}"'
+                    f'Academic shaming or punitive tone detected: "{word}"',
                 )
 
         logger.info('Tone evaluation passed (SAFE).')
