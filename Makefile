@@ -1,6 +1,7 @@
 .PHONY: generate_baml test lint start stop restart logs migrate makemigrations
 
 start:
+	@if [ ! -f .env ]; then cp .env.example .env; fi
 	docker compose up --build -d
 
 stop:
@@ -13,6 +14,9 @@ logs:
 
 migrate:
 	docker compose exec api alembic upgrade head
+
+reset_db:
+	./scripts/reset.sh
 
 makemigrations:
 	docker compose exec api alembic revision --autogenerate -m "$(m)"
