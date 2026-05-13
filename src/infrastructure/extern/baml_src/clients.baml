@@ -27,6 +27,18 @@ client<llm> Gemini_31_Flash_Lite {
   }
 }
 
+client<llm> Gemini_31_Flash_Lite_Health {
+  provider google-ai
+  retry_policy Exponential
+  options {
+    model "gemini-3.1-flash-lite-preview"
+    api_key env.GOOGLE_API_KEY
+    generationConfig {
+      maxOutputTokens 1024
+    }
+  }
+}
+
 // Example Google AI client (uncomment to use)
 client<llm> Gemma_4_31b {
   provider google-ai

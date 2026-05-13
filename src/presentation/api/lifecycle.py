@@ -45,7 +45,7 @@ async def redis_pubsub_listener() -> None:
     try:
         await pubsub.subscribe('ws_updates')
         logger.info(
-            'API Lifecycle: Redis Pub/Sub listener started on channel "ws_updates".'
+            'API Lifecycle: Redis Pub/Sub listener started on channel "ws_updates".',
         )
         async for message in pubsub.listen():
             if message['type'] == 'message':
@@ -62,7 +62,7 @@ async def redis_pubsub_listener() -> None:
                         await ws_manager.broadcast(data)
                 except Exception as e:
                     logger.error(
-                        'API Lifecycle: Error processing Pub/Sub message', error=str(e)
+                        'API Lifecycle: Error processing Pub/Sub message', error=str(e),
                     )
     except redis.ConnectionError:
         logger.info('API Lifecycle: Redis Pub/Sub listener stopping...')
