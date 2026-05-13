@@ -14,8 +14,12 @@ import { Button } from "@/components/ui/button"
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function AnalysisPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
+
   return (
     <TooltipProvider delayDuration={150}>
       <div className="flex w-full flex-1 flex-col gap-6">
@@ -29,12 +33,14 @@ export default function AnalysisPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button asChild size="sm" className="rounded-xl">
-              <Link href="/dashboard/import">
-                <Upload className="size-4" />
-                Nhập CSV
-              </Link>
-            </Button>
+            {isAdmin && (
+              <Button asChild size="sm" className="rounded-xl">
+                <Link href="/dashboard/import">
+                  <Upload className="size-4" />
+                  Nhập CSV
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="outline" size="sm" className="rounded-xl">
               <Link href="/dashboard/alerts">
                 Xem cảnh báo
@@ -57,13 +63,17 @@ export default function AnalysisPage() {
             <div className="max-w-md space-y-1">
               <h2 className="font-serif text-xl font-semibold">Sẵn sàng phân tích</h2>
               <p className="text-sm text-muted-foreground">
-                Hệ thống đã được kết nối với máy chủ. Tải lên dữ liệu CSV mới để bắt đầu quá trình nhận diện rủi ro tự động.
+                {isAdmin 
+                  ? "Hệ thống đã được kết nối với máy chủ. Tải lên dữ liệu CSV mới để bắt đầu quá trình nhận diện rủi ro tự động."
+                  : "Hệ thống đang hoạt động và giám sát dữ liệu sinh viên. Truy cập trung tâm cảnh báo để xem các trường hợp cần can thiệp."}
               </p>
             </div>
             <div className="flex gap-2">
-              <Button asChild className="rounded-xl">
-                <Link href="/dashboard/import">Nhập dữ liệu</Link>
-              </Button>
+              {isAdmin && (
+                <Button asChild className="rounded-xl">
+                  <Link href="/dashboard/import">Nhập dữ liệu</Link>
+                </Button>
+              )}
               <Button asChild variant="outline" className="rounded-xl">
                 <Link href="/dashboard/alerts">Kiểm tra cảnh báo</Link>
               </Button>
