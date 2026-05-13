@@ -197,7 +197,11 @@ async def get_my_points(
 #     except ValueError as e:
 #         raise HTTPException(status_code=400, detail='Invalid advisor ID format') from e
 #     except Exception as e:
-#         logger.error(f'Failed to fetch badges for advisor {advisor_id}: {e}')
+#         logger.error(
+#             'Failed to fetch badges for advisor',
+#             advisor_id=advisor_id,
+#             error=str(e),
+#         )
 #         raise HTTPException(
 #             status_code=500,
 #             detail='Failed to retrieve advisor badges',

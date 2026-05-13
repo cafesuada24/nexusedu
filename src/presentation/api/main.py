@@ -8,7 +8,7 @@ import time
 from collections.abc import Awaitable, Callable
 
 import structlog
-from fastapi import APIRouter, FastAPI, Request, Response, status
+from fastapi import APIRouter, FastAPI, Request, Response, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -79,6 +79,15 @@ async def log_requests(
         duration=process_time,
     )
     return response
+
+
+@app.exception_handler(WebSocketDisconnect)
+async def websocket_disconnect_handler(_request: Request, _exc: WebSocketDisconnect) -> None:
+    """Handles WebSocketDisconnect exceptions.
+
+    These are expected when a client disconnects and don't need to be logged as errors.
+    """
+    return
 
 
 @app.exception_handler(Exception)

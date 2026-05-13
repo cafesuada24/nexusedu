@@ -36,7 +36,8 @@ class WebSocketManager:
     def disconnect(self, user_id: uuid.UUID, websocket: WebSocket) -> None:
         """Removes a connection from the active connections map."""
         if user_id in self.active_connections:
-            self.active_connections[user_id].remove(websocket)
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
         logger.debug(

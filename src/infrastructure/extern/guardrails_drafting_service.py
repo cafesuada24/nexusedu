@@ -56,7 +56,7 @@ class GuardrailsEmailDraftingService:
 
         except (ToxicityDetectedError, TonePolicyViolationError):
             raise
-        except Exception as e:
+        except (Exception, TimeoutError) as e:
             logger.error('Draft generation error', error=str(e), exc_info=True)
             raise DraftGenerationError(f'Failed to generate valid draft: {e}') from e
 

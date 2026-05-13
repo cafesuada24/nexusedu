@@ -39,7 +39,7 @@ async def test_run_batch_case_overviews_task_success():
         with patch("src.worker.Container") as MockContainer:
             container = MockContainer.return_value
             case_repo = container.case_repo
-            student_query_service = container.get_student_query_service.return_value
+            student_query_service = container.student_query_service
             
             # Mock student metrics
             mock_metrics = MagicMock()

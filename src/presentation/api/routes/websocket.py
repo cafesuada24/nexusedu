@@ -26,7 +26,8 @@ async def get_ws_current_user(
         BaseUserManager[User, UUID],
         Depends(get_user_manager),
     ],
-) -> User:
+) -> User | None:
+    """Dependency to authenticate WebSocket connections via cookies."""
     strategy = get_jwt_strategy()
 
     token = websocket.cookies.get('nexusedu_auth_token')
@@ -35,10 +36,7 @@ async def get_ws_current_user(
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
         )
-
-        raise WebSocketDisconnect(
-            code=status.WS_1008_POLICY_VIOLATION,
-        )
+        return None
 
     user = await strategy.read_token(
         token,
@@ -49,10 +47,7 @@ async def get_ws_current_user(
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
         )
-
-        raise WebSocketDisconnect(
-            code=status.WS_1008_POLICY_VIOLATION,
-        )
+        return None
 
     return user
 
@@ -60,26 +55,31 @@ async def get_ws_current_user(
 @router.websocket('/ws')
 async def websocket_endpoint(
     websocket: WebSocket,
-    user: Annotated[User, Depends(get_ws_current_user)],
+    user: Annotated[User | None, Depends(get_ws_current_user)],
 ) -> None:
     """Entry point for real-time WebSocket communication."""
-    await ws_manager.connect(
-        user.id,
-        websocket,
-    )
+    if user is None:
+        return
 
     try:
+        await ws_manager.connect(
+            user.id,
+            websocket,
+        )
+
         while True:
             await websocket.receive()
 
     except WebSocketDisconnect:
         logger.info(
-            f'WS disconnected: {user.id}',
+            'WS disconnected',
+            user_id=str(user.id),
         )
 
     except Exception:
         logger.error(
-            f'Unexpected WS error: {user.id}',
+            'Unexpected WS error',
+            user_id=str(user.id),
         )
 
     finally:
