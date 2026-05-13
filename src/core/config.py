@@ -1,30 +1,59 @@
 """Centralized application config."""
 
+import os
 from typing import Annotated, Literal
 
-from dotenv import load_dotenv
-from pydantic import Field, PositiveInt, PostgresDsn
+from pydantic import AnyHttpUrl, Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()
+# from dotenv import load_dotenv
+# load_dotenv()
 
 
-class Config(BaseSettings):
+class AppConfig(BaseSettings):
     """Application config."""
+
+    model_config = SettingsConfigDict(
+        env_file='.env',
+        env_file_encoding='utf-8',
+        extra='ignore',
+    )
 
     environment: Literal['production', 'development', 'test'] = 'development'
     log_level: Literal['INFO', 'WARNING', 'ERROR', 'DEBUG'] = 'DEBUG'
-    jwt_secret: str = 'PLEASE_SET_ME_IN_PRODUCTION'
+    jwt_secret: str
+    database_url: str
+    db_ingest_chunk_size: PositiveInt
+    worker_max_jobs: PositiveInt
+    worker_job_timeout_sec: PositiveInt
+    redis_host: str
+    redis_port: Annotated[int, Field(ge=1, le=65535)]
+    allowed_origins: str
+
+    booking_url_template: str
+    review_url_template: str
+
+    # SMTP Settings
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str
+
+
+class DevConfig(AppConfig):
+    """Development application config."""
+
+    environment: Literal['production', 'development', 'test'] = 'development'
+    log_level: Literal['INFO', 'WARNING', 'ERROR', 'DEBUG'] = 'DEBUG'
+    jwt_secret: str = 'SET_ME_IN_PRODUCTION_HEHEHE'
     database_url: str = 'sqlite+aiosqlite:///./data/app.db'
-    pg_dsn: PostgresDsn | None = None
-    motherduck_token: str | None = None
     db_ingest_chunk_size: PositiveInt = 50
     worker_max_jobs: PositiveInt = 5
     worker_job_timeout_sec: PositiveInt = 60
     redis_host: str = 'localhost'
     redis_port: Annotated[int, Field(ge=1, le=65535)] = 6379
     allowed_origins: str = ''
-
 
     booking_url_template: str = 'http://localhost:3000/booking?cid={cid}'
     review_url_template: str = 'http://localhost:3000/review?token={token}'
@@ -37,11 +66,29 @@ class Config(BaseSettings):
     smtp_from_email: str = 'noreply@example.com'
 
 
-    model_config = SettingsConfigDict(
-        # env_file='.env',
-        # env_file_encoding='utf-8',
-        extra='ignore',
-    )
+class ProdConfig(AppConfig):
+    """Production application config."""
+
+    environment: Literal['production', 'development', 'test'] = 'production'
+    log_level: Literal['INFO', 'WARNING', 'ERROR', 'DEBUG'] = 'INFO'
+    jwt_secret: str
+    database_url: str
+    db_ingest_chunk_size: PositiveInt
+    worker_max_jobs: PositiveInt
+    worker_job_timeout_sec: PositiveInt
+    redis_host: str
+    redis_port: Annotated[int, Field(ge=1, le=65535)]
+    allowed_origins: str
+
+    booking_url_template: str
+    review_url_template: str
+
+    # SMTP Settings
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str
 
 
-config = Config()
+config = ProdConfig() if os.getenv('ENVIRONMENT') == 'production' else DevConfig()

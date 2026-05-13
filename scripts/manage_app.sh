@@ -28,7 +28,7 @@ function shutdown_apps() {
 
 function shutdown_infra() {
     log_info "Stopping infrastructure containers..."
-    docker stop arppool007 mailpit007 2>/dev/null
+    docker stop arppool007 mailpit007 jaeger007 2>/dev/null
 }
 
 function stop_all() {
@@ -44,7 +44,7 @@ trap stop_all SIGINT SIGTERM
 
 case "$1" in
     start)
-        log_info "Starting Application (Redis + API + Worker)..."
+        log_info "Starting Application (Redis + Mailpit + Jaeger + API + Worker)..."
         
         # 0. Ensure Redis is running
         if [ "$(docker ps -q -f name=arppool007)" ]; then
@@ -66,6 +66,20 @@ case "$1" in
         else
             log_info "Creating and starting new Mailpit container 'mailpit007'..."
             docker run -d --name mailpit007 -p 1025:1025 -p 8025:8025 axllent/mailpit > /dev/null
+        fi
+
+        # 0c. Ensure Jaeger is running
+        if [ "$(docker ps -q -f name=jaeger007)" ]; then
+            log_success "Jaeger container 'jaeger007' is already running."
+        elif [ "$(docker ps -aq -f name=jaeger007)" ]; then
+            log_info "Starting existing Jaeger container 'jaeger007'..."
+            docker start jaeger007 > /dev/null
+        else
+            log_info "Creating and starting new Jaeger container 'jaeger007'..."
+            docker run -d --name jaeger007 \
+              -p 16686:16686 \
+              -p 4318:4318 \
+              jaegertracing/all-in-one:latest > /dev/null
         fi
 
         # 1. Start API in background

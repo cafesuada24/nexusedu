@@ -40,6 +40,11 @@ def configure_logger() -> None:
         level=log_level,
     )
 
+    if config.environment == 'production':
+        renderer = structlog.processors.JSONRenderer()
+    else:
+        renderer = structlog.dev.ConsoleRenderer()
+
     processors: list[Processor] = [
         # Merges contextvars (bound context) into the log event
         structlog.contextvars.merge_contextvars,
@@ -51,8 +56,8 @@ def configure_logger() -> None:
         structlog.processors.TimeStamper(fmt='iso'),
         # Adds OpenTelemetry Trace/Span IDs for correlation
         add_opentelemetry_ids,
-        # Renders the final event as a JSON string
-        structlog.processors.JSONRenderer(),
+        # Renders the final event
+        renderer,
     ]
 
     structlog.configure(
