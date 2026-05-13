@@ -129,9 +129,15 @@ async def run_email_draft_task(
                     )
 
                 except Exception as ws_err:
-                    logger.error('Worker: Failed to publish WS failure', error=str(ws_err))
+                    logger.error(
+                        'Worker: Failed to publish WS failure', error=str(ws_err)
+                    )
 
-            logger.error('Worker: Email generated job failed or timed out', case_id=str(case_id), error=str(e))
+            logger.error(
+                'Worker: Email generated job failed or timed out',
+                case_id=str(case_id),
+                error=str(e),
+            )
             if isinstance(e, asyncio.CancelledError):
                 raise e
 
@@ -154,7 +160,11 @@ async def run_dispatch_email_task(
         assert case.assigned_advisor_id is not None
         email = await email_repo.get_by_case(case_id)
         student = await student_repo.get_by_id(case.sid)
-        logger.info('Worker: Dispatching intervention email', case_id=str(case_id), email=student.email)
+        logger.info(
+            'Worker: Dispatching intervention email',
+            case_id=str(case_id),
+            email=student.email,
+        )
 
         # Send actual email
         await email_sending_service.send_email(
@@ -186,7 +196,9 @@ async def run_dispatch_email_task(
                     user_id=advisor.user_id,
                 )
         except Exception as ws_err:
-            logger.error('Worker: Failed to publish WS status update', error=str(ws_err))
+            logger.error(
+                'Worker: Failed to publish WS status update', error=str(ws_err)
+            )
 
         points = gamification_service.calculate_points(
             gamification_service.Action.SEND_EMAIL,
@@ -212,7 +224,9 @@ async def run_dispatch_review_email_task(
     target_email: str,
 ) -> None:
     """Worker task to send a review email to the student."""
-    logger.info('Worker: Dispatching review email', case_id=str(case_id), email=target_email)
+    logger.info(
+        'Worker: Dispatching review email', case_id=str(case_id), email=target_email
+    )
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -255,9 +269,15 @@ async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None
                 if redis:
                     cache_key = f'advisor_badges:{advisor_id}'
                     await redis.delete(cache_key)
-                    logger.info('Worker: Invalidated cache for advisor', advisor_id=str(advisor_id))
+                    logger.info(
+                        'Worker: Invalidated cache for advisor',
+                        advisor_id=str(advisor_id),
+                    )
 
-            logger.info('Worker: Badge evaluation completed for advisor', advisor_id=str(advisor_id))
+            logger.info(
+                'Worker: Badge evaluation completed for advisor',
+                advisor_id=str(advisor_id),
+            )
         except Exception as e:
             logger.error('Worker: Failed to evaluate badges', error=str(e))
             raise
@@ -350,7 +370,11 @@ async def run_case_resolved_task(
     comment: str | None = None,
 ) -> None:
     """Worker task to handle CaseResolvedEvent."""
-    logger.info('Worker: Handling CaseResolvedEvent', case_id=str(case_id), satisfaction=str(satisfaction))
+    logger.info(
+        'Worker: Handling CaseResolvedEvent',
+        case_id=str(case_id),
+        satisfaction=str(satisfaction),
+    )
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -392,7 +416,11 @@ async def run_case_failed_task(
     comment: str | None = None,
 ) -> None:
     """Worker task to handle CaseFailedEvent."""
-    logger.info('Worker: Handling CaseFailedEvent', case_id=str(case_id), satisfaction=str(satisfaction))
+    logger.info(
+        'Worker: Handling CaseFailedEvent',
+        case_id=str(case_id),
+        satisfaction=str(satisfaction),
+    )
 
     async for session in get_async_session():
         container = Container(session=session)
@@ -491,7 +519,10 @@ async def run_auto_resolve_case_task(
             await handler.handle_submit_case_review(command)
             await session.commit()
         else:
-            logger.info('Worker: Case already finalized, skipping auto-resolve', case_id=str(case_id))
+            logger.info(
+                'Worker: Case already finalized, skipping auto-resolve',
+                case_id=str(case_id),
+            )
 
 
 async def run_batch_case_overviews_task(ctx: dict[str, Any]) -> None:
@@ -515,18 +546,25 @@ async def run_batch_case_overviews_task(ctx: dict[str, Any]) -> None:
             logger.debug('Worker: No NEW cases without AI overview found.')
             return
 
-        logger.info(f'Worker: Found {len(orm_cases)} NEW cases for AI overview generation.')
+        logger.info(
+            'Worker: Found NEW cases for AI overview generation',
+            count=len(orm_cases),
+        )
 
         for orm_case in orm_cases:
             try:
                 # 2. Fetch student metrics to provide context to AI
-                metrics = await student_query_service.get_student_term_metrics(sid=orm_case.sid)
+                metrics = await student_query_service.get_student_term_metrics(
+                    sid=orm_case.sid
+                )
 
                 # 3. Generate overview via BAML Gemini 3.1 Flash Lite
                 # Simple serialization for context
                 metrics_context = metrics.model_dump_json()
 
-                overview = await b.GenerateCaseOverview(performance_data=metrics_context)
+                overview = await b.GenerateCaseOverview(
+                    performance_data=metrics_context
+                )
 
                 # 4. Update the case domain entity (enforces max 3 action keys)
                 case_domain = DataMapper.to_domain_case(orm_case)
@@ -537,17 +575,18 @@ async def run_batch_case_overviews_task(ctx: dict[str, Any]) -> None:
 
                 # 5. Persist the change
                 await case_repo.save(case_domain)
-                logger.info('Worker: AI overview generated for case', case_id=str(orm_case.case_id))
-
-            except Exception as e:
+                await session.commit()
+                logger.info(
+                    'Worker: AI overview generated for case',
+                    case_id=str(orm_case.case_id),
+                )
+            except (Exception, TimeoutError) as e:
                 logger.error(
                     'Worker: AI overview generation failed for case',
                     case_id=str(orm_case.case_id),
                     error=str(e),
                 )
-                continue
 
-        await session.commit()
     logger.info('Worker: Finished batch AI overview generation task')
 
 
@@ -595,13 +634,24 @@ async def run_advisor_created_task(
             try:
                 await schedule_handler.handle_add_working_hours(morning_cmd)
                 await schedule_handler.handle_add_working_hours(afternoon_cmd)
-                logger.debug('Worker: Added default hours for advisor on day', advisor_id=str(advisor_id), day=day)
+                logger.debug(
+                    'Worker: Added default hours for advisor on day',
+                    advisor_id=str(advisor_id),
+                    day=day,
+                )
             except Exception as e:
-                logger.error('Worker: Failed to add default hours for advisor on day', advisor_id=str(advisor_id), day=day, error=str(e))
+                logger.error(
+                    'Worker: Failed to add default hours for advisor on day',
+                    advisor_id=str(advisor_id),
+                    day=day,
+                    error=str(e),
+                )
 
         await session.commit()
 
-    logger.info('Worker: Finished setting default hours for advisor', advisor_id=str(advisor_id))
+    logger.info(
+        'Worker: Finished setting default hours for advisor', advisor_id=str(advisor_id)
+    )
 
 
 class WorkerSettings:
