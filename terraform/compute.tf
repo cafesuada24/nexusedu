@@ -25,7 +25,7 @@ resource "google_compute_instance" "api_server" {
   machine_type = var.vm_machine_type
   zone         = var.zone
 
-  deletion_protection = true
+  deletion_protection = false
 
   ###########################################
   # Shielded VM
