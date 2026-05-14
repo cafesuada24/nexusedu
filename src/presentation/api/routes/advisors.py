@@ -26,6 +26,7 @@ from src.application.dtos.gamification_dtos import (
     GetLeaderboardQuery,
     LeaderboardEntryDTO,
 )
+from src.application.dtos.metrics_dtos import EmergencyDashboardDTO
 from src.application.dtos.pagination import PagedResponse
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
@@ -114,6 +115,25 @@ async def get_advisor_profile(
     """Get the current user's advisor profile."""
     query = GetAdvisorProfileQuery(advisor_id=advisor_id, include_metrics=metrics)
     return await advisor_query_handler.handle_get_advisor_profile(query)
+
+
+@router.get('/me/dashboard')
+async def get_my_dashboard(
+    query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
+    user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+) -> EmergencyDashboardDTO:
+    """Get the current advisor's emergency dashboard metrics."""
+    return await query_handler.handle_get_user_emergency_dashboard(user.id)
+
+
+@router.get('/{advisor_id}/dashboard')
+async def get_advisor_dashboard(
+    advisor_id: UUID,
+    query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
+    _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
+) -> EmergencyDashboardDTO:
+    """Retrieve the emergency dashboard metrics for a specific advisor."""
+    return await query_handler.handle_get_emergency_dashboard(advisor_id)
 
 
 @router.get('/{advisor_id}/availability')

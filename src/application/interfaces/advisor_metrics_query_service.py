@@ -3,6 +3,7 @@
 from typing import Protocol
 
 from src.application.dtos.advisor_dtos import PersonalAdvisorMetricsDTO
+from src.application.dtos.metrics_dtos import EmergencyDashboardDTO
 from src.core.identifiers import EntityID
 
 
@@ -14,4 +15,11 @@ class AdvisorMetricsQueryService(Protocol):
         advisor_id: EntityID,
     ) -> PersonalAdvisorMetricsDTO:
         """Calculate and retrieve personal performance metrics for an advisor."""
+        ...
+
+    async def get_emergency_dashboard(
+        self,
+        advisor_id: EntityID,
+    ) -> EmergencyDashboardDTO:
+        """Calculate and retrieve aggregate emergency dashboard metrics for an advisor."""
         ...
