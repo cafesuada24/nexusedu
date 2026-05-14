@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 from src.core.identifiers import EntityID, generate_uuid
 from src.domain.entities.appointment import Appointment
 from src.domain.entities.base import AggregateRoot
-from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
     CaseAcceptedEvent,
     CaseFailedEvent,
