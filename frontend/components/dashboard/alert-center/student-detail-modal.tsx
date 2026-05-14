@@ -21,6 +21,7 @@ import {
     TrendingDown,
     BrainCircuit,
     Info,
+    Loader2,
 } from "lucide-react";
 import { useStudent, useStudentMetrics } from "@/hooks/use-student-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -85,6 +86,38 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
         alert?.id || undefined,
         open,
     );
+
+    const hasAiData = Boolean(
+        alert?.aiOverview?.academicSummary ||
+            (alert?.aiOverview?.actionKeys &&
+                alert.aiOverview.actionKeys.length > 0),
+    );
+
+    const [showAiSection, setShowAiSection] = React.useState(true);
+    const [isAiGenerating, setIsAiGenerating] = React.useState(!hasAiData);
+
+    React.useEffect(() => {
+        if (!open) return;
+
+        if (hasAiData) {
+            setIsAiGenerating(false);
+            setShowAiSection(true);
+            return;
+        }
+
+        // If no data, start/reset the timeout
+        setIsAiGenerating(true);
+        setShowAiSection(true);
+
+        const timer = setTimeout(() => {
+            if (!hasAiData) {
+                setIsAiGenerating(false);
+                setShowAiSection(false);
+            }
+        }, 30000); // 30 seconds timeout
+
+        return () => clearTimeout(timer);
+    }, [open, hasAiData, alert?.id]);
 
     const latestTerm = metricsData?.terms?.[0];
 
@@ -398,56 +431,69 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                             </div>
 
                             {/* AI Overview Section (Full Width) */}
-                            <section className="rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50/50 to-indigo-50/30 p-6 shadow-sm">
-                                <div className="mb-4 flex items-center gap-2">
-                                    <div className="p-1.5 bg-purple-100 rounded-lg text-purple-600">
-                                        <BrainCircuit className="size-4" />
+                            {showAiSection && (
+                                <section className="rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50/50 to-indigo-50/30 p-6 shadow-sm">
+                                    <div className="mb-4 flex items-center gap-2">
+                                        <div className="p-1.5 bg-purple-100 rounded-lg text-purple-600">
+                                            <BrainCircuit className="size-4" />
+                                        </div>
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-purple-700">
+                                            AI Insights & Recommendations
+                                        </h4>
                                     </div>
-                                    <h4 className="text-xs font-bold uppercase tracking-widest text-purple-700">
-                                        AI Insights & Recommendations
-                                    </h4>
-                                </div>
-                                <div className="grid grid-cols-3 gap-6">
-                                    <div className="col-span-2 space-y-4">
-                                        <div className="rounded-lg bg-white/60 p-4 ring-1 ring-purple-100">
-                                            <p className="text-sm font-semibold text-slate-900 mb-1">
-                                                Phân tích rủi ro
-                                            </p>
-                                            <p className="text-sm text-slate-600 leading-relaxed">
-                                                {alert?.aiOverview
-                                                    ?.academicSummary ||
-                                                    "Chưa có phân tích từ AI cho hồ sơ này"}
+                                    {isAiGenerating ? (
+                                        <div className="flex flex-col items-center justify-center py-8">
+                                            <Loader2 className="h-8 w-8 animate-spin text-purple-600 mb-2" />
+                                            <p className="text-sm font-medium text-purple-700 animate-pulse">
+                                                AI đang phân tích dữ liệu...
                                             </p>
                                         </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <p className="text-[10px] font-bold uppercase text-purple-400">
-                                            Khuyến nghị hành động
-                                        </p>
-                                        {alert?.aiOverview?.actionKeys &&
-                                        alert.aiOverview.actionKeys.length >
-                                            0 ? (
-                                            <ul className="space-y-2">
-                                                {alert.aiOverview.actionKeys.map(
-                                                    (action, i) => (
-                                                        <li
-                                                            key={i}
-                                                            className="flex items-start gap-2 text-xs text-slate-700"
-                                                        >
-                                                            <div className="mt-1 size-1.5 rounded-full bg-purple-400 shrink-0" />
-                                                            {action}
-                                                        </li>
-                                                    ),
+                                    ) : (
+                                        <div className="grid grid-cols-3 gap-6">
+                                            <div className="col-span-2 space-y-4">
+                                                <div className="rounded-lg bg-white/60 p-4 ring-1 ring-purple-100">
+                                                    <p className="text-sm font-semibold text-slate-900 mb-1">
+                                                        Phân tích rủi ro
+                                                    </p>
+                                                    <p className="text-sm text-slate-600 leading-relaxed">
+                                                        {alert?.aiOverview
+                                                            ?.academicSummary ||
+                                                            "Chưa có phân tích từ AI cho hồ sơ này"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <p className="text-[10px] font-bold uppercase text-purple-400">
+                                                    Khuyến nghị hành động
+                                                </p>
+                                                {alert?.aiOverview
+                                                    ?.actionKeys &&
+                                                alert.aiOverview.actionKeys
+                                                    .length > 0 ? (
+                                                    <ul className="space-y-2">
+                                                        {alert.aiOverview.actionKeys.map(
+                                                            (action, i) => (
+                                                                <li
+                                                                    key={i}
+                                                                    className="flex items-start gap-2 text-xs text-slate-700"
+                                                                >
+                                                                    <div className="mt-1 size-1.5 rounded-full bg-purple-400 shrink-0" />
+                                                                    {action}
+                                                                </li>
+                                                            ),
+                                                        )}
+                                                    </ul>
+                                                ) : (
+                                                    <p className="text-xs text-slate-500 italic">
+                                                        Chưa có khuyến nghị hành
+                                                        động.
+                                                    </p>
                                                 )}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-xs text-slate-500 italic">
-                                                Chưa có khuyến nghị hành động.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </section>
+                                            </div>
+                                        </div>
+                                    )}
+                                </section>
+                            )}
                         </div>
                     ) : null}
                 </ScrollArea>
