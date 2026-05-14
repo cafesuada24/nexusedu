@@ -63,6 +63,55 @@ type ScheduleState = {
   overrides: Override[]
 }
 
+const HHMM_24H_REGEX = /^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/
+const HHMM_AMPM_REGEX = /^(\d{1,2}):([0-5]\d)\s*([AP]M)$/i
+const STRICT_HHMM_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+function normalizeTimeToHHMM(value: string): string {
+  const raw = value.trim()
+  if (!raw) return ""
+
+  const ampmMatch = raw.match(HHMM_AMPM_REGEX)
+  if (ampmMatch) {
+    const hour = Number(ampmMatch[1])
+    const minute = Number(ampmMatch[2])
+    if (Number.isNaN(hour) || Number.isNaN(minute) || hour < 1 || hour > 12) {
+      return ""
+    }
+    const period = ampmMatch[3].toUpperCase()
+    const hour24 = (hour % 12) + (period === "PM" ? 12 : 0)
+    return `${hour24.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+  }
+
+  const twentyFourMatch = raw.match(HHMM_24H_REGEX)
+  if (!twentyFourMatch) return ""
+
+  const hour = Number(twentyFourMatch[1])
+  const minute = Number(twentyFourMatch[2])
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+}
+
+function normalizeWeekToHHMM(week: WeekSchedule): WeekSchedule {
+  return (Object.keys(week) as DayKey[]).reduce<WeekSchedule>((acc, dayKey) => {
+    const day = week[dayKey]
+    acc[dayKey] = {
+      ...day,
+      slots: day.slots.map((slot) => ({
+        ...slot,
+        from: normalizeTimeToHHMM(slot.from) || slot.from,
+        to: normalizeTimeToHHMM(slot.to) || slot.to,
+      })),
+    }
+    return acc
+  }, {} as WeekSchedule)
+}
+
+function openNativeTimePicker(input: HTMLInputElement) {
+  if ("showPicker" in input && typeof input.showPicker === "function") {
+    input.showPicker()
+  }
+}
+
 class ScheduleStore {
   private state: ScheduleState
   private listeners = new Set<() => void>()
@@ -188,16 +237,19 @@ const SlotRow = React.memo(
     slot: Slot
   }) => {
     const dispatch = useScheduleDispatch()
-    const [draftFrom, setDraftFrom] = React.useState(slot.from)
-    const [draftTo, setDraftTo] = React.useState(slot.to)
+    const [draftFrom, setDraftFrom] = React.useState(() => normalizeTimeToHHMM(slot.from))
+    const [draftTo, setDraftTo] = React.useState(() => normalizeTimeToHHMM(slot.to))
 
     React.useEffect(() => {
-      setDraftFrom(slot.from)
-      setDraftTo(slot.to)
+      setDraftFrom(normalizeTimeToHHMM(slot.from))
+      setDraftTo(normalizeTimeToHHMM(slot.to))
     }, [slot.from, slot.to])
 
     const updateSlot = React.useCallback(
       (field: "from" | "to", value: string) => {
+        const normalized = normalizeTimeToHHMM(value)
+        if (!normalized) return
+
         dispatch((prev) => ({
           ...prev,
           week: {
@@ -205,7 +257,7 @@ const SlotRow = React.memo(
             [dayKey]: {
               ...prev.week[dayKey],
               slots: prev.week[dayKey].slots.map((s) =>
-                s.id === slot.id ? { ...s, [field]: value } : s,
+                s.id === slot.id ? { ...s, [field]: normalized } : s,
               ),
             },
           },
@@ -215,11 +267,25 @@ const SlotRow = React.memo(
     )
 
     const commitFrom = React.useCallback(() => {
-      if (draftFrom !== slot.from) updateSlot("from", draftFrom)
+      const normalizedDraft = normalizeTimeToHHMM(draftFrom)
+      const normalizedSlot = normalizeTimeToHHMM(slot.from)
+      if (STRICT_HHMM_REGEX.test(normalizedDraft) && normalizedDraft !== normalizedSlot) {
+        setDraftFrom(normalizedDraft)
+        updateSlot("from", normalizedDraft)
+      } else if (!STRICT_HHMM_REGEX.test(normalizedDraft)) {
+        setDraftFrom(normalizedSlot)
+      }
     }, [draftFrom, slot.from, updateSlot])
 
     const commitTo = React.useCallback(() => {
-      if (draftTo !== slot.to) updateSlot("to", draftTo)
+      const normalizedDraft = normalizeTimeToHHMM(draftTo)
+      const normalizedSlot = normalizeTimeToHHMM(slot.to)
+      if (STRICT_HHMM_REGEX.test(normalizedDraft) && normalizedDraft !== normalizedSlot) {
+        setDraftTo(normalizedDraft)
+        updateSlot("to", normalizedDraft)
+      } else if (!STRICT_HHMM_REGEX.test(normalizedDraft)) {
+        setDraftTo(normalizedSlot)
+      }
     }, [draftTo, slot.to, updateSlot])
 
     const removeSlot = React.useCallback(() => {
@@ -235,24 +301,30 @@ const SlotRow = React.memo(
       }))
     }, [dayKey, slot.id, dispatch])
 
+    const fromValue = normalizeTimeToHHMM(draftFrom)
+    const toValue = normalizeTimeToHHMM(draftTo)
+
     return (
       <div className="flex items-center gap-3">
         <div className="relative">
           <Input
+            key={`slot-${slot.id}-from-${fromValue || "empty"}`}
             type="time"
-            value={draftFrom}
-            onChange={(e) => setDraftFrom(e.target.value)}
-            onBlur={commitFrom}
-            onClick={(e) => {
-              if ("showPicker" in e.currentTarget && typeof (e.currentTarget as any).showPicker === "function") {
-                (e.currentTarget as any).showPicker();
+            value={fromValue}
+            onChange={(e) => {
+              const val = e.target.value
+              const normalized = normalizeTimeToHHMM(val)
+              setDraftFrom(normalized)
+              if (STRICT_HHMM_REGEX.test(normalized)) {
+                updateSlot("from", normalized)
               }
             }}
+            onBlur={commitFrom}
+            onClick={(e) => openNativeTimePicker(e.currentTarget)}
             onKeyDown={(e) => {
               if (e.key === "Enter") commitFrom()
-              else if (e.key !== "Tab") e.preventDefault()
             }}
-            className="h-9 w-[110px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 font-mono text-sm transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40"
+            className="h-9 w-[124px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 py-0 font-sans text-sm tabular-nums leading-normal [text-indent:0] [line-height:1.2] transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-hour-field]:text-left"
           />
         </div>
         <span className="text-[11px] font-bold uppercase tracking-wider text-primary/60">
@@ -260,20 +332,23 @@ const SlotRow = React.memo(
         </span>
         <div className="relative">
           <Input
+            key={`slot-${slot.id}-to-${toValue || "empty"}`}
             type="time"
-            value={draftTo}
-            onChange={(e) => setDraftTo(e.target.value)}
-            onBlur={commitTo}
-            onClick={(e) => {
-              if ("showPicker" in e.currentTarget && typeof (e.currentTarget as any).showPicker === "function") {
-                (e.currentTarget as any).showPicker();
+            value={toValue}
+            onChange={(e) => {
+              const val = e.target.value
+              const normalized = normalizeTimeToHHMM(val)
+              setDraftTo(normalized)
+              if (STRICT_HHMM_REGEX.test(normalized)) {
+                updateSlot("to", normalized)
               }
             }}
+            onBlur={commitTo}
+            onClick={(e) => openNativeTimePicker(e.currentTarget)}
             onKeyDown={(e) => {
               if (e.key === "Enter") commitTo()
-              else if (e.key !== "Tab") e.preventDefault()
             }}
-            className="h-9 w-[110px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 font-mono text-sm transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40"
+            className="h-9 w-[124px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 py-0 font-sans text-sm tabular-nums leading-normal [text-indent:0] [line-height:1.2] transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-hour-field]:text-left"
           />
         </div>
         <Button
@@ -533,7 +608,7 @@ export function ScheduleEditorSheet() {
   React.useEffect(() => {
     if (open) {
       storeRef.current.setState({
-        week: schedule.week,
+        week: normalizeWeekToHHMM(schedule.week),
         overrides: schedule.overrides
       })
       setShowErrors(false)
