@@ -66,7 +66,7 @@ class CaseApplicationService:
 
         await self.task_queue.enqueue(
             'run_dispatch_review_email_task',
-            DispatchReviewEmailPayload(
+            payload=DispatchReviewEmailPayload(
                 case_id=case_id,
                 header='Review support',
                 body=email_body,
@@ -77,6 +77,6 @@ class CaseApplicationService:
         # 3. Schedule auto-resolution after 7 days
         await self.task_queue.enqueue(
             'run_auto_resolve_case_task',
-            AutoResolveCasePayload(case_id=case_id),
+            payload=AutoResolveCasePayload(case_id=case_id),
             _defer_by=timedelta(days=7),
         )
