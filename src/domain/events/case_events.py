@@ -6,6 +6,7 @@ from datetime import datetime
 from src.core.identifiers import EntityID
 from src.domain.events.base import DomainEvent
 from src.domain.value_objects.status import MeetingMethod
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,7 @@ class CaseResolvedEvent(DomainEvent):
 
     case_id: EntityID
     advisor_id: EntityID
-    satisfaction: str | None = None
+    satisfaction: StudentSatisfaction
     comment: str | None = None
 
 
@@ -50,7 +51,7 @@ class CaseFailedEvent(DomainEvent):
 
     case_id: EntityID
     advisor_id: EntityID
-    satisfaction: str | None = None
+    satisfaction: StudentSatisfaction
     comment: str | None = None
 
 
