@@ -1,0 +1,5 @@
+project_id  = "gen-lang-client-0930334575"
+region      = "us-central1"
+zone        = "us-central1-a"
+db_username = "YOUR_USERNAME"
+db_password = "CHANGEME_SUPER_SECRET_PASSWORD"
