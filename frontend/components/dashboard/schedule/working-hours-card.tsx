@@ -10,7 +10,6 @@ import {
   DAY_ORDER,
   type WeekSchedule,
   type DayKey,
-  convertUtcToUtc7,
 } from "@/lib/schedule";
 
 interface WorkingHoursCardProps {
@@ -45,12 +44,7 @@ export function WorkingHoursCard({
               : !hasSlots
               ? "Trống"
               : dayConfig.slots
-                  .map(
-                    (s) =>
-                      `${convertUtcToUtc7(s.from)} – ${convertUtcToUtc7(
-                        s.to
-                      )}`
-                  )
+                  .map((s) => `${s.from} – ${s.to}`)
                   .join(" · ");
 
             return (
