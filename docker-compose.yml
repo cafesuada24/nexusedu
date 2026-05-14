@@ -54,14 +54,16 @@ services:
 
   worker:
     <<: *app-base
-    command: ["arq", "src.worker.WorkerSettings"]
+    command: ["arq", "src.infrastructure.workers.worker.WorkerSettings"]
 
   db:
     image: postgres:16-alpine
     env_file:
       - .env
-    expose:
-      - "5432"
+    # expose:
+    #   - "5432"
+    ports:
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_INITDB_ARGS: "--data-checksums"
     volumes:
