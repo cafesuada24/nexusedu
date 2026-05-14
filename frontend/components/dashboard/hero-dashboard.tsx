@@ -50,6 +50,20 @@ const XP_DATA = [
 export function HeroDashboard() {
   const { data: alerts = [] } = useAlerts()
 
+  const { rescueRate, rescueRateLabel } = React.useMemo(() => {
+    const resolvedCount = alerts.filter(a => (a.intervention_status || "").toLowerCase() === "resolved").length
+    const failedCount = alerts.filter(a => (a.intervention_status || "").toLowerCase() === "failed").length
+    const totalClosed = resolvedCount + failedCount
+    
+    const rate = totalClosed === 0 ? 0 : (resolvedCount / totalClosed) * 100
+    const label = `${resolvedCount}/${totalClosed} SV`
+    
+    return {
+      rescueRate: rate.toFixed(1),
+      rescueRateLabel: label
+    }
+  }, [alerts])
+
   const priorityCount = React.useMemo(() => {
     return alerts.filter((alert) => {
       // Logic: Only count alerts in the 'New' column that are also 'High Risk'
@@ -196,15 +210,15 @@ export function HeroDashboard() {
                   </div>
                   <span className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">TỶ LỆ GIẢI CỨU</span>
                 </div>
-                <span className="font-serif text-3xl font-bold text-primary">65%</span>
+                <span className="font-serif text-3xl font-bold text-primary">{rescueRate}%</span>
               </div>
               
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[10px] font-bold">
                   <span className="text-primary uppercase tracking-tighter">ĐÃ ĐẠT ỔN ĐỊNH</span>
-                  <span className="text-muted-foreground">130/200 SV</span>
+                  <span className="text-muted-foreground">{rescueRateLabel}</span>
                 </div>
-                <Progress value={65} className="h-2.5 bg-primary/10" indicatorClassName="bg-primary shadow-[0_0_8px_rgba(37,99,235,0.3)]" />
+                <Progress value={Number(rescueRate)} className="h-2.5 bg-primary/10" indicatorClassName="bg-primary shadow-[0_0_8px_rgba(37,99,235,0.3)]" />
               </div>
               
               <p className="text-[11px] text-muted-foreground">

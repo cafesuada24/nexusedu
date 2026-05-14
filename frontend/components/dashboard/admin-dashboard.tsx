@@ -30,6 +30,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
+import { useCases } from "@/hooks/use-alerts"
 
 const ACADEMIC_IMPACT_DATA = [
   { name: "GPA", before: 2.1, after: 3.2 },
@@ -53,6 +54,21 @@ const RECOVERY_TREND_DATA = [
 ]
 
 export function AdminDashboard() {
+  const { data: casesData } = useCases(200, 0)
+  const cases = casesData?.items || []
+
+  const { rescueRate } = React.useMemo(() => {
+    const resolvedCount = cases.filter(c => (c.intervention_status || "").toLowerCase() === "resolved").length
+    const failedCount = cases.filter(c => (c.intervention_status || "").toLowerCase() === "failed").length
+    const totalClosed = resolvedCount + failedCount
+    
+    const rate = totalClosed === 0 ? 0 : (resolvedCount / totalClosed) * 100
+    
+    return {
+      rescueRate: rate.toFixed(1)
+    }
+  }, [cases])
+
   return (
     <div className="flex flex-col gap-6">
       {/* 1. Strategic Pulse (Top Row) */}
@@ -72,7 +88,7 @@ export function AdminDashboard() {
                   <div className="flex flex-col">
                     <span className="text-xs font-bold tracking-widest text-primary uppercase">Overall Recovery Rate</span>
                     <div className="flex items-baseline gap-2">
-                      <span className="font-serif text-5xl font-black text-primary">82%</span>
+                      <span className="font-serif text-5xl font-black text-primary">{rescueRate}%</span>
                       <div className="flex items-center gap-1 text-sm font-bold text-success">
                         <TrendingUp className="size-4" />
                         +4%
@@ -99,7 +115,7 @@ export function AdminDashboard() {
                   <span>Vs Last Semester</span>
                   <span>Target: 85%</span>
                 </div>
-                <Progress value={82} className="h-2 bg-primary/10" indicatorClassName="bg-primary" />
+                <Progress value={Number(rescueRate)} className="h-2 bg-primary/10" indicatorClassName="bg-primary" />
               </div>
               <p className="text-xs text-muted-foreground">
                 Formula: (Stable Students / Total At-Risk). Significant growth in technical departments.
