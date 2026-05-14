@@ -3,10 +3,12 @@
 from datetime import time
 
 from src.application.commands.schedule_commands import AddWorkingHoursCommand
+from src.application.dtos.worker_payloads.case_payloads import AdvisorCreatedPayload
+from src.application.dtos.worker_payloads.gamification_payloads import (
+    EvaluateBadgesPayload,
+)
 from src.infrastructure.workers.framework.context import TaskContext
 from src.infrastructure.workers.framework.decorators import worker_task
-from src.application.dtos.worker_payloads.case_payloads import AdvisorCreatedPayload
-from src.application.dtos.worker_payloads.gamification_payloads import EvaluateBadgesPayload
 
 
 @worker_task()

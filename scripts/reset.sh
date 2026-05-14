@@ -33,6 +33,9 @@ done
 echo "Running migrations..."
 make migrate
 
+# echo "Seeding dashboard data..."
+# docker compose exec api env PYTHONPATH=. python scripts/reseed_dashboard.py
+
 echo "Seeding default users..."
 # Run seeding inside the container
 docker compose exec api env PYTHONPATH=. python scripts/create_user.py --email dev@gmail.com --password dev --role admin
