@@ -384,13 +384,26 @@ const DayRow = React.memo(
     const isInvalid = showErrors && config.enabled && config.slots.length === 0
 
     const toggleDay = React.useCallback(() => {
-      dispatch((prev) => ({
-        ...prev,
-        week: {
-          ...prev.week,
-          [dayKey]: { ...prev.week[dayKey], enabled: !prev.week[dayKey].enabled },
-        },
-      }))
+      dispatch((prev) => {
+        const currentConfig = prev.week[dayKey]
+        const nextEnabled = !currentConfig.enabled
+        const nextSlots =
+          nextEnabled && currentConfig.slots.length === 0
+            ? [{ id: crypto.randomUUID(), from: "09:00", to: "17:00" }]
+            : currentConfig.slots
+
+        return {
+          ...prev,
+          week: {
+            ...prev.week,
+            [dayKey]: {
+              ...currentConfig,
+              enabled: nextEnabled,
+              slots: nextSlots,
+            },
+          },
+        }
+      })
     }, [dayKey, dispatch])
 
     const addSlot = React.useCallback(() => {
