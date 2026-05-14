@@ -4,7 +4,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 
 from src.application.commands.data_commands import DataCommandHandler
 from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
@@ -35,42 +35,37 @@ async def ingest_data(
     Automatically triggers the anomaly detection engine post-ingestion.
     For students transitioning to 'new' risk status, triggers AI draft generation.
     """
-    try:
-        if idempotency_key:
-            idemp_key = UUID(idempotency_key)
-            if await idempotency_repo.check_key(idemp_key):
-                logger.info('Idempotency hit for ingest_data', idemp_key=str(idemp_key))
-                return {
-                    'status': 'success',
-                    'batch_id': request.batch_id,
-                    'message': 'Data already ingested (idempotent).',
-                }
-        # Map request to command DTO
-        data_sources: list[DataSourceDTO] = []
-        for source in request.data_sources:
-            if isinstance(source, CoreDataSource):
-                data_sources.append(
-                    DataSourceDTO(
-                        source_type=source.source_type,
-                        records=[r.model_dump(by_alias=True) for r in source.records],
-                    ),
-                )
+    if idempotency_key:
+        idemp_key = UUID(idempotency_key)
+        if await idempotency_repo.check_key(idemp_key):
+            logger.info('Idempotency hit for ingest_data', idemp_key=str(idemp_key))
+            return {
+                'status': 'success',
+                'batch_id': request.batch_id,
+                'message': 'Data already ingested (idempotent).',
+            }
+    # Map request to command DTO
+    data_sources: list[DataSourceDTO] = []
+    for source in request.data_sources:
+        if isinstance(source, CoreDataSource):
+            data_sources.append(
+                DataSourceDTO(
+                    source_type=source.source_type,
+                    records=[r.model_dump(by_alias=True) for r in source.records],
+                ),
+            )
 
 
-        command = DataIngestionCommand(data_sources=data_sources)
+    command = DataIngestionCommand(data_sources=data_sources)
 
-        results = await command_handler.handle_ingest_data(command)
+    results = await command_handler.handle_ingest_data(command)
 
-        if idempotency_key:
-            await idempotency_repo.record_key(UUID(idempotency_key))
+    if idempotency_key:
+        await idempotency_repo.record_key(UUID(idempotency_key))
 
-        return {
-            'status': 'success',
-            'batch_id': request.batch_id,
-            'results': results['results'],
-            'automatic_drafts': results.get('triggered_jobs', []),
-        }
-
-    except Exception as e:
-        logger.error('Critical error during data ingestion', error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    return {
+        'status': 'success',
+        'batch_id': request.batch_id,
+        'results': results['results'],
+        'automatic_drafts': results.get('triggered_jobs', []),
+    }
