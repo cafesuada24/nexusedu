@@ -38,34 +38,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         return typeof jobType === "string" ? jobType : "";
     }, []);
 
-    const markDraftCompletedImmediately = React.useCallback(
-        (caseId: string) => {
-            queryClient.setQueryData(
-                queryKeys.cases.draft(caseId),
-                (oldData: any) => ({
-                    subject: oldData?.subject ?? null,
-                    body: oldData?.body ?? null,
-                    status: oldData?.status ?? "draft",
-                    is_generating: false,
-                })
-            );
-        },
-        [queryClient]
-    );
-
-    const hydrateDraftCache = React.useCallback(
-        async (caseId: string) => {
-            const freshDraft = await fetchDraftStatus(caseId);
-            queryClient.setQueryData(queryKeys.cases.draft(caseId), {
-                subject: freshDraft.subject ?? null,
-                body: freshDraft.body ?? null,
-                status: freshDraft.status,
-                is_generating: false,
-            });
-        },
-        [queryClient]
-    );
-
     /**
      * Surgical update helper for list caches (flat arrays or paged items).
      * Uses setQueriesData to find and update the specific case across all matching queries.
@@ -96,6 +68,45 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             });
         },
         [queryClient]
+    );
+
+    const markDraftCompletedImmediately = React.useCallback(
+        (caseId: string) => {
+            queryClient.setQueryData(
+                queryKeys.cases.draft(caseId),
+                (oldData: any) => ({
+                    subject: oldData?.subject ?? null,
+                    body: oldData?.body ?? null,
+                    status: oldData?.status ?? "draft",
+                    is_generating: false,
+                })
+            );
+        },
+        [queryClient]
+    );
+
+    const hydrateDraftCache = React.useCallback(
+        async (caseId: string) => {
+            const freshDraft = await fetchDraftStatus(caseId);
+            queryClient.setQueryData(queryKeys.cases.draft(caseId), {
+                subject: freshDraft.subject ?? null,
+                body: freshDraft.body ?? null,
+                status: freshDraft.status,
+                is_generating: false,
+            });
+
+            // Surgically update list caches so "Edit Email" sheet sees the content immediately
+            const updater = (item: any) => ({
+                ...item,
+                draft_subject: freshDraft.subject ?? null,
+                draft_body: freshDraft.body ?? null,
+                draft_status: freshDraft.status,
+                is_generating: false,
+            });
+            updateSurgicalCache(queryKeys.cases.all, caseId, updater);
+            updateSurgicalCache(queryKeys.alerts.all, caseId, updater);
+        },
+        [queryClient, updateSurgicalCache]
     );
 
     const handleMessage = React.useCallback(
