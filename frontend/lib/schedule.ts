@@ -26,15 +26,15 @@ export const DAYS: {
   key: DayKey
   short: string
   long: string
-  jsDay: number
+  apiDay: number
 }[] = [
-  { key: "mon", short: "T2", long: "Thứ Hai", jsDay: 1 },
-  { key: "tue", short: "T3", long: "Thứ Ba", jsDay: 2 },
-  { key: "wed", short: "T4", long: "Thứ Tư", jsDay: 3 },
-  { key: "thu", short: "T5", long: "Thứ Năm", jsDay: 4 },
-  { key: "fri", short: "T6", long: "Thứ Sáu", jsDay: 5 },
-  { key: "sat", short: "T7", long: "Thứ Bảy", jsDay: 6 },
-  { key: "sun", short: "CN", long: "Chủ Nhật", jsDay: 0 },
+  { key: "mon", short: "T2", long: "Thứ Hai", apiDay: 0 },
+  { key: "tue", short: "T3", long: "Thứ Ba", apiDay: 1 },
+  { key: "wed", short: "T4", long: "Thứ Tư", apiDay: 2 },
+  { key: "thu", short: "T5", long: "Thứ Năm", apiDay: 3 },
+  { key: "fri", short: "T6", long: "Thứ Sáu", apiDay: 4 },
+  { key: "sat", short: "T7", long: "Thứ Bảy", apiDay: 5 },
+  { key: "sun", short: "CN", long: "Chủ Nhật", apiDay: 6 },
 ]
 
 export const DAY_ORDER: DayKey[] = [

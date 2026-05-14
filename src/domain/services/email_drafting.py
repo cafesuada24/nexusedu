@@ -13,14 +13,12 @@ class EmailDraftingService(Protocol):
         self,
         student_name: str,
         performance_context: str,
-        booking_link: str,
     ) -> tuple[str, str]:
         """Generate a personalized email subject and body.
 
         Args:
             student_name: The name of the student.
             performance_context: A string describing recent performance trends.
-            booking_link: The URL for the student to book a meeting.
 
         Returns:
             A tuple of (subject, body).

@@ -4,11 +4,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from src.core.identifiers import EntityID
+from src.domain.entities.base import AggregateRoot
 from src.domain.value_objects.status import RiskStatus
 
 
 @dataclass
-class Student:
+class Student(AggregateRoot):
     """Represents a student in the system."""
 
     sid: EntityID

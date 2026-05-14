@@ -34,7 +34,7 @@ export function backendToFrontend(be: AdvisorScheduleRead): Schedule {
   }
 
   for (const d of DAYS) {
-    const whs = groupedByDay[d.jsDay] || [];
+    const whs = groupedByDay[d.apiDay] || [];
     if (whs.length > 0) {
       week[d.key].enabled = true;
       whs.sort((a, b) => a.start_time.localeCompare(b.start_time));
@@ -93,7 +93,7 @@ export function generateDiffCommands(
     if (dayConfig.enabled) {
       for (const slot of dayConfig.slots) {
         targetWhs.push({
-          day_of_week: d.jsDay,
+          day_of_week: d.apiDay,
           start_time: `${slot.from}:00`,
           end_time: `${slot.to}:00`,
           timezone: nextFe.timezone,

@@ -7,8 +7,6 @@ from dotenv import load_dotenv
 from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()
-
 
 class AppConfig(BaseSettings):
     """Application config."""
@@ -28,10 +26,9 @@ class AppConfig(BaseSettings):
     worker_job_timeout_sec: PositiveInt
     redis_host: str
     redis_port: Annotated[int, Field(ge=1, le=65535)]
-    redis_password: str | None = None
+    redis_password: str | None
     allowed_origins: str
 
-    booking_url_template: str
     review_url_template: str
 
     # SMTP Settings
@@ -57,7 +54,6 @@ class DevConfig(AppConfig):
     redis_password: str | None = None
     allowed_origins: str = ''
 
-    booking_url_template: str = 'http://localhost:3000/booking?cid={cid}'
     review_url_template: str = 'http://localhost:3000/review?token={token}'
 
     # SMTP Settings
@@ -80,10 +76,9 @@ class ProdConfig(AppConfig):
     worker_job_timeout_sec: PositiveInt
     redis_host: str
     redis_port: Annotated[int, Field(ge=1, le=65535)]
-    redis_password: str
+    redis_password: str | None
     allowed_origins: str
 
-    booking_url_template: str
     review_url_template: str
 
     # SMTP Settings
@@ -94,4 +89,16 @@ class ProdConfig(AppConfig):
     smtp_from_email: str
 
 
-config = ProdConfig() if os.getenv('ENVIRONMENT') == 'production' else DevConfig()
+# Load environment variables from .env file
+load_dotenv()
+
+_env = os.getenv('ENVIRONMENT', 'development').lower()
+
+if _env == 'production':
+    # ProdConfig will raise a validation error if required secrets (like jwt_secret) are missing.
+    config = ProdConfig()
+elif _env == 'test':
+    config = DevConfig(environment='test')
+else:
+    # Default to development for local DX, but use DevConfig which provides defaults.
+    config = DevConfig()

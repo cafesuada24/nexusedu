@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from src.application.commands.schedule_commands import ScheduleCommandHandler
 from src.application.dtos.advisor_dtos import (
@@ -30,7 +30,6 @@ from src.application.dtos.pagination import PagedResponse
 from src.application.queries.advisor_queries import (
     AdvisorQueryHandler,
 )
-from src.domain.exceptions import AdvisorNotFoundError, UserIsNotAnAdvisorError
 from src.domain.repositories.interfaces import AdvisorRepository
 from src.domain.value_objects.gamification import RankingType
 from src.presentation.api.auth import Scope, User, current_active_user, require_scope
@@ -61,10 +60,7 @@ async def get_my_profile(
     user: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
 ) -> AdvisorProfileDTO:
     """Get the current user's advisor profile."""
-    try:
-        return await advisor_query_handler.handle_get_user_advisor_profile(user.id)
-    except (UserIsNotAnAdvisorError, AdvisorNotFoundError) as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+    return await advisor_query_handler.handle_get_user_advisor_profile(user.id)
 
 
 @router.patch('/profile')
@@ -116,11 +112,8 @@ async def get_advisor_profile(
     metrics: bool = False,
 ) -> AdvisorProfileDTO:
     """Get the current user's advisor profile."""
-    try:
-        query = GetAdvisorProfileQuery(advisor_id=advisor_id, include_metrics=metrics)
-        return await advisor_query_handler.handle_get_advisor_profile(query)
-    except AdvisorNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+    query = GetAdvisorProfileQuery(advisor_id=advisor_id, include_metrics=metrics)
+    return await advisor_query_handler.handle_get_advisor_profile(query)
 
 
 @router.get('/{advisor_id}/availability')
@@ -141,21 +134,12 @@ async def get_advisor_availability(
     ],
 ) -> list[AvailabilitySlotDTO]:
     """Retrieve available appointment slots for a specific advisor."""
-    try:
-        query = GetAdvisorAvailabilityQuery(
-            advisor_id=advisor_id,
-            start_date=start_date,
-            end_date=end_date,
-        )
-        return await advisor_query_handler.handle_get_advisor_availability(query)
-    except AdvisorNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        logger.error('Failed to fetch availability', error=str(e), exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail='Failed to fetch availability',
-        ) from e
+    query = GetAdvisorAvailabilityQuery(
+        advisor_id=advisor_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return await advisor_query_handler.handle_get_advisor_availability(query)
 
 
 @router.get('/me/points')
@@ -167,69 +151,8 @@ async def get_my_points(
     ],
 ) -> dict[str, int]:
     """Get the current user's advisor points."""
-    try:
-        points = await advisor_query_handler.handle_get_user_advisor_points(user.id)
-        return {'points': points}
-    except (UserIsNotAnAdvisorError, AdvisorNotFoundError) as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
-
-# @router.get('/profile/{advisor_id}/badges')
-# async def get_advisor_badges(
-#     advisor_id: str,
-#     query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
-#     _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
-# ) -> list[dict[str, Any]]:
-#     """Retrieve the badges earned by an advisor (with Redis caching)."""
-#     try:
-#         adv_uuid = UUID(advisor_id)
-#         badges = await query_handler.handle_get_advisor_badges(adv_uuid)
-#
-#         return [
-#             {
-#                 'badge_id': b.badge_id,
-#                 'name': b.name,
-#                 'description': b.description,
-#                 'icon': b.icon,
-#             }
-#             for b in badges
-#         ]
-#     except ValueError as e:
-#         raise HTTPException(status_code=400, detail='Invalid advisor ID format') from e
-#     except Exception as e:
-#         logger.error(f'Failed to fetch badges for advisor {advisor_id}: {e}')
-#         raise HTTPException(
-#             status_code=500,
-#             detail='Failed to retrieve advisor badges',
-#         ) from e
-
-
-# @router.get('/engagement')
-# async def get_engagement_metrics(
-#     query_handler: Annotated[AdvisorQueryHandler, Depends(get_advisor_query_handler)],
-#     _: Annotated[User, Depends(require_scope(Scope.ADVISORS_READ))],
-# ) -> list[dict[str, Any]]:
-#     """Retrieve engagement metrics aggregated by major (faculty).
-#
-#     Returns:
-#         List of majors and their sent/drafted counts.
-#     """
-#     try:
-#         metrics = await query_handler.handle_get_engagement_metrics()
-#         return [
-#             {
-#                 'major': m.major,
-#                 'sent_count': m.sent_count,
-#                 'drafted_count': m.drafted_count,
-#             }
-#             for m in metrics
-#         ]
-#     except Exception as e:
-#         logger.error('Failed to fetch engagement metrics', error=str(e))
-#         raise HTTPException(
-#             status_code=500,
-#             detail='Failed to retrieve engagement metrics',
-#         ) from e
+    points = await advisor_query_handler.handle_get_user_advisor_points(user.id)
+    return {'points': points}
 
 
 # Self-service aliases
@@ -358,16 +281,9 @@ async def get_leaderboard(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PagedResponse[LeaderboardEntryDTO]:
     """Retrieve the advisor leaderboard based on gamification points."""
-    try:
-        query = GetLeaderboardQuery(
-            time_window=time_window,
-            limit=limit,
-            offset=offset,
-        )
-        return await query_handler.handle_get_leaderboard(query)
-    except Exception as e:
-        logger.error('Failed to fetch leaderboard', error=str(e))
-        raise HTTPException(
-            status_code=500,
-            detail='Failed to retrieve leaderboard',
-        ) from e
+    query = GetLeaderboardQuery(
+        time_window=time_window,
+        limit=limit,
+        offset=offset,
+    )
+    return await query_handler.handle_get_leaderboard(query)

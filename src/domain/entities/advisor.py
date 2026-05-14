@@ -3,10 +3,11 @@
 from dataclasses import dataclass
 
 from src.core.identifiers import EntityID
+from src.domain.entities.base import AggregateRoot
 
 
 @dataclass
-class Advisor:
+class Advisor(AggregateRoot):
     """Represents an academic advisor."""
 
     advisor_id: EntityID

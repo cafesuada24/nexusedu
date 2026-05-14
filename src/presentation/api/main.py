@@ -8,12 +8,13 @@ import time
 from collections.abc import Awaitable, Callable
 
 import structlog
-from fastapi import APIRouter, FastAPI, Request, Response, status
+from fastapi import APIRouter, FastAPI, Request, Response, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.core.config import config
 from src.core.otel import setup_otel
+from src.domain import exceptions as domain_exc
 from src.presentation.api.auth import auth_backend, fastapi_users
 from src.presentation.api.lifecycle import lifespan
 from src.presentation.api.middleware.rate_limit import rate_limit_middleware
@@ -79,6 +80,76 @@ async def log_requests(
         duration=process_time,
     )
     return response
+
+
+@app.exception_handler(WebSocketDisconnect)
+async def websocket_disconnect_handler(
+    _request: Request,
+    _exc: WebSocketDisconnect,
+) -> None:
+    """Handles WebSocketDisconnect exceptions.
+
+    These are expected when a client disconnects and don't need to be logged as errors.
+    """
+    return
+
+
+@app.exception_handler(domain_exc.DomainError)
+async def domain_error_handler(
+    _request: Request,
+    exc: domain_exc.DomainError,
+) -> JSONResponse:
+    """Maps domain errors to appropriate HTTP status codes."""
+    # Define mapping of exception types to status codes
+    not_found_errors = (
+        domain_exc.CaseNotFoundError,
+        domain_exc.StudentNotFoundError,
+        domain_exc.TaskNotFoundError,
+        domain_exc.AdvisorNotFoundError,
+        domain_exc.WorkingHoursNotFoundError,
+        domain_exc.EmailNotFoundError,
+        domain_exc.JobNotFoundError,
+    )
+
+    unauthorized_errors = (domain_exc.UnauthorizedError,)
+
+    if isinstance(exc, not_found_errors):
+        status_code = status.HTTP_404_NOT_FOUND
+    elif isinstance(exc, unauthorized_errors):
+        status_code = status.HTTP_403_FORBIDDEN
+    else:
+        # Default to 400 Bad Request for other domain/validation errors
+        status_code = status.HTTP_400_BAD_REQUEST
+
+    logger.warning(
+        'Domain error occurred',
+        error=str(exc),
+        type=type(exc).__name__,
+        status_code=status_code,
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            'detail': str(exc),
+            'type': type(exc).__name__,
+        },
+    )
+
+
+@app.exception_handler(domain_exc.InvalidActionError)
+async def invalid_action_error_handler(
+    _request: Request,
+    exc: domain_exc.InvalidActionError,
+) -> JSONResponse:
+    """Specific handler for InvalidActionError (which doesn't inherit from DomainError)."""
+    logger.warning('Invalid action error occurred', error=str(exc))
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            'detail': str(exc),
+            'type': 'InvalidActionError',
+        },
+    )
 
 
 @app.exception_handler(Exception)

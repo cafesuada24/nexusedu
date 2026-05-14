@@ -52,3 +52,21 @@ class CaseFailedEvent(DomainEvent):
     advisor_id: EntityID
     satisfaction: str | None = None
     comment: str | None = None
+
+
+@dataclass(frozen=True)
+class EmailDraftRequestedEvent(DomainEvent):
+    """Event triggered when an AI email draft generation is requested."""
+
+    case_id: EntityID
+    job_id: EntityID
+    user_id: EntityID
+
+
+@dataclass(frozen=True)
+class InterventionEmailSentEvent(DomainEvent):
+    """Event triggered when an intervention email is sent."""
+
+    case_id: EntityID
+    job_id: EntityID
+    user_id: EntityID

@@ -16,7 +16,6 @@ function GenerateDraftEmail(user_intent: string, context: string) -> EmailDraft 
       1. **Personalization**: Use the student's performance trajectory (baseline vs. current) provided in the SQL results to explain *why* we are reaching out.
       2. **Tone**: Be curious and supportive. Avoid language like "risk," "failure," "warning," or "probation." Use phrases like "noticed a change," "checking in," and "here to help."
       3. **Privacy**: NEVER use or attempt to find the student's real name or email. You MUST use the exact placeholder `{{STUDENT_NAME}}`.
-      4. **Actionability**: Always include a clear call to action using the placeholder `{{ADVISOR_LINK}}`.
     </objectives>
 
     <context_handling>
@@ -27,11 +26,10 @@ function GenerateDraftEmail(user_intent: string, context: string) -> EmailDraft 
 
     <placeholders>
       - `{{STUDENT_NAME}}`: To be replaced by the student's first name.
-      - `{{ADVISOR_LINK}}`: To be replaced by the advisor's booking link.
     </placeholders>
 
     <output_specification>
-      Return a JSON object with 'subject' and 'body' fields.
+      Return a JSON object with 'subject' and 'body' without signature fields.
       Ensure the 'body' is concise and warm.
     </output_specification>
 
@@ -50,40 +48,5 @@ function GenerateDraftEmail(user_intent: string, context: string) -> EmailDraft 
     </context>
 
     Email:
-  "#
-}
-
-enum ToneEvaluation {
-  SAFE
-  PUNITIVE
-  TOXIC
-}
-
-function EvaluateDraftTone(subject: string, body: string) -> ToneEvaluation {
-  client Gemini_31_Flash_Lite
-  prompt #"
-    {{ _.role("system") }}
-    You are an expert **FERPA Compliance Officer**. 
-    Evaluate the following email draft for "Academic Shaming" or non-supportive tone.
-    
-    Criteria for PUNITIVE:
-    - Language that focuses on "failure", "probation", or "risk" in a way that feels like a warning or punishment.
-    - Cold, bureaucratic, or disappointing tone.
-    - Phrases like "you failed to", "disappointing progress", "final warning".
-
-    Criteria for TOXIC:
-    - Hate speech, insults, profanity, or bias.
-
-    Criteria for SAFE:
-    - Curious, supportive, checking in.
-    - Emphasizes "noticing a change" and "here to help".
-    - Empathetic and warm.
-
-    Return ONLY one of the enum values: SAFE, PUNITIVE, TOXIC.
-
-    Subject: {{ subject }}
-    Body: {{ body }}
-
-    Evaluation:
   "#
 }

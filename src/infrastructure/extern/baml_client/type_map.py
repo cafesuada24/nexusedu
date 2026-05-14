@@ -19,25 +19,8 @@ type_map = {
     "types.CaseOverview": types.CaseOverview,
     "stream_types.CaseOverview": stream_types.CaseOverview,
 
-    "types.DiscoveryRequest": types.DiscoveryRequest,
-    "stream_types.DiscoveryRequest": stream_types.DiscoveryRequest,
-
     "types.EmailDraft": types.EmailDraft,
     "stream_types.EmailDraft": stream_types.EmailDraft,
 
-    "types.GeneratedSQL": types.GeneratedSQL,
-    "stream_types.GeneratedSQL": stream_types.GeneratedSQL,
-
-    "types.PlannerTask": types.PlannerTask,
-    "stream_types.PlannerTask": stream_types.PlannerTask,
-
-    "types.RequestTableSchema": types.RequestTableSchema,
-    "stream_types.RequestTableSchema": stream_types.RequestTableSchema,
-
-    "types.RouterPlan": types.RouterPlan,
-    "stream_types.RouterPlan": stream_types.RouterPlan,
-
-
-    "types.ToneEvaluation": types.ToneEvaluation,
 
 }

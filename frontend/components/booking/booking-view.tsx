@@ -12,7 +12,6 @@ import {
     Video,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
 import {
     Card,
     CardContent,
@@ -30,14 +29,9 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useScheduleQuery } from "@/hooks/use-schedule-query";
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule";
-import { confirmBooking } from "@/lib/api";
-import { useAppointmentsQuery } from "@/hooks/use-appointments-query";
-import { SlotTakenError } from "@/lib/appointments";
-import { queryKeys } from "@/lib/query-keys";
+import { confirmBooking, SlotTakenError } from "@/lib/api";
 
 type Mode = "video" | "inperson";
-
-const APPOINTMENTS_WINDOW_DAYS = 60;
 
 export function BookingView({ caseId }: { caseId: string }) {
     const today = startOfToday();
@@ -47,27 +41,6 @@ export function BookingView({ caseId }: { caseId: string }) {
     const [mode, setMode] = React.useState<Mode>("video");
     const [stage, setStage] = React.useState<"pick" | "syncing" | "done">(
         "pick",
-    );
-    const queryClient = useQueryClient();
-
-    const windowFrom = React.useMemo(
-        () => format(today, "yyyy-MM-dd"),
-        [today],
-    );
-    const windowTo = React.useMemo(
-        () => format(addDays(today, APPOINTMENTS_WINDOW_DAYS), "yyyy-MM-dd"),
-        [today],
-    );
-
-    const { data: appointments = [] } = useAppointmentsQuery({
-        caseId,
-        from: windowFrom,
-        to: windowTo,
-    });
-
-    const bookedSet = React.useMemo(
-        () => new Set(appointments.map((a) => `${a.date}|${a.slot}`)),
-        [appointments],
     );
 
     const slotsForDate = React.useMemo(
@@ -94,9 +67,6 @@ export function BookingView({ caseId }: { caseId: string }) {
             setStage("pick");
             if (error instanceof SlotTakenError) {
                 setSlot(null);
-                queryClient.invalidateQueries({
-                    queryKey: queryKeys.appointments.all,
-                });
                 toast.error("Khung giờ vừa được người khác đặt", {
                     description: "Vui lòng chọn khung giờ khác.",
                 });
@@ -109,8 +79,6 @@ export function BookingView({ caseId }: { caseId: string }) {
             }
             return;
         }
-
-        queryClient.invalidateQueries({ queryKey: queryKeys.appointments.all });
 
         setTimeout(() => {
             setStage("done");
@@ -282,25 +250,16 @@ export function BookingView({ caseId }: { caseId: string }) {
                         ) : (
                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                                 {slotsForDate.map((s) => {
-                                    const busy = date
-                                        ? bookedSet.has(
-                                              `${format(date, "yyyy-MM-dd")}|${s}`,
-                                          )
-                                        : false;
                                     const selected = s === slot;
                                     return (
                                         <button
                                             key={s}
                                             type="button"
-                                            disabled={busy || !date}
                                             onClick={() => setSlot(s)}
                                             aria-pressed={selected}
                                             className={cn(
                                                 "h-10 rounded-xl border text-sm font-medium transition-all",
-                                                busy &&
-                                                    "cursor-not-allowed border-dashed border-border bg-muted/40 text-muted-foreground line-through",
-                                                !busy &&
-                                                    !selected &&
+                                                !selected &&
                                                     "border-border hover:border-primary/50 hover:bg-primary/5",
                                                 selected &&
                                                     "border-primary bg-primary text-primary-foreground shadow-sm",

@@ -20,22 +20,18 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(type_builder.TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["CaseOverview","DiscoveryRequest","EmailDraft","GeneratedSQL","PlannerTask","RequestTableSchema","RouterPlan",]
+          ["CaseOverview","EmailDraft",]
         ), enums=set(
-          ["ToneEvaluation",]
+          []
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
 
     # #########################################################################
-    # Generated enums 1
+    # Generated enums 0
     # #########################################################################
-
-    @property
-    def ToneEvaluation(self) -> "ToneEvaluationViewer":
-        return ToneEvaluationViewer(self)
 
 
     # #########################################################################
-    # Generated classes 7
+    # Generated classes 2
     # #########################################################################
 
     @property
@@ -43,84 +39,18 @@ class TypeBuilder(type_builder.TypeBuilder):
         return CaseOverviewViewer(self)
 
     @property
-    def DiscoveryRequest(self) -> "DiscoveryRequestViewer":
-        return DiscoveryRequestViewer(self)
-
-    @property
     def EmailDraft(self) -> "EmailDraftViewer":
         return EmailDraftViewer(self)
 
-    @property
-    def GeneratedSQL(self) -> "GeneratedSQLViewer":
-        return GeneratedSQLViewer(self)
-
-    @property
-    def PlannerTask(self) -> "PlannerTaskViewer":
-        return PlannerTaskViewer(self)
-
-    @property
-    def RequestTableSchema(self) -> "RequestTableSchemaViewer":
-        return RequestTableSchemaViewer(self)
-
-    @property
-    def RouterPlan(self) -> "RouterPlanViewer":
-        return RouterPlanViewer(self)
-
 
 
 # #########################################################################
-# Generated enums 1
+# Generated enums 0
 # #########################################################################
-
-class ToneEvaluationAst:
-    def __init__(self, tb: type_builder.TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.enum("ToneEvaluation")
-        self._values: typing.Set[str] = set([  "SAFE",  "PUNITIVE",  "TOXIC",  ])
-        self._vals = ToneEvaluationValues(self._bldr, self._values)
-
-    def type(self) -> baml_py.FieldType:
-        return self._bldr.field()
-
-    @property
-    def values(self) -> "ToneEvaluationValues":
-        return self._vals
-
-
-class ToneEvaluationViewer(ToneEvaluationAst):
-    def __init__(self, tb: type_builder.TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_values(self) -> typing.List[typing.Tuple[str, type_builder.EnumValueViewer]]:
-        return [(name, type_builder.EnumValueViewer(self._bldr.value(name))) for name in self._values]
-    
-
-class ToneEvaluationValues:
-    def __init__(self, enum_bldr: baml_py.EnumBuilder, values: typing.Set[str]):
-        self.__bldr = enum_bldr
-        self.__values = values # type: ignore (we know how to use this private attribute) # noqa: F821
-
-    
-    
-    @property
-    def SAFE(self) -> type_builder.EnumValueViewer:
-        return type_builder.EnumValueViewer(self.__bldr.value("SAFE"))
-    
-    @property
-    def PUNITIVE(self) -> type_builder.EnumValueViewer:
-        return type_builder.EnumValueViewer(self.__bldr.value("PUNITIVE"))
-    
-    @property
-    def TOXIC(self) -> type_builder.EnumValueViewer:
-        return type_builder.EnumValueViewer(self.__bldr.value("TOXIC"))
-    
-    
-
 
 
 # #########################################################################
-# Generated classes 7
+# Generated classes 2
 # #########################################################################
 
 class CaseOverviewAst:
@@ -166,53 +96,6 @@ class CaseOverviewProperties:
     
 
 
-class DiscoveryRequestAst:
-    def __init__(self, tb: type_builder.TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("DiscoveryRequest")
-        self._properties: typing.Set[str] = set([  "tool_name",  "db_id",  "table_name",  ])
-        self._props = DiscoveryRequestProperties(self._bldr, self._properties)
-
-    def type(self) -> baml_py.FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "DiscoveryRequestProperties":
-        return self._props
-
-
-class DiscoveryRequestViewer(DiscoveryRequestAst):
-    def __init__(self, tb: type_builder.TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
-        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-    
-
-
-class DiscoveryRequestProperties:
-    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
-
-    
-    
-    @property
-    def tool_name(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("tool_name"))
-    
-    @property
-    def db_id(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("db_id"))
-    
-    @property
-    def table_name(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("table_name"))
-    
-    
-
-
 class EmailDraftAst:
     def __init__(self, tb: type_builder.TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
@@ -252,206 +135,6 @@ class EmailDraftProperties:
     @property
     def body(self) -> type_builder.ClassPropertyViewer:
         return type_builder.ClassPropertyViewer(self.__bldr.property("body"))
-    
-    
-
-
-class GeneratedSQLAst:
-    def __init__(self, tb: type_builder.TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("GeneratedSQL")
-        self._properties: typing.Set[str] = set([  "sql",  "explanation",  "accessed_tables",  "dialect_used",  ])
-        self._props = GeneratedSQLProperties(self._bldr, self._properties)
-
-    def type(self) -> baml_py.FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "GeneratedSQLProperties":
-        return self._props
-
-
-class GeneratedSQLViewer(GeneratedSQLAst):
-    def __init__(self, tb: type_builder.TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
-        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-    
-
-
-class GeneratedSQLProperties:
-    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
-
-    
-    
-    @property
-    def sql(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("sql"))
-    
-    @property
-    def explanation(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("explanation"))
-    
-    @property
-    def accessed_tables(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("accessed_tables"))
-    
-    @property
-    def dialect_used(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("dialect_used"))
-    
-    
-
-
-class PlannerTaskAst:
-    def __init__(self, tb: type_builder.TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("PlannerTask")
-        self._properties: typing.Set[str] = set([  "db_id",  "dialect",  "query_intent",  "schema_hint",  ])
-        self._props = PlannerTaskProperties(self._bldr, self._properties)
-
-    def type(self) -> baml_py.FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "PlannerTaskProperties":
-        return self._props
-
-
-class PlannerTaskViewer(PlannerTaskAst):
-    def __init__(self, tb: type_builder.TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
-        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-    
-
-
-class PlannerTaskProperties:
-    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
-
-    
-    
-    @property
-    def db_id(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("db_id"))
-    
-    @property
-    def dialect(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("dialect"))
-    
-    @property
-    def query_intent(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("query_intent"))
-    
-    @property
-    def schema_hint(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("schema_hint"))
-    
-    
-
-
-class RequestTableSchemaAst:
-    def __init__(self, tb: type_builder.TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("RequestTableSchema")
-        self._properties: typing.Set[str] = set([  "db_id",  "table_names",  ])
-        self._props = RequestTableSchemaProperties(self._bldr, self._properties)
-
-    def type(self) -> baml_py.FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "RequestTableSchemaProperties":
-        return self._props
-
-
-class RequestTableSchemaViewer(RequestTableSchemaAst):
-    def __init__(self, tb: type_builder.TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
-        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-    
-
-
-class RequestTableSchemaProperties:
-    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
-
-    
-    
-    @property
-    def db_id(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("db_id"))
-    
-    @property
-    def table_names(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("table_names"))
-    
-    
-
-
-class RouterPlanAst:
-    def __init__(self, tb: type_builder.TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("RouterPlan")
-        self._properties: typing.Set[str] = set([  "path",  "tasks",  "next_action_after_sql",  "direct_response_draft",  "discovery_requests",  ])
-        self._props = RouterPlanProperties(self._bldr, self._properties)
-
-    def type(self) -> baml_py.FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "RouterPlanProperties":
-        return self._props
-
-
-class RouterPlanViewer(RouterPlanAst):
-    def __init__(self, tb: type_builder.TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, type_builder.ClassPropertyViewer]]:
-        return [(name, type_builder.ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-    
-
-
-class RouterPlanProperties:
-    def __init__(self, bldr: baml_py.ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties # type: ignore (we know how to use this private attribute) # noqa: F821
-
-    
-    
-    @property
-    def path(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("path"))
-    
-    @property
-    def tasks(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("tasks"))
-    
-    @property
-    def next_action_after_sql(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("next_action_after_sql"))
-    
-    @property
-    def direct_response_draft(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("direct_response_draft"))
-    
-    @property
-    def discovery_requests(self) -> type_builder.ClassPropertyViewer:
-        return type_builder.ClassPropertyViewer(self.__bldr.property("discovery_requests"))
     
     
 

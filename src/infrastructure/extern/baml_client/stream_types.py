@@ -23,44 +23,16 @@ class StreamState(BaseModel, typing.Generic[StreamStateValueT]):
     value: StreamStateValueT
     state: typing_extensions.Literal["Pending", "Incomplete", "Complete"]
 # #########################################################################
-# Generated classes (7)
+# Generated classes (2)
 # #########################################################################
 
 class CaseOverview(BaseModel):
     academic_summary: typing.Optional[str] = Field(default=None, description='A concise summary of the student\'s academic performance and risks based on the provided metrics.')
     action_keys: typing.List[str] = Field(description='Exactly 3 concise action keys (short phrases) for the advisor to focus on.')
 
-class DiscoveryRequest(BaseModel):
-    tool_name: typing.Optional[typing.Union[typing_extensions.Literal['get_db_list'], typing_extensions.Literal['list_tables'], typing_extensions.Literal['describe_table']]] = Field(default=None, description='The name of the discovery tool to call."')
-    db_id: typing.Optional[str] = Field(default=None, description='The database ID.')
-    table_name: typing.Optional[str] = Field(default=None, description='The table name if calling describe_table.')
-
 class EmailDraft(BaseModel):
     subject: typing.Optional[str] = None
     body: typing.Optional[str] = None
-
-class GeneratedSQL(BaseModel):
-    sql: typing.Optional[str] = Field(default=None, description='The generated SQL query.')
-    explanation: typing.Optional[str] = Field(default=None, description='Brief explanation of the query logic.')
-    accessed_tables: typing.List[str] = Field(description='Table names used in the query.')
-    dialect_used: typing.Optional[str] = None
-
-class PlannerTask(BaseModel):
-    db_id: typing.Optional[str] = Field(default=None, description='The ID of the database to query.')
-    dialect: typing.Optional[str] = Field(default=None, description='The SQL dialect to use.')
-    query_intent: typing.Optional[str] = Field(default=None, description='The specific data to retrieve from this database.')
-    schema_hint: typing.Optional[str] = Field(default=None, description='Optional hints about tables or columns to focus on.')
-
-class RequestTableSchema(BaseModel):
-    db_id: typing.Optional[str] = Field(default=None, description='The db id to request its schema.')
-    table_names: typing.List[str] = Field(description='The list of table names to request their schema.')
-
-class RouterPlan(BaseModel):
-    path: typing.Optional[typing.Union[typing_extensions.Literal['SQL_EXECUTION'], typing_extensions.Literal['DIRECT_ANSWER'], typing_extensions.Literal['DISCOVERY_REQUIRED'], typing_extensions.Literal['EXTERNAL_TOOL']]] = Field(default=None, description='The execution path chosen by the planner.\'')
-    tasks: typing.Optional[typing.List["PlannerTask"]] = Field(default=None, description='The list of parallel SQL tasks to execute (required if path is SQL_EXECUTION).')
-    next_action_after_sql: typing.Optional[typing.Union[typing_extensions.Literal['RESPOND'], typing_extensions.Literal['EMAIL_DRAFT']]] = Field(default=None, description='The next step to take after SQL execution (e.g., RESPOND or EMAIL_DRAFT).\'')
-    direct_response_draft: typing.Optional[str] = Field(default=None, description='A draft of the direct response (required if path is DIRECT_ANSWER).')
-    discovery_requests: typing.Optional[typing.List["DiscoveryRequest"]] = Field(default=None, description='The list of discovery tools to call (required if path is DISCOVERY_REQUIRED).')
 
 # #########################################################################
 # Generated type aliases (0)

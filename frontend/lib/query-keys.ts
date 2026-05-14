@@ -19,11 +19,6 @@ export const queryKeys = {
   schedule: {
     all: ["schedule"] as const,
   },
-  appointments: {
-    all: ["appointments"] as const,
-    list: (caseId: string, from: string, to: string) =>
-      ["appointments", "list", caseId, from, to] as const,
-  },
   metrics: {
     stats: ["metrics", "stats"] as const,
     retention: ["metrics", "retention"] as const,

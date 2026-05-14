@@ -46,6 +46,7 @@ def handler(mock_repos, mock_engine):
         case_repo=mock_repos['case'],
         job_repo=mock_repos['job'],
         anomaly_engine=mock_engine,
+        task_queue=AsyncMock(),
     )
 
 

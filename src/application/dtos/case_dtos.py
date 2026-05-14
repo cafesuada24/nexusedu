@@ -37,7 +37,6 @@ class GenerateEmailDraftCommand:
 
     case_id: EntityID
     job_id: EntityID
-    booking_link: str | None = None
     user_id: EntityID | None = None
 
 
@@ -130,6 +129,14 @@ class TriggerDraftDTO(BaseModel):
     job_id: EntityID
     status: JobStatus
     is_new_job: bool
+
+
+class SendEmailResponseDTO(BaseModel):
+    """Response for the send email action, allowing job tracking."""
+
+    job_id: EntityID
+    status: JobStatus
+    recipient: EmailStr
 
 
 class ActionResponseDTO(BaseModel):
