@@ -22,6 +22,7 @@ from fastapi_users.jwt import generate_jwt
 from fastapi_users_db_sqlalchemy import BaseUserDatabase, SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.application.dtos.worker_payloads.case_payloads import AdvisorCreatedPayload
 from src.application.interfaces.unit_of_work import UnitOfWork
 from src.core.config import config
 from src.domain.repositories.settings_repository import UserSettingsRepository
@@ -135,10 +136,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 if created:
                     await self._uow.enqueue(
                         'run_advisor_created_task',
-                        advisor_id=advisor_id,
-                        email=user.email,
-                        name=name,
-                        occurred_at=datetime.now(UTC),
+                        payload=AdvisorCreatedPayload(
+                            advisor_id=advisor_id,
+                            email=user.email,
+                            name=name,
+                            occurred_at=datetime.now(UTC),
+                        ),
                     )
                 await self._uow.commit()
 
@@ -162,10 +165,12 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 if created:
                     await self._uow.enqueue(
                         'run_advisor_created_task',
-                        advisor_id=advisor_id,
-                        email=user.email,
-                        name=name,
-                        occurred_at=datetime.now(UTC),
+                        payload=AdvisorCreatedPayload(
+                            advisor_id=advisor_id,
+                            email=user.email,
+                            name=name,
+                            occurred_at=datetime.now(UTC),
+                        ),
                     )
                 await self._uow.commit()
 

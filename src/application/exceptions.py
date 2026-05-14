@@ -39,3 +39,9 @@ class AuthenticationError(ApplicationError):
     """Raised when authentication fails at the application level."""
 
     pass
+
+
+class ConfigurationError(ApplicationError):
+    """Raised when application configuration is missing or invalid."""
+
+    pass
