@@ -132,6 +132,14 @@ class TriggerDraftDTO(BaseModel):
     is_new_job: bool
 
 
+class SendEmailResponseDTO(BaseModel):
+    """Response for the send email action, allowing job tracking."""
+
+    job_id: EntityID
+    status: JobStatus
+    recipient: EmailStr
+
+
 class ActionResponseDTO(BaseModel):
     """Generic response for status updates and actions."""
 
