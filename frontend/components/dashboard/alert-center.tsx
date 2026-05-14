@@ -175,6 +175,12 @@ export function AlertCenter() {
                               submittedAt: r.student_concern.submitted_at,
                           }
                         : null,
+                    aiOverview: r.ai_overview
+                        ? {
+                              academicSummary: r.ai_overview.academic_summary,
+                              actionKeys: r.ai_overview.action_keys,
+                          }
+                        : null,
                 };
             });
     }, [remoteAlerts, localAlertState, hiddenAlerts]);
