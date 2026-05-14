@@ -16,7 +16,6 @@ function GenerateDraftEmail(user_intent: string, context: string) -> EmailDraft 
       1. **Personalization**: Use the student's performance trajectory (baseline vs. current) provided in the SQL results to explain *why* we are reaching out.
       2. **Tone**: Be curious and supportive. Avoid language like "risk," "failure," "warning," or "probation." Use phrases like "noticed a change," "checking in," and "here to help."
       3. **Privacy**: NEVER use or attempt to find the student's real name or email. You MUST use the exact placeholder `{{STUDENT_NAME}}`.
-      4. **Actionability**: Always include a clear call to action using the placeholder `{{ADVISOR_LINK}}`.
     </objectives>
 
     <context_handling>

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -23,11 +24,11 @@ from sqlalchemy import (
     text,
     update,
 )
-from uuid6 import uuid7
 
 from src.application.exceptions import ConcurrencyError
 from src.core.config import config
 from src.core.identifiers import generate_uuid
+from src.domain.entities.base import AggregateRoot
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseNotFoundError,
@@ -84,13 +85,20 @@ if TYPE_CHECKING:
     from src.domain.entities.student import Student as DomainStudent
     from src.domain.repositories.metadata_repository import DBDescription
 
+# Type alias for the event collection callback used by the Unit of Work
+type EventCollector = Callable[[AggregateRoot], None]
 
 class SqlAlchemyStudentRepository:
     """SQLAlchemy implementation of the StudentRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        collect_events_callback: EventCollector | None = None,
+    ) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
+        self.collect_events_callback = collect_events_callback
         self.chunk_size = config.db_ingest_chunk_size
 
     async def get_by_id(self, sid: uuid.UUID) -> DomainStudent:
@@ -100,9 +108,14 @@ class SqlAlchemyStudentRepository:
         student = result.scalar_one_or_none()
         if student is None:
             raise StudentNotFoundError(sid)
-        return DataMapper.to_domain_student(student)
+        domain_student = DataMapper.to_domain_student(student)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_student)
+        return domain_student
 
     async def save(self, student: DomainStudent) -> None:
+        if self.collect_events_callback:
+            self.collect_events_callback(student)
         stmt = (
             update(Student)
             .where(Student.sid == student.sid)
@@ -209,7 +222,7 @@ class SqlAlchemyActivityRepository:
                 week = record.get('week', '')
 
                 name = f'{sid}-{course_id}-{test_type}-{year}-{sem}-{week}'
-                record['activity_id'] = uuid7(LMS_ACTIVITY_NAMESPACE, name)
+                record['activity_id'] = uuid.uuid5(LMS_ACTIVITY_NAMESPACE, name)
             elif isinstance(record['activity_id'], str):
                 record['activity_id'] = uuid.UUID(record['activity_id'])
 
@@ -263,7 +276,7 @@ class SqlAlchemyActivityRepository:
             )
         )
         res = await self.session.execute(stmt)
-        return [dict(r._mapping) for r in res.all()]
+        return [dict(r) for r in res.mappings().all()]
 
 
 class SqlAlchemyStatusHistoryRepository:
@@ -323,9 +336,14 @@ class SqlAlchemyStatusHistoryRepository:
 class SqlAlchemyAdvisorRepository:
     """SQLAlchemy implementation of the AdvisorRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        collect_events_callback: EventCollector | None = None,
+    ) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
+        self.collect_events_callback = collect_events_callback
 
     async def get_by_id(self, advisor_id: uuid.UUID) -> DomainAdvisor:
         """Retrieve an advisor by their unique ID."""
@@ -339,14 +357,26 @@ class SqlAlchemyAdvisorRepository:
         stmt = select(OrmAdvisor).where(OrmAdvisor.advisor_id == advisor_id)
         result = await self.session.execute(stmt)
         advisor = result.scalar_one_or_none()
-        return DataMapper.to_domain_advisor(advisor) if advisor is not None else None
+        if not advisor:
+            return None
+
+        domain_advisor = DataMapper.to_domain_advisor(advisor)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_advisor)
+        return domain_advisor
 
     async def find_by_user_id(self, user_id: uuid.UUID) -> DomainAdvisor | None:
         """Retrieve an advisor by their associated user ID."""
         stmt = select(OrmAdvisor).where(OrmAdvisor.user_id == user_id)
         result = await self.session.execute(stmt)
         advisor = result.scalar_one_or_none()
-        return DataMapper.to_domain_advisor(advisor) if advisor else None
+        if not advisor:
+            return None
+
+        domain_advisor = DataMapper.to_domain_advisor(advisor)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_advisor)
+        return domain_advisor
 
     async def get_by_user_id(self, user_id: uuid.UUID) -> DomainAdvisor:
         """Retrieve an advisor by their associated user ID."""
@@ -356,6 +386,9 @@ class SqlAlchemyAdvisorRepository:
         return advisor
 
     async def save(self, advisor: DomainAdvisor) -> None:
+        if self.collect_events_callback:
+            self.collect_events_callback(advisor)
+
         stmt = (
             update(OrmAdvisor)
             .where(
@@ -465,7 +498,7 @@ class SqlAlchemyBadgeRepository:
             index_elements=['advisor_id', 'badge_id'],
         )
         result = await self.session.execute(stmt)
-        return result.rowcount > 0
+        return result.rowcount > 0 # pyright: ignore
 
     async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
         # Get total points and action count
@@ -600,12 +633,20 @@ class SqlAlchemyMetadataRepository:
 class SqlAlchemyEmailRepository:
     """SQLAlchemy implementation of the EmailRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        collect_events_callback: EventCollector | None = None,
+    ) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
+        self.collect_events_callback = collect_events_callback
 
     async def add(self, email: DomainInterventionEmail) -> None:
         """Add an intervention email."""
+        if self.collect_events_callback:
+            self.collect_events_callback(email)
+
         new_mail = InterventionEmail(
             email_id=email.email_id,
             case_id=email.case_id,
@@ -620,6 +661,9 @@ class SqlAlchemyEmailRepository:
 
     async def save(self, email: DomainInterventionEmail) -> None:
         """Update the content and status of an existing case email."""
+        if self.collect_events_callback:
+            self.collect_events_callback(email)
+
         stmt = (
             update(InterventionEmail)
             .where(
@@ -657,18 +701,32 @@ class SqlAlchemyEmailRepository:
         )
         result = await self.session.execute(stmt)
         email = result.scalar_one_or_none()
-        return DataMapper.to_domain_email(email) if email else None
+        if not email:
+            return None
+
+        domain_email = DataMapper.to_domain_email(email)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_email)
+        return domain_email
 
 
 class SqlAlchemyCaseRepository:
     """SQLAlchemy implementation of the CaseRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        collect_events_callback: EventCollector | None = None,
+    ) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
+        self.collect_events_callback = collect_events_callback
 
     async def add(self, case: DomainCase) -> None:
         """Add a new case."""
+        if self.collect_events_callback:
+            self.collect_events_callback(case)
+
         new_case = OrmCase(
             case_id=case.case_id,
             sid=case.sid,
@@ -703,9 +761,18 @@ class SqlAlchemyCaseRepository:
         )
         result = await self.session.execute(stmt)
         orm_case = result.scalar_one_or_none()
-        return DataMapper.to_domain_case(orm_case) if orm_case else None
+        if orm_case is None:
+            return None
+
+        domain_case = DataMapper.to_domain_case(orm_case)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_case)
+        return domain_case
 
     async def save(self, case: DomainCase) -> None:
+        if self.collect_events_callback:
+            self.collect_events_callback(case)
+
         stmt = (
             update(OrmCase)
             .where(
@@ -796,7 +863,13 @@ class SqlAlchemyCaseRepository:
         stmt = select(OrmCase).where(OrmCase.case_id == case_id)
         result = await self.session.execute(stmt)
         case = result.scalar_one_or_none()
-        return DataMapper.to_domain_case(case) if case else None
+        if not case:
+            return None
+
+        domain_case = DataMapper.to_domain_case(case)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_case)
+        return domain_case
 
     async def get_student_cases(self, sid: uuid.UUID) -> list[DomainCase]:
         """Retrieve all cases for a specific student."""
@@ -804,7 +877,11 @@ class SqlAlchemyCaseRepository:
             select(OrmCase).where(OrmCase.sid == sid).order_by(desc(OrmCase.created_at))
         )
         result = await self.session.execute(stmt)
-        return [DataMapper.to_domain_case(row[0]) for row in result.all()]
+        domain_cases = [DataMapper.to_domain_case(row[0]) for row in result.all()]
+        if self.collect_events_callback:
+            for case in domain_cases:
+                self.collect_events_callback(case)
+        return domain_cases
 
 
 # class SqlAlchemyTaskRepository:
@@ -948,12 +1025,20 @@ class SqlAlchemyMetricsRepository:
 class SqlAlchemyJobRepository:
     """SQLAlchemy implementation of the JobRepository."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        collect_events_callback: EventCollector | None = None,
+    ) -> None:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
+        self.collect_events_callback = collect_events_callback
 
     async def add(self, job: Job) -> None:
         """Record an background job."""
+        if self.collect_events_callback:
+            self.collect_events_callback(job)
+
         orm_job = BackgroundJobTracker(
             job_id=job.job_id,
             status=job.status,
@@ -971,10 +1056,15 @@ class SqlAlchemyJobRepository:
             BackgroundJobTracker.job_id == job_id,
         )
         result = await self.session.execute(stmt)
-        value = result.scalar_one_or_none()
-        if value is None:
-            raise JobNotFoundError(job_id=job_id)
-        return DataMapper.to_domain_job(value)
+        job_orm = result.scalar_one_or_none()
+        if not job_orm:
+            raise JobNotFoundError(job_id)
+
+        domain_job = DataMapper.to_domain_job(job_orm)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_job)
+        return domain_job
+
 
     async def find_by_correlation_id(
         self,
@@ -993,7 +1083,13 @@ class SqlAlchemyJobRepository:
         )
         result = await self.session.execute(stmt)
         value = result.scalar_one_or_none()
-        return DataMapper.to_domain_job(value) if value else None
+        if not value:
+            return None
+
+        domain_job = DataMapper.to_domain_job(value)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_job)
+        return domain_job
 
     async def get_by_correlation_id(
         self,
@@ -1007,7 +1103,10 @@ class SqlAlchemyJobRepository:
         return res
 
     async def save(self, job: Job) -> None:
-        """Update an existing job."""
+        """Update job status."""
+        if self.collect_events_callback:
+            self.collect_events_callback(job)
+
         stmt = (
             update(BackgroundJobTracker)
             .where(BackgroundJobTracker.job_id == job.job_id)
@@ -1018,6 +1117,7 @@ class SqlAlchemyJobRepository:
             )
         )
         await self.session.execute(stmt)
+
 
 
 class SqlAlchemyUserSettingsRepository:

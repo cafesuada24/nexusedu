@@ -41,30 +41,6 @@ class LlmResponseParser:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateDraftEmail", llm_response=llm_response, mode="request")
         return typing.cast(types.EmailDraft, __result__)
 
-    def GenerateSQL(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateSQL", llm_response=llm_response, mode="request")
-        return typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], __result__)
-
-    def PlanNextStep(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> types.RouterPlan:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="PlanNextStep", llm_response=llm_response, mode="request")
-        return typing.cast(types.RouterPlan, __result__)
-
-    def ReflectSQLError(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> str:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="ReflectSQLError", llm_response=llm_response, mode="request")
-        return typing.cast(str, __result__)
-
-    def Respond(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> str:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="Respond", llm_response=llm_response, mode="request")
-        return typing.cast(str, __result__)
-
     
 
 class LlmStreamParser:
@@ -90,29 +66,5 @@ class LlmStreamParser:
     ) -> stream_types.EmailDraft:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateDraftEmail", llm_response=llm_response, mode="stream")
         return typing.cast(stream_types.EmailDraft, __result__)
-
-    def GenerateSQL(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"]:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="GenerateSQL", llm_response=llm_response, mode="stream")
-        return typing.cast(typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], __result__)
-
-    def PlanNextStep(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> stream_types.RouterPlan:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="PlanNextStep", llm_response=llm_response, mode="stream")
-        return typing.cast(stream_types.RouterPlan, __result__)
-
-    def ReflectSQLError(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> str:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="ReflectSQLError", llm_response=llm_response, mode="stream")
-        return typing.cast(str, __result__)
-
-    def Respond(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> str:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="Respond", llm_response=llm_response, mode="stream")
-        return typing.cast(str, __result__)
 
     

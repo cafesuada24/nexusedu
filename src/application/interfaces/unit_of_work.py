@@ -5,10 +5,14 @@ from typing import Any, Protocol, Self
 
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
+from src.domain.repositories.badge_repository import BadgeRepository
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.email_repository import EmailRepository
+from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
+from src.domain.repositories.point_ledger_repository import PointLedgerRepository
 from src.domain.repositories.schedule_repository import ScheduleRepository
+from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
 from src.domain.repositories.student_repository import StudentRepository
 
@@ -24,6 +28,10 @@ class UnitOfWork(Protocol):
     activities: ActivityRepository
     history: StatusHistoryRepository
     schedules: ScheduleRepository
+    badges: BadgeRepository
+    idempotency: IdempotencyRepository
+    user_settings: UserSettingsRepository
+    point_ledger: PointLedgerRepository
 
     async def __aenter__(self) -> Self:
         """Begin a transaction."""

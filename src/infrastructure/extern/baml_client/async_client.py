@@ -127,66 +127,6 @@ class BamlAsyncClient:
                 "user_intent": user_intent,"context": context,
             })
             return typing.cast(types.EmailDraft, __result__.cast_to(types, types, stream_types, False, __runtime__))
-    async def GenerateSQL(self, message: str,
-        baml_options: BamlCallOptions = {},
-    ) -> typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]:
-        # Check if on_tick is provided
-        if 'on_tick' in baml_options:
-            # Use streaming internally when on_tick is provided
-            __stream__ = self.stream.GenerateSQL(message=message,
-                baml_options=baml_options)
-            return await __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="GenerateSQL", args={
-                "message": message,
-            })
-            return typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], __result__.cast_to(types, types, stream_types, False, __runtime__))
-    async def PlanNextStep(self, thread: str,
-        baml_options: BamlCallOptions = {},
-    ) -> types.RouterPlan:
-        # Check if on_tick is provided
-        if 'on_tick' in baml_options:
-            # Use streaming internally when on_tick is provided
-            __stream__ = self.stream.PlanNextStep(thread=thread,
-                baml_options=baml_options)
-            return await __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="PlanNextStep", args={
-                "thread": thread,
-            })
-            return typing.cast(types.RouterPlan, __result__.cast_to(types, types, stream_types, False, __runtime__))
-    async def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
-        baml_options: BamlCallOptions = {},
-    ) -> str:
-        # Check if on_tick is provided
-        if 'on_tick' in baml_options:
-            # Use streaming internally when on_tick is provided
-            __stream__ = self.stream.ReflectSQLError(query=query,error=error,db_schema_hint=db_schema_hint,
-                baml_options=baml_options)
-            return await __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="ReflectSQLError", args={
-                "query": query,"error": error,"db_schema_hint": db_schema_hint,
-            })
-            return typing.cast(str, __result__.cast_to(types, types, stream_types, False, __runtime__))
-    async def Respond(self, result: str,
-        baml_options: BamlCallOptions = {},
-    ) -> str:
-        # Check if on_tick is provided
-        if 'on_tick' in baml_options:
-            # Use streaming internally when on_tick is provided
-            __stream__ = self.stream.Respond(result=result,
-                baml_options=baml_options)
-            return await __stream__.get_final_response()
-        else:
-            # Original non-streaming code
-            __result__ = await self.__options.merge_options(baml_options).call_function_async(function_name="Respond", args={
-                "result": result,
-            })
-            return typing.cast(str, __result__.cast_to(types, types, stream_types, False, __runtime__))
     
 
 
@@ -232,54 +172,6 @@ class BamlStreamClient:
           lambda x: typing.cast(types.EmailDraft, x.cast_to(types, types, stream_types, False, __runtime__)),
           __ctx__,
         )
-    def GenerateSQL(self, message: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]]:
-        __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="GenerateSQL", args={
-            "message": message,
-        })
-        return baml_py.BamlStream[typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], typing.Union["types.GeneratedSQL", "types.RequestTableSchema"]](
-          __result__,
-          lambda x: typing.cast(typing.Union["stream_types.GeneratedSQL", "stream_types.RequestTableSchema"], x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(typing.Union["types.GeneratedSQL", "types.RequestTableSchema"], x.cast_to(types, types, stream_types, False, __runtime__)),
-          __ctx__,
-        )
-    def PlanNextStep(self, thread: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[stream_types.RouterPlan, types.RouterPlan]:
-        __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="PlanNextStep", args={
-            "thread": thread,
-        })
-        return baml_py.BamlStream[stream_types.RouterPlan, types.RouterPlan](
-          __result__,
-          lambda x: typing.cast(stream_types.RouterPlan, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(types.RouterPlan, x.cast_to(types, types, stream_types, False, __runtime__)),
-          __ctx__,
-        )
-    def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[str, str]:
-        __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="ReflectSQLError", args={
-            "query": query,"error": error,"db_schema_hint": db_schema_hint,
-        })
-        return baml_py.BamlStream[str, str](
-          __result__,
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, False, __runtime__)),
-          __ctx__,
-        )
-    def Respond(self, result: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlStream[str, str]:
-        __ctx__, __result__ = self.__options.merge_options(baml_options).create_async_stream(function_name="Respond", args={
-            "result": result,
-        })
-        return baml_py.BamlStream[str, str](
-          __result__,
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, True, __runtime__)),
-          lambda x: typing.cast(str, x.cast_to(types, types, stream_types, False, __runtime__)),
-          __ctx__,
-        )
     
 
 class BamlHttpRequestClient:
@@ -309,34 +201,6 @@ class BamlHttpRequestClient:
             "user_intent": user_intent,"context": context,
         }, mode="request")
         return __result__
-    async def GenerateSQL(self, message: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="GenerateSQL", args={
-            "message": message,
-        }, mode="request")
-        return __result__
-    async def PlanNextStep(self, thread: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="PlanNextStep", args={
-            "thread": thread,
-        }, mode="request")
-        return __result__
-    async def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="ReflectSQLError", args={
-            "query": query,"error": error,"db_schema_hint": db_schema_hint,
-        }, mode="request")
-        return __result__
-    async def Respond(self, result: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="Respond", args={
-            "result": result,
-        }, mode="request")
-        return __result__
     
 
 class BamlHttpStreamRequestClient:
@@ -364,34 +228,6 @@ class BamlHttpStreamRequestClient:
     ) -> baml_py.baml_py.HTTPRequest:
         __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="GenerateDraftEmail", args={
             "user_intent": user_intent,"context": context,
-        }, mode="stream")
-        return __result__
-    async def GenerateSQL(self, message: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="GenerateSQL", args={
-            "message": message,
-        }, mode="stream")
-        return __result__
-    async def PlanNextStep(self, thread: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="PlanNextStep", args={
-            "thread": thread,
-        }, mode="stream")
-        return __result__
-    async def ReflectSQLError(self, query: str,error: str,db_schema_hint: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="ReflectSQLError", args={
-            "query": query,"error": error,"db_schema_hint": db_schema_hint,
-        }, mode="stream")
-        return __result__
-    async def Respond(self, result: str,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.baml_py.HTTPRequest:
-        __result__ = await self.__options.merge_options(baml_options).create_http_request_async(function_name="Respond", args={
-            "result": result,
         }, mode="stream")
         return __result__
     

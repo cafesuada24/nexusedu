@@ -2,19 +2,18 @@
 
 import argparse
 import asyncio
+import logging
 
 from dotenv import load_dotenv
+from fastapi_users_db_sqlalchemy import SQLAlchemyUserDatabase
 
-from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import async_session_maker
 from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
-    SqlAlchemyAdvisorRepository,
     SqlAlchemyUserSettingsRepository,
 )
-from src.infrastructure.queue.outbox_adapter import TransactionalOutboxAdapter
+from src.infrastructure.persistence.sqlalchemy_uow import SqlAlchemyUnitOfWork
 from src.presentation.api.auth import (
-    SQLAlchemyUserDatabase,
     UserManager,
     UserRole,
 )
@@ -28,19 +27,15 @@ async def create_user(email: str, password: str, role: str) -> None:
     async with async_session_maker() as session:
         user_db = SQLAlchemyUserDatabase(session, User)
         settings_repo = SqlAlchemyUserSettingsRepository(session)
-        advisor_repo = SqlAlchemyAdvisorRepository(session)
+        uow = SqlAlchemyUnitOfWork(session)
 
-        # Instantiate EventPublisher via Outbox for transactional consistency
-        outbox_queue = TransactionalOutboxAdapter(session)
-        event_publisher = TaskQueueEventPublisher(outbox_queue)
-
-        user_manager = UserManager(user_db, settings_repo, advisor_repo, event_publisher)
+        user_manager = UserManager(user_db, settings_repo, uow)
 
         # 1. Create user
         user_create = UserCreate(email=email, password=password)
         try:
             user = await user_manager.create(user_create)
-            print(f'User created successfully: {user.email} (ID: {user.id})')
+            logging.info(f'User created successfully: {user.email} (ID: {user.id})')
 
             # 2. Update role if not viewer
             if role != UserRole.VIEWER.value:
@@ -50,16 +45,16 @@ async def create_user(email: str, password: str, role: str) -> None:
                     # Use user_manager.update to trigger on_after_update (advisor linkage)
                     await user_manager.update(user_update, user)
                     await session.commit()
-                    print(f'User role updated to: {user_role.value}')
+                    logging.info(f'User role updated to: {user_role.value}')
                 except ValueError:
-                    print(f"Error: Invalid role '{role}'. Defaulting to 'viewer'.")
-                    print(f'Available roles: {[r.value for r in UserRole]}')
+                    logging.error(f"Error: Invalid role '{role}'. Defaulting to 'viewer'.")
+                    logging.error(f'Available roles: {[r.value for r in UserRole]}')
             else:
                 await session.commit()
                 print('User role set to: viewer')
 
         except Exception as e:
-            print(f'Error creating user: {e}')
+            logging.error(f'Error creating user: {e}', exc_info=True)
             await session.rollback()
 
 

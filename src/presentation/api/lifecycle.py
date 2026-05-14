@@ -70,7 +70,7 @@ async def redis_pubsub_listener() -> None:
         logger.info('API Lifecycle: Redis Pub/Sub listener stopping...')
         await pubsub.unsubscribe('ws_updates')
     finally:
-        await r.close()
+        await r.aclose()
 
 
 @asynccontextmanager
