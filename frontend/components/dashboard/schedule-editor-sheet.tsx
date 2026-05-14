@@ -12,8 +12,10 @@ import {
   Link2,
   Check,
   Loader2,
+  Calendar as CalendarIcon,
 } from "lucide-react"
 import { toast } from "sonner"
+import { format } from "date-fns"
 import {
   Sheet,
   SheetContent,
@@ -29,13 +31,11 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import {
   Tooltip,
   TooltipContent,
@@ -55,47 +55,307 @@ import {
 } from "@/lib/schedule"
 
 /* ────────────────────────────────────────────────────────────────
+ * State Management (Context Selector Store for 100fps)
+ * ──────────────────────────────────────────────────────────────── */
+
+type ScheduleState = {
+  week: WeekSchedule
+  overrides: Override[]
+}
+
+const HHMM_24H_REGEX = /^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/
+const HHMM_AMPM_REGEX = /^(\d{1,2}):([0-5]\d)\s*([AP]M)$/i
+const STRICT_HHMM_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+function normalizeTimeToHHMM(value: string): string {
+  const raw = value.trim()
+  if (!raw) return ""
+
+  const ampmMatch = raw.match(HHMM_AMPM_REGEX)
+  if (ampmMatch) {
+    const hour = Number(ampmMatch[1])
+    const minute = Number(ampmMatch[2])
+    if (Number.isNaN(hour) || Number.isNaN(minute) || hour < 1 || hour > 12) {
+      return ""
+    }
+    const period = ampmMatch[3].toUpperCase()
+    const hour24 = (hour % 12) + (period === "PM" ? 12 : 0)
+    return `${hour24.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+  }
+
+  const twentyFourMatch = raw.match(HHMM_24H_REGEX)
+  if (!twentyFourMatch) return ""
+
+  const hour = Number(twentyFourMatch[1])
+  const minute = Number(twentyFourMatch[2])
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+}
+
+function normalizeWeekToHHMM(week: WeekSchedule): WeekSchedule {
+  return (Object.keys(week) as DayKey[]).reduce<WeekSchedule>((acc, dayKey) => {
+    const day = week[dayKey]
+    acc[dayKey] = {
+      ...day,
+      slots: day.slots.map((slot) => ({
+        ...slot,
+        from: normalizeTimeToHHMM(slot.from) || slot.from,
+        to: normalizeTimeToHHMM(slot.to) || slot.to,
+      })),
+    }
+    return acc
+  }, {} as WeekSchedule)
+}
+
+function openNativeTimePicker(input: HTMLInputElement) {
+  if ("showPicker" in input && typeof input.showPicker === "function") {
+    input.showPicker()
+  }
+}
+
+class ScheduleStore {
+  private state: ScheduleState
+  private listeners = new Set<() => void>()
+
+  constructor(initialState: ScheduleState) {
+    this.state = initialState
+  }
+
+  getState = () => this.state
+
+  setState = (nextState: Partial<ScheduleState> | ((prev: ScheduleState) => ScheduleState)) => {
+    this.state = typeof nextState === "function" ? nextState(this.state) : { ...this.state, ...nextState }
+    this.listeners.forEach((l) => l())
+  }
+
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+}
+
+const ScheduleStoreContext = React.createContext<ScheduleStore | null>(null)
+
+function useScheduleStore<T>(selector: (state: ScheduleState) => T): T {
+  const store = React.useContext(ScheduleStoreContext)
+  if (!store) throw new Error("useScheduleStore must be used within ScheduleStoreProvider")
+  return React.useSyncExternalStore(store.subscribe, () => selector(store.getState()))
+}
+
+function useScheduleDispatch() {
+  const store = React.useContext(ScheduleStoreContext)
+  if (!store) throw new Error("useScheduleDispatch must be used within ScheduleStoreProvider")
+  return store.setState
+}
+
+/* ────────────────────────────────────────────────────────────────
  * Sub-components (Memoized for 100fps performance)
  * ──────────────────────────────────────────────────────────────── */
+
+const MemoizedCalendar = React.memo(Calendar)
+
+const OverrideForm = React.memo(() => {
+  const dispatch = useScheduleDispatch()
+  const [date, setDate] = React.useState<Date>()
+  const [note, setNote] = React.useState("")
+
+  const handleAdd = React.useCallback(() => {
+    if (!date || !note) {
+      toast.error("Vui lòng nhập ngày và lý do")
+      return
+    }
+    
+    dispatch((prev) => ({
+      ...prev,
+      overrides: [
+        {
+          id: crypto.randomUUID(),
+          date: format(date, "dd/MM/yyyy"),
+          type: "off",
+          note: note,
+        },
+        ...prev.overrides,
+      ],
+    }))
+    
+    toast.success("Đã thêm ngày nghỉ")
+    setDate(undefined)
+    setNote("")
+  }, [date, note, dispatch])
+
+  return (
+    <div className="grid gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-sm transition-all duration-300 hover:shadow-md sm:grid-cols-[160px_1fr_auto]">
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "h-10 rounded-lg border-primary/20 bg-background px-4 justify-start text-left font-sans text-sm font-normal transition-all duration-200 hover:border-primary/40 hover:bg-primary/5",
+              !date && "text-muted-foreground",
+            )}
+          >
+            <CalendarIcon className="mr-2 size-4 text-primary" />
+            {date ? format(date, "dd/MM/yyyy") : <span>Chọn ngày</span>}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <MemoizedCalendar
+            mode="single"
+            selected={date}
+            onSelect={setDate}
+            disabled={(date) =>
+              date < new Date(new Date().setHours(0, 0, 0, 0))
+            }
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+      <Input
+        type="text"
+        placeholder="Lý do, ví dụ: Hội thảo tại Đà Nẵng"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        className="h-10 rounded-lg border-primary/20 bg-background px-4 font-sans text-sm transition-all duration-200 focus:border-primary/50"
+      />
+      <Button
+        className="h-10 rounded-lg bg-primary px-6 font-bold text-primary-foreground transition-all duration-200 hover:bg-primary/90 active:scale-95"
+        onClick={handleAdd}
+      >
+        <Plus className="mr-1.5 size-4" />
+        Thêm
+      </Button>
+    </div>
+  )
+})
+OverrideForm.displayName = "OverrideForm"
 
 const SlotRow = React.memo(
   ({
     dayKey,
     slot,
-    onUpdate,
-    onRemove,
   }: {
     dayKey: DayKey
     slot: Slot
-    onUpdate: (day: DayKey, id: string, field: "from" | "to", value: string) => void
-    onRemove: (day: DayKey, id: string) => void
   }) => {
+    const dispatch = useScheduleDispatch()
+    const [draftFrom, setDraftFrom] = React.useState(() => normalizeTimeToHHMM(slot.from))
+    const [draftTo, setDraftTo] = React.useState(() => normalizeTimeToHHMM(slot.to))
+
+    React.useEffect(() => {
+      setDraftFrom(normalizeTimeToHHMM(slot.from))
+      setDraftTo(normalizeTimeToHHMM(slot.to))
+    }, [slot.from, slot.to])
+
+    const updateSlot = React.useCallback(
+      (field: "from" | "to", value: string) => {
+        const normalized = normalizeTimeToHHMM(value)
+        if (!normalized) return
+
+        dispatch((prev) => ({
+          ...prev,
+          week: {
+            ...prev.week,
+            [dayKey]: {
+              ...prev.week[dayKey],
+              slots: prev.week[dayKey].slots.map((s) =>
+                s.id === slot.id ? { ...s, [field]: normalized } : s,
+              ),
+            },
+          },
+        }))
+      },
+      [dayKey, slot.id, dispatch],
+    )
+
+    const commitFrom = React.useCallback(() => {
+      const normalizedDraft = normalizeTimeToHHMM(draftFrom)
+      const normalizedSlot = normalizeTimeToHHMM(slot.from)
+      if (STRICT_HHMM_REGEX.test(normalizedDraft) && normalizedDraft !== normalizedSlot) {
+        setDraftFrom(normalizedDraft)
+        updateSlot("from", normalizedDraft)
+      } else if (!STRICT_HHMM_REGEX.test(normalizedDraft)) {
+        setDraftFrom(normalizedSlot)
+      }
+    }, [draftFrom, slot.from, updateSlot])
+
+    const commitTo = React.useCallback(() => {
+      const normalizedDraft = normalizeTimeToHHMM(draftTo)
+      const normalizedSlot = normalizeTimeToHHMM(slot.to)
+      if (STRICT_HHMM_REGEX.test(normalizedDraft) && normalizedDraft !== normalizedSlot) {
+        setDraftTo(normalizedDraft)
+        updateSlot("to", normalizedDraft)
+      } else if (!STRICT_HHMM_REGEX.test(normalizedDraft)) {
+        setDraftTo(normalizedSlot)
+      }
+    }, [draftTo, slot.to, updateSlot])
+
+    const removeSlot = React.useCallback(() => {
+      dispatch((prev) => ({
+        ...prev,
+        week: {
+          ...prev.week,
+          [dayKey]: {
+            ...prev.week[dayKey],
+            slots: prev.week[dayKey].slots.filter((s) => s.id !== slot.id),
+          },
+        },
+      }))
+    }, [dayKey, slot.id, dispatch])
+
+    const fromValue = normalizeTimeToHHMM(draftFrom)
+    const toValue = normalizeTimeToHHMM(draftTo)
+
     return (
-      <div className="flex items-center gap-3 transition-all animate-in fade-in slide-in-from-left-2 duration-200">
+      <div className="flex items-center gap-3">
         <div className="relative">
           <Input
+            key={`slot-${slot.id}-from-${fromValue || "empty"}`}
             type="time"
-            value={slot.from}
-            onChange={(e) => onUpdate(dayKey, slot.id, "from", e.target.value)}
-            className="h-9 w-[110px] rounded-lg border-border/60 bg-background px-3 font-mono text-sm transition-shadow focus-visible:ring-1"
+            value={fromValue}
+            onChange={(e) => {
+              const val = e.target.value
+              const normalized = normalizeTimeToHHMM(val)
+              setDraftFrom(normalized)
+              if (STRICT_HHMM_REGEX.test(normalized)) {
+                updateSlot("from", normalized)
+              }
+            }}
+            onBlur={commitFrom}
+            onClick={(e) => openNativeTimePicker(e.currentTarget)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitFrom()
+            }}
+            className="h-9 w-[124px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 py-0 font-sans text-sm tabular-nums leading-normal [text-indent:0] [line-height:1.2] transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-hour-field]:text-left"
           />
         </div>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-primary/60">
           đến
         </span>
         <div className="relative">
           <Input
+            key={`slot-${slot.id}-to-${toValue || "empty"}`}
             type="time"
-            value={slot.to}
-            onChange={(e) => onUpdate(dayKey, slot.id, "to", e.target.value)}
-            className="h-9 w-[110px] rounded-lg border-border/60 bg-background px-3 font-mono text-sm transition-shadow focus-visible:ring-1"
+            value={toValue}
+            onChange={(e) => {
+              const val = e.target.value
+              const normalized = normalizeTimeToHHMM(val)
+              setDraftTo(normalized)
+              if (STRICT_HHMM_REGEX.test(normalized)) {
+                updateSlot("to", normalized)
+              }
+            }}
+            onBlur={commitTo}
+            onClick={(e) => openNativeTimePicker(e.currentTarget)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitTo()
+            }}
+            className="h-9 w-[124px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 py-0 font-sans text-sm tabular-nums leading-normal [text-indent:0] [line-height:1.2] transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40 [&::-webkit-calendar-picker-indicator]:opacity-80 [&::-webkit-datetime-edit]:p-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0 [&::-webkit-datetime-edit-hour-field]:p-0 [&::-webkit-datetime-edit-minute-field]:p-0 [&::-webkit-datetime-edit-hour-field]:text-left"
           />
         </div>
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 shrink-0 rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-          onClick={() => onRemove(dayKey, slot.id)}
+          className="size-9 shrink-0 rounded-lg text-muted-foreground transition-colors duration-200 hover:bg-destructive/10 hover:text-destructive"
+          onClick={removeSlot}
           aria-label="Xoá khoảng giờ"
         >
           <Trash2 className="size-4" />
@@ -111,27 +371,66 @@ const DayRow = React.memo(
     dayKey,
     label,
     shortLabel,
-    config,
-    onToggle,
-    onAddSlot,
-    onRemoveSlot,
-    onUpdateSlot,
+    showErrors,
   }: {
     dayKey: DayKey
     label: string
     shortLabel: string
-    config: DayConfig
-    onToggle: (day: DayKey) => void
-    onAddSlot: (day: DayKey) => void
-    onRemoveSlot: (day: DayKey, id: string) => void
-    onUpdateSlot: (day: DayKey, id: string, field: "from" | "to", value: string) => void
+    showErrors: boolean
   }) => {
+    const config = useScheduleStore((s) => s.week[dayKey])
+    const dispatch = useScheduleDispatch()
+
+    const isInvalid = showErrors && config.enabled && config.slots.length === 0
+
+    const toggleDay = React.useCallback(() => {
+      dispatch((prev) => {
+        const currentConfig = prev.week[dayKey]
+        const nextEnabled = !currentConfig.enabled
+        const nextSlots =
+          nextEnabled && currentConfig.slots.length === 0
+            ? [{ id: crypto.randomUUID(), from: "09:00", to: "17:00" }]
+            : currentConfig.slots
+
+        return {
+          ...prev,
+          week: {
+            ...prev.week,
+            [dayKey]: {
+              ...currentConfig,
+              enabled: nextEnabled,
+              slots: nextSlots,
+            },
+          },
+        }
+      })
+    }, [dayKey, dispatch])
+
+    const addSlot = React.useCallback(() => {
+      dispatch((prev) => ({
+        ...prev,
+        week: {
+          ...prev.week,
+          [dayKey]: {
+            ...prev.week[dayKey],
+            enabled: true,
+            slots: [
+              ...prev.week[dayKey].slots,
+              { id: crypto.randomUUID(), from: "13:00", to: "14:00" },
+            ],
+          },
+        },
+      }))
+    }, [dayKey, dispatch])
+
     return (
       <div
         className={cn(
-          "group rounded-2xl border p-4 transition-all duration-300",
+          "group rounded-xl border p-4",
           config.enabled
-            ? "border-border/80 bg-card shadow-sm"
+            ? isInvalid
+              ? "border-destructive/50 bg-destructive/5 shadow-md"
+              : "border-primary/10 bg-card shadow-md hover:shadow-lg"
             : "border-border/30 bg-muted/20 opacity-80",
         )}
       >
@@ -139,29 +438,46 @@ const DayRow = React.memo(
           <div className="flex items-center gap-4">
             <div
               className={cn(
-                "grid size-10 place-items-center rounded-xl text-sm font-bold shadow-sm transition-colors",
+                "grid size-11 place-items-center rounded-full text-sm font-black shadow-sm transition-transform duration-500",
                 config.enabled
-                  ? "bg-primary/15 text-primary ring-1 ring-primary/20"
+                  ? isInvalid
+                    ? "bg-destructive text-destructive-foreground ring-4 ring-destructive/10"
+                    : "bg-primary text-primary-foreground ring-4 ring-primary/10"
                   : "bg-muted text-muted-foreground/60",
               )}
             >
               {shortLabel}
             </div>
             <div>
-              <p className="font-serif text-[15px] font-semibold tracking-tight">
+              <p
+                className={cn(
+                  "font-sans text-[15px] font-bold tracking-tight",
+                  isInvalid ? "text-destructive" : "text-foreground/90",
+                )}
+              >
                 {label}
               </p>
-              <p className="text-[11px] leading-none text-muted-foreground/80">
+              <p
+                className={cn(
+                  "text-[11px] leading-none transition-colors",
+                  isInvalid ? "font-bold text-destructive" : "font-medium text-primary/60",
+                )}
+              >
                 {config.enabled
-                  ? `${config.slots.length} khoảng giờ làm việc`
+                  ? isInvalid
+                    ? "Vui lòng thêm khung giờ"
+                    : `${config.slots.length} khoảng giờ làm việc`
                   : "Đang được thiết lập là ngày nghỉ"}
               </p>
             </div>
           </div>
           <Switch
             checked={config.enabled}
-            onCheckedChange={() => onToggle(dayKey)}
-            className="data-[state=checked]:bg-primary"
+            onCheckedChange={toggleDay}
+            className={cn(
+              isInvalid && "ring-2 ring-destructive/20 ring-offset-2",
+              "data-[state=checked]:bg-primary transition-colors duration-200",
+            )}
           />
         </div>
 
@@ -172,15 +488,13 @@ const DayRow = React.memo(
                 key={slot.id}
                 dayKey={dayKey}
                 slot={slot}
-                onUpdate={onUpdateSlot}
-                onRemove={onRemoveSlot}
               />
             ))}
             <Button
               variant="ghost"
               size="sm"
-              className="mt-1 w-fit rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 text-[11px] font-medium text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-              onClick={() => onAddSlot(dayKey)}
+              className="mt-1 w-fit rounded-lg border border-dashed border-primary/20 bg-primary/5 px-4 text-[11px] font-bold text-primary transition-colors duration-200 hover:border-primary/40 hover:bg-primary/10"
+              onClick={addSlot}
             >
               <Plus className="mr-1.5 size-3.5" />
               Thêm khoảng giờ
@@ -193,6 +507,100 @@ const DayRow = React.memo(
 )
 DayRow.displayName = "DayRow"
 
+const StatsBadges = React.memo(() => {
+  const week = useScheduleStore((s) => s.week)
+  
+  const stats = React.useMemo(() => {
+    let minutes = 0
+    Object.values(week).forEach((d) => {
+      if (!d.enabled) return
+      d.slots.forEach((s) => {
+        const [fh, fm] = s.from.split(":").map(Number)
+        const [th, tm] = s.to.split(":").map(Number)
+        const diff = th * 60 + tm - (fh * 60 + fm)
+        if (diff > 0) minutes += diff
+      })
+    })
+    const hours = (minutes / 60).toFixed(1)
+    const dur = DEFAULT_SCHEDULE.duration + DEFAULT_SCHEDULE.buffer
+    const capacity = dur ? Math.floor((Number(hours) * 60) / dur) : 0
+    
+    return { hours, capacity }
+  }, [week])
+
+  return (
+    <div className="hidden items-center gap-2 sm:flex">
+      <Badge variant="secondary" className="gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-primary shadow-sm border-none font-bold">
+        <Clock className="size-3.5" />
+        {stats.hours} giờ / tuần
+      </Badge>
+      <Badge variant="outline" className="gap-1.5 rounded-full border-primary/20 px-3 py-1 text-primary shadow-sm font-bold">
+        <Users className="size-3.5" />~{stats.capacity} cuộc
+      </Badge>
+    </div>
+  )
+})
+StatsBadges.displayName = "StatsBadges"
+
+const OverrideRow = React.memo(({ override: o }: { override: Override }) => {
+  const dispatch = useScheduleDispatch()
+  
+  const removeOverride = React.useCallback(() => {
+    dispatch((prev) => ({
+      ...prev,
+      overrides: prev.overrides.filter((item) => item.id !== o.id)
+    }))
+  }, [o.id, dispatch])
+
+  return (
+    <div
+      className="grid grid-cols-[100px_1fr_100px_48px] items-center border-b border-primary/5 hover:bg-primary/[0.02]"
+    >
+      <div className="px-4 font-mono text-[12px] font-bold text-primary">
+        {o.date}
+      </div>
+      <div className="px-4 text-[12px] font-medium text-foreground/80 truncate">
+        {o.note}
+      </div>
+      <div className="px-4">
+        <Badge
+          variant={o.type === "off" ? "destructive" : "secondary"}
+          className={cn(
+            "h-6 gap-1.5 rounded-full px-2.5 text-[10px] font-black tracking-wide uppercase shadow-sm transition-all duration-300",
+            o.type === "off" 
+              ? "bg-destructive text-destructive-foreground shadow-destructive/20" 
+              : "bg-primary/10 text-primary shadow-primary/5 hover:bg-primary/20"
+          )}
+        >
+          {o.type === "off" ? (
+            <>
+              <CalendarX className="size-3" />
+              Nghỉ
+            </>
+          ) : (
+            <>
+              <Clock className="size-3" />
+              Giờ riêng
+            </>
+          )}
+        </Badge>
+      </div>
+      <div className="px-4 text-right">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 rounded-lg text-muted-foreground/40 transition-colors duration-200 hover:bg-destructive/10 hover:text-destructive"
+          onClick={removeOverride}
+          aria-label="Xoá ngày nghỉ"
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+})
+OverrideRow.displayName = "OverrideRow"
+
 /* ────────────────────────────────────────────────────────────────
  * Main Component
  * ──────────────────────────────────────────────────────────────── */
@@ -201,106 +609,68 @@ export function ScheduleEditorSheet() {
   const { schedule, setSchedule, resetSchedule, isMutating } = useScheduleQuery()
   const [open, setOpen] = React.useState(false)
 
-  // Draft state
-  const [week, setWeek] = React.useState<WeekSchedule>(schedule.week)
-  const [overrides, setOverrides] = React.useState<Override[]>(
-    schedule.overrides,
-  )
-  const [newDate, setNewDate] = React.useState("")
-  const [newNote, setNewNote] = React.useState("")
+  // Store instance
+  const storeRef = React.useRef<ScheduleStore>(new ScheduleStore({
+    week: schedule.week,
+    overrides: schedule.overrides
+  }))
+
+  // Validation state
+  const [showErrors, setShowErrors] = React.useState(false)
 
   React.useEffect(() => {
-    if (!open) return
-    setWeek(schedule.week)
-    setOverrides(schedule.overrides)
+    if (open) {
+      storeRef.current.setState({
+        week: normalizeWeekToHHMM(schedule.week),
+        overrides: schedule.overrides
+      })
+      setShowErrors(false)
+    }
   }, [open, schedule])
-
-  const toggleDay = React.useCallback((day: DayKey) => {
-    setWeek((w) => ({ ...w, [day]: { ...w[day], enabled: !w[day].enabled } }))
-  }, [])
-
-  const addSlot = React.useCallback((day: DayKey) => {
-    setWeek((w) => ({
-      ...w,
-      [day]: {
-        ...w[day],
-        enabled: true,
-        slots: [
-          ...w[day].slots,
-          { id: crypto.randomUUID(), from: "13:00", to: "14:00" },
-        ],
-      },
-    }))
-  }, [])
-
-  const removeSlot = React.useCallback((day: DayKey, id: string) => {
-    setWeek((w) => ({
-      ...w,
-      [day]: { ...w[day], slots: w[day].slots.filter((s) => s.id !== id) },
-    }))
-  }, [])
-
-  const updateSlot = React.useCallback(
-    (day: DayKey, id: string, field: "from" | "to", value: string) => {
-      setWeek((w) => ({
-        ...w,
-        [day]: {
-          ...w[day],
-          slots: w[day].slots.map((s) =>
-            s.id === id ? { ...s, [field]: value } : s,
-          ),
-        },
-      }))
-    },
-    [],
-  )
 
   const copyWeekday = React.useCallback(
     (source: DayKey) => {
-      const sourceSlots = week[source].slots
-      setWeek((w) => {
-        const next = { ...w }
-        ;(["mon", "tue", "wed", "thu", "fri"] as DayKey[]).forEach((d) => {
-          next[d] = {
-            enabled: true,
-            slots: sourceSlots.map((s) => ({ ...s, id: crypto.randomUUID() })),
-          }
-        })
-        return next
+      const state = storeRef.current.getState()
+      const sourceSlots = state.week[source].slots
+      
+      const nextWeek = { ...state.week }
+      ;(["mon", "tue", "wed", "thu", "fri"] as DayKey[]).forEach((d) => {
+        nextWeek[d] = {
+          enabled: true,
+          slots: sourceSlots.map((s) => ({ ...s, id: crypto.randomUUID() })),
+        }
       })
+      
+      storeRef.current.setState({ week: nextWeek })
       toast.success(
         `Đã áp lịch ${DAYS.find((d) => d.key === source)?.long} cho T2–T6`,
       )
     },
-    [week],
+    [],
   )
 
-  const addOverride = React.useCallback(() => {
-    if (!newDate || !newNote) {
-      toast.error("Vui lòng nhập ngày và lý do")
-      return
-    }
-    setOverrides((prev) => [
-      { id: crypto.randomUUID(), date: newDate, type: "off", note: newNote },
-      ...prev,
-    ])
-    setNewDate("")
-    setNewNote("")
-    toast.success("Đã thêm ngoại lệ lịch")
-  }, [newDate, newNote])
-
-  const removeOverride = React.useCallback((id: string) => {
-    setOverrides((prev) => prev.filter((o) => o.id !== id))
-  }, [])
-
   const reset = React.useCallback(() => {
-    setWeek(DEFAULT_SCHEDULE.week)
-    setOverrides(DEFAULT_SCHEDULE.overrides)
+    storeRef.current.setState({
+      week: DEFAULT_SCHEDULE.week,
+      overrides: DEFAULT_SCHEDULE.overrides
+    })
     resetSchedule()
     toast.success("Đã khôi phục lịch mặc định")
   }, [resetSchedule])
 
   const save = React.useCallback(() => {
+    const { week, overrides } = storeRef.current.getState()
+    
+    const invalidDays = (Object.keys(week) as DayKey[]).filter(
+      (key) => week[key].enabled && week[key].slots.length === 0,
+    )
+
+    if (invalidDays.length > 0) {
+      setShowErrors(true)
+      toast.error("Vui lòng thêm đầy đủ khoảng thời gian cho các ngày đã chọn.")
+      return
+    }
+
     setSchedule({
       ...DEFAULT_SCHEDULE,
       week,
@@ -312,295 +682,207 @@ export function ScheduleEditorSheet() {
         "Thay đổi đã áp dụng cho trang đặt lịch và card Giờ làm việc.",
     })
     setOpen(false)
+    setShowErrors(false)
   }, [
     setSchedule,
-    week,
-    overrides,
     schedule.timezone,
   ])
 
-  const totalActiveHours = React.useMemo(() => {
-    let minutes = 0
-    Object.values(week).forEach((d) => {
-      if (!d.enabled) return
-      d.slots.forEach((s) => {
-        const [fh, fm] = s.from.split(":").map(Number)
-        const [th, tm] = s.to.split(":").map(Number)
-        const diff = th * 60 + tm - (fh * 60 + fm)
-        if (diff > 0) minutes += diff
-      })
-    })
-    return (minutes / 60).toFixed(1)
-  }, [week])
-
-  const weeklyCapacity = React.useMemo(() => {
-    const dur = DEFAULT_SCHEDULE.duration + DEFAULT_SCHEDULE.buffer
-    if (!dur) return 0
-    return Math.floor((Number(totalActiveHours) * 60) / dur)
-  }, [totalActiveHours])
-
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="mt-2 rounded-lg">
-          <CalendarDays className="size-4" />
-          Chỉnh sửa lịch chi tiết
-        </Button>
-      </SheetTrigger>
-      <SheetContent
-        side="right"
-        className="will-change-transform translate-z-0 w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl border-l border-border/60 bg-background shadow-2xl"
-      >
-        <SheetHeader className="sticky top-0 z-10 border-b border-border/60 bg-background/95 px-6 py-5 backdrop-blur-md">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <SheetTitle className="flex items-center gap-2 font-serif text-xl">
-                <span className="grid size-8 place-items-center rounded-lg bg-primary/15 text-primary">
-                  <CalendarDays className="size-4" />
-                </span>
-                Chỉnh sửa lịch chi tiết
-              </SheetTitle>
-              <SheetDescription className="mt-1 text-pretty">
-                Tuỳ chỉnh khung giờ tiếp sinh viên và ngày nghỉ ngoại lệ.
-              </SheetDescription>
-            </div>
-            <div className="hidden items-center gap-2 sm:flex">
-              <Badge variant="secondary" className="gap-1 rounded-full px-2.5">
-                <Clock className="size-3" />
-                {totalActiveHours} giờ / tuần
-              </Badge>
-              <Badge variant="outline" className="gap-1 rounded-full px-2.5">
-                <Users className="size-3" />~{weeklyCapacity} cuộc
-              </Badge>
-            </div>
-          </div>
-        </SheetHeader>
-
-        <div className="grid gap-8 px-6 py-6">
-          {/* Weekly schedule */}
-          <section className="grid gap-4">
-            <div className="flex items-center justify-between gap-3">
+    <ScheduleStoreContext.Provider value={storeRef.current}>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="sm" className="mt-2 rounded-lg">
+            <CalendarDays className="size-4" />
+            Chỉnh sửa lịch chi tiết
+          </Button>
+        </SheetTrigger>
+        <SheetContent
+          side="right"
+          className="w-full gap-0 overflow-y-auto border-l border-primary/10 bg-background p-0 font-sans antialiased sm:max-w-2xl"
+        >
+          <SheetHeader className="sticky top-0 z-10 border-b border-primary/10 bg-background px-6 py-5">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="font-serif text-base font-medium">
-                  Khung giờ theo tuần
+                <SheetTitle className="flex items-center gap-3 font-sans text-xl font-black tracking-tight text-primary">
+                  <span className="grid size-10 place-items-center rounded-xl bg-primary shadow-lg shadow-primary/20 text-primary-foreground">
+                    <CalendarDays className="size-5" />
+                  </span>
+                  Chỉnh sửa lịch chi tiết
+                </SheetTitle>
+                <SheetDescription className="mt-2 text-pretty font-sans text-sm font-medium text-muted-foreground/80">
+                  Tuỳ chỉnh khung giờ tiếp sinh viên và ngày nghỉ với hiệu năng tối ưu.
+                </SheetDescription>
+              </div>
+              <StatsBadges />
+            </div>
+          </SheetHeader>
+
+          <div className="grid gap-8 px-6 py-8">
+            {/* Weekly schedule */}
+            <section className="grid gap-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-sans text-base font-black text-foreground/90 uppercase tracking-tight">
+                    Khung giờ theo tuần
+                  </h3>
+                  <p className="text-xs font-medium text-muted-foreground/70">
+                    Bật/tắt theo ngày, thêm nhiều khoảng giờ linh hoạt.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 min-w-[130px] rounded-lg border-primary/20 bg-primary/5 text-primary font-bold transition-all duration-300 hover:bg-primary/10 hover:border-primary/40 hover:shadow-md"
+                  onClick={() => copyWeekday("mon")}
+                >
+                  <Copy className="size-3.5 mr-2" />
+                  Copy T2 → T6
+                </Button>
+              </div>
+
+              <div className="grid gap-4">
+                {DAYS.map((d) => (
+                  <DayRow
+                    key={d.key}
+                    dayKey={d.key}
+                    label={d.long}
+                    shortLabel={d.short}
+                    showErrors={showErrors}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <Separator className="bg-primary/5" />
+
+            {/* Overrides */}
+            <section className="grid gap-5">
+              <div>
+                <h3 className="font-sans text-base font-black text-foreground/90 uppercase tracking-tight">
+                  Ngày nghỉ & Ngoại lệ
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  Bật/tắt theo ngày, thêm nhiều khoảng giờ trong cùng một ngày.
+                <p className="text-[11px] font-medium text-muted-foreground/70">
+                  Thêm ngày nghỉ lễ, đi công tác, hoặc khung giờ đặc biệt cho
+                  ngày cụ thể.
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 min-w-[120px] rounded-lg border border-border/40 hover:bg-muted/80"
-                onClick={() => copyWeekday("mon")}
-              >
-                <Copy className="size-3.5" />
-                Copy T2 → T6
-              </Button>
-            </div>
 
-            <div className="grid gap-3">
-              {DAYS.map((d) => (
-                <DayRow
-                  key={d.key}
-                  dayKey={d.key}
-                  label={d.long}
-                  shortLabel={d.short}
-                  config={week[d.key]}
-                  onToggle={toggleDay}
-                  onAddSlot={addSlot}
-                  onRemoveSlot={removeSlot}
-                  onUpdateSlot={updateSlot}
-                />
-              ))}
-            </div>
-          </section>
+              <OverrideForm />
 
-          <Separator className="bg-border/60" />
+              <OverridesList />
+            </section>
 
-          {/* Overrides */}
-          <section className="grid gap-4">
-            <div>
-              <h3 className="font-serif text-base font-medium text-foreground/90">
-                Ngoại lệ & ngày nghỉ
-              </h3>
-              <p className="text-[11px] text-muted-foreground">
-                Thêm ngày nghỉ lễ, đi công tác, hoặc khung giờ đặc biệt cho
-                ngày cụ thể.
-              </p>
-            </div>
+            <Separator className="bg-primary/5" />
 
-            <div className="grid gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:grid-cols-[160px_1fr_auto]">
-              <Input
-                type="text"
-                placeholder="dd/mm/yyyy"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background px-4"
-              />
-              <Input
-                type="text"
-                placeholder="Lý do, ví dụ: Hội thảo tại Đà Nẵng"
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background px-4"
-              />
-              <Button
-                variant="secondary"
-                className="h-10 rounded-xl bg-primary/10 text-primary hover:bg-primary/15"
-                onClick={addOverride}
-              >
-                <Plus className="mr-1.5 size-4" />
-                Thêm
-              </Button>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-border/60 shadow-sm">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="h-11 px-4 font-serif text-[13px] font-bold">Ngày</TableHead>
-                    <TableHead className="h-11 px-4 font-serif text-[13px] font-bold">Ghi chú</TableHead>
-                    <TableHead className="h-11 px-4 font-serif text-[13px] font-bold">Loại</TableHead>
-                    <TableHead className="h-11 w-12 px-4" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {overrides.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="py-8 text-center text-[12px] text-muted-foreground italic"
-                      >
-                        Chưa có ngoại lệ nào. Lịch chạy theo khung giờ tuần.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    overrides.map((o) => (
-                      <TableRow key={o.id} className="hover:bg-muted/30">
-                        <TableCell className="px-4 font-mono text-[12px] font-medium">
-                          {o.date}
-                        </TableCell>
-                        <TableCell className="px-4 text-[12px] text-foreground/80">{o.note}</TableCell>
-                        <TableCell className="px-4">
-                          <Badge
-                            variant={o.type === "off" ? "destructive" : "secondary"}
-                            className="h-6 gap-1.5 rounded-full px-2.5 text-[10px] font-semibold tracking-wide uppercase"
-                          >
-                            {o.type === "off" ? (
-                              <>
-                                <CalendarX className="size-3" />
-                                Nghỉ
-                              </>
-                            ) : (
-                              <>
-                                <Clock className="size-3" />
-                                Giờ riêng
-                              </>
-                            )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="px-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 rounded-lg text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => removeOverride(o.id)}
-                            aria-label="Xoá ngoại lệ"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </section>
-
-          <Separator className="bg-border/60" />
-
-          {/* Timezone & link */}
-          <section className="grid gap-5">
-            <div>
-              <h3 className="font-serif text-base font-medium text-foreground/90">
-                Liên kết đặt lịch công khai
-              </h3>
-              <p className="text-[11px] text-muted-foreground">
-                Sinh viên có thể đặt lịch hẹn trực tiếp qua liên kết này.
-              </p>
-            </div>
-
-            <div className="grid gap-2">
-              <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-2.5 shadow-inner">
-                <Link2 className="size-4 text-muted-foreground/70" />
-                <code className="flex-1 truncate font-mono text-[12px] text-foreground/70">
-                  nexusedu.app/booking/le-ha
-                </code>
-                <TooltipProvider delayDuration={100}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 rounded-lg text-muted-foreground/60 transition-colors hover:bg-primary/10 hover:text-primary"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(
-                            "https://nexusedu.app/booking/le-ha",
-                          )
-                          toast.success("Đã sao chép liên kết", {
-                            description:
-                              "Thông tin đã được lưu vào bộ nhớ tạm của bạn",
-                          })
-                        }}
-                      >
-                        <Copy className="size-3.5" />
-                        <span className="sr-only">Copy</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Sao chép liên kết</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+            {/* Timezone & link */}
+            <section className="grid gap-5">
+              <div>
+                <h3 className="font-sans text-base font-black text-foreground/90 uppercase tracking-tight">
+                  Liên kết đặt lịch công khai
+                </h3>
+                <p className="text-[11px] font-medium text-muted-foreground/70">
+                  Sinh viên có thể đặt lịch hẹn trực tiếp qua liên kết này.
+                </p>
               </div>
-              <p className="text-[10px] text-muted-foreground/70">
-                Tự động đính kèm vào email AI gửi sinh viên.
-              </p>
-            </div>
-          </section>
-        </div>
 
-        <SheetFooter className="sticky bottom-0 z-10 flex-row items-center justify-between gap-3 border-t border-border/60 bg-background/95 px-6 py-5 backdrop-blur-md">
-          <Button
-            variant="ghost"
-            className="h-10 rounded-xl text-[13px] font-medium text-muted-foreground hover:bg-muted/50"
-            onClick={reset}
-          >
-            Khôi phục mặc định
-          </Button>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="h-10 rounded-xl border-border/80 px-6 text-[13px] font-medium transition-colors hover:bg-muted/50"
-              onClick={() => setOpen(false)}
-            >
-              Huỷ
-            </Button>
-            <Button 
-              className="h-10 rounded-xl bg-primary px-8 text-[13px] font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98]" 
-              onClick={save}
-              disabled={isMutating}
-            >
-              {isMutating ? (
-                <Loader2 className="mr-2 size-4 animate-spin" />
-              ) : (
-                <Check className="mr-2 size-4" />
-              )}
-              {isMutating ? "Đang lưu…" : "Lưu lịch"}
-            </Button>
+              <div className="grid gap-2">
+                <div className="flex items-center gap-3 rounded-xl border border-primary/10 bg-primary/5 px-4 py-3 shadow-inner transition-colors duration-300 hover:bg-primary/[0.08]">
+                  <Link2 className="size-4 text-primary" />
+                  <code className="flex-1 truncate font-mono text-[12px] font-bold text-primary">
+                    nexusedu.app/booking/le-ha
+                  </code>
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 rounded-lg text-primary/60 transition-colors duration-200 hover:bg-primary/10 hover:text-primary active:scale-95"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(
+                              "https://nexusedu.app/booking/le-ha",
+                            )
+                            toast.success("Đã sao chép liên kết", {
+                              description:
+                                "Thông tin đã được lưu vào bộ nhớ tạm của bạn",
+                            })
+                          }}
+                        >
+                          <Copy className="size-3.5" />
+                          <span className="sr-only">Copy</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Sao chép liên kết</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <p className="text-[10px] font-medium text-muted-foreground/50">
+                  Tự động đính kèm vào email AI gửi sinh viên.
+                </p>
+              </div>
+            </section>
           </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+
+          <SheetFooter className="sticky bottom-0 z-10 flex-row items-center justify-between gap-3 border-t border-primary/10 bg-background px-6 py-5">
+            <Button
+              variant="ghost"
+              className="h-10 rounded-xl text-[13px] font-bold text-muted-foreground transition-colors duration-200 hover:bg-muted/50 hover:text-foreground"
+              onClick={reset}
+            >
+              Khôi phục mặc định
+            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                className="h-10 rounded-xl border-primary/20 px-6 text-[13px] font-bold text-primary transition-colors duration-200 hover:bg-primary/5 hover:shadow-sm"
+                onClick={() => setOpen(false)}
+              >
+                Huỷ
+              </Button>
+              <Button 
+                className="h-10 rounded-xl bg-primary px-8 text-[13px] font-black text-primary-foreground shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98]" 
+                onClick={save}
+                disabled={isMutating}
+              >
+                {isMutating ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <Check className="mr-2 size-4" />
+                )}
+                {isMutating ? "Đang lưu…" : "Lưu lịch"}
+              </Button>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </ScheduleStoreContext.Provider>
+  )
+}
+
+function OverridesList() {
+  const overrides = useScheduleStore((s) => s.overrides)
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-primary/10 bg-card shadow-md transition-all duration-300">
+      <div className="grid grid-cols-[100px_1fr_100px_48px] bg-primary/5 border-b border-primary/10">
+        <div className="h-11 flex items-center px-4 font-sans text-[12px] font-black uppercase tracking-wider text-primary/70">Ngày</div>
+        <div className="h-11 flex items-center px-4 font-sans text-[12px] font-black uppercase tracking-wider text-primary/70">Ghi chú</div>
+        <div className="h-11 flex items-center px-4 font-sans text-[12px] font-black uppercase tracking-wider text-primary/70">Loại</div>
+        <div className="h-11 w-12 px-4" />
+      </div>
+
+      {overrides.length === 0 ? (
+        <div className="py-12 text-center text-[12px] text-muted-foreground/60 italic font-medium bg-muted/5">
+          Chưa có ngày nghỉ nào. Lịch chạy theo khung giờ tuần.
+        </div>
+      ) : (
+        <div className="hide-scrollbar max-h-80 overflow-y-auto">
+          {overrides.map((override) => (
+            <OverrideRow key={override.id} override={override} />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

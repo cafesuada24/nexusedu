@@ -20,7 +20,7 @@ export function OverridesCard({ upcomingOverrides }: OverridesCardProps) {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <CalendarX className="size-4 text-warning" />
-          Ngoại lệ
+          Ngày nghỉ
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-2">

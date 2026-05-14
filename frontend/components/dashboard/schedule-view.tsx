@@ -40,7 +40,17 @@ export function ScheduleView() {
     if (isMutating) return
     setSchedule((prev) => {
       const next = { ...prev.week }
-      next[key] = { ...next[key], enabled }
+      const currentSlots = next[key].slots
+      const nextSlots =
+        enabled && currentSlots.length === 0
+          ? [{ id: crypto.randomUUID(), from: "09:00", to: "17:00" }]
+          : currentSlots
+
+      next[key] = {
+        ...next[key],
+        enabled,
+        slots: nextSlots,
+      }
       return { ...prev, week: next }
     })
   }

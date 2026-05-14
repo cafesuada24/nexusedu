@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { SlotTakenError } from "@/lib/appointments";
+export class SlotTakenError extends Error {
+  code = "SLOT_TAKEN" as const;
+  constructor(message = "slot_taken") {
+    super(message);
+    this.name = "SlotTakenError";
+  }
+}
 
 /**
  * Backend API client for the NexusEDU intervention service.
