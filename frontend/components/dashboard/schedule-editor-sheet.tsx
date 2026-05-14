@@ -316,7 +316,7 @@ export function ScheduleEditorSheet() {
     ])
     setNewDate("")
     setNewNote("")
-    toast.success("Đã thêm ngoại lệ lịch")
+    toast.success("Đã thêm ngày nghỉ")
   }, [newDate, newNote])
 
   const removeOverride = React.useCallback((id: string) => {
@@ -399,7 +399,7 @@ export function ScheduleEditorSheet() {
                 Chỉnh sửa lịch chi tiết
               </SheetTitle>
               <SheetDescription className="mt-1 text-pretty">
-                Tuỳ chỉnh khung giờ tiếp sinh viên và ngày nghỉ ngoại lệ.
+                Tuỳ chỉnh khung giờ tiếp sinh viên và ngày nghỉ.
               </SheetDescription>
             </div>
             <div className="hidden items-center gap-2 sm:flex">
@@ -461,7 +461,7 @@ export function ScheduleEditorSheet() {
           <section className="grid gap-4">
             <div>
               <h3 className="font-serif text-base font-medium text-foreground/90">
-                Ngoại lệ & ngày nghỉ
+                Ngày nghỉ
               </h3>
               <p className="text-[11px] text-muted-foreground">
                 Thêm ngày nghỉ lễ, đi công tác, hoặc khung giờ đặc biệt cho
@@ -511,7 +511,7 @@ export function ScheduleEditorSheet() {
                         colSpan={4}
                         className="py-8 text-center text-[12px] text-muted-foreground italic"
                       >
-                        Chưa có ngoại lệ nào. Lịch chạy theo khung giờ tuần.
+                        Chưa có ngày nghỉ nào. Lịch chạy theo khung giờ tuần.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -545,7 +545,7 @@ export function ScheduleEditorSheet() {
                             size="icon"
                             className="size-8 rounded-lg text-muted-foreground/60 transition-colors hover:bg-destructive/10 hover:text-destructive"
                             onClick={() => removeOverride(o.id)}
-                            aria-label="Xoá ngoại lệ"
+                            aria-label="Xoá ngày nghỉ"
                           >
                             <Trash2 className="size-3.5" />
                           </Button>
