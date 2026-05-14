@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from src.core.identifiers import EntityID, generate_uuid
+from src.domain.entities.base import AggregateRoot
 from src.domain.exceptions import (
     EmptyEmailError,
     InvalidActionError,
@@ -13,7 +14,7 @@ from src.domain.value_objects.status import EmailStatus
 
 
 @dataclass
-class InterventionEmail:
+class InterventionEmail(AggregateRoot):
     """Represents an intervention email drafted or sent to a student."""
 
     case_id: EntityID
