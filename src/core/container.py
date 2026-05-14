@@ -26,7 +26,6 @@ from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
-from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.application.services.websocket_publisher import WebSocketEventPublisher
 from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -88,6 +87,7 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
     SqlAlchemyStudentRepository,
     SqlAlchemyUserSettingsRepository,
 )
+from src.infrastructure.persistence.sqlalchemy_uow import SqlAlchemyUnitOfWork
 from src.infrastructure.queue.arq_adapter import ArqTaskQueueAdapter
 from src.infrastructure.queue.outbox_adapter import TransactionalOutboxAdapter
 from src.infrastructure.queue.outbox_processor import OutboxProcessor
@@ -233,14 +233,18 @@ class Container:
         return TransactionalOutboxAdapter(self.session)
 
     @cached_property
-    def outbox_processor(self) -> OutboxProcessor:
-        """Processor to forward outbox events to the real background queue."""
-        return OutboxProcessor(self.session, self.direct_task_queue)
+    def uow(self) -> SqlAlchemyUnitOfWork:
+        """Unit of Work for managing transactions and events."""
+        return SqlAlchemyUnitOfWork(self.session)
 
     @cached_property
-    def event_publisher(self) -> TaskQueueEventPublisher:
-        """Domain event publisher."""
-        return TaskQueueEventPublisher(self.task_queue)
+    def outbox_processor(self) -> OutboxProcessor:
+        """Processor to forward outbox events to the real background queue."""
+        return OutboxProcessor(
+            self.session,
+            self.direct_task_queue,
+            self.websocket_publisher,
+        )
 
     @cached_property
     def websocket_publisher(self) -> WebSocketEventPublisher:
@@ -287,32 +291,20 @@ class Container:
     def get_case_command_handler(self) -> CaseCommandHandler:
         """Case command handler."""
         return CaseCommandHandler(
-            self.student_repo,
-            self.email_repo,
-            self.case_repo,
-            self.advisor_repo,
-            self.job_repo,
-            self.task_queue,
-            self.event_publisher,
-            self.websocket_publisher,
+            uow=self.uow,
             availability_service=self.availability_service,
             email_drafting_service=self.email_drafting_service,
         )
 
     def get_schedule_command_handler(self) -> ScheduleCommandHandler:
         """Schedule command handler."""
-        return ScheduleCommandHandler(self.schedule_repo)
+        return ScheduleCommandHandler(uow=self.uow)
 
     def get_data_command_handler(self) -> DataCommandHandler:
         """Data command handler."""
         return DataCommandHandler(
-            self.student_repo,
-            self.activity_repo,
-            self.status_history_repo,
-            self.case_repo,
-            self.job_repo,
-            self.anomaly_engine,
-            self.task_queue,
+            uow=self.uow,
+            anomaly_engine=self.anomaly_engine,
         )
 
     # Query Handlers
