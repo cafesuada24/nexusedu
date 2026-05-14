@@ -52,6 +52,10 @@ export type Alert = {
     goals: Goal[];
     /** Khi sinh viên click "Chưa giải quyết xong" — comment được lưu lại. */
     studentConcern?: { comment: string; submittedAt: number } | null;
+    aiOverview?: {
+        academicSummary?: string | null;
+        actionKeys?: string[] | null;
+    } | null;
 };
 
 export const problemMeta: Record<
