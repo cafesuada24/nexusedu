@@ -243,10 +243,16 @@ const SlotRow = React.memo(
             value={draftFrom}
             onChange={(e) => setDraftFrom(e.target.value)}
             onBlur={commitFrom}
+            onClick={(e) => {
+              if ("showPicker" in e.currentTarget && typeof (e.currentTarget as any).showPicker === "function") {
+                (e.currentTarget as any).showPicker();
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") commitFrom()
+              else if (e.key !== "Tab") e.preventDefault()
             }}
-            className="h-9 w-[110px] rounded-lg border-primary/20 bg-background px-3 font-mono text-sm transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40"
+            className="h-9 w-[110px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 font-mono text-sm transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40"
           />
         </div>
         <span className="text-[11px] font-bold uppercase tracking-wider text-primary/60">
@@ -258,10 +264,16 @@ const SlotRow = React.memo(
             value={draftTo}
             onChange={(e) => setDraftTo(e.target.value)}
             onBlur={commitTo}
+            onClick={(e) => {
+              if ("showPicker" in e.currentTarget && typeof (e.currentTarget as any).showPicker === "function") {
+                (e.currentTarget as any).showPicker();
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") commitTo()
+              else if (e.key !== "Tab") e.preventDefault()
             }}
-            className="h-9 w-[110px] rounded-lg border-primary/20 bg-background px-3 font-mono text-sm transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40"
+            className="h-9 w-[110px] cursor-pointer rounded-lg border-primary/20 bg-background px-3 font-mono text-sm transition-colors duration-200 focus-visible:ring-1 focus-visible:ring-primary/30 hover:border-primary/40"
           />
         </div>
         <Button
