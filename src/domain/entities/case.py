@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from src.core.identifiers import EntityID, generate_uuid
 from src.domain.entities.appointment import Appointment
+from src.domain.entities.base import AggregateRoot
 from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
     CaseAcceptedEvent,
@@ -53,7 +54,7 @@ _INTERVENTION_STATUS_TRANSITION = {
 
 
 @dataclass
-class Case:
+class Case(AggregateRoot):
     """Represents an intervention case for a student."""
 
     sid: EntityID
@@ -67,23 +68,6 @@ class Case:
     academic_summary: str | None = None
     action_keys: list[str] | None = None
     version: int = field(default=0)
-    _domain_events: list[DomainEvent] = field(
-        default_factory=list[DomainEvent],
-        init=False,
-    )
-
-    @property
-    def domain_events(self) -> list[DomainEvent]:
-        """Return registered domain events."""
-        return self._domain_events
-
-    def clear_events(self) -> None:
-        """Clear all registered domain events."""
-        self._domain_events.clear()
-
-    def register_event(self, event: DomainEvent) -> None:
-        """Register a new domain event."""
-        self._domain_events.append(event)
 
     @property
     def time_to_resolve(self) -> timedelta | None:
