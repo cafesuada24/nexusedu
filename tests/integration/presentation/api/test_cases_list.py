@@ -7,7 +7,7 @@ from starlette.testclient import TestClient
 from src.domain.entities.case import Case
 from src.domain.repositories.case_repository import CaseRepository
 from src.domain.repositories.student_repository import StudentRepository
-from src.domain.value_objects.status import CaseStatus
+from src.domain.value_objects.status import InterventionStatus
 from src.infrastructure.database.models import Advisor
 from src.presentation.api.auth import User
 
@@ -46,16 +46,14 @@ async def test_get_task_list(
                 'student_name': 'Task Test Student',
                 'email': 'task@test.com',
                 'current_risk_status': 'Critical',
-                'intervention_status': 'notified',
                 'major': 'CS',
             },
         ],
     )
 
     # 2. Create a case
-    await case_repository.create_case(
-        Case(case_id=cid, sid=sid, status=CaseStatus.OPEN),
-    )
+    case = Case(case_id=cid, sid=sid)
+    await case_repository.add(case)
     # Assign the case to an advisor
     await case_repository.assign_case(cid, adv_id)
 
@@ -65,7 +63,6 @@ async def test_get_task_list(
     test_db_session.add(
         InterventionEmail(
             email_id=uuid4(),
-            sid=sid,
             case_id=cid,
             subject='Draft Subj',
             body='Draft Body',
@@ -120,8 +117,8 @@ async def test_assign_case_idempotency(
     adv_2 = uuid4()
 
     # 1. Create a case
-    await case_repository.create_case(
-        Case(case_id=cid, sid=sid, status=CaseStatus.OPEN),
+    await case_repository.add(
+        Case(case_id=cid, sid=sid),
     )
 
     # 2. First assignment should succeed

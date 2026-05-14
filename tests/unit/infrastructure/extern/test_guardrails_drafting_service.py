@@ -25,10 +25,8 @@ async def test_generate_draft_success(service, monkeypatch):
 
     subject, body = await service.generate_draft(
         student_name="John",
-        performance_context="Grades are slipping.",
-        booking_link="http://book.me"
+        performance_context="Grades are slipping."
     )
-
     assert "John" in subject or "John" in body
     assert "John" in body
     assert "http://book.me" in body

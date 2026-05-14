@@ -23,6 +23,7 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
     SqlAlchemyStatusHistoryRepository,
     SqlAlchemyStudentRepository,
 )
+from src.infrastructure.persistence.sqlalchemy_uow import SqlAlchemyUnitOfWork
 from src.presentation.api.auth import User, UserRole, current_active_user
 from src.presentation.api.main import app
 
@@ -121,6 +122,12 @@ async def test_db_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
     await engine.dispose()
+
+
+@pytest.fixture
+def uow(test_db_session: AsyncSession) -> SqlAlchemyUnitOfWork:
+    """Provides a SqlAlchemyUnitOfWork."""
+    return SqlAlchemyUnitOfWork(test_db_session)
 
 
 @pytest.fixture

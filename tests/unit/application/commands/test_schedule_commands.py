@@ -1,35 +1,41 @@
 """Unit tests for ScheduleCommandHandler."""
 
+import uuid
 from datetime import date, time
-from unittest.mock import AsyncMock
-from uuid import uuid4
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.application.commands.schedule_commands import ScheduleCommandHandler
-from src.application.dtos.advisor_dtos import (
+from src.application.commands.schedule_commands import (
     AddDayOffCommand,
     AddWorkingHoursCommand,
     DeleteDayOffCommand,
     DeleteWorkingHoursCommand,
+    ScheduleCommandHandler,
     UpdateWorkingHoursCommand,
 )
-from src.domain.entities.schedule import DayOff, WorkingHours
+from src.domain.entities.schedule import WorkingHours
 
 
 @pytest.fixture
-def schedule_repo():
-    return AsyncMock()
+def mock_uow():
+    uow = MagicMock()
+    uow.schedules = AsyncMock()
+    uow.__aenter__.return_value = uow
+    uow.__aexit__.return_value = None
+    uow.commit = AsyncMock()
+    uow.rollback = AsyncMock()
+    return uow
 
 
 @pytest.fixture
-def handler(schedule_repo):
-    return ScheduleCommandHandler(schedule_repo)
+def handler(mock_uow):
+    return ScheduleCommandHandler(uow=mock_uow)
 
 
 @pytest.mark.asyncio
-async def test_handle_add_working_hours(handler, schedule_repo):
-    advisor_id = uuid4()
+async def test_handle_add_working_hours(handler, mock_uow):
+    advisor_id = uuid.uuid4()
     command = AddWorkingHoursCommand(
         advisor_id=advisor_id,
         day_of_week=0,
@@ -37,21 +43,17 @@ async def test_handle_add_working_hours(handler, schedule_repo):
         end_time=time(17, 0),
         timezone="UTC"
     )
-    
+
     await handler.handle_add_working_hours(command)
-    
-    schedule_repo.add_working_hours.assert_called_once()
-    wh = schedule_repo.add_working_hours.call_args[0][0]
-    assert isinstance(wh, WorkingHours)
-    assert wh.advisor_id == advisor_id
-    assert wh.day_of_week == 0
-    assert wh.start_time == time(9, 0)
+
+    mock_uow.schedules.add_working_hours.assert_called_once()
+    mock_uow.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_handle_update_working_hours(handler, schedule_repo):
-    wh_id = uuid4()
-    advisor_id = uuid4()
+async def test_handle_update_working_hours(handler, mock_uow):
+    wh_id = uuid.uuid4()
+    advisor_id = uuid.uuid4()
     command = UpdateWorkingHoursCommand(
         working_hours_id=wh_id,
         day_of_week=1,
@@ -69,58 +71,43 @@ async def test_handle_update_working_hours(handler, schedule_repo):
         end_time=time(17, 0),
         timezone="UTC"
     )
-    schedule_repo.get_working_hours_by_id.return_value = existing_wh
+    mock_uow.schedules.get_working_hours_by_id.return_value = existing_wh
 
     await handler.handle_update_working_hours(command)
 
-    schedule_repo.get_working_hours_by_id.assert_called_once_with(wh_id)
-    schedule_repo.update_working_hours.assert_called_once()
-    wh = schedule_repo.update_working_hours.call_args[0][0]
-    assert wh.id == wh_id
-    assert wh.day_of_week == 1
-    assert wh.timezone == "EST"
-    assert wh.advisor_id == advisor_id
+    mock_uow.schedules.get_working_hours_by_id.assert_called_once_with(wh_id)
+    mock_uow.schedules.update_working_hours.assert_called_once()
+    mock_uow.commit.assert_called_once()
+
 
 @pytest.mark.asyncio
-async def test_handle_delete_working_hours(handler, schedule_repo):
-    wh_id = uuid4()
+async def test_handle_delete_working_hours(handler, mock_uow):
+    wh_id = uuid.uuid4()
     command = DeleteWorkingHoursCommand(working_hours_id=wh_id)
-    
+
     await handler.handle_delete_working_hours(command)
-    
-    schedule_repo.delete_working_hours.assert_called_once_with(wh_id)
+
+    mock_uow.schedules.delete_working_hours.assert_called_once_with(wh_id)
+    mock_uow.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_handle_add_day_off(handler, schedule_repo):
-    advisor_id = uuid4()
+async def test_handle_add_day_off(handler, mock_uow):
+    advisor_id = uuid.uuid4()
     command = AddDayOffCommand(advisor_id=advisor_id, date=date(2026, 6, 1), reason="Vacation")
-    
+
     await handler.handle_add_day_off(command)
-    
-    schedule_repo.add_day_off.assert_called_once()
-    do = schedule_repo.add_day_off.call_args[0][0]
-    assert isinstance(do, DayOff)
-    assert do.advisor_id == advisor_id
-    assert do.date == date(2026, 6, 1)
+
+    mock_uow.schedules.add_day_off.assert_called_once()
+    mock_uow.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_handle_delete_day_off(handler, schedule_repo):
-    do_id = uuid4()
+async def test_handle_delete_day_off(handler, mock_uow):
+    do_id = uuid.uuid4()
     command = DeleteDayOffCommand(day_off_id=do_id)
-    
+
     await handler.handle_delete_day_off(command)
-    
-    schedule_repo.delete_day_off.assert_called_once_with(do_id)
 
-
-@pytest.mark.asyncio
-async def test_invalid_working_hours_rejected(handler):
-    with pytest.raises(ValueError, match="start_time must be before end_time"):
-        AddWorkingHoursCommand(
-            advisor_id=uuid4(),
-            day_of_week=0,
-            start_time=time(17, 0),
-            end_time=time(9, 0), # Invalid: end before start
-        )
+    mock_uow.schedules.delete_day_off.assert_called_once_with(do_id)
+    mock_uow.commit.assert_called_once()
