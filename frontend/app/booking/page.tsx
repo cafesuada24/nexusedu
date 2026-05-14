@@ -68,7 +68,7 @@ export default async function PublicBookingPage({
             </p>
           </div>
 
-          <BookingView caseId={caseId} />
+          <BookingView caseId={caseId} advisorName={meta.advisor} />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người được mời qua email này, bạn có thể bỏ

@@ -8,7 +8,7 @@ import { ADVISOR_META, DEFAULT_ADVISOR_META } from "@/lib/static-content"
 
 function decodeJwtPayload(
   token: string,
-): { case_id?: string; advisor?: string } | null {
+): { case_id?: string; advisor_name?: string } | null {
   try {
     const payload = token.split(".")[1]
     return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"))
@@ -26,8 +26,7 @@ export default async function PublicFeedbackPage({
   const raw = typeof token === "string" ? token : undefined
 
   const claims = raw ? decodeJwtPayload(raw) : null
-  const meta =
-    ADVISOR_META[claims?.advisor ?? ""] ?? ADVISOR_META["le-ha"]
+  const advisorName = claims?.advisor_name ?? "Cố vấn"
 
   if (!raw || !claims?.case_id) {
     return (
@@ -66,18 +65,18 @@ export default async function PublicFeedbackPage({
               className="w-fit rounded-md bg-primary/10 text-primary hover:bg-primary/10"
             >
               <Star className="size-3" />
-              Đánh giá quá trình hỗ trợ từ {meta.advisor}
+              Đánh giá quá trình hỗ trợ từ {advisorName}
             </Badge>
             <h1 className="font-serif text-3xl font-bold tracking-tight text-balance md:text-4xl">
               Bạn cảm thấy thế nào sau buổi hỗ trợ?
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground text-pretty md:text-base">
-              Phản hồi của bạn hoàn toàn bảo mật và giúp {meta.advisor} cải
+              Phản hồi của bạn hoàn toàn bảo mật và giúp {advisorName} cải
               thiện chất lượng hỗ trợ cho các sinh viên khác.
             </p>
           </div>
 
-          <FeedbackView token={raw} />
+          <FeedbackView token={raw} advisorName={advisorName} />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người nhận được yêu cầu đánh giá này, bạn có
