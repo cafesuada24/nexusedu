@@ -184,6 +184,7 @@ class CaseCommandHandler:
 
             case.record_email_sent(job_id=job_id, user_id=command.user_id)
             await self.uow.cases.save(case=case)
+            await self.uow.commit()
 
             return SendEmailResponseDTO(
                 job_id=job_id,
