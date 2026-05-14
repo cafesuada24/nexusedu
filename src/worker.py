@@ -771,7 +771,7 @@ class WorkerSettings:
     on_startup = on_startup
     cron_jobs = [
         cron(run_outbox_poller_task, second=set(range(0, 60, 5))),
-        cron(run_ai_health_check_task, minute=set(range(0, 60))),
+        cron(run_ai_health_check_task, minute=30),
     ]
     redis_settings = RedisSettings(
         host=config.redis_host,
