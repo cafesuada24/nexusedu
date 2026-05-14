@@ -30,7 +30,6 @@ import {
     type CaseStatus,
     problemMeta,
     COLUMNS,
-    pickRandomAppointment,
     fromBackendStatus,
     toBackendStatus,
 } from "@/lib/alerts";
