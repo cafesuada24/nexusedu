@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect } from "react";
 import { useWebSocket, WebSocketMessage } from "@/hooks/use-websocket";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { fetchDraftStatus } from "@/lib/api";
 import { toast } from "sonner";
 
 interface WebSocketContextType {
@@ -18,6 +19,52 @@ export const useWebSocketContext = () => useContext(WebSocketContext);
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const queryClient = useQueryClient();
+    const getCaseIdFromJobPayload = React.useCallback((rawPayload: unknown) => {
+        const payload = (rawPayload ?? {}) as Record<string, any>;
+        const metadataCaseId = payload.metadata?.case_id;
+        if (typeof metadataCaseId === "string" && metadataCaseId) {
+            return metadataCaseId;
+        }
+        const correlationId = payload.correlation_id;
+        if (typeof correlationId === "string" && correlationId) {
+            return correlationId;
+        }
+        return null;
+    }, []);
+
+    const getJobType = React.useCallback((rawPayload: unknown) => {
+        const payload = (rawPayload ?? {}) as Record<string, any>;
+        const jobType = payload.job_type ?? payload.correlation_type;
+        return typeof jobType === "string" ? jobType : "";
+    }, []);
+
+    const markDraftCompletedImmediately = React.useCallback(
+        (caseId: string) => {
+            queryClient.setQueryData(
+                queryKeys.cases.draft(caseId),
+                (oldData: any) => ({
+                    subject: oldData?.subject ?? null,
+                    body: oldData?.body ?? null,
+                    status: oldData?.status ?? "draft",
+                    is_generating: false,
+                })
+            );
+        },
+        [queryClient]
+    );
+
+    const hydrateDraftCache = React.useCallback(
+        async (caseId: string) => {
+            const freshDraft = await fetchDraftStatus(caseId);
+            queryClient.setQueryData(queryKeys.cases.draft(caseId), {
+                subject: freshDraft.subject ?? null,
+                body: freshDraft.body ?? null,
+                status: freshDraft.status,
+                is_generating: false,
+            });
+        },
+        [queryClient]
+    );
 
     /**
      * Surgical update helper for list caches (flat arrays or paged items).
@@ -52,15 +99,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     );
 
     const handleMessage = React.useCallback(
-        (message: WebSocketMessage) => {
+        async (message: WebSocketMessage) => {
             const { type, payload } = message;
             console.log("[WS] Received message:", type, payload);
 
             switch (type) {
                 case "JOB:STARTED":
                     console.log("[WS] Job started", payload);
-                    const startedCaseId = payload.metadata?.case_id;
-                    if (startedCaseId) {
+                    const startedCaseId = getCaseIdFromJobPayload(payload);
+                    const startedJobType = getJobType(payload);
+                    if (startedCaseId && startedJobType === "email_draft") {
                         const updater = (item: any) => ({
                             ...item,
                             is_generating: true,
@@ -71,17 +119,18 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                         updateSurgicalCache(queryKeys.alerts.all, startedCaseId, updater);
                     }
 
-                    if (payload.job_type === "email_draft") {
+                    if (startedJobType === "email_draft") {
                         toast.info("Generating email draft...");
-                    } else if (payload.job_type === "email_send") {
+                    } else if (startedJobType === "email_send") {
                         toast.info("Sending intervention email...");
                     }
                     break;
 
                 case "JOB:COMPLETED":
                     console.log("[WS] Job completed, surgical cache update...", payload);
-                    const completedCaseId = payload.metadata?.case_id;
-                    if (completedCaseId) {
+                    const completedCaseId = getCaseIdFromJobPayload(payload);
+                    const completedJobType = getJobType(payload);
+                    if (completedCaseId && completedJobType === "email_draft") {
                         // Surgical update to all lists (Tasks, Open Cases, Alerts, etc.)
                         const updater = (item: any) => ({
                             ...item,
@@ -92,23 +141,28 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                         updateSurgicalCache(queryKeys.cases.all, completedCaseId, updater);
                         updateSurgicalCache(queryKeys.alerts.all, completedCaseId, updater);
 
-                        // Invalidate targeted draft query since it's a single item fetch
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.draft(completedCaseId),
-                        });
+                        // Phase 1: stop composing state immediately.
+                        markDraftCompletedImmediately(completedCaseId);
                     }
 
-                    if (payload.job_type === "email_draft") {
+                    if (completedJobType === "email_draft") {
                         toast.success("Draft generation completed!");
-                    } else if (payload.job_type === "email_send") {
+                        if (completedCaseId) {
+                            // Phase 2: hydrate subject/body right after completion.
+                            hydrateDraftCache(completedCaseId).catch((error) => {
+                                console.error("[WS] Failed to hydrate completed draft:", error);
+                            });
+                        }
+                    } else if (completedJobType === "email_send") {
                         toast.success("Intervention email sent successfully!");
                     }
                     break;
 
                 case "JOB:FAILED":
                     console.error("[WS] Job failed", payload);
-                    const failedCaseId = payload.metadata?.case_id;
-                    if (failedCaseId) {
+                    const failedCaseId = getCaseIdFromJobPayload(payload);
+                    const failedJobType = getJobType(payload);
+                    if (failedCaseId && failedJobType === "email_draft") {
                         // Surgical update to all lists
                         const updater = (item: any) => ({
                             ...item,
@@ -125,9 +179,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                         });
                     }
 
-                    const jobName = payload.job_type === "email_draft" ? "Draft generation" : "Email dispatch";
+                    const jobName = failedJobType === "email_draft" ? "Draft generation" : "Email dispatch";
                     toast.error(`${jobName} failed`, {
-                        description: payload.error || "Unknown error occurred",
+                        description: ((payload ?? {}) as Record<string, any>).error || "Unknown error occurred",
                     });
                     break;
 
@@ -167,7 +221,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     console.log("[WS] Unhandled message type:", type);
             }
         },
-        [queryClient, updateSurgicalCache]
+        [
+            getCaseIdFromJobPayload,
+            getJobType,
+            hydrateDraftCache,
+            markDraftCompletedImmediately,
+            queryClient,
+            updateSurgicalCache,
+        ]
     );
 
     const { status } = useWebSocket({ onMessage: handleMessage });

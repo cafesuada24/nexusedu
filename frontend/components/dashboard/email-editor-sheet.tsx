@@ -80,13 +80,14 @@ export function EmailEditorSheet({
     }, [subject, body]);
 
     const isSent = alert?.interventionStatus === "sent" || localSent;
+    const draftSubject = draft?.subject || "";
+    const draftBody = draft?.body || "";
+    const draftIsGenerating = !!draft?.is_generating;
 
     // --- 3. Prefer derived generation state ---
     const isGenerating =
         isAiDrafting ||
-        (draft !== undefined
-            ? !!draft?.is_generating
-            : !!alert?.isGenerating) ||
+        (draft !== undefined ? draftIsGenerating : !!alert?.isGenerating) ||
         (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
 
     // --- 4. Synchronization Logic (Modal Open & AI Completion Only) ---
@@ -102,8 +103,8 @@ export function EmailEditorSheet({
         }
 
         const incomingSubject =
-            alert.draftSubject || draft?.subject || alert.subject || "";
-        const incomingBody = alert.draftBody || draft?.body || alert.body || "";
+            draftSubject || alert.draftSubject || alert.subject || "";
+        const incomingBody = draftBody || alert.draftBody || alert.body || "";
 
         // SCENARIO A: Switching to a new case (Isolated State)
         if (alert.id !== currentAlertId) {
@@ -127,9 +128,44 @@ export function EmailEditorSheet({
             setBody(incomingBody);
             setIsDirty(false);
         }
+        // Keep editor in sync with fresh websocket-driven draft cache updates,
+        // but never override user edits in progress.
+        else if (
+            !isDirty &&
+            (
+                incomingSubject !== subjectRef.current ||
+                incomingBody !== bodyRef.current
+            )
+        ) {
+            setSubject(incomingSubject);
+            setBody(incomingBody);
+        }
 
         wasGenerating.current = isGenerating;
-    }, [alert, draft, isGenerating, currentAlertId]);
+    }, [alert, currentAlertId, draftBody, draftSubject, isGenerating]);
+
+    // Deterministic cache -> local sync for the currently opened case.
+    React.useEffect(() => {
+        if (!alert || alert.id !== currentAlertId) return;
+        if (isDirty) return;
+        if (!draftSubject && !draftBody) return;
+
+        if (
+            draftSubject !== subjectRef.current ||
+            draftBody !== bodyRef.current
+        ) {
+            setSubject(draftSubject);
+            setBody(draftBody);
+            wasGenerating.current = draftIsGenerating;
+        }
+    }, [
+        alert,
+        currentAlertId,
+        draftBody,
+        draftIsGenerating,
+        draftSubject,
+        isDirty,
+    ]);
 
     // --- 5. Action-Based Debounced Auto-Save (One-Way / Send-Only) ---
     const debouncedSave = React.useMemo(() => {

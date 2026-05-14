@@ -246,21 +246,9 @@ export function useDraftStatus(case_id?: string | null) {
       return await fetchDraftStatus(case_id);
     },
     enabled: isAuthenticated && !!case_id,
-    // Poll only if the query data suggests generation is in progress.
-    refetchInterval: (query) => {
-      const state = query.state;
-      const data = state.data;
-
-      // Stop polling if the fetch errored.
-      if (state.error) return false;
-
-      // If we have data and it says NOT generating, we can stop.
-      if (data && !data.is_generating) return false;
-
-      // Otherwise (no data yet or explicitly generating), poll every 30s as a fallback.
-      return 30000;
-    },
-    // Prevent refetching on window focus to reduce noise during background polling.
+    // Event-driven updates via websocket cache hydration; no polling loop.
+    refetchInterval: false,
+    // Prevent refetching on window focus to reduce noise.
     refetchOnWindowFocus: false,
     staleTime: 0,
     retry: 2,
