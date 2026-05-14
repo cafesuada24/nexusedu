@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Star, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import { Star, CheckCircle2, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import {
   Card,
@@ -17,8 +17,8 @@ import { submitFeedback, type StudentSatisfaction } from "@/lib/api"
 
 const RATING_LABELS = ["", "Không hài lòng", "Tạm được", "Ổn", "Hài lòng", "Rất hài lòng"]
 
-type Submitting = "none" | "resolved" | "unresolved"
-type Stage = "form" | "done_resolved" | "done_unresolved"
+type Submitting = "none" | "resolved"
+type Stage = "form" | "done_resolved"
 
 function toSatisfaction(rating: number, resolved: boolean): StudentSatisfaction {
   if (!resolved) return "very_bad"
@@ -29,23 +29,7 @@ function toSatisfaction(rating: number, resolved: boolean): StudentSatisfaction 
   return "very_good"
 }
 
-function decodeToken(token: string): { case_id?: string } | null {
-  try {
-    const payload = token.split(".")[1]
-    const padded = payload
-      .replace(/-/g, "+")
-      .replace(/_/g, "/")
-      .padEnd(Math.ceil(payload.length / 4) * 4, "=")
-    return JSON.parse(atob(padded))
-  } catch {
-    return null
-  }
-}
-
 export function FeedbackView({ token }: { token: string }) {
-  const claims = React.useMemo(() => decodeToken(token), [token])
-  const caseId = claims?.case_id ?? ""
-
   const [rating, setRating] = React.useState(0)
   const [hovered, setHovered] = React.useState(0)
   const [comment, setComment] = React.useState("")
@@ -69,22 +53,6 @@ export function FeedbackView({ token }: { token: string }) {
     }
   }
 
-  const handleUnresolved = async () => {
-    if (comment.trim().length === 0) {
-      toast.error("Vui lòng cho biết lý do bạn cảm thấy chưa giải quyết.")
-      return
-    }
-    setSubmitting("unresolved")
-    try {
-      await submitFeedback(token, toSatisfaction(0, false), comment.trim())
-      await new Promise((r) => setTimeout(r, 400))
-      setStage("done_unresolved")
-    } catch {
-      setSubmitting("none")
-      toast.error("Không thể gửi phản hồi. Vui lòng thử lại sau.")
-    }
-  }
-
   if (stage === "done_resolved") {
     return (
       <Card className="rounded-2xl border-success/30 bg-success/5">
@@ -96,24 +64,6 @@ export function FeedbackView({ token }: { token: string }) {
             <h2 className="font-serif text-2xl font-bold">Cảm ơn bạn đã xác nhận!</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Phản hồi tích cực của bạn đã được gửi tới cố vấn. Chúc bạn học tập hiệu quả!
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (stage === "done_unresolved") {
-    return (
-      <Card className="rounded-2xl border-amber-300/50 bg-amber-50/40 dark:border-amber-400/40 dark:bg-amber-500/10">
-        <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
-          <span className="grid size-16 place-items-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-            <AlertCircle className="size-8" />
-          </span>
-          <div>
-            <h2 className="font-serif text-2xl font-bold">Đã ghi nhận phản hồi</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Cố vấn sẽ liên hệ lại với bạn sớm để tiếp tục hỗ trợ.
             </p>
           </div>
         </CardContent>
@@ -160,10 +110,7 @@ export function FeedbackView({ token }: { token: string }) {
 
         <div className="grid gap-2">
           <label htmlFor="comment" className="text-sm font-medium">
-            Nhận xét / Lý do{" "}
-            <span className="font-normal text-muted-foreground">
-              (bắt buộc nếu chưa giải quyết)
-            </span>
+            Nhận xét / Lý do
           </label>
           <Textarea
             id="comment"
@@ -176,25 +123,7 @@ export function FeedbackView({ token }: { token: string }) {
           <p className="text-right text-xs text-muted-foreground">{comment.length}/500</p>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          <Button
-            variant="outline"
-            className="h-11 rounded-xl border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
-            disabled={submitting !== "none"}
-            onClick={handleUnresolved}
-          >
-            {submitting === "unresolved" ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Đang gửi...
-              </>
-            ) : (
-              <>
-                <AlertCircle className="size-4" />
-                Chưa giải quyết xong
-              </>
-            )}
-          </Button>
+        <div className="grid gap-2">
           <Button
             className="h-11 rounded-xl bg-success text-success-foreground hover:bg-success/90"
             disabled={submitting !== "none"}

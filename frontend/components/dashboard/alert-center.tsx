@@ -235,6 +235,23 @@ export function AlertCenter() {
             resolved: [],
         };
         for (const a of filteredAlerts) map[a.status].push(a);
+
+        // Sorting for "Đã chấp nhận" (Accepted) column
+        // Priority 1: Risk Status (High > Medium)
+        // Priority 2: Time moved (Newest first)
+        map.accepted.sort((a, b) => {
+            const weightA = a.severity === "high" ? 2 : 1;
+            const weightB = b.severity === "high" ? 2 : 1;
+
+            if (weightA !== weightB) {
+                return weightB - weightA;
+            }
+
+            const timeA = a.movedAt ?? 0;
+            const timeB = b.movedAt ?? 0;
+            return timeB - timeA;
+        });
+
         map.scheduled.sort((a, b) => {
             const ta = a.appointmentAt ?? Number.POSITIVE_INFINITY;
             const tb = b.appointmentAt ?? Number.POSITIVE_INFINITY;
