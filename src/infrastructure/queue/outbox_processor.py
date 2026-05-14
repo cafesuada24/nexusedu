@@ -116,3 +116,5 @@ class OutboxProcessor:
                     )
 
                 event.processed_at = datetime.now(UTC)
+
+        await self.session.commit()

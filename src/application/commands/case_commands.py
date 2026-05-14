@@ -182,6 +182,9 @@ class CaseCommandHandler:
             )
             await self.uow.jobs.add(new_job)
 
+            case.record_email_sent(job_id=job_id, user_id=command.user_id)
+            await self.uow.cases.save(case=case)
+
             return SendEmailResponseDTO(
                 job_id=job_id,
                 status=new_job.status,
