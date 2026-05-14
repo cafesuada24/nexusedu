@@ -7,8 +7,6 @@ from dotenv import load_dotenv
 from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()
-
 
 class AppConfig(BaseSettings):
     """Application config."""
@@ -91,4 +89,16 @@ class ProdConfig(AppConfig):
     smtp_from_email: str
 
 
-config = ProdConfig() if os.getenv('ENVIRONMENT') == 'production' else DevConfig()
+# Load environment variables from .env file
+load_dotenv()
+
+_env = os.getenv('ENVIRONMENT', 'development').lower()
+
+if _env == 'production':
+    # ProdConfig will raise a validation error if required secrets (like jwt_secret) are missing.
+    config = ProdConfig()
+elif _env == 'test':
+    config = DevConfig(environment='test')
+else:
+    # Default to development for local DX, but use DevConfig which provides defaults.
+    config = DevConfig()
