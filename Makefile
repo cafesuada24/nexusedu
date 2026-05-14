@@ -1,4 +1,4 @@
-.PHONY: generate_baml test lint start stop restart logs migrate makemigrations
+.PHONY: generate_baml test lint start stop restart logs migrate makemigrations reset_db reseed
 
 start:
 	@if [ ! -f .env ]; then cp .env.example .env; fi
@@ -14,6 +14,9 @@ logs:
 
 migrate:
 	docker compose exec api alembic upgrade head
+
+reseed:
+	docker compose exec api env PYTHONPATH=. python scripts/reseed_dashboard.py
 
 reset_db:
 	./scripts/reset.sh
