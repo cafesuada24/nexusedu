@@ -7,14 +7,13 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
-from src.infrastructure.repositories.sqlalchemy_repositories import (
+from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyBadgeRepository,
 )
 
 from src.domain.value_objects.badges import BADGE_MAP
 from src.infrastructure.database.models import AdvisorBadge, PointLedger
 from src.infrastructure.database.models import Case as OrmCase
-from src.infrastructure.database.models import Task as OrmTask
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -73,29 +72,17 @@ async def test_badge_repository_stats_calculation(
             sid=sid,
             assigned_advisor_id=advisor_id,
             created_at=created_at,
-            status="open",
+            intervention_status="accepted",
         ),
     )
 
     # 2. Add an action (points ledger) for that case
-    task_id = uuid4()
-    test_db_session.add(
-        OrmTask(
-            task_id=task_id,
-            case_id=case_id,
-            action_type="send email",
-            status="completed",
-            points_reward=10,
-            created_at=created_at,
-            completed_at=datetime.now(UTC),
-            completed_by_advisor_id=advisor_id,
-        ),
-    )
     test_db_session.add(
         PointLedger(
             id=uuid4(),
             advisor_id=advisor_id,
-            task_id=task_id,
+            case_id=case_id,
+            action="accept_case",
             points=10,
             earned_at=datetime.now(UTC),
         ),

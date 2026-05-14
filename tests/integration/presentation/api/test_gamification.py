@@ -14,7 +14,6 @@ from src.infrastructure.database.models import (
     Advisor,
     PointLedger,
     StudentStatusHistory,
-    Task,
 )
 from src.infrastructure.database.models import (
     Case as OrmCase,
@@ -74,7 +73,7 @@ async def test_draft_review_points(
             },
         ],
     )
-    await case_repository.create_case(Case(case_id=cid, sid=sid))
+    await case_repository.add(Case(case_id=cid, sid=sid))
     test_db_session.add(
         StudentStatusHistory(
             history_id=uuid4(),
@@ -94,13 +93,13 @@ async def test_draft_review_points(
     # Check ledger
     from sqlalchemy import select
 
-    stmt = select(PointLedger, Task).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
+    stmt = select(PointLedger).where(PointLedger.case_id == cid)
     result = await test_db_session.execute(stmt)
-    rows = result.all()
+    rows = result.scalars().all()
 
     assert len(rows) == 1
-    ledger_entry, task = rows[0]
-    assert task.action_type == 'review draft'
+    ledger_entry = rows[0]
+    assert ledger_entry.action == 'review_draft'
     assert ledger_entry.points == 7
 
 
@@ -129,7 +128,7 @@ async def test_idempotency_prevents_duplicate_review_points(
 
         [{'sid': sid, 'student_name': 'Idemp', 'email': 'i@ex.com'}],
     )
-    await case_repository.create_case(Case(case_id=cid, sid=sid))
+    await case_repository.add(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
     headers = {'Idempotency-Key': idemp_key}
 
@@ -149,7 +148,7 @@ async def test_idempotency_prevents_duplicate_review_points(
     # Check that only ONE ledger entry was created
     from sqlalchemy import select
 
-    stmt = select(PointLedger).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
+    stmt = select(PointLedger).where(PointLedger.case_id == cid)
     ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
     assert len(ledger_entries) == 1
 
@@ -184,7 +183,7 @@ async def test_duplicate_action_guard_prevents_double_points(
             },
         ],
     )
-    await case_repository.create_case(Case(case_id=cid, sid=sid))
+    await case_repository.add(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
 
     # Act: Two requests WITHOUT Idempotency-Key
@@ -197,7 +196,7 @@ async def test_duplicate_action_guard_prevents_double_points(
     # Assert: Only ONE ledger entry should exist
     from sqlalchemy import select
 
-    stmt = select(PointLedger).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
+    stmt = select(PointLedger).where(PointLedger.case_id == cid)
     ledger_entries = (await test_db_session.execute(stmt)).scalars().all()
     assert len(ledger_entries) == 1
 
@@ -232,7 +231,7 @@ async def test_email_sent_points(
             },
         ],
     )
-    await case_repository.create_case(Case(case_id=cid, sid=sid))
+    await case_repository.add(Case(case_id=cid, sid=sid))
 
     # We need a draft first for /send to work
     from src.infrastructure.database.models import InterventionEmail
@@ -240,7 +239,6 @@ async def test_email_sent_points(
     test_db_session.add(
         InterventionEmail(
             email_id=uuid4(),
-            sid=sid,
             case_id=cid,
             subject='S',
             body='B',
@@ -261,10 +259,10 @@ async def test_email_sent_points(
     # Check ledger
     from sqlalchemy import select
 
-    stmt = select(PointLedger, Task).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
+    stmt = select(PointLedger).where(PointLedger.case_id == cid)
     result = await test_db_session.execute(stmt)
-    rows = result.all()
-    assert any(row.Task.action_type == 'send email' for row in rows)
+    rows = result.scalars().all()
+    assert any(row.action == 'send_email' for row in rows)
 
 
 @pytest.mark.asyncio
@@ -297,7 +295,7 @@ async def test_status_change_points(
             },
         ],
     )
-    await case_repository.create_case(Case(case_id=cid, sid=sid))
+    await case_repository.add(Case(case_id=cid, sid=sid))
     await test_db_session.commit()
 
     # Booked
@@ -307,13 +305,13 @@ async def test_status_change_points(
 
     from sqlalchemy import select
 
-    stmt = select(PointLedger, Task).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
+    stmt = select(PointLedger).where(PointLedger.case_id == cid)
     result = await test_db_session.execute(stmt)
-    rows = result.all()
+    rows = result.scalars().all()
 
-    actions = [row.Task.action_type for row in rows]
-    assert 'student book' in actions
-    assert 'resolve case' in actions
+    actions = [row.action for row in rows]
+    assert 'student_booked' in actions
+    assert 'resolve_case' in actions
 
 
 @pytest.mark.asyncio
@@ -371,10 +369,10 @@ async def test_response_time_bonus(
             },
         ],
     )
-    await case_repository.create_case(Case(case_id=cid_fast, sid=sid_fast))
-    await case_repository.create_case(Case(case_id=cid_mid, sid=sid_mid))
-    await case_repository.create_case(Case(case_id=cid_slow, sid=sid_slow))
-    await case_repository.create_case(Case(case_id=cid_penalty, sid=sid_penalty))
+    await case_repository.add(Case(case_id=cid_fast, sid=sid_fast))
+    await case_repository.add(Case(case_id=cid_mid, sid=sid_mid))
+    await case_repository.add(Case(case_id=cid_slow, sid=sid_slow))
+    await case_repository.add(Case(case_id=cid_penalty, sid=sid_penalty))
 
     # Use explicit UTC
     now = datetime.now(UTC)
@@ -429,13 +427,13 @@ async def test_response_time_bonus(
 
     from sqlalchemy import select
 
-    def get_stmt(sid: UUID):
-        return select(PointLedger).join(Task, PointLedger.task_id == Task.task_id).join(OrmCase, Task.case_id == OrmCase.case_id).where(OrmCase.sid == sid)
+    def get_stmt(cid: UUID):
+        return select(PointLedger).where(PointLedger.case_id == cid)
 
-    res_fast = (await test_db_session.execute(get_stmt(sid_fast))).scalar_one()
-    res_mid = (await test_db_session.execute(get_stmt(sid_mid))).scalar_one()
-    res_slow = (await test_db_session.execute(get_stmt(sid_slow))).scalar_one()
-    res_penalty = (await test_db_session.execute(get_stmt(sid_penalty))).scalar_one()
+    res_fast = (await test_db_session.execute(get_stmt(cid_fast))).scalar_one()
+    res_mid = (await test_db_session.execute(get_stmt(cid_mid))).scalar_one()
+    res_slow = (await test_db_session.execute(get_stmt(cid_slow))).scalar_one()
+    res_penalty = (await test_db_session.execute(get_stmt(cid_penalty))).scalar_one()
 
     assert res_fast.points == 7
     assert res_mid.points == 6
@@ -451,7 +449,6 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
     adv2_id = uuid4()
     s1, s2, s3, s4 = uuid4(), uuid4(), uuid4(), uuid4()
     cid1, cid2, cid3, cid4 = uuid4(), uuid4(), uuid4(), uuid4()
-    t1, t2, t3, t4 = uuid4(), uuid4(), uuid4(), uuid4()
 
     test_db_session.add_all([
         Advisor(advisor_id=adv1_id, name="Adv 1", email="a1@ex.com"),
@@ -465,40 +462,37 @@ async def test_leaderboard(client: TestClient, test_db_session: AsyncSession) ->
         OrmCase(case_id=cid4, sid=s4),
     ])
 
-    test_db_session.add_all([
-        Task(task_id=t1, case_id=cid1, action_type='send email'),
-        Task(task_id=t2, case_id=cid2, action_type='send email'),
-        Task(task_id=t3, case_id=cid3, action_type='send email'),
-        Task(task_id=t4, case_id=cid4, action_type='send email'),
-    ])
-
     test_db_session.add_all(
         [
             PointLedger(
                 id=uuid4(),
                 advisor_id=adv1_id,
-                task_id=t1,
+                case_id=cid1,
+                action='send_email',
                 points=100,
                 earned_at=datetime.now(UTC),
             ),
             PointLedger(
                 id=uuid4(),
                 advisor_id=adv1_id,
-                task_id=t2,
+                case_id=cid2,
+                action='send_email',
                 points=50,
                 earned_at=datetime.now(UTC),
             ),
             PointLedger(
                 id=uuid4(),
                 advisor_id=adv2_id,
-                task_id=t3,
+                case_id=cid3,
+                action='send_email',
                 points=80,
                 earned_at=datetime.now(UTC),
             ),
             PointLedger(
                 id=uuid4(),
                 advisor_id=adv2_id,
-                task_id=t4,
+                case_id=cid4,
+                action='send_email',
                 points=10,
                 earned_at=datetime.now(UTC) - timedelta(days=10),
             ),
