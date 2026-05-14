@@ -77,6 +77,7 @@ export function useAlerts() {
           appointment: c.appointment || null,
           created_at: c.created_at,
           sent_at: c.sent_at || null,
+          ai_overview: c.ai_overview || null,
         }));
 
         console.log(
