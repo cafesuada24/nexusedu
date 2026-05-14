@@ -159,6 +159,7 @@ export function AlertCenter() {
                     draftJobId: null,
                     draftSubject: r.draft_subject || null,
                     draftBody: r.draft_body || null,
+                    draftStatus: r.draft_status || null,
                     isGenerating:
                         r.is_generating || r.draft_status === "generating",
                     interventionStatus: r.intervention_status || null,
@@ -753,7 +754,15 @@ export function AlertCenter() {
                                         ),
                                     )}
                                     aiDraftErrorById={aiDraftErrorById}
-                                    aiDraftReadyById={aiDraftReadyById}
+                                    aiDraftReadyById={Object.fromEntries(
+                                        filteredAlerts
+                                            .filter(
+                                                (a) =>
+                                                    a.draftStatus === "completed" ||
+                                                    aiDraftReadyById[a.id],
+                                            )
+                                            .map((a) => [a.id, true]),
+                                    )}
                                     acceptingCaseById={acceptingCaseById}
                                 />
                             ))}
