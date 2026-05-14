@@ -41,8 +41,10 @@ export function Logo({
   
   const innerContent = (
     <div 
-      className="flex flex-none flex-nowrap items-center justify-start w-fit p-0 m-0 overflow-hidden"
-      style={{ gap: '4px' }}
+      className={cn(
+        "flex flex-none flex-nowrap items-center justify-start gap-1 overflow-hidden transition-all duration-300",
+        "group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+      )}
     >
       <Image
         src="/logos/logo.png"
@@ -53,13 +55,14 @@ export function Logo({
         className={cn(
           heightClass,
           "w-auto flex-none object-contain transition-all duration-300",
-          size === "sm" && "group-data-[collapsible=icon]:h-8"
+          size === "sm" && "group-data-[collapsible=icon]:h-7"
         )}
       />
       {showText && (
         <span
           className={cn(
-            "font-sans font-bold tracking-tighter transition-all duration-300 flex-none m-0 p-0 leading-none group-data-[collapsible=icon]:hidden whitespace-nowrap",
+            "font-sans font-bold tracking-tighter transition-all duration-300 flex-none m-0 p-0 leading-none group-data-[collapsible=icon]:hidden whitespace-nowrap opacity-100 max-w-full",
+            "group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:max-w-0",
             textSizeClass
           )}
           style={{
@@ -78,14 +81,15 @@ export function Logo({
 
   if (href === null) {
     return (
-      <div className={cn("flex flex-none items-center justify-start w-fit p-0", className)}>
+      <div className={cn("flex flex-none items-center justify-start w-fit p-0 group-data-[collapsible=icon]:w-full", className)}>
         {innerContent}
       </div>
     )
   }
   
   const containerClasses = cn(
-    "flex flex-none items-center justify-start w-fit p-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer",
+    "flex flex-none items-center justify-start w-fit p-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer transition-all duration-300",
+    "group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center",
     className
   )
 

@@ -22,6 +22,7 @@ import {
     SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
+    useSidebar,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
 import { useAuth } from "@/hooks/use-auth";
@@ -96,6 +97,7 @@ const secondaryNav: NavItem[] = [
 export function AppSidebar() {
     const pathname = usePathname();
     const { user } = useAuth();
+    const { state } = useSidebar();
     const isAdmin = user?.role === "admin";
     const isAdvisor = user?.role === "advisor";
     const mainNav = baseMainNav.filter((item) => {
@@ -118,7 +120,7 @@ export function AppSidebar() {
             className="border-r border-sidebar-border transition-all duration-300"
         >
             <SidebarHeader className="border-b border-sidebar-border bg-gradient-to-b from-primary/5 to-transparent px-4 py-3 transition-all duration-300 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
-                <Logo size="sm" />
+                <Logo size="sm" showText={state !== "collapsed"} />
             </SidebarHeader>
 
             <SidebarContent className="gap-1 px-1.5 py-2">
