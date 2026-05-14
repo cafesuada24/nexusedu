@@ -89,6 +89,13 @@ export const TaskItemBaseSchema = z.object({
   intervention_status: z.string().nullable().optional(),
   email: z.any().nullable().optional(),
   appointment: AppointmentSchema.nullable().optional(),
+  ai_overview: z
+    .object({
+      academic_summary: z.string().nullable().optional(),
+      action_keys: z.array(z.string()).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export const TaskItemSchema = TaskItemBaseSchema.transform((data) => {
