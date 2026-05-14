@@ -116,6 +116,7 @@ const DayRow = React.memo(
     onAddSlot,
     onRemoveSlot,
     onUpdateSlot,
+    isInvalid,
   }: {
     dayKey: DayKey
     label: string
@@ -125,13 +126,16 @@ const DayRow = React.memo(
     onAddSlot: (day: DayKey) => void
     onRemoveSlot: (day: DayKey, id: string) => void
     onUpdateSlot: (day: DayKey, id: string, field: "from" | "to", value: string) => void
+    isInvalid?: boolean
   }) => {
     return (
       <div
         className={cn(
           "group rounded-2xl border p-4 transition-all duration-300",
           config.enabled
-            ? "border-border/80 bg-card shadow-sm"
+            ? isInvalid
+              ? "border-destructive/50 bg-destructive/5 shadow-sm"
+              : "border-border/80 bg-card shadow-sm"
             : "border-border/30 bg-muted/20 opacity-80",
         )}
       >
@@ -141,19 +145,33 @@ const DayRow = React.memo(
               className={cn(
                 "grid size-10 place-items-center rounded-xl text-sm font-bold shadow-sm transition-colors",
                 config.enabled
-                  ? "bg-primary/15 text-primary ring-1 ring-primary/20"
+                  ? isInvalid
+                    ? "bg-destructive/15 text-destructive ring-1 ring-destructive/20"
+                    : "bg-primary/15 text-primary ring-1 ring-primary/20"
                   : "bg-muted text-muted-foreground/60",
               )}
             >
               {shortLabel}
             </div>
             <div>
-              <p className="font-serif text-[15px] font-semibold tracking-tight">
+              <p
+                className={cn(
+                  "font-serif text-[15px] font-semibold tracking-tight",
+                  isInvalid && "text-destructive",
+                )}
+              >
                 {label}
               </p>
-              <p className="text-[11px] leading-none text-muted-foreground/80">
+              <p
+                className={cn(
+                  "text-[11px] leading-none transition-colors",
+                  isInvalid ? "font-medium text-destructive" : "text-muted-foreground/80",
+                )}
+              >
                 {config.enabled
-                  ? `${config.slots.length} khoảng giờ làm việc`
+                  ? isInvalid
+                    ? "Vui lòng thêm khung giờ"
+                    : `${config.slots.length} khoảng giờ làm việc`
                   : "Đang được thiết lập là ngày nghỉ"}
               </p>
             </div>
@@ -161,7 +179,7 @@ const DayRow = React.memo(
           <Switch
             checked={config.enabled}
             onCheckedChange={() => onToggle(dayKey)}
-            className="data-[state=checked]:bg-primary"
+            className={cn(isInvalid && "ring-2 ring-destructive/20 ring-offset-2", "data-[state=checked]:bg-primary")}
           />
         </div>
 
@@ -209,8 +227,20 @@ export function ScheduleEditorSheet() {
   const [newDate, setNewDate] = React.useState("")
   const [newNote, setNewNote] = React.useState("")
 
+  // Validation state
+  const [showErrors, setShowErrors] = React.useState(false)
+
+  const invalidDays = React.useMemo(() => {
+    return (Object.keys(week) as DayKey[]).filter(
+      (key) => week[key].enabled && week[key].slots.length === 0,
+    )
+  }, [week])
+
   React.useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setShowErrors(false)
+      return
+    }
     setWeek(schedule.week)
     setOverrides(schedule.overrides)
   }, [open, schedule])
@@ -301,6 +331,12 @@ export function ScheduleEditorSheet() {
   }, [resetSchedule])
 
   const save = React.useCallback(() => {
+    if (invalidDays.length > 0) {
+      setShowErrors(true)
+      toast.error("Vui lòng thêm đầy đủ khoảng thời gian cho các ngày đã chọn.")
+      return
+    }
+
     setSchedule({
       ...DEFAULT_SCHEDULE,
       week,
@@ -312,11 +348,13 @@ export function ScheduleEditorSheet() {
         "Thay đổi đã áp dụng cho trang đặt lịch và card Giờ làm việc.",
     })
     setOpen(false)
+    setShowErrors(false)
   }, [
     setSchedule,
     week,
     overrides,
     schedule.timezone,
+    invalidDays,
   ])
 
   const totalActiveHours = React.useMemo(() => {
@@ -411,6 +449,7 @@ export function ScheduleEditorSheet() {
                   onAddSlot={addSlot}
                   onRemoveSlot={removeSlot}
                   onUpdateSlot={updateSlot}
+                  isInvalid={showErrors && invalidDays.includes(d.key)}
                 />
               ))}
             </div>
