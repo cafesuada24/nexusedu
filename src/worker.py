@@ -62,7 +62,6 @@ async def run_email_draft_task(
     case_id: UUID,
     job_id: UUID,
     user_id: UUID,
-    booking_link: str | None = None,
 ) -> None:
     """Worker task to generate email draft using AlertCommandHandler."""
     start_time = datetime.now(UTC)
@@ -97,7 +96,6 @@ async def run_email_draft_task(
             command = GenerateEmailDraftCommand(
                 case_id=case_id,
                 job_id=job_id,
-                booking_link=booking_link,
                 user_id=user_id,
             )
 

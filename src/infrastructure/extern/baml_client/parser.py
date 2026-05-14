@@ -29,12 +29,6 @@ class LlmResponseParser:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="CheckHealth", llm_response=llm_response, mode="request")
         return typing.cast(str, __result__)
 
-    def EvaluateDraftTone(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> types.ToneEvaluation:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="EvaluateDraftTone", llm_response=llm_response, mode="request")
-        return typing.cast(types.ToneEvaluation, __result__)
-
     def GenerateCaseOverview(
         self, llm_response: str, baml_options: BamlCallOptions = {},
     ) -> types.CaseOverview:
@@ -84,12 +78,6 @@ class LlmStreamParser:
     ) -> str:
         __result__ = self.__options.merge_options(baml_options).parse_response(function_name="CheckHealth", llm_response=llm_response, mode="stream")
         return typing.cast(str, __result__)
-
-    def EvaluateDraftTone(
-        self, llm_response: str, baml_options: BamlCallOptions = {},
-    ) -> types.ToneEvaluation:
-        __result__ = self.__options.merge_options(baml_options).parse_response(function_name="EvaluateDraftTone", llm_response=llm_response, mode="stream")
-        return typing.cast(types.ToneEvaluation, __result__)
 
     def GenerateCaseOverview(
         self, llm_response: str, baml_options: BamlCallOptions = {},

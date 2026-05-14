@@ -61,7 +61,6 @@ class EmailDraftRequestedEvent(DomainEvent):
     case_id: EntityID
     job_id: EntityID
     user_id: EntityID
-    booking_link: str | None = None
 
 
 @dataclass(frozen=True)

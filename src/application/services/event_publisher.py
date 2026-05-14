@@ -39,7 +39,6 @@ class TaskQueueEventPublisher:
                     case_id=event.case_id,
                     job_id=event.job_id,
                     user_id=event.user_id,
-                    booking_link=event.booking_link,
                 )
             elif isinstance(event, InterventionEmailSentEvent):
                 await self.task_queue.enqueue(

@@ -129,7 +129,12 @@ async def get_case_details(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error('Failed to get case details', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to get case details',
+            case_id=case_id,
+            error=str(e),
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -143,19 +148,19 @@ async def trigger_draft(
         Depends(get_idempotency_repository),
     ],
     user: Annotated[User, Depends(require_scope(Scope.ALERTS_WRITE))],
-    idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
+    idempotency_key: Annotated[UUID | None, Header(alias='Idempotency-Key')] = None,
 ) -> TriggerDraftDTO:
     """Manually triggers a background AI draft generation."""
     try:
-        if idempotency_key:
-            idemp_key = UUID(idempotency_key)
-            if await idempotency_repo.check_key(idemp_key):
-                logger.info('Idempotency hit', operation='trigger_draft', idempotency_key=idemp_key)
-
-                # return {
-                #     'status': 'success',
-                #     'message': 'Draft already triggered (idempotent).',
-                # }
+        if idempotency_key and await idempotency_repo.check_key(idempotency_key):
+            logger.info(
+                'Idempotency hit',
+                operation='trigger_draft',
+                idempotency_key=idempotency_key,
+            )
+            raise HTTPException(
+                status_code=200, detail='Draft already triggered (idempotent).',
+            )
 
         command = TriggerDraftCommand(
             case_id=case_id,
@@ -164,7 +169,7 @@ async def trigger_draft(
         result = await command_handler.handle_trigger_draft(command)
 
         if idempotency_key:
-            await idempotency_repo.record_key(UUID(idempotency_key))
+            await idempotency_repo.record_key(idempotency_key)
 
         if result.is_new_job:
             response.status_code = status.HTTP_202_ACCEPTED
@@ -194,7 +199,12 @@ async def get_email_draft(
     except (CaseNotFoundError, EmailUnavailableError, EmailNotFoundError) as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception as e:
-        logger.error('Failed to get email draft', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to get email draft',
+            case_id=case_id,
+            error=str(e),
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -222,7 +232,12 @@ async def update_email_draft(
     except (InvalidActionError, InvalidStateTransitionError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error('Failed to update email draft', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to update email draft',
+            case_id=case_id,
+            error=str(e),
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -242,7 +257,10 @@ async def send_nudge_email(
     try:
         # 1. Early Return: Check idempotency
         if idemp_key and await idempotency_repo.check_key(idemp_key):
-            raise HTTPException(status_code=200, detail='Email already sent (idempotent).')
+            raise HTTPException(
+                status_code=200,
+                detail='Email already sent (idempotent).',
+            )
 
         # 2. Database Write: Record state and get email address
         command = SendEmailCommand(case_id=case_id, user_id=user.id)
@@ -261,7 +279,12 @@ async def send_nudge_email(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error('Failed to send nudge email', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to send nudge email',
+            case_id=case_id,
+            error=str(e),
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -294,7 +317,12 @@ async def accept_task(
             detail='Student information not found.',
         ) from e
     except Exception as e:
-        logger.error('Failed to accept task', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to accept task',
+            case_id=case_id,
+            error=str(e),
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -324,7 +352,9 @@ async def book_appointment(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error('Failed to book appointment', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to book appointment', case_id=case_id, error=str(e), exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -349,7 +379,9 @@ async def start_supporting(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error('Failed to start supporting', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to start supporting', case_id=case_id, error=str(e), exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -372,7 +404,9 @@ async def resolve_case(
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error('Failed to resolve case', case_id=case_id, error=str(e), exc_info=True)
+        logger.error(
+            'Failed to resolve case', case_id=case_id, error=str(e), exc_info=True,
+        )
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

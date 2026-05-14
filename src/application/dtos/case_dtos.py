@@ -37,7 +37,6 @@ class GenerateEmailDraftCommand:
 
     case_id: EntityID
     job_id: EntityID
-    booking_link: str | None = None
     user_id: EntityID | None = None
 
 

@@ -127,7 +127,6 @@ class Case(AggregateRoot):
         self,
         job_id: EntityID,
         user_id: EntityID,
-        booking_link: str | None = None,
     ) -> None:
         """Request an AI-generated email draft for this case."""
         if not self.can_generate_draft():
@@ -141,7 +140,6 @@ class Case(AggregateRoot):
                 case_id=self.case_id,
                 job_id=job_id,
                 user_id=user_id,
-                booking_link=booking_link,
             ),
         )
 

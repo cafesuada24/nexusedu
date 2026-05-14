@@ -37,13 +37,8 @@ def get_checks(checks: typing.Dict[CheckName, Check]) -> typing.List[Check]:
 def all_succeeded(checks: typing.Dict[CheckName, Check]) -> bool:
     return all(check.status == "succeeded" for check in get_checks(checks))
 # #########################################################################
-# Generated enums (1)
+# Generated enums (0)
 # #########################################################################
-
-class ToneEvaluation(str, Enum):
-    SAFE = "SAFE"
-    PUNITIVE = "PUNITIVE"
-    TOXIC = "TOXIC"
 
 # #########################################################################
 # Generated classes (7)
