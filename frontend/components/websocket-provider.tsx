@@ -57,50 +57,76 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             console.log("[WS] Received message:", type, payload);
 
             switch (type) {
+                case "JOB:STARTED":
+                    console.log("[WS] Job started", payload);
+                    const startedCaseId = payload.metadata?.case_id;
+                    if (startedCaseId) {
+                        const updater = (item: any) => ({
+                            ...item,
+                            is_generating: true,
+                            draft_status: "generating",
+                        });
+
+                        updateSurgicalCache(queryKeys.cases.all, startedCaseId, updater);
+                        updateSurgicalCache(queryKeys.alerts.all, startedCaseId, updater);
+                    }
+
+                    if (payload.job_type === "email_draft") {
+                        toast.info("Generating email draft...");
+                    } else if (payload.job_type === "email_send") {
+                        toast.info("Sending intervention email...");
+                    }
+                    break;
+
                 case "JOB:COMPLETED":
                     console.log("[WS] Job completed, surgical cache update...", payload);
-                    if (payload.case_id) {
+                    const completedCaseId = payload.metadata?.case_id;
+                    if (completedCaseId) {
                         // Surgical update to all lists (Tasks, Open Cases, Alerts, etc.)
-                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, (item) => ({
+                        const updater = (item: any) => ({
                             ...item,
                             is_generating: false,
                             draft_status: "completed",
-                        }));
-                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, (item) => ({
-                            ...item,
-                            is_generating: false,
-                            draft_status: "completed",
-                        }));
+                        });
+
+                        updateSurgicalCache(queryKeys.cases.all, completedCaseId, updater);
+                        updateSurgicalCache(queryKeys.alerts.all, completedCaseId, updater);
 
                         // Invalidate targeted draft query since it's a single item fetch
                         queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.draft(payload.case_id),
+                            queryKey: queryKeys.cases.draft(completedCaseId),
                         });
                     }
-                    toast.success("Draft generation completed!");
+
+                    if (payload.job_type === "email_draft") {
+                        toast.success("Draft generation completed!");
+                    } else if (payload.job_type === "email_send") {
+                        toast.success("Intervention email sent successfully!");
+                    }
                     break;
 
                 case "JOB:FAILED":
                     console.error("[WS] Job failed", payload);
-                    if (payload.case_id) {
+                    const failedCaseId = payload.metadata?.case_id;
+                    if (failedCaseId) {
                         // Surgical update to all lists
-                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, (item) => ({
+                        const updater = (item: any) => ({
                             ...item,
                             is_generating: false,
                             draft_status: "failed",
-                        }));
-                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, (item) => ({
-                            ...item,
-                            is_generating: false,
-                            draft_status: "failed",
-                        }));
+                        });
+
+                        updateSurgicalCache(queryKeys.cases.all, failedCaseId, updater);
+                        updateSurgicalCache(queryKeys.alerts.all, failedCaseId, updater);
 
                         // Invalidate targeted draft query
                         queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.draft(payload.case_id),
+                            queryKey: queryKeys.cases.draft(failedCaseId),
                         });
                     }
-                    toast.error("Draft generation failed", {
+
+                    const jobName = payload.job_type === "email_draft" ? "Draft generation" : "Email dispatch";
+                    toast.error(`${jobName} failed`, {
                         description: payload.error || "Unknown error occurred",
                     });
                     break;

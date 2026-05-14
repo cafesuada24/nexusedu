@@ -12,6 +12,7 @@ from src.application.dtos.case_dtos import (
     GenerateEmailDraftCommand,
     ResolveCaseCommand,
     SendEmailCommand,
+    SendEmailResponseDTO,
     StartSupportingCommand,
     SubmitCaseReviewCommand,
     TriggerDraftCommand,
@@ -190,14 +191,17 @@ class CaseCommandHandler:
 
         booking_link = config.booking_url_template.format(cid=str(case.case_id))
 
-        # 3. Queue the job
-        await self.task_queue.enqueue(
-            'run_email_draft_task',
+        case.request_email_draft(
             job_id=job_id,
-            case_id=case.case_id,
-            booking_link=booking_link,
             user_id=command.user_id,
+            booking_link=booking_link,
         )
+
+        await self.case_repo.save(case)
+
+        # Dispatch events
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
 
         return TriggerDraftDTO(
             job_id=new_job.job_id,
@@ -205,7 +209,7 @@ class CaseCommandHandler:
             is_new_job=True,
         )
 
-    async def handle_send_email(self, command: SendEmailCommand) -> str:
+    async def handle_send_email(self, command: SendEmailCommand) -> SendEmailResponseDTO:
         """Execute the send email command."""
         advisor = await self.advisor_repo.find_by_user_id(command.user_id)
         if advisor is None:
@@ -224,25 +228,31 @@ class CaseCommandHandler:
 
         # 1. Fetch student PII to get email
         student = await self.student_repo.get_by_id(case.sid)
-
         recipient_email = student.email
 
+        # 2. Track as Job
         job_id = generate_uuid()
         new_job = Job(
             job_id=job_id,
             correlation_id=case.case_id,
-            correlation_type='email_draft',
+            correlation_type='email_send',
             created_at=datetime.now(UTC),
-        )
-
-        await self.task_queue.enqueue(
-            'run_dispatch_email_task',
-            case_id=case.case_id,
         )
         await self.job_repo.add(new_job)
 
-        # 4. Return recipient email for dispatching
-        return recipient_email
+        # 3. Domain Logic & Events
+        case.record_email_sent(job_id=job_id, user_id=command.user_id)
+        await self.case_repo.save(case)
+
+        # 4. Dispatch events
+        await self.event_publisher.publish(case.domain_events)
+        case.clear_events()
+
+        return SendEmailResponseDTO(
+            job_id=job_id,
+            status=new_job.status,
+            recipient=recipient_email,
+        )
 
     async def handle_update_email(self, command: UpdateEmailCommand) -> None:
         """Execute the update email command."""

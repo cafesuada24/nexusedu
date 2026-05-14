@@ -10,6 +10,8 @@ from src.domain.events.case_events import (
     CaseFailedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
+    EmailDraftRequestedEvent,
+    InterventionEmailSentEvent,
     StudentBookedEvent,
 )
 
@@ -30,6 +32,20 @@ class TaskQueueEventPublisher:
                     case_id=event.case_id,
                     advisor_id=event.advisor_id,
                     occurred_at=event.occurred_at,
+                )
+            elif isinstance(event, EmailDraftRequestedEvent):
+                await self.task_queue.enqueue(
+                    'run_email_draft_task',
+                    case_id=event.case_id,
+                    job_id=event.job_id,
+                    user_id=event.user_id,
+                )
+            elif isinstance(event, InterventionEmailSentEvent):
+                await self.task_queue.enqueue(
+                    'run_dispatch_email_task',
+                    case_id=event.case_id,
+                    job_id=event.job_id,
+                    user_id=event.user_id,
                 )
             elif isinstance(event, StudentBookedEvent):
                 await self.task_queue.enqueue(

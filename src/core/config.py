@@ -28,10 +28,9 @@ class AppConfig(BaseSettings):
     worker_job_timeout_sec: PositiveInt
     redis_host: str
     redis_port: Annotated[int, Field(ge=1, le=65535)]
-    redis_password: str | None = None
+    redis_password: str | None
     allowed_origins: str
 
-    booking_url_template: str
     review_url_template: str
 
     # SMTP Settings
@@ -57,7 +56,6 @@ class DevConfig(AppConfig):
     redis_password: str | None = None
     allowed_origins: str = ''
 
-    booking_url_template: str = 'http://localhost:3000/booking?cid={cid}'
     review_url_template: str = 'http://localhost:3000/review?token={token}'
 
     # SMTP Settings
@@ -80,10 +78,9 @@ class ProdConfig(AppConfig):
     worker_job_timeout_sec: PositiveInt
     redis_host: str
     redis_port: Annotated[int, Field(ge=1, le=65535)]
-    redis_password: str
+    redis_password: str | None
     allowed_origins: str
 
-    booking_url_template: str
     review_url_template: str
 
     # SMTP Settings

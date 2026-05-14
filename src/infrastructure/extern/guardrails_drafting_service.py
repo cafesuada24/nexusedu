@@ -26,7 +26,6 @@ class GuardrailsEmailDraftingService:
         self,
         student_name: str,
         performance_context: str,
-        booking_link: str,
     ) -> tuple[str, str]:
 
         # 1. Mask PII in input
@@ -47,8 +46,8 @@ class GuardrailsEmailDraftingService:
             self._validate_semantic_policy(baml_output)
 
             # 4. Interpolation & Invariant Verification
-            subject = self._interpolate(baml_output.subject, student_name, booking_link)
-            body = self._interpolate(baml_output.body, student_name, booking_link)
+            subject = self._interpolate(baml_output.subject, student_name)
+            body = self._interpolate(baml_output.body, student_name)
 
             self._verify_output_invariants(subject, body)
 
@@ -93,8 +92,8 @@ class GuardrailsEmailDraftingService:
         if not masked.strip() and raw.strip():
             raise DraftGenerationError('PII Masking returned empty context.')
 
-    def _interpolate(self, text: str, name: str, link: str) -> str:
-        return text.replace('{{STUDENT_NAME}}', name).replace('{{ADVISOR_LINK}}', link)
+    def _interpolate(self, text: str, name: str) -> str:
+        return text.replace('{{STUDENT_NAME}}', name)
 
     def _verify_output_invariants(self, subject: str, body: str) -> None:
         if '{{' in subject or '{{' in body:

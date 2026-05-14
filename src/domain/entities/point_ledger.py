@@ -1,3 +1,4 @@
+"""Background Job entity."""
 from dataclasses import dataclass, field
 from datetime import datetime
 

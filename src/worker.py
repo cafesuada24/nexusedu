@@ -10,7 +10,6 @@ import structlog
 from arq import cron
 from arq.connections import RedisSettings
 from opentelemetry import trace
-
 from sqlalchemy import select
 
 from src.application.commands.case_commands import (
@@ -63,7 +62,6 @@ async def run_email_draft_task(
     case_id: UUID,
     job_id: UUID,
     user_id: UUID,
-    booking_link: str | None = None,
 ) -> None:
     """Worker task to generate email draft using AlertCommandHandler."""
     start_time = datetime.now(UTC)
@@ -78,13 +76,26 @@ async def run_email_draft_task(
             await job_repo.save(job)
             await session.commit()
 
+            ws_publisher = container.websocket_publisher
+            await ws_publisher.publish(
+                'JOB:STARTED',
+                {
+                    'job_id': str(job_id),
+                    'job_type': job.correlation_type,
+                    'status': job.status,
+                    'metadata': {
+                        'case_id': str(case_id),
+                    },
+                },
+                user_id=user_id,
+            )
+
             # Command Handler via Container
             handler = container.get_case_command_handler()
 
             command = GenerateEmailDraftCommand(
                 case_id=case_id,
                 job_id=job_id,
-                booking_link=booking_link,
                 user_id=user_id,
             )
 
@@ -94,13 +105,15 @@ async def run_email_draft_task(
             await job_repo.save(job)
             await session.commit()
 
-            ws_publisher = container.websocket_publisher
             await ws_publisher.publish(
                 'JOB:COMPLETED',
                 {
                     'job_id': str(job_id),
-                    'case_id': str(case_id),
+                    'job_type': job.correlation_type,
                     'status': job.status,
+                    'metadata': {
+                        'case_id': str(case_id),
+                    },
                 },
                 user_id=user_id,
             )
@@ -121,9 +134,12 @@ async def run_email_draft_task(
                         'JOB:FAILED',
                         {
                             'job_id': str(job_id),
-                            'case_id': str(case_id),
+                            'job_type': job.correlation_type,
                             'status': job.status,
                             'error': str(e),
+                            'metadata': {
+                                'case_id': str(case_id),
+                            },
                         },
                         user_id=user_id,
                     )
@@ -143,77 +159,154 @@ async def run_email_draft_task(
 
 
 async def run_dispatch_email_task(
-    _: dict[str, Any],
+    ctx: dict[str, Any],
     case_id: UUID,
+    job_id: UUID,
+    user_id: UUID,
 ) -> None:
     """Worker task to send an email to the student."""
+    start_time = datetime.now(UTC)
     async for session in get_async_session():
-        container = Container(session=session)
-        case_repo = container.case_repo
-        student_repo = container.student_repo
-        email_repo = container.email_repo
-        email_sending_service = container.email_sending_service
-        point_ledger_repo = container.point_ledger_repo
-        gamification_service = container.gamification_service
+        container = Container(session=session, redis_pool=ctx.get('redis'))
+        job_repo = container.job_repo
+        job = await job_repo.get_by_id(job_id)
 
-        case = await case_repo.get_by_id(case_id=case_id)
-        assert case.assigned_advisor_id is not None
-        email = await email_repo.get_by_case(case_id)
-        student = await student_repo.get_by_id(case.sid)
-        logger.info(
-            'Worker: Dispatching intervention email',
-            case_id=str(case_id),
-            email=student.email,
-        )
-
-        # Send actual email
-        await email_sending_service.send_email(
-            to_email=student.email,
-            subject=email.subject,  # pyright: ignore
-            body=email.body,  # pyright: ignore
-        )
-
-        student.last_notified_timestamp = datetime.now(UTC)
-        await student_repo.save(student=student)
-
-        email.mark_as_sent()
-        case.mark_as_sent()
-
-        await email_repo.save(email)
-        await case_repo.save(case)
-
-        # Notify UI via WebSocket
         try:
-            advisor = await advisor_repo.get_by_id(case.assigned_advisor_id)
-            if advisor.user_id:
-                ws_publisher = container.websocket_publisher
-                await ws_publisher.publish(
-                    'CASE:STATUS_UPDATED',
-                    {
+            job.start(start_time)
+            await job_repo.save(job)
+            await session.commit()
+
+            ws_publisher = container.websocket_publisher
+            await ws_publisher.publish(
+                'JOB:STARTED',
+                {
+                    'job_id': str(job_id),
+                    'job_type': job.correlation_type,
+                    'status': job.status,
+                    'metadata': {
                         'case_id': str(case_id),
-                        'new_status': case.intervention_status.value,
                     },
-                    user_id=advisor.user_id,
-                )
-        except Exception as ws_err:
-            logger.error(
-                'Worker: Failed to publish WS status update', error=str(ws_err)
+                },
+                user_id=user_id,
             )
 
-        points = gamification_service.calculate_points(
-            gamification_service.Action.SEND_EMAIL,
-            case.assigned_at,
-            student.current_risk_status,
-        )
-        ledger = await point_ledger_repo.get_by_advisor_id(case.assigned_advisor_id)
-        ledger.award_points(
-            case_id=case.case_id,
-            action='send_email',
-            points=points,
-            earned_at=datetime.now(UTC),
-        )
-        await point_ledger_repo.save(ledger)
-        await session.commit()
+            case_repo = container.case_repo
+            student_repo = container.student_repo
+            email_repo = container.email_repo
+            email_sending_service = container.email_sending_service
+            point_ledger_repo = container.point_ledger_repo
+            gamification_service = container.gamification_service
+            advisor_repo = container.advisor_repo
+
+            case = await case_repo.get_by_id(case_id=case_id)
+            assert case.assigned_advisor_id is not None
+            email = await email_repo.get_by_case(case_id)
+            student = await student_repo.get_by_id(case.sid)
+            logger.info(
+                'Worker: Dispatching intervention email',
+                case_id=str(case_id),
+                email=student.email,
+            )
+
+            # Send actual email
+            await email_sending_service.send_email(
+                to_email=student.email,
+                subject=email.subject,  # pyright: ignore
+                body=email.body,  # pyright: ignore
+            )
+
+            student.last_notified_timestamp = datetime.now(UTC)
+            await student_repo.save(student=student)
+
+            email.mark_as_sent()
+            case.mark_as_sent()
+
+            await email_repo.save(email)
+            await case_repo.save(case)
+
+            # Notify UI via WebSocket
+            try:
+                advisor = await advisor_repo.get_by_id(case.assigned_advisor_id)
+                if advisor.user_id:
+                    await ws_publisher.publish(
+                        'CASE:STATUS_UPDATED',
+                        {
+                            'case_id': str(case_id),
+                            'new_status': case.intervention_status.value,
+                        },
+                        user_id=advisor.user_id,
+                    )
+            except Exception as ws_err:
+                logger.error(
+                    'Worker: Failed to publish WS status update', error=str(ws_err)
+                )
+
+            points = gamification_service.calculate_points(
+                gamification_service.Action.SEND_EMAIL,
+                case.assigned_at,
+                student.current_risk_status,
+            )
+            ledger = await point_ledger_repo.get_by_advisor_id(case.assigned_advisor_id)
+            ledger.award_points(
+                case_id=case.case_id,
+                action='send_email',
+                points=points,
+                earned_at=datetime.now(UTC),
+            )
+            await point_ledger_repo.save(ledger)
+
+            job.finish(datetime.now(UTC))
+            await job_repo.save(job)
+            await session.commit()
+
+            await ws_publisher.publish(
+                'JOB:COMPLETED',
+                {
+                    'job_id': str(job_id),
+                    'job_type': job.correlation_type,
+                    'status': job.status,
+                    'metadata': {
+                        'case_id': str(case_id),
+                    },
+                },
+                user_id=user_id,
+            )
+
+        except (Exception, asyncio.CancelledError) as e:
+            if job.status == JobStatus.RUNNING:
+                job.fail(datetime.now(UTC))
+                await job_repo.save(job)
+                await session.commit()
+
+                # Notify UI via WebSocket of failure
+                try:
+                    ws_publisher = container.websocket_publisher
+                    await ws_publisher.publish(
+                        'JOB:FAILED',
+                        {
+                            'job_id': str(job_id),
+                            'job_type': job.correlation_type,
+                            'status': job.status,
+                            'error': str(e),
+                            'metadata': {
+                                'case_id': str(case_id),
+                            },
+                        },
+                        user_id=user_id,
+                    )
+
+                except Exception as ws_err:
+                    logger.error(
+                        'Worker: Failed to publish WS failure', error=str(ws_err)
+                    )
+
+            logger.error(
+                'Worker: Email dispatch job failed or timed out',
+                case_id=str(case_id),
+                error=str(e),
+            )
+            if isinstance(e, asyncio.CancelledError):
+                raise e
 
 
 async def run_dispatch_review_email_task(
@@ -676,7 +769,7 @@ class WorkerSettings:
     on_startup = on_startup
     cron_jobs = [
         cron(run_outbox_poller_task, second=set(range(0, 60, 5))),
-        cron(run_ai_health_check_task, minute=set(range(0, 60))),
+        cron(run_ai_health_check_task, minute=30),
     ]
     redis_settings = RedisSettings(
         host=config.redis_host,

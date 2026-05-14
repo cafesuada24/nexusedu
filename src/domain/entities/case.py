@@ -5,12 +5,15 @@ from datetime import UTC, datetime, timedelta
 
 from src.core.identifiers import EntityID, generate_uuid
 from src.domain.entities.appointment import Appointment
+from src.domain.entities.base import AggregateRoot
 from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
     CaseAcceptedEvent,
     CaseFailedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
+    EmailDraftRequestedEvent,
+    InterventionEmailSentEvent,
     StudentBookedEvent,
 )
 from src.domain.exceptions import (
@@ -51,7 +54,7 @@ _INTERVENTION_STATUS_TRANSITION = {
 
 
 @dataclass
-class Case:
+class Case(AggregateRoot):
     """Represents an intervention case for a student."""
 
     sid: EntityID
@@ -65,23 +68,6 @@ class Case:
     academic_summary: str | None = None
     action_keys: list[str] | None = None
     version: int = field(default=0)
-    _domain_events: list[DomainEvent] = field(
-        default_factory=list[DomainEvent],
-        init=False,
-    )
-
-    @property
-    def domain_events(self) -> list[DomainEvent]:
-        """Return registered domain events."""
-        return self._domain_events
-
-    def clear_events(self) -> None:
-        """Clear all registered domain events."""
-        self._domain_events.clear()
-
-    def register_event(self, event: DomainEvent) -> None:
-        """Register a new domain event."""
-        self._domain_events.append(event)
 
     @property
     def time_to_resolve(self) -> timedelta | None:
@@ -136,6 +122,37 @@ class Case:
     def mark_as_sent(self) -> None:
         """The intervention email has been sent."""
         self._transition_to(InterventionStatus.SENT)
+
+    def request_email_draft(
+        self,
+        job_id: EntityID,
+        user_id: EntityID,
+    ) -> None:
+        """Request an AI-generated email draft for this case."""
+        if not self.can_generate_draft():
+            raise InvalidStateTransitionError(
+                current_status=self.intervention_status.value,
+                attempted_action='request_email_draft',
+            )
+
+        self.register_event(
+            EmailDraftRequestedEvent(
+                case_id=self.case_id,
+                job_id=job_id,
+                user_id=user_id,
+            ),
+        )
+
+    def record_email_sent(self, job_id: EntityID, user_id: EntityID) -> None:
+        """Record that an intervention email has been dispatched."""
+        self.mark_as_sent()
+        self.register_event(
+            InterventionEmailSentEvent(
+                case_id=self.case_id,
+                job_id=job_id,
+                user_id=user_id,
+            ),
+        )
 
     def record_booking(
         self,
