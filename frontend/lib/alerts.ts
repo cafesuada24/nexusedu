@@ -190,17 +190,6 @@ export function relativeTime(seconds: number): string {
     return `${Math.floor(diff / 86400)} ngày trước`;
 }
 
-/** Bốc một mốc giờ hợp lý trong giờ làm việc 1–7 ngày tới. */
-export function pickRandomAppointment(): number {
-    const now = Date.now();
-    const dayOffset = 1 + Math.floor(Math.random() * 7); // 1..7 ngày
-    const hour = 8 + Math.floor(Math.random() * 9); // 8..16
-    const minute = Math.random() < 0.5 ? 0 : 30;
-    const d = new Date(now + dayOffset * 86400 * 1000);
-    d.setHours(hour, minute, 0, 0);
-    return Math.floor(d.getTime() / 1000);
-}
-
 const APPOINTMENT_FORMATTER = new Intl.DateTimeFormat("vi-VN", {
     weekday: "short",
     day: "2-digit",
