@@ -1,9 +1,21 @@
 """Mapper for domain events to outbox tasks."""
 
-import uuid
-from datetime import datetime
 from typing import Any
 
+from src.application.dtos.worker_payloads.case_payloads import (
+    AdvisorCreatedPayload,
+    CaseReviewRequestedPayload,
+)
+from src.application.dtos.worker_payloads.email_payloads import (
+    DispatchEmailPayload,
+    EmailDraftPayload,
+)
+from src.application.dtos.worker_payloads.gamification_payloads import (
+    CaseAcceptedPayload,
+    CaseFailedPayload,
+    CaseResolvedPayload,
+    StudentBookedPayload,
+)
 from src.domain.events.advisor_events import AdvisorCreatedEvent
 from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
@@ -51,76 +63,92 @@ class OutboxMapper:
             return {
                 'task_name': 'run_case_accepted_task',
                 'kwargs': {
-                    'case_id': event.case_id,
-                    'advisor_id': event.advisor_id,
-                    'occurred_at': event.occurred_at,
+                    'payload': CaseAcceptedPayload(
+                        case_id=event.case_id,
+                        advisor_id=event.advisor_id,
+                        occurred_at=event.occurred_at,
+                    ),
                 },
             }
         if isinstance(event, EmailDraftRequestedEvent):
             return {
                 'task_name': 'run_email_draft_task',
                 'kwargs': {
-                    'case_id': event.case_id,
-                    'job_id': event.job_id,
-                    'user_id': event.user_id,
+                    'payload': EmailDraftPayload(
+                        case_id=event.case_id,
+                        job_id=event.job_id,
+                        user_id=event.user_id,
+                    ),
                 },
             }
         if isinstance(event, InterventionEmailSentEvent):
             return {
                 'task_name': 'run_dispatch_email_task',
                 'kwargs': {
-                    'case_id': event.case_id,
-                    'job_id': event.job_id,
-                    'user_id': event.user_id,
+                    'payload': DispatchEmailPayload(
+                        case_id=event.case_id,
+                        job_id=event.job_id,
+                        user_id=event.user_id,
+                    ),
                 },
             }
         if isinstance(event, StudentBookedEvent):
             return {
                 'task_name': 'run_student_booked_task',
                 'kwargs': {
-                    'case_id': event.case_id,
-                    'occurred_at': event.occurred_at,
+                    'payload': StudentBookedPayload(
+                        case_id=event.case_id,
+                        occurred_at=event.occurred_at,
+                    ),
                 },
             }
         if isinstance(event, AdvisorCreatedEvent):
             return {
                 'task_name': 'run_advisor_created_task',
                 'kwargs': {
-                    'advisor_id': event.advisor_id,
-                    'email': event.email,
-                    'name': event.name,
-                    'occurred_at': event.occurred_at,
+                    'payload': AdvisorCreatedPayload(
+                        advisor_id=event.advisor_id,
+                        email=event.email,
+                        name=event.name,
+                        occurred_at=event.occurred_at,
+                    ),
                 },
             }
         if isinstance(event, CaseResolvedEvent):
             return {
                 'task_name': 'run_case_resolved_task',
                 'kwargs': {
-                    'case_id': event.case_id,
-                    'advisor_id': event.advisor_id,
-                    'occurred_at': event.occurred_at,
-                    'satisfaction': event.satisfaction,
-                    'comment': event.comment,
+                    'payload': CaseResolvedPayload(
+                        case_id=event.case_id,
+                        advisor_id=event.advisor_id,
+                        occurred_at=event.occurred_at,
+                        satisfaction=event.satisfaction,
+                        comment=event.comment,
+                    ),
                 },
             }
         if isinstance(event, CaseFailedEvent):
             return {
                 'task_name': 'run_case_failed_task',
                 'kwargs': {
-                    'case_id': event.case_id,
-                    'advisor_id': event.advisor_id,
-                    'occurred_at': event.occurred_at,
-                    'satisfaction': event.satisfaction,
-                    'comment': event.comment,
+                    'payload': CaseFailedPayload(
+                        case_id=event.case_id,
+                        advisor_id=event.advisor_id,
+                        occurred_at=event.occurred_at,
+                        satisfaction=event.satisfaction,
+                        comment=event.comment,
+                    ),
                 },
             }
         if isinstance(event, CaseReviewRequestedEvent):
             return {
                 'task_name': 'run_case_review_requested_task',
                 'kwargs': {
-                    'case_id': event.case_id,
-                    'advisor_id': event.advisor_id,
-                    'occurred_at': event.occurred_at,
+                    'payload': CaseReviewRequestedPayload(
+                        case_id=event.case_id,
+                        advisor_id=event.advisor_id,
+                        occurred_at=event.occurred_at,
+                    ),
                 },
             }
         return None
