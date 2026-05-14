@@ -414,40 +414,37 @@ export const StudentDetailModal = React.memo(function StudentDetailModal({
                                                 Phân tích rủi ro
                                             </p>
                                             <p className="text-sm text-slate-600 leading-relaxed">
-                                                Sinh viên có dấu hiệu sụt giảm
-                                                kết quả ở các môn chuyên ngành
-                                                (Mạng máy tính, Lập trình). Tuy
-                                                nhiên, các môn lý thuyết tính
-                                                toán có sự cải thiện rõ rệt. Cần
-                                                chú trọng hỗ trợ kỹ năng thực
-                                                hành.
+                                                {alert?.aiOverview
+                                                    ?.academicSummary ||
+                                                    "Chưa có phân tích từ AI cho hồ sơ này"}
                                             </p>
-                                        </div>
-                                        <div className="flex gap-4">
-                                            <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-indigo-200">
-                                                Cần tư vấn môn chuyên ngành
-                                            </Badge>
                                         </div>
                                     </div>
                                     <div className="space-y-3">
                                         <p className="text-[10px] font-bold uppercase text-purple-400">
                                             Khuyến nghị hành động
                                         </p>
-                                        <ul className="space-y-2">
-                                            {[
-                                                "Đăng ký phụ đạo môn Mạng",
-                                                "Gặp cố vấn học tập tuần 12",
-                                                "Tham gia Lab thực hành bổ sung",
-                                            ].map((action, i) => (
-                                                <li
-                                                    key={i}
-                                                    className="flex items-start gap-2 text-xs text-slate-700"
-                                                >
-                                                    <div className="mt-1 size-1.5 rounded-full bg-purple-400 shrink-0" />
-                                                    {action}
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        {alert?.aiOverview?.actionKeys &&
+                                        alert.aiOverview.actionKeys.length >
+                                            0 ? (
+                                            <ul className="space-y-2">
+                                                {alert.aiOverview.actionKeys.map(
+                                                    (action, i) => (
+                                                        <li
+                                                            key={i}
+                                                            className="flex items-start gap-2 text-xs text-slate-700"
+                                                        >
+                                                            <div className="mt-1 size-1.5 rounded-full bg-purple-400 shrink-0" />
+                                                            {action}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-xs text-slate-500 italic">
+                                                Chưa có khuyến nghị hành động.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </section>
