@@ -24,6 +24,7 @@ from src.application.dtos.case_dtos import (
     QueryEmailDTO,
     ResolveCaseCommand,
     ReviewCaseDTO,
+    SendEmailResponseDTO,
     StartSupportingCommand,
     TriggerDraftDTO,
 )
@@ -235,28 +236,25 @@ async def send_nudge_email(
         Depends(get_idempotency_repository),
     ],
     idempotency_key: Annotated[str | None, Header(alias='Idempotency-Key')] = None,
-) -> dict[str, str]:
+) -> SendEmailResponseDTO:
     """Dispatches the email and updates the intervention lifecycle."""
     idemp_key = UUID(idempotency_key) if idempotency_key else None
     try:
         # 1. Early Return: Check idempotency
         if idemp_key and await idempotency_repo.check_key(idemp_key):
-            return {
-                'status': 'success',
-                'message': 'Email already sent (idempotent).',
-            }
+            raise HTTPException(status_code=200, detail='Email already sent (idempotent).')
 
         # 2. Database Write: Record state and get email address
         command = SendEmailCommand(case_id=case_id, user_id=user.id)
-        target_email = await command_handler.handle_send_email(command)
+        result = await command_handler.handle_send_email(command)
 
         if idemp_key:
             await idempotency_repo.record_key(idemp_key)
 
         # 3. External I/O: Send the email AFTER the DB commit succeeds
-        logger.info('Dispatching email', case_id=case_id, target_email=target_email)
+        logger.info('Dispatching email job', case_id=case_id, job_id=result.job_id)
 
-        return {'status': 'success', 'message': f'Email sent to {target_email}'}
+        return result
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
