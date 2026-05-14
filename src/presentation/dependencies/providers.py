@@ -19,11 +19,11 @@ from src.application.interfaces.gamification_query_service import (
 )
 from src.application.interfaces.ledger_query_service import PointLedgerQueryService
 from src.application.interfaces.student_query_service import StudentQueryService
+from src.application.interfaces.unit_of_work import UnitOfWork
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
-from src.application.services.event_publisher import TaskQueueEventPublisher
 from src.core.container import Container
 from src.domain.repositories.activity_repository import ActivityRepository
 from src.domain.repositories.advisor_repository import AdvisorRepository
@@ -199,11 +199,11 @@ async def get_student_query_service(
     return container.student_query_service
 
 
-async def get_event_publisher(
+async def get_unit_of_work(
     container: Annotated[Container, Depends(get_container)],
-) -> TaskQueueEventPublisher:
-    """Dependency provider for the EventPublisher."""
-    return container.event_publisher
+) -> UnitOfWork:
+    """Dependency provider for the UnitOfWork."""
+    return container.uow
 
 
 async def get_case_command_handler(

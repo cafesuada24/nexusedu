@@ -125,12 +125,9 @@ async def reseed() -> None:
         print('Creating default admin user (admin@example.com / password123)...')
         user_db = SQLAlchemyUserDatabase(session, User)
         user_settings_repo = SqlAlchemyUserSettingsRepository(session)
-        advisor_repo = SqlAlchemyAdvisorRepository(session)
-        # Use Outbox for event publishing during seeding to avoid errors
-        from src.application.services.event_publisher import TaskQueueEventPublisher
-        from src.infrastructure.queue.outbox_adapter import TransactionalOutboxAdapter
-        event_publisher = TaskQueueEventPublisher(TransactionalOutboxAdapter(session))
-        user_manager = UserManager(user_db, user_settings_repo, advisor_repo, event_publisher)
+        from src.infrastructure.persistence.sqlalchemy_uow import SqlAlchemyUnitOfWork
+        uow = SqlAlchemyUnitOfWork(session)
+        user_manager = UserManager(user_db, user_settings_repo, uow)
         user = await user_manager.create(
             UserCreate(email='dev@example.com', password='dev'), safe=True,
         )

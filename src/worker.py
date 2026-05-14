@@ -22,7 +22,6 @@ from src.core.container import Container
 from src.core.otel import setup_otel
 from src.domain.value_objects.status import InterventionStatus, JobStatus
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
-from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.session import get_async_session
 from src.infrastructure.extern.baml_client.async_client import b
@@ -69,26 +68,13 @@ async def run_email_draft_task(
 
     async for session in get_async_session():
         container = Container(session=session, redis_pool=ctx.get('redis'))
-        job_repo = container.job_repo
-        job = await job_repo.get_by_id(job_id)
+        uow = container.uow
         try:
-            job.start(start_time)
-            await job_repo.save(job)
-            await session.commit()
-
-            ws_publisher = container.websocket_publisher
-            await ws_publisher.publish(
-                'JOB:STARTED',
-                {
-                    'job_id': str(job_id),
-                    'job_type': job.correlation_type,
-                    'status': job.status,
-                    'metadata': {
-                        'case_id': str(case_id),
-                    },
-                },
-                user_id=user_id,
-            )
+            async with uow:
+                job = await uow.jobs.get_by_id(job_id)
+                job.start(start_time, user_id=user_id)
+                await uow.jobs.save(job)
+                await uow.commit()
 
             # Command Handler via Container
             handler = container.get_case_command_handler()
@@ -101,53 +87,22 @@ async def run_email_draft_task(
 
             await handler.handle_generate_email_draft(command)
 
-            job.finish(datetime.now(UTC))
-            await job_repo.save(job)
-            await session.commit()
-
-            await ws_publisher.publish(
-                'JOB:COMPLETED',
-                {
-                    'job_id': str(job_id),
-                    'job_type': job.correlation_type,
-                    'status': job.status,
-                    'metadata': {
-                        'case_id': str(case_id),
-                    },
-                },
-                user_id=user_id,
-            )
+            async with uow:
+                job = await uow.jobs.get_by_id(job_id)
+                job.finish(datetime.now(UTC), user_id=user_id)
+                await uow.jobs.save(job)
+                await uow.commit()
 
             logger.info(
                 f'Worker: Email generated job finished sucessfully for case with id {case_id}',
             )
         except (Exception, asyncio.CancelledError) as e:
-            if job.status == JobStatus.RUNNING:
-                job.fail(datetime.now(UTC))
-                await job_repo.save(job)
-                await session.commit()
-
-                # Notify UI via WebSocket of failure
-                try:
-                    ws_publisher = container.websocket_publisher
-                    await ws_publisher.publish(
-                        'JOB:FAILED',
-                        {
-                            'job_id': str(job_id),
-                            'job_type': job.correlation_type,
-                            'status': job.status,
-                            'error': str(e),
-                            'metadata': {
-                                'case_id': str(case_id),
-                            },
-                        },
-                        user_id=user_id,
-                    )
-
-                except Exception as ws_err:
-                    logger.error(
-                        'Worker: Failed to publish WS failure', error=str(ws_err)
-                    )
+            async with uow:
+                job = await uow.jobs.get_by_id(job_id)
+                if job.status == JobStatus.RUNNING:
+                    job.fail(datetime.now(UTC), user_id=user_id)
+                    await uow.jobs.save(job)
+                    await uow.commit()
 
             logger.error(
                 'Worker: Email generated job failed or timed out',
@@ -168,35 +123,20 @@ async def run_dispatch_email_task(
     start_time = datetime.now(UTC)
     async for session in get_async_session():
         container = Container(session=session, redis_pool=ctx.get('redis'))
-        job_repo = container.job_repo
-        job = await job_repo.get_by_id(job_id)
+        uow = container.uow
 
         try:
-            job.start(start_time)
-            await job_repo.save(job)
-            await session.commit()
-
-            ws_publisher = container.websocket_publisher
-            await ws_publisher.publish(
-                'JOB:STARTED',
-                {
-                    'job_id': str(job_id),
-                    'job_type': job.correlation_type,
-                    'status': job.status,
-                    'metadata': {
-                        'case_id': str(case_id),
-                    },
-                },
-                user_id=user_id,
-            )
+            async with uow:
+                job = await uow.jobs.get_by_id(job_id)
+                job.start(start_time, user_id=user_id)
+                await uow.jobs.save(job)
+                await uow.commit()
 
             case_repo = container.case_repo
             student_repo = container.student_repo
             email_repo = container.email_repo
             email_sending_service = container.email_sending_service
-            point_ledger_repo = container.point_ledger_repo
             gamification_service = container.gamification_service
-            advisor_repo = container.advisor_repo
 
             case = await case_repo.get_by_id(case_id=case_id)
             assert case.assigned_advisor_id is not None
@@ -215,90 +155,50 @@ async def run_dispatch_email_task(
                 body=email.body,  # pyright: ignore
             )
 
-            student.last_notified_timestamp = datetime.now(UTC)
-            await student_repo.save(student=student)
+            async with uow:
+                # Re-fetch entities within the transaction to ensure latest version
+                case = await uow.cases.get_by_id(case_id)
+                email = await uow.emails.get_by_case(case_id)
+                student = await uow.students.get_by_id(case.sid)
+                job = await uow.jobs.get_by_id(job_id)
 
-            email.mark_as_sent()
-            case.mark_as_sent()
+                student.last_notified_timestamp = datetime.now(UTC)
+                await uow.students.save(student)
 
-            await email_repo.save(email)
-            await case_repo.save(case)
+                email.mark_as_sent()
+                await uow.emails.save(email)
 
-            # Notify UI via WebSocket
-            try:
-                advisor = await advisor_repo.get_by_id(case.assigned_advisor_id)
-                if advisor.user_id:
-                    await ws_publisher.publish(
-                        'CASE:STATUS_UPDATED',
-                        {
-                            'case_id': str(case_id),
-                            'new_status': case.intervention_status.value,
-                        },
-                        user_id=advisor.user_id,
-                    )
-            except Exception as ws_err:
-                logger.error(
-                    'Worker: Failed to publish WS status update', error=str(ws_err)
+                case.record_email_sent(job_id=job_id, user_id=user_id)
+                await uow.cases.save(case)
+
+                # Gamification
+                points = gamification_service.calculate_points(
+                    gamification_service.Action.SEND_EMAIL,
+                    case.assigned_at,
+                    student.current_risk_status,
                 )
+                ledger = await uow.point_ledger.get_by_advisor_id(
+                    case.assigned_advisor_id,
+                )
+                ledger.award_points(
+                    case_id=case.case_id,
+                    action='send_email',
+                    points=points,
+                    earned_at=datetime.now(UTC),
+                )
+                await uow.point_ledger.save(ledger)
 
-            points = gamification_service.calculate_points(
-                gamification_service.Action.SEND_EMAIL,
-                case.assigned_at,
-                student.current_risk_status,
-            )
-            ledger = await point_ledger_repo.get_by_advisor_id(case.assigned_advisor_id)
-            ledger.award_points(
-                case_id=case.case_id,
-                action='send_email',
-                points=points,
-                earned_at=datetime.now(UTC),
-            )
-            await point_ledger_repo.save(ledger)
-
-            job.finish(datetime.now(UTC))
-            await job_repo.save(job)
-            await session.commit()
-
-            await ws_publisher.publish(
-                'JOB:COMPLETED',
-                {
-                    'job_id': str(job_id),
-                    'job_type': job.correlation_type,
-                    'status': job.status,
-                    'metadata': {
-                        'case_id': str(case_id),
-                    },
-                },
-                user_id=user_id,
-            )
+                job.finish(datetime.now(UTC), user_id=user_id)
+                await uow.jobs.save(job)
+                await uow.commit()
 
         except (Exception, asyncio.CancelledError) as e:
-            if job.status == JobStatus.RUNNING:
-                job.fail(datetime.now(UTC))
-                await job_repo.save(job)
-                await session.commit()
-
-                # Notify UI via WebSocket of failure
-                try:
-                    ws_publisher = container.websocket_publisher
-                    await ws_publisher.publish(
-                        'JOB:FAILED',
-                        {
-                            'job_id': str(job_id),
-                            'job_type': job.correlation_type,
-                            'status': job.status,
-                            'error': str(e),
-                            'metadata': {
-                                'case_id': str(case_id),
-                            },
-                        },
-                        user_id=user_id,
-                    )
-
-                except Exception as ws_err:
-                    logger.error(
-                        'Worker: Failed to publish WS failure', error=str(ws_err)
-                    )
+            async with uow:
+                job = await uow.jobs.get_by_id(job_id)
+                if job.status == JobStatus.RUNNING:
+                    job.fail(datetime.now(UTC), user_id=user_id)
+                    await uow.jobs.save(job)
+                    await uow.commit()
 
             logger.error(
                 'Worker: Email dispatch job failed or timed out',
@@ -318,7 +218,9 @@ async def run_dispatch_review_email_task(
 ) -> None:
     """Worker task to send a review email to the student."""
     logger.info(
-        'Worker: Dispatching review email', case_id=str(case_id), email=target_email
+        'Worker: Dispatching review email',
+        case_id=str(case_id),
+        email=target_email,
     )
 
     async for session in get_async_session():
@@ -341,20 +243,21 @@ async def run_evaluate_badges_task(ctx: dict[str, Any], advisor_id: str) -> None
     async for session in get_async_session():
         try:
             container = Container(session=session, redis_pool=ctx.get('redis'))
-            badge_repo = container.badge_repo
-            stats = await badge_repo.get_advisor_stats(UUID(advisor_id))
+            uow = container.uow
+            async with uow:
+                stats = await uow.badges.get_advisor_stats(UUID(advisor_id))
 
-            gamification = container.gamification_service
-            eligible_badges = gamification.check_badges(stats)
-            existing_badges = await badge_repo.get_advisor_badges(UUID(advisor_id))
+                gamification = container.gamification_service
+                eligible_badges = gamification.check_badges(stats)
+                existing_badges = await uow.badges.get_advisor_badges(UUID(advisor_id))
 
-            any_awarded = False
-            for badge in eligible_badges:
-                if badge not in existing_badges:
-                    await badge_repo.award_badge(UUID(advisor_id), badge)
-                    any_awarded = True
+                any_awarded = False
+                for badge in eligible_badges:
+                    if badge not in existing_badges:
+                        await uow.badges.award_badge(UUID(advisor_id), badge)
+                        any_awarded = True
 
-            await session.commit()
+                await uow.commit()
 
             # Invalidate cache if a new badge was awarded
             if any_awarded:
@@ -388,29 +291,27 @@ async def run_case_accepted_task(
 
     async for session in get_async_session():
         container = Container(session=session)
-        case_repo = container.case_repo
-        student_repo = container.student_repo
-        point_ledger_repo = container.point_ledger_repo
+        uow = container.uow
+        async with uow:
+            case = await uow.cases.get_by_id(case_id)
+            student = await uow.students.get_by_id(case.sid)
 
-        case = await case_repo.get_by_id(case_id)
-        student = await student_repo.get_by_id(case.sid)
+            gamification_service = container.gamification_service
+            points = gamification_service.calculate_points(
+                gamification_service.Action.ACCEPT_TASK,
+                case.created_at,
+                student.current_risk_status,
+            )
 
-        gamification_service = container.gamification_service
-        points = gamification_service.calculate_points(
-            gamification_service.Action.ACCEPT_TASK,
-            case.created_at,
-            student.current_risk_status,
-        )
-
-        ledger = await point_ledger_repo.get_by_advisor_id(advisor_id)
-        ledger.award_points(
-            case_id=case_id,
-            action='accept_case',
-            points=points,
-            earned_at=occurred_at,
-        )
-        await point_ledger_repo.save(ledger)
-        await session.commit()
+            ledger = await uow.point_ledger.get_by_advisor_id(advisor_id)
+            ledger.award_points(
+                case_id=case_id,
+                action='accept_case',
+                points=points,
+                earned_at=occurred_at,
+            )
+            await uow.point_ledger.save(ledger)
+            await uow.commit()
 
     logger.info('Worker: Finished CaseAcceptedEvent', case_id=str(case_id))
 
@@ -425,31 +326,29 @@ async def run_student_booked_task(
 
     async for session in get_async_session():
         container = Container(session=session)
-        case_repo = container.case_repo
-        student_repo = container.student_repo
-        point_ledger_repo = container.point_ledger_repo
+        uow = container.uow
+        async with uow:
+            case = await uow.cases.get_by_id(case_id)
+            assert case.assigned_advisor_id is not None
+            student = await uow.students.get_by_id(case.sid)
 
-        case = await case_repo.get_by_id(case_id)
-        assert case.assigned_advisor_id is not None
-        student = await student_repo.get_by_id(case.sid)
+            gamification_service = container.gamification_service
+            # For student booking, we bypass action time extra points as requested
+            points = gamification_service.calculate_points(
+                gamification_service.Action.STUDENT_BOOK,
+                None,
+                student.current_risk_status,
+            )
 
-        gamification_service = container.gamification_service
-        # For student booking, we bypass action time extra points as requested
-        points = gamification_service.calculate_points(
-            gamification_service.Action.STUDENT_BOOK,
-            None,
-            student.current_risk_status,
-        )
-
-        ledger = await point_ledger_repo.get_by_advisor_id(case.assigned_advisor_id)
-        ledger.award_points(
-            case_id=case_id,
-            action='student_booked',
-            points=points,
-            earned_at=occurred_at,
-        )
-        await point_ledger_repo.save(ledger)
-        await session.commit()
+            ledger = await uow.point_ledger.get_by_advisor_id(case.assigned_advisor_id)
+            ledger.award_points(
+                case_id=case_id,
+                action='student_booked',
+                points=points,
+                earned_at=occurred_at,
+            )
+            await uow.point_ledger.save(ledger)
+            await uow.commit()
 
     logger.info('Worker: Finished StudentBookedEvent', case_id=str(case_id))
 
@@ -471,31 +370,29 @@ async def run_case_resolved_task(
 
     async for session in get_async_session():
         container = Container(session=session)
-        case_repo = container.case_repo
-        student_repo = container.student_repo
-        point_ledger_repo = container.point_ledger_repo
+        uow = container.uow
+        async with uow:
+            case = await uow.cases.get_by_id(case_id)
+            student = await uow.students.get_by_id(case.sid)
 
-        case = await case_repo.get_by_id(case_id)
-        student = await student_repo.get_by_id(case.sid)
+            gamification_service = container.gamification_service
+            # For resolution, we measure from assignment time
+            points = gamification_service.calculate_points(
+                gamification_service.Action.RESOLVE_CASE,
+                case.assigned_at,
+                student.current_risk_status,
+                satisfaction=satisfaction,
+            )
 
-        gamification_service = container.gamification_service
-        # For resolution, we measure from assignment time
-        points = gamification_service.calculate_points(
-            gamification_service.Action.RESOLVE_CASE,
-            case.assigned_at,
-            student.current_risk_status,
-            satisfaction=satisfaction,
-        )
-
-        ledger = await point_ledger_repo.get_by_advisor_id(advisor_id)
-        ledger.award_points(
-            case_id=case_id,
-            action='resolve_case',
-            points=points,
-            earned_at=occurred_at,
-        )
-        await point_ledger_repo.save(ledger)
-        await session.commit()
+            ledger = await uow.point_ledger.get_by_advisor_id(advisor_id)
+            ledger.award_points(
+                case_id=case_id,
+                action='resolve_case',
+                points=points,
+                earned_at=occurred_at,
+            )
+            await uow.point_ledger.save(ledger)
+            await uow.commit()
 
     logger.info('Worker: Finished CaseResolvedEvent', case_id=str(case_id))
 
@@ -517,18 +414,18 @@ async def run_case_failed_task(
 
     async for session in get_async_session():
         container = Container(session=session)
-        point_ledger_repo = container.point_ledger_repo
-
-        # Per requirement, failed cases award 0 points
-        ledger = await point_ledger_repo.get_by_advisor_id(advisor_id)
-        ledger.award_points(
-            case_id=case_id,
-            action='resolve_case_failed',
-            points=0,
-            earned_at=occurred_at,
-        )
-        await point_ledger_repo.save(ledger)
-        await session.commit()
+        uow = container.uow
+        async with uow:
+            # Per requirement, failed cases award 0 points
+            ledger = await uow.point_ledger.get_by_advisor_id(advisor_id)
+            ledger.award_points(
+                case_id=case_id,
+                action='resolve_case_failed',
+                points=0,
+                earned_at=occurred_at,
+            )
+            await uow.point_ledger.save(ledger)
+            await uow.commit()
 
     logger.info('Worker: Finished CaseFailedEvent', case_id=str(case_id))
 
@@ -624,7 +521,7 @@ async def run_batch_case_overviews_task(ctx: dict[str, Any]) -> None:
 
     async for session in get_async_session():
         container = Container(session=session, redis_pool=ctx.get('redis'))
-        case_repo = container.case_repo
+        uow = container.uow
         student_query_service = container.student_query_service
 
         # 1. Fetch NEW cases that missing an AI overview
@@ -659,16 +556,18 @@ async def run_batch_case_overviews_task(ctx: dict[str, Any]) -> None:
                     performance_data=metrics_context
                 )
 
-                # 4. Update the case domain entity (enforces max 3 action keys)
-                case_domain = DataMapper.to_domain_case(orm_case)
-                case_domain.set_ai_overview(
-                    summary=overview.academic_summary,
-                    keys=overview.action_keys,
-                )
+                async with uow:
+                    # 4. Update the case domain entity (enforces max 3 action keys)
+                    case_domain = await uow.cases.get_by_id(orm_case.case_id)
+                    case_domain.set_ai_overview(
+                        summary=overview.academic_summary,
+                        keys=overview.action_keys,
+                    )
 
-                # 5. Persist the change
-                await case_repo.save(case_domain)
-                await session.commit()
+                    # 5. Persist the change
+                    await uow.cases.save(case_domain)
+                    await uow.commit()
+
                 logger.info(
                     'Worker: AI overview generated for case',
                     case_id=str(orm_case.case_id),
@@ -704,43 +603,45 @@ async def run_advisor_created_task(
 
     async for session in get_async_session():
         container = Container(session=session)
-        schedule_handler = container.get_schedule_command_handler()
+        uow = container.uow
+        async with uow:
+            schedule_handler = container.get_schedule_command_handler()
 
-        # Monday (0) to Friday (4)
-        for day in range(5):
-            # Morning session
-            morning_cmd = AddWorkingHoursCommand(
-                advisor_id=advisor_id,
-                day_of_week=day,
-                start_time=time(9, 0),
-                end_time=time(11, 0),
-                timezone='Asia/Ho_Chi_Minh',
-            )
-            # Afternoon session
-            afternoon_cmd = AddWorkingHoursCommand(
-                advisor_id=advisor_id,
-                day_of_week=day,
-                start_time=time(14, 0),
-                end_time=time(17, 0),
-                timezone='Asia/Ho_Chi_Minh',
-            )
-            try:
-                await schedule_handler.handle_add_working_hours(morning_cmd)
-                await schedule_handler.handle_add_working_hours(afternoon_cmd)
-                logger.debug(
-                    'Worker: Added default hours for advisor on day',
-                    advisor_id=str(advisor_id),
-                    day=day,
+            # Monday (0) to Friday (4)
+            for day in range(5):
+                # Morning session
+                morning_cmd = AddWorkingHoursCommand(
+                    advisor_id=advisor_id,
+                    day_of_week=day,
+                    start_time=time(9, 0),
+                    end_time=time(11, 0),
+                    timezone='Asia/Ho_Chi_Minh',
                 )
-            except Exception as e:
-                logger.error(
-                    'Worker: Failed to add default hours for advisor on day',
-                    advisor_id=str(advisor_id),
-                    day=day,
-                    error=str(e),
+                # Afternoon session
+                afternoon_cmd = AddWorkingHoursCommand(
+                    advisor_id=advisor_id,
+                    day_of_week=day,
+                    start_time=time(14, 0),
+                    end_time=time(17, 0),
+                    timezone='Asia/Ho_Chi_Minh',
                 )
+                try:
+                    await schedule_handler.handle_add_working_hours(morning_cmd)
+                    await schedule_handler.handle_add_working_hours(afternoon_cmd)
+                    logger.debug(
+                        'Worker: Added default hours for advisor on day',
+                        advisor_id=str(advisor_id),
+                        day=day,
+                    )
+                except Exception as e:
+                    logger.error(
+                        'Worker: Failed to add default hours for advisor on day',
+                        advisor_id=str(advisor_id),
+                        day=day,
+                        error=str(e),
+                    )
 
-        await session.commit()
+            await uow.commit()
 
     logger.info(
         'Worker: Finished setting default hours for advisor', advisor_id=str(advisor_id)
