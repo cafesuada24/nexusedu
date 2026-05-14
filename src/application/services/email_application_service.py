@@ -72,9 +72,6 @@ class EmailApplicationService:
             email.mark_as_sent()
             await self.uow.emails.save(email)
 
-            case.record_email_sent(job_id=job_id, user_id=user_id)
-            await self.uow.cases.save(case)
-
             # 3. Gamification
             await self.gamification_app_service.award_points(
                 advisor_id=case.assigned_advisor_id,
