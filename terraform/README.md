@@ -58,3 +58,27 @@ After `terraform apply` finishes, it will output the `vm_public_ip` and `db_priv
     ```
 3.  **Configure Application:**
     Create a `.env.production` file on the VM using the `db_private_ip` for the `DATABASE_URL`.
+
+## Troubleshooting
+
+### VPC Deletion Issues
+If `terraform destroy` fails with an error like `Producer services are still using this connection` or `Network is already being used by routes`:
+
+1.  **Wait:** GCP sometimes takes 2-5 minutes to release internal resources after Cloud SQL is deleted.
+2.  **Manual Cleanup:** Run the provided helper script to force-clear the locks:
+    ```bash
+    chmod +x scripts/cleanup_vpc.sh
+    ./scripts/cleanup_vpc.sh gen-lang-client-0930334575 nexusedu-vpc
+    ```
+    Alternatively, run the commands manually:
+    ```bash
+    # 1. Delete the VPC Peering (Service Networking)
+    gcloud compute networks peerings delete servicenetworking-googleapis-com --network=nexusedu-vpc
+    
+    # 2. Delete any residual routes if necessary
+    # (Replace ROUTE_NAME with the one from the error message)
+    gcloud compute routes delete ROUTE_NAME
+    
+    # 3. Retry Terraform Destroy
+    terraform destroy
+    ```

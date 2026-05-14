@@ -7,7 +7,7 @@ resource "google_sql_database_instance" "postgres" {
 
   settings {
     tier = "db-f1-micro" # Minimum tier, adjust for production
-    edition  = "ENTERPRISE"
+    edition  = "ENTERPRISE_PLUS"
 
     ip_configuration {
       ipv4_enabled                                  = false

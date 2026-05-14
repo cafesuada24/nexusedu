@@ -4,6 +4,26 @@ variable "project_id" {
   default     = "gen-lang-client-0930334575"
 }
 
+variable "project" {
+  description = "Project name"
+  type = string
+  default = "nexusedu"
+}
+
+variable "public_subnet_cidr" {
+  type = string
+  default = "10.0.1.0/24"
+}
+
+variable "private_subnet_cidr" {
+  type = string
+  default = "10.0.2.0/24"
+}
+
+variable "admin_ip_cidr" {
+  type = string
+}
+
 variable "region" {
   description = "The GCP region"
   type        = string
@@ -14,12 +34,6 @@ variable "zone" {
   description = "The GCP zone"
   type        = string
   default     = "us-central1-a"
-}
-
-variable "vpc_name" {
-  description = "Name of the VPC"
-  type        = string
-  default     = "nexusedu-vpc"
 }
 
 variable "db_username" {
