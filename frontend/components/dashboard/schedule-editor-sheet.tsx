@@ -12,8 +12,10 @@ import {
   Link2,
   Check,
   Loader2,
+  Calendar as CalendarIcon,
 } from "lucide-react"
 import { toast } from "sonner"
+import { format } from "date-fns"
 import {
   Sheet,
   SheetContent,
@@ -28,6 +30,12 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import {
   Table,
   TableBody,
@@ -224,7 +232,7 @@ export function ScheduleEditorSheet() {
   const [overrides, setOverrides] = React.useState<Override[]>(
     schedule.overrides,
   )
-  const [newDate, setNewDate] = React.useState("")
+  const [newDate, setNewDate] = React.useState<Date>()
   const [newNote, setNewNote] = React.useState("")
 
   // Validation state
@@ -311,10 +319,15 @@ export function ScheduleEditorSheet() {
       return
     }
     setOverrides((prev) => [
-      { id: crypto.randomUUID(), date: newDate, type: "off", note: newNote },
+      {
+        id: crypto.randomUUID(),
+        date: format(newDate, "dd/MM/yyyy"),
+        type: "off",
+        note: newNote,
+      },
       ...prev,
     ])
-    setNewDate("")
+    setNewDate(undefined)
     setNewNote("")
     toast.success("Đã thêm ngày nghỉ")
   }, [newDate, newNote])
@@ -470,13 +483,31 @@ export function ScheduleEditorSheet() {
             </div>
 
             <div className="grid gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/10 p-4 sm:grid-cols-[160px_1fr_auto]">
-              <Input
-                type="text"
-                placeholder="dd/mm/yyyy"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="h-10 rounded-xl border-border/60 bg-background px-4"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-10 rounded-xl border-border/60 bg-background px-4 justify-start text-left font-normal",
+                      !newDate && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 size-4" />
+                    {newDate ? format(newDate, "dd/MM/yyyy") : <span>Chọn ngày</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={newDate}
+                    onSelect={setNewDate}
+                    disabled={(date) =>
+                      date < new Date(new Date().setHours(0, 0, 0, 0))
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               <Input
                 type="text"
                 placeholder="Lý do, ví dụ: Hội thảo tại Đà Nẵng"
