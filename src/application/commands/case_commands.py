@@ -1,7 +1,6 @@
 """Command handlers for case-related operations."""
 
 from datetime import UTC, datetime
-from string import Template
 
 import structlog
 
@@ -25,7 +24,6 @@ from src.domain.entities.job import Job
 from src.domain.exceptions import (
     CaseAlreadyClosedError,
     CaseNotFoundError,
-    DraftGenerationError,
     EmailUnavailableError,
     InvalidActionError,
     JobNotFoundError,
@@ -39,14 +37,6 @@ from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 logger = structlog.get_logger(__name__)
-# Application-level safe fallbacks
-SAFE_SUBJECT = 'Checking in on your academic progress'
-SAFE_BODY = Template(
-    'Hi ${student_name},\n\n'
-    'I noticed a change in your recent course activity and wanted to check in to see how things are going. '
-    'We are here to support you and help you navigate any challenges you might be facing.\n\n'
-    'If you have a moment, I would love to chat and see how we can help. ',
-)
 
 
 class CaseCommandHandler:
@@ -226,29 +216,30 @@ class CaseCommandHandler:
         """Execute the generate email draft command (Worker task logic)."""
         logger.info('Generating email draft', case_id=str(command.case_id))
 
-        async with self.uow:
-            # 1. Fetch case and student info
-            case = await self.uow.cases.get_by_id(command.case_id)
-            email = await self.uow.emails.get_by_case(case.case_id)
-            email.mark_as_generating()
-            await self.uow.emails.save(email)
+        try:
+            async with self.uow:
+                # 1. Fetch case and student info
+                case = await self.uow.cases.get_by_id(command.case_id)
+                email = await self.uow.emails.get_by_case(case.case_id)
+                email.mark_as_generating()
+                await self.uow.emails.save(email)
 
-            student_data = await self.uow.students.get_by_id(case.sid)
-            if not student_data.student_name:
-                raise StudentNameMissingError(case.sid)
+                student_data = await self.uow.students.get_by_id(case.sid)
+                if not student_data.student_name:
+                    raise StudentNameMissingError(case.sid)
 
-            # 2. Fetch performance data (Deterministic Fetching)
-            perf_raw = await self.uow.students.get_recent_performance(case.sid)
-            if not perf_raw:
-                raise MissingPerformanceDataError(case.sid)
+                # 2. Fetch performance data (Deterministic Fetching)
+                perf_raw = await self.uow.students.get_recent_performance(case.sid)
+                if not perf_raw:
+                    raise MissingPerformanceDataError(case.sid)
 
-            history_lines = [
-                f'Year {p["yr"]} Sem {p["sem"]} Week {p["wk"]}: Score {p["score"]} ({p["status"]})'
-                for p in perf_raw
-            ]
-            context_str = 'Trend: ' + ' | '.join(history_lines)
+                history_lines = [
+                    f'Year {p["yr"]} Sem {p["sem"]} Week {p["wk"]}: Score {p["score"]} ({p["status"]})'
+                    for p in perf_raw
+                ]
+                context_str = 'Trend: ' + ' | '.join(history_lines)
 
-            try:
+                # 3. Structural Generation
                 (
                     subject,
                     personalized_body,
@@ -256,24 +247,26 @@ class CaseCommandHandler:
                     student_data.student_name,
                     context_str,
                 )
-            except DraftGenerationError as e:
-                logger.warning(
-                    'Draft generation failed, falling back to safe template',
-                    case_id=str(command.case_id),
-                    error=str(e),
-                )
-                subject = SAFE_SUBJECT
-                personalized_body = SAFE_BODY.safe_substitute(
-                    student_name=student_data.student_name,
-                )
 
-            # 4. Persistent storage: Update the existing placeholder
-            email.set_draft_content(
-                subject,
-                personalized_body,
+                # 4. Persistent storage: Update the existing placeholder
+                email.set_draft_content(
+                    subject,
+                    personalized_body,
+                )
+                await self.uow.emails.save(email)
+                await self.uow.commit()
+        except Exception as e:
+            logger.error(
+                'Email draft generation failed, reverting state',
+                case_id=str(command.case_id),
+                error=str(e),
             )
-            await self.uow.emails.save(email)
-            await self.uow.commit()
+            async with self.uow:
+                email = await self.uow.emails.get_by_case(command.case_id)
+                email.prepare_for_regeneration()
+                await self.uow.emails.save(email)
+                await self.uow.commit()
+            raise
 
     async def handle_book_appointment(self, command: BookAppointmentCommand) -> None:
         """Record that a student has booked an appointment for their case."""
