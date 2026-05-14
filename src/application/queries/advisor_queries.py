@@ -19,6 +19,7 @@ from src.application.dtos.gamification_dtos import (
     GetLeaderboardQuery,
     LeaderboardEntryDTO,
 )
+from src.application.dtos.metrics_dtos import EmergencyDashboardDTO, KPIStatsDTO
 from src.application.dtos.pagination import PagedResponse
 from src.application.interfaces.advisor_metrics_query_service import (
     AdvisorMetricsQueryService,
@@ -119,6 +120,27 @@ class AdvisorQueryHandler:
         await self.__advisor_repo.get_by_id(advisor_id)
         return await self.__advisor_metrics_query_service.get_advisor_metrics(
             advisor_id,
+        )
+
+    async def handle_get_emergency_dashboard(
+        self,
+        advisor_id: EntityID,
+    ) -> EmergencyDashboardDTO:
+        """Execute the get emergency dashboard query."""
+        # Ensure advisor exists
+        await self.__advisor_repo.get_by_id(advisor_id)
+        return await self.__advisor_metrics_query_service.get_emergency_dashboard(
+            advisor_id,
+        )
+
+    async def handle_get_user_emergency_dashboard(
+        self,
+        user_id: EntityID,
+    ) -> EmergencyDashboardDTO:
+        """Execute the get emergency dashboard query for a user's advisor profile."""
+        advisor = await self.__advisor_repo.get_by_user_id(user_id)
+        return await self.__advisor_metrics_query_service.get_emergency_dashboard(
+            advisor.advisor_id,
         )
 
     async def handle_get_advisor_badges(self, advisor_id: EntityID) -> list[BadgeDTO]:
