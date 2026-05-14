@@ -39,6 +39,7 @@ export type Alert = {
     draftJobId?: string | null;
     draftSubject?: string | null;
     draftBody?: string | null;
+    draftStatus?: string | null;
     isGenerating?: boolean;
     activeCaseId?: string | null;
     /** Raw backend intervention status (e.g. "sent", "booked"). Used to
