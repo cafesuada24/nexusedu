@@ -26,6 +26,11 @@ from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
+from src.application.services.gamification_application_service import (
+    GamificationApplicationService,
+)
+from src.application.services.email_application_service import EmailApplicationService
+from src.application.services.case_application_service import CaseApplicationService
 from src.application.services.websocket_publisher import WebSocketEventPublisher
 from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -185,6 +190,33 @@ class Container:
     def gamification_service(self) -> GamificationService:
         """Gamification domain service."""
         return GamificationService()
+
+    @cached_property
+    def gamification_app_service(self) -> GamificationApplicationService:
+        """Gamification application service."""
+        return GamificationApplicationService(
+            uow=self.uow,
+            gamification_service=self.gamification_service,
+            task_queue=self.task_queue,
+        )
+
+    @cached_property
+    def email_app_service(self) -> EmailApplicationService:
+        """Email application service."""
+        return EmailApplicationService(
+            uow=self.uow,
+            email_sending_service=self.email_sending_service,
+            gamification_app_service=self.gamification_app_service,
+            gamification_service=self.gamification_service,
+        )
+
+    @cached_property
+    def case_app_service(self) -> CaseApplicationService:
+        """Case application service."""
+        return CaseApplicationService(
+            uow=self.uow,
+            task_queue=self.task_queue,
+        )
 
     @cached_property
     def availability_service(self) -> AdvisorAvailabilityService:
