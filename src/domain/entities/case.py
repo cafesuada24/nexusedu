@@ -11,6 +11,8 @@ from src.domain.events.case_events import (
     CaseFailedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
+    EmailDraftRequestedEvent,
+    InterventionEmailSentEvent,
     StudentBookedEvent,
 )
 from src.domain.exceptions import (
@@ -136,6 +138,39 @@ class Case:
     def mark_as_sent(self) -> None:
         """The intervention email has been sent."""
         self._transition_to(InterventionStatus.SENT)
+
+    def request_email_draft(
+        self,
+        job_id: EntityID,
+        user_id: EntityID,
+        booking_link: str | None = None,
+    ) -> None:
+        """Request an AI-generated email draft for this case."""
+        if not self.can_generate_draft():
+            raise InvalidStateTransitionError(
+                current_status=self.intervention_status.value,
+                attempted_action='request_email_draft',
+            )
+
+        self.register_event(
+            EmailDraftRequestedEvent(
+                case_id=self.case_id,
+                job_id=job_id,
+                user_id=user_id,
+                booking_link=booking_link,
+            ),
+        )
+
+    def record_email_sent(self, job_id: EntityID, user_id: EntityID) -> None:
+        """Record that an intervention email has been dispatched."""
+        self.mark_as_sent()
+        self.register_event(
+            InterventionEmailSentEvent(
+                case_id=self.case_id,
+                job_id=job_id,
+                user_id=user_id,
+            ),
+        )
 
     def record_booking(
         self,
