@@ -221,7 +221,7 @@ function KanbanCardInner({
                 <p className="mt-3 text-[13px] text-success font-medium">
                     Đã được gửi.
                 </p>
-            ) : a.status === "accepted" && (isAiDraftReady || a.draftSubject) ? (
+            ) : a.status === "accepted" && (isAiDraftReady || a.draftSubject || a.draftStatus === "completed") ? (
                 <p className="mt-3 text-[13px] text-success">
                     Bản nháp đã sẵn sàng.
                 </p>
