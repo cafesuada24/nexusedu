@@ -27,6 +27,7 @@ from src.domain.value_objects.status import (
     MeetingMethod,
     RiskReason,
 )
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 _INTERVENTION_STATUS_TRANSITION = {
     InterventionStatus.NEW: [InterventionStatus.ACCEPTED, InterventionStatus.DISMISSED],
@@ -220,7 +221,7 @@ class Case(AggregateRoot):
     def finalize_resolution(
         self,
         occurred_at: datetime,
-        satisfaction: str | None = None,
+        satisfaction: StudentSatisfaction | None = None,
         comment: str | None = None,
         is_failed: bool = False,
         final_gpa: float | None = None,

@@ -49,7 +49,7 @@ class CaseResolvedEvent(DomainEvent):
 
     case_id: EntityID
     advisor_id: EntityID
-    satisfaction: StudentSatisfaction
+    satisfaction: StudentSatisfaction | None = None
     comment: str | None = None
 
 
@@ -59,7 +59,7 @@ class CaseFailedEvent(DomainEvent):
 
     case_id: EntityID
     advisor_id: EntityID
-    satisfaction: StudentSatisfaction
+    satisfaction: StudentSatisfaction | None = None
     comment: str | None = None
 
 
