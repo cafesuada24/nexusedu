@@ -124,7 +124,7 @@ async def trigger_draft(
             idempotency_key=idempotency_key,
         )
         # Using 200 for idempotent hits is a choice, though some prefer 204 or just returning the result.
-        return TriggerDraftDTO(case_id=case_id, is_new_job=False)
+        raise HTTPException(200, 'email already triggered.')
 
     command = TriggerDraftCommand(
         case_id=case_id,

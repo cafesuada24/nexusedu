@@ -56,7 +56,7 @@ async def run_batch_case_overviews_task(ctx: TaskContext) -> None:
     for case_id in case_ids:
         await ctx.container.task_queue.enqueue(
             'run_generate_case_overview_task',
-            GenerateCaseOverviewPayload(case_id=case_id),
+            payload=GenerateCaseOverviewPayload(case_id=case_id),
         )
 
     ctx.logger.info('enqueued_individual_ai_overview_tasks', count=len(case_ids))
