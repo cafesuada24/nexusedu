@@ -354,12 +354,34 @@ export const DEFAULT_TIMEOUT_MS = 10_000;
 const INGEST_TIMEOUT_MS = 60_000;
 
 
+// function getApiBase(): string {
+//   // On the client, we MUST use the relative proxy path so that proxy.ts can
+//   // intercept the request, extract the httpOnly cookie, and inject the Bearer token.
+//   if (typeof window !== "undefined") {
+//     return "/api/v1";
+//   }
+
 function getApiBase(): string {
-  // On the client, we MUST use the relative proxy path so that proxy.ts can
-  // intercept the request, extract the httpOnly cookie, and inject the Bearer token.
+  // Lấy giá trị từ biến môi trường đã cấu hình trên Vercel
+  const envBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
+
   if (typeof window !== "undefined") {
+    // Nếu có biến môi trường, dùng biến đó làm Base URL tuyệt đối
+    if (envBase && envBase.trim()) {
+      return envBase.trim().replace(/\/+$/, "");
+    }
+    // Nếu không có, mới quay về dùng đường dẫn tương đối (chỉ dùng khi có proxy/rewrite)
     return "/api/v1";
   }
+
+  // Cấu hình cho Server-side (giữ nguyên hoặc tối ưu)
+  if (envBase && envBase.trim()) {
+    return envBase.trim().replace(/\/+$/, "");
+  }
+
+  return "http://127.0.0.1:8000/api/v1";
+}
+
 
   // On the server, we can talk directly to the backend URL to avoid double-proxying.
   const env = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -1426,4 +1448,3 @@ export async function submitFeedback(
   const detail = await parseErrorDetail(res);
   throw new Error(`Gửi đánh giá thất bại [${res.status}]: ${detail}`);
 }
-
