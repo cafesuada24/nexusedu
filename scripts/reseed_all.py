@@ -129,10 +129,10 @@ async def reseed() -> None:
         uow = SqlAlchemyUnitOfWork(session)
         user_manager = UserManager(user_db, user_settings_repo, uow)
         user = await user_manager.create(
-            UserCreate(email='dev@example.com', password='dev'), safe=True,
+            UserCreate(email='dev@gmail.com', password='dev'), safe=True,
         )
         adv = await user_manager.create(
-            UserCreate(email='adv@example.com', password='adv'), safe=True,
+            UserCreate(email='adv@gmail.com', password='adv'), safe=True,
         )
         # Update role to admin
         from sqlalchemy import update
