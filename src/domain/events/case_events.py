@@ -28,6 +28,14 @@ class StudentBookedEvent(DomainEvent):
 
 
 @dataclass(frozen=True)
+class CaseSupportingStartedEvent(DomainEvent):
+    """Event triggered when an advisor starts supporting a student."""
+
+    case_id: EntityID
+    advisor_id: EntityID
+
+
+@dataclass(frozen=True)
 class CaseReviewRequestedEvent(DomainEvent):
     """Event triggered when an advisor requests a case resolution, pending student review."""
 
@@ -41,7 +49,7 @@ class CaseResolvedEvent(DomainEvent):
 
     case_id: EntityID
     advisor_id: EntityID
-    satisfaction: StudentSatisfaction
+    satisfaction: StudentSatisfaction | None = None
     comment: str | None = None
 
 
@@ -51,7 +59,7 @@ class CaseFailedEvent(DomainEvent):
 
     case_id: EntityID
     advisor_id: EntityID
-    satisfaction: StudentSatisfaction
+    satisfaction: StudentSatisfaction | None = None
     comment: str | None = None
 
 

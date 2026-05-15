@@ -6,8 +6,10 @@ from typing import Any
 
 from src.application.dtos.data_dtos import DataIngestionCommand
 from src.application.interfaces.unit_of_work import UnitOfWork
-from src.core.identifiers import EntityID
+from src.core.identifiers import EntityID, generate_uuid
 from src.domain.entities.case import Case
+from src.domain.entities.data_ingestion import DataIngestion
+from src.domain.events.data_events import DataIngestedEvent
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.value_objects.status import InterventionStatus, RiskStatus
 
@@ -19,14 +21,18 @@ class DataCommandHandler:
         self,
         uow: UnitOfWork,
         anomaly_engine: AnomalyEngine,
-    ):
+    ) -> None:
+        """Initialize the data command handler."""
         self.uow = uow
         self.anomaly_engine = anomaly_engine
 
-    async def handle_ingest_data(self, command: DataIngestionCommand) -> Mapping[str, Any]:
+    async def handle_ingest_data(
+        self,
+        command: DataIngestionCommand,
+        job_id: EntityID | None = None,
+    ) -> Mapping[str, Any]:
         """Execute the data ingestion command with orchestration."""
         results: list[str] = []
-
         async with self.uow:
             for source in command.data_sources:
                 if source.source_type == 'sis':
@@ -36,18 +42,30 @@ class DataCommandHandler:
                     await self.uow.activities.ingest_activities(source.records)
                     results.append(f'Ingested {len(source.records)} activity records.')
 
+            await self.uow.commit()
+
             # Orchestrate Anomaly Detection
             new_sids = await self._run_anomaly_detection()
             results.append(
                 f'Anomaly engine execution completed. Found {len(new_sids)} new transitions.',
             )
 
+            # Publish Ingestion Event
+            ingestion = DataIngestion()
+            ingestion.register_event(
+                DataIngestedEvent(
+                    job_id=job_id or generate_uuid(),
+                    new_sids=new_sids,
+                    results=results,
+                ),
+            )
+            self.uow.collect_events(ingestion)
             await self.uow.commit()
 
-        return {
-            'results': results,
-            'new_sids': new_sids,
-        }
+            return {
+                'results': results,
+                'new_sids': new_sids,
+            }
 
     async def _run_anomaly_detection(self) -> list[tuple[EntityID, EntityID]]:
         """Orchestrate the anomaly detection process."""
@@ -102,6 +120,7 @@ class DataCommandHandler:
             new_at_risk_sids.append((sid, case_id))
 
         if new_at_risk_sids:
+            # Batch process AI overviews for new cases
             await self.uow.enqueue('run_batch_case_overviews_task')
 
         return new_at_risk_sids

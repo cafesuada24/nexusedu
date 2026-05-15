@@ -24,12 +24,14 @@ from src.domain.events.case_events import (
     CaseOverviewGeneratedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
+    CaseSupportingStartedEvent,
     EmailDraftRequestedEvent,
     InterventionEmailSentEvent,
     StudentBookedEvent,
 )
+from src.domain.events.data_events import DataIngestedEvent
 from src.domain.events.job_events import JobStatusChangedEvent
-from src.domain.value_objects.status import JobStatus
+from src.domain.value_objects.status import InterventionStatus, JobStatus
 
 
 class OutboxMapper:
@@ -157,6 +159,19 @@ class OutboxMapper:
     @staticmethod
     def _map_to_websocket_task(event: DomainEvent) -> dict[str, Any] | None:
         """Map a domain event to a WebSocket broadcast task."""
+        if isinstance(event, DataIngestedEvent):
+            return {
+                'task_name': 'websocket_broadcast',
+                'kwargs': {
+                    'event_type': 'DATA:INGESTED',
+                    'payload': {
+                        'job_id': str(event.job_id),
+                        'results': event.results,
+                        'new_cases_count': len(event.new_sids),
+                    },
+                },
+            }
+
         if isinstance(event, CaseOverviewGeneratedEvent):
             return {
                 'task_name': 'websocket_broadcast',
@@ -204,16 +219,18 @@ class OutboxMapper:
             CaseResolvedEvent,
             CaseFailedEvent,
             CaseReviewRequestedEvent,
+            CaseSupportingStartedEvent,
         )
 
         if isinstance(event, case_events):
             status_map = {
-                CaseAcceptedEvent: 'ACCEPTED',
-                InterventionEmailSentEvent: 'SENT',
-                StudentBookedEvent: 'BOOKED',
-                CaseResolvedEvent: 'RESOLVED',
-                CaseFailedEvent: 'FAILED',
-                CaseReviewRequestedEvent: 'PENDING_REVIEW',
+                CaseAcceptedEvent: InterventionStatus.ACCEPTED.value,
+                InterventionEmailSentEvent: InterventionStatus.SENT.value,
+                StudentBookedEvent: InterventionStatus.BOOKED.value,
+                CaseResolvedEvent: InterventionStatus.RESOLVED.value,
+                CaseFailedEvent: InterventionStatus.FAILED.value,
+                CaseReviewRequestedEvent: InterventionStatus.PENDING_REVIEW.value,
+                CaseSupportingStartedEvent: InterventionStatus.SUPPORTING.value,
             }
 
             payload = {

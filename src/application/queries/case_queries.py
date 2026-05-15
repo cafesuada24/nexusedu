@@ -97,7 +97,7 @@ class CaseQueryHandler:
             intervention_status=case.intervention_status,
             email=QueryEmailDTO(
                 email_id=email.email_id,
-                recipent=student.email,
+                recipient=student.email,
                 subject=email.subject,
                 body=email.body,
                 status=email.status,
@@ -134,7 +134,7 @@ class CaseQueryHandler:
 
         return QueryEmailDTO(
             email_id=email.email_id,
-            recipent=student.email,
+            recipient=student.email,
             status=email.status,
             created_at=email.created_at,
             body=email.body,

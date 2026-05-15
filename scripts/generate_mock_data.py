@@ -51,13 +51,17 @@ def generate_mock_data():
         profile = random.choices(
             ['steady', 'improving', 'degrading'], weights=[0.6, 0.2, 0.2],
         )[0]
+        
+        # Determine risk status: will be assigned based on performance later
+        risk_status = 'Normal'
+            
         students.append(
             {
                 'sid': str(sid),
                 'student_name': name,
                 'email': f'student_{i}@university.edu',
                 'major': random.choice(MAJORS),
-                'current_risk_status': 'Normal',
+                'current_risk_status': risk_status,
                 'last_notified_timestamp': None,
                 'last_notified_satisfaction': 0,
                 'profile': profile,  # Temporary for score generation
@@ -71,6 +75,9 @@ def generate_mock_data():
     courses = [
         {'id': f'C{100 + i}', 'name': name} for i, name in enumerate(COURSE_NAMES)
     ]
+
+    # Assign 10 students as "at-risk" profile
+    at_risk_sids = [s['sid'] for s in random.sample(students, 10)]
 
     for year in YEARS:
         for semester in SEMESTERS:
@@ -87,7 +94,9 @@ def generate_mock_data():
                         if random.random() > 0.4:  # 60% chance of an activity each week
                             # Determine base score based on profile and year
                             profile = student['profile']
-                            if profile == 'degrading':
+                            if student['sid'] in at_risk_sids:
+                                base_score = 25 + random.randint(-10, 10) # Consistently low scores
+                            elif profile == 'degrading':
                                 base_score = (
                                     90
                                     - (year * 10)

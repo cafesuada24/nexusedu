@@ -24,6 +24,7 @@ from src.infrastructure.workers.tasks.case_tasks import (
     run_case_resolved_task,
     run_case_review_requested_task,
 )
+from src.infrastructure.workers.tasks.data_tasks import run_data_ingest_task
 from src.infrastructure.workers.tasks.email_tasks import (
     run_dispatch_email_task,
     run_dispatch_review_email_task,
@@ -57,6 +58,9 @@ class WorkerSettings:
         run_dispatch_email_task,
         run_dispatch_review_email_task,
 
+        # Data Tasks
+        run_data_ingest_task,
+
         # Event Handlers
         run_case_accepted_task,
         run_student_booked_task,
@@ -76,8 +80,8 @@ class WorkerSettings:
     on_startup = on_startup
 
     cron_jobs = [
-        # Poll outbox every 5 seconds
-        cron(run_outbox_poller_task, second=set(range(0, 60, 5))),
+        # Poll outbox every 1 second
+        cron(run_outbox_poller_task, second=set(range(0, 60, 1))),
 
         # AI health check every 30 minutes
         cron(run_ai_health_check_task, minute=30),

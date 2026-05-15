@@ -89,9 +89,11 @@ async def run_case_review_requested_task(
     payload: CaseReviewRequestedPayload,
 ) -> None:
     """Worker task to handle CaseReviewRequestedEvent."""
-    await ctx.container.case_app_service.initiate_case_review(
-        case_id=payload.case_id,
-    )
+    async with ctx.uow:
+        await ctx.container.case_app_service.initiate_case_review(
+            case_id=payload.case_id,
+        )
+        await ctx.uow.commit()
 
 
 @worker_task()

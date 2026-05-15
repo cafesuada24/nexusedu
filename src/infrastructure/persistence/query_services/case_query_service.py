@@ -151,7 +151,7 @@ class SqlAlchemyCaseQueryService:
                     intervention_status=intervention_status,
                     email=QueryEmailDTO(
                         email_id=row['email_id'],
-                        recipent=row['student_email'],
+                        recipient=row['student_email'],
                         subject=row['draft_subject'],
                         body=row['draft_body'],
                         status=row['draft_status'],
@@ -174,6 +174,14 @@ class SqlAlchemyCaseQueryService:
                     )
                     if row['academic_summary']
                     else None,
+                    points_reward=self.gamification_service.calculate_points(
+                        self.gamification_service.Action.ACCEPT_TASK,
+                        recorded_dt=row['created_at'],
+                        risk_level=risk_status,
+                    ),
+                    draft_subject=row['draft_subject'],
+                    draft_body=row['draft_body'],
+                    draft_status=row['draft_status'],
                 ),
             )
         return PagedResponse(

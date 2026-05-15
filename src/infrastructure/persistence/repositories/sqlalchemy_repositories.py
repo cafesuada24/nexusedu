@@ -930,6 +930,7 @@ class SqlAlchemyCaseRepository:
             )
             .values(
                 assigned_advisor_id=advisor_id,
+                intervention_status=InterventionStatus.ACCEPTED,
                 version=OrmCase.version + 1,
             )
         )
@@ -1031,19 +1032,21 @@ class SqlAlchemyMetricsRepository:
         total = total_res.scalar() or 1
 
         normal_stmt = select(func.count(Student.sid)).where(
-            Student.current_risk_status == 'Normal',
+            Student.current_risk_status == RiskStatus.NORMAL.value,
         )
         normal_res = await self.session.execute(normal_stmt)
         normal = normal_res.scalar() or 0
 
         dropout_stmt = select(func.count(Student.sid)).where(
-            Student.current_risk_status.like('%Significant Drop%'),
+            Student.current_risk_status.in_(
+                [RiskStatus.CRITICAL.value, RiskStatus.ELEVATED.value],
+            ),
         )
         dropout_res = await self.session.execute(dropout_stmt)
         dropout = dropout_res.scalar() or 0
 
-        retention_rate = (normal / total) * 100
-        dropout_rate = (dropout / total) * 100
+        retention_rate = (normal / total) * 100 if total > 0 else 0.0
+        dropout_rate = (dropout / total) * 100 if total > 0 else 0.0
 
         # 2. Interventions
         int_stmt = select(func.count(distinct(OrmCase.sid))).where(
@@ -1083,7 +1086,7 @@ class SqlAlchemyMetricsRepository:
                 cast(literal_column('80'), Integer).label('baseline'),
                 (
                     func.count(
-                        case((StudentStatusHistory.anomaly_flag == 'Normal', 1)),
+                        case((StudentStatusHistory.anomaly_flag == RiskStatus.NORMAL.value, 1)),
                     )
                     * 100.0
                     / func.count(StudentStatusHistory.history_id)

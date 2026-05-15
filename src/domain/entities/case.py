@@ -12,6 +12,7 @@ from src.domain.events.case_events import (
     CaseOverviewGeneratedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
+    CaseSupportingStartedEvent,
     EmailDraftRequestedEvent,
     InterventionEmailSentEvent,
     StudentBookedEvent,
@@ -26,6 +27,7 @@ from src.domain.value_objects.status import (
     MeetingMethod,
     RiskReason,
 )
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 _INTERVENTION_STATUS_TRANSITION = {
     InterventionStatus.NEW: [InterventionStatus.ACCEPTED, InterventionStatus.DISMISSED],
@@ -198,6 +200,12 @@ class Case(AggregateRoot):
     def start_supporting(self) -> None:
         """Advisor starts supporting the student after they booked."""
         self._transition_to(InterventionStatus.SUPPORTING)
+        self.register_event(
+            CaseSupportingStartedEvent(
+                case_id=self.case_id,
+                advisor_id=self.assigned_advisor_id,  # type: ignore
+            ),
+        )
 
     def request_resolution(self, occurred_at: datetime) -> None:
         """Mark the case as pending review from the student."""
@@ -213,7 +221,7 @@ class Case(AggregateRoot):
     def finalize_resolution(
         self,
         occurred_at: datetime,
-        satisfaction: str | None = None,
+        satisfaction: StudentSatisfaction | None = None,
         comment: str | None = None,
         is_failed: bool = False,
         final_gpa: float | None = None,

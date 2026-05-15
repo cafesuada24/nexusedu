@@ -62,7 +62,6 @@ class CaseCommandHandler:
             if advisor is None:
                 raise UserIsNotAnAdvisorError(command.user_id)
 
-            case.assign_advisor(advisor.advisor_id, command.accepted_at)
 
             # Capture initial GPA snapshot
             recent_perf = await self.uow.students.get_recent_performance(case.sid)
@@ -70,6 +69,8 @@ class CaseCommandHandler:
                 # Calculate average of recent scores as initial GPA proxy
                 avg_score = sum(p['score'] for p in recent_perf) / len(recent_perf)
                 case.set_initial_gpa(avg_score)
+
+            case.assign_advisor(advisor.advisor_id, command.accepted_at)
 
             # Ensure email record is created before events are published
             new_email = InterventionEmail(case_id=case.case_id)

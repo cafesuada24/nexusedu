@@ -93,17 +93,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         return `${wsBaseUrl}/ws`;
       }
 
-      // Fallback
-      const isDev = process.env.NODE_ENV === "development";
-
       const protocol =
         window.location.protocol === "https:"
           ? "wss:"
           : "ws:";
 
-      const host = isDev
-        ? "localhost:8000"
-        : window.location.host;
+      const host = window.location.host;
 
       return `${protocol}//${host}/api/v1/ws`;
     },
@@ -156,10 +151,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     socket.onmessage = (event: MessageEvent<string>) => {
       try {
+        console.debug("[WS] Raw message received:", event.data);
         const parsedMessage: WebSocketMessage = JSON.parse(
           event.data,
         );
 
+        console.info("[WS] Processed message:", parsedMessage.type, parsedMessage.payload);
         setLastMessage(parsedMessage);
         onMessageRef.current?.(parsedMessage);
       } catch (error) {

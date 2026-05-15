@@ -201,9 +201,68 @@ export function CsvUploader() {
             if (lmsRecords.length > 0) {
                 dataSources.push({ source_type: "lms", records: lmsRecords });
             }
-            if (dataSources.length === 0) {
-                setInflight({ kind: "ready", totalStudents: 0, highRisk: 0 });
-                return;
+
+            if (dataSources.length > 0) {
+                try {
+                    console.log("[CSV] Submitting data sources:", {
+                        sourceCount: dataSources.length,
+                        sources: dataSources.map(s => ({
+                            type: s.source_type,
+                            recordCount: s.records.length,
+                        })),
+                        totalRecords: dataSources.reduce((sum, s) => sum + s.records.length, 0),
+                    });
+
+                    await updateUserSettings({ auto_draft_enabled: false });
+                    const ingestResponse = (await ingestData(dataSources)) as any;
+                    console.log("[CSV] /data/ingest response:", ingestResponse);
+
+                    // Invalidate alerts query so the Alert Center reflects the new data
+                    queryClient.invalidateQueries({
+                        queryKey: queryKeys.alerts.list(),
+                    });
+
+                    updateUpload(id, {
+                        jobId: ingestResponse.job_id,
+                        totalStudents: result.totalStudents,
+                        totalTests: result.totalTests,
+                        highRisk: result.highRisk,
+                    });
+                    toast.success("Hồ sơ đã được gửi", {
+                        description: `Đang xử lý ${result.totalStudents.toLocaleString(
+                            "vi-VN",
+                        )} sinh viên trong nền.`,
+                    });
+                } catch (err: any) {
+                    console.error("[CSV] /data/ingest failed with error:", {
+                        message: err.message,
+                        detail: err.detail,
+                        stack: err.stack,
+                    });
+
+                    let errorMessage =
+                        err.message || "Không thể đồng bộ với máy chủ.";
+                    if (err.detail) {
+                        if (Array.isArray(err.detail)) {
+                            errorMessage = err.detail
+                                .map((d: any) => d.msg || d.message)
+                                .join(", ");
+                        } else {
+                            errorMessage =
+                                typeof err.detail === "string"
+                                    ? err.detail
+                                    : JSON.stringify(err.detail);
+                        }
+                    }
+
+                    updateUpload(id, {
+                        status: "error",
+                        errorMessage,
+                    });
+                    toast.error("Đồng bộ thất bại", {
+                        description: errorMessage,
+                    });
+                }
             }
 
             await updateUserSettings({ auto_draft_enabled: false });
