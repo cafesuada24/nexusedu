@@ -34,3 +34,10 @@ resource "google_sql_user" "app_user" {
   instance = google_sql_database_instance.postgres.name
   password = var.db_password
 }
+
+resource "google_project_iam_member" "cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+
+  member = "serviceAccount:${google_service_account.app.email}"
+}
