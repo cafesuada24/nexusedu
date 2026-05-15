@@ -248,6 +248,10 @@ class StudentStatusHistory(Base):
     baseline_std: Mapped[float | None] = mapped_column(Double)
     current_score_avg: Mapped[float | None] = mapped_column(Double)
     z_score: Mapped[float | None] = mapped_column(Double)
+    avg_normalized_drift: Mapped[float | None] = mapped_column(Double)
+    trend_score: Mapped[float | None] = mapped_column(Double)
+    confidence: Mapped[float | None] = mapped_column(Double)
+    systemic_breadth: Mapped[float | None] = mapped_column(Double)
     anomaly_flag: Mapped[str | None] = mapped_column(String, index=True)
     status_recorded_at: Mapped[datetime] = mapped_column(
         server_default=func.now(),

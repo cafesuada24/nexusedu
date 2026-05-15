@@ -48,6 +48,11 @@ class StudentDTO(BaseModel):
     last_notified_at: datetime | None
     is_generating: bool = False
     active_case_id: EntityID | None = None
+    
+    # Adaptive Evaluation Signals
+    current_trend: float | None = None
+    confidence_score: float | None = None
+    is_systemic: bool = False
 
 
 class AlertDTO(BaseModel):
