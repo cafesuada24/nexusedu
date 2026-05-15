@@ -9,21 +9,42 @@ import { toast } from "sonner";
 
 interface WebSocketContextType {
     status: "connecting" | "open" | "closed";
+    latestDraftCompletion: {
+        caseId: string;
+        subject: string | null;
+        body: string | null;
+        sequence: number;
+    } | null;
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
     status: "closed",
+    latestDraftCompletion: null,
 });
 
 export const useWebSocketContext = () => useContext(WebSocketContext);
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const queryClient = useQueryClient();
+    const [latestDraftCompletion, setLatestDraftCompletion] = React.useState<{
+        caseId: string;
+        subject: string | null;
+        body: string | null;
+        sequence: number;
+    } | null>(null);
     const getCaseIdFromJobPayload = React.useCallback((rawPayload: unknown) => {
         const payload = (rawPayload ?? {}) as Record<string, any>;
+        const rootCaseId = payload.case_id ?? payload.caseId;
+        if (typeof rootCaseId === "string" && rootCaseId) {
+            return rootCaseId;
+        }
         const metadataCaseId = payload.metadata?.case_id;
         if (typeof metadataCaseId === "string" && metadataCaseId) {
             return metadataCaseId;
+        }
+        const metadataCaseIdCamel = payload.metadata?.caseId;
+        if (typeof metadataCaseIdCamel === "string" && metadataCaseIdCamel) {
+            return metadataCaseIdCamel;
         }
         const correlationId = payload.correlation_id;
         if (typeof correlationId === "string" && correlationId) {
@@ -71,18 +92,39 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     );
 
     const markDraftCompletedImmediately = React.useCallback(
-        (caseId: string) => {
+        (caseId: string, payload?: any) => {
+            // Update the targeted draft query
             queryClient.setQueryData(
                 queryKeys.cases.draft(caseId),
                 (oldData: any) => ({
-                    subject: oldData?.subject ?? null,
-                    body: oldData?.body ?? null,
-                    status: oldData?.status ?? "draft",
+                    subject: payload?.subject ?? oldData?.subject ?? null,
+                    body: payload?.body ?? oldData?.body ?? null,
+                    status: "completed",
                     is_generating: false,
                 })
             );
+
+            // Surgical update to all lists (Tasks, Open Cases, Alerts, etc.)
+            const updater = (item: any) => ({
+                ...item,
+                is_generating: false,
+                draft_status: "completed",
+                ...(payload?.subject ? { draft_subject: payload.subject } : {}),
+                ...(payload?.body ? { draft_body: payload.body } : {}),
+            });
+
+            updateSurgicalCache(queryKeys.cases.all, caseId, updater);
+            updateSurgicalCache(queryKeys.alerts.all, caseId, updater);
+            updateSurgicalCache(queryKeys.alerts.list(), caseId, updater);
+
+            setLatestDraftCompletion({
+                caseId,
+                subject: payload?.subject ?? null,
+                body: payload?.body ?? null,
+                sequence: Date.now(),
+            });
         },
-        [queryClient]
+        [queryClient, updateSurgicalCache]
     );
 
     const hydrateDraftCache = React.useCallback(
@@ -105,6 +147,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             });
             updateSurgicalCache(queryKeys.cases.all, caseId, updater);
             updateSurgicalCache(queryKeys.alerts.all, caseId, updater);
+            updateSurgicalCache(queryKeys.alerts.list(), caseId, updater);
+
+            setLatestDraftCompletion({
+                caseId,
+                subject: freshDraft.subject ?? null,
+                body: freshDraft.body ?? null,
+                sequence: Date.now(),
+            });
         },
         [queryClient, updateSurgicalCache]
     );
@@ -128,6 +178,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
                         updateSurgicalCache(queryKeys.cases.all, startedCaseId, updater);
                         updateSurgicalCache(queryKeys.alerts.all, startedCaseId, updater);
+                        updateSurgicalCache(queryKeys.alerts.list(), startedCaseId, updater);
                     }
 
                     if (startedJobType === "email_draft") {
@@ -142,24 +193,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     const completedCaseId = getCaseIdFromJobPayload(payload);
                     const completedJobType = getJobType(payload);
                     if (completedCaseId && completedJobType === "email_draft") {
-                        // Surgical update to all lists (Tasks, Open Cases, Alerts, etc.)
-                        const updater = (item: any) => ({
-                            ...item,
-                            is_generating: false,
-                            draft_status: "completed",
-                        });
-
-                        updateSurgicalCache(queryKeys.cases.all, completedCaseId, updater);
-                        updateSurgicalCache(queryKeys.alerts.all, completedCaseId, updater);
-
-                        // Phase 1: stop composing state immediately.
-                        markDraftCompletedImmediately(completedCaseId);
+                        // Phase 1: stop composing state immediately and update content if available.
+                        markDraftCompletedImmediately(completedCaseId, payload);
                     }
 
                     if (completedJobType === "email_draft") {
                         toast.success("Draft generation completed!");
                         if (completedCaseId) {
-                            // Phase 2: hydrate subject/body right after completion.
+                            // Phase 2: hydrate subject/body right after completion (ensures we have latest even if WS payload was partial).
                             hydrateDraftCache(completedCaseId).catch((error) => {
                                 console.error("[WS] Failed to hydrate completed draft:", error);
                             });
@@ -183,6 +224,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
                         updateSurgicalCache(queryKeys.cases.all, failedCaseId, updater);
                         updateSurgicalCache(queryKeys.alerts.all, failedCaseId, updater);
+                        updateSurgicalCache(queryKeys.alerts.list(), failedCaseId, updater);
 
                         // Invalidate targeted draft query
                         queryClient.invalidateQueries({
@@ -245,7 +287,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const { status } = useWebSocket({ onMessage: handleMessage });
 
     return (
-        <WebSocketContext.Provider value={{ status }}>
+        <WebSocketContext.Provider value={{ status, latestDraftCompletion }}>
             {children}
         </WebSocketContext.Provider>
     );
