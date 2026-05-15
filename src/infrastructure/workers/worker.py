@@ -24,6 +24,7 @@ from src.infrastructure.workers.tasks.case_tasks import (
     run_case_resolved_task,
     run_case_review_requested_task,
 )
+from src.infrastructure.workers.tasks.data_tasks import run_data_ingest_task
 from src.infrastructure.workers.tasks.email_tasks import (
     run_dispatch_email_task,
     run_dispatch_review_email_task,
@@ -56,6 +57,9 @@ class WorkerSettings:
         run_email_draft_task,
         run_dispatch_email_task,
         run_dispatch_review_email_task,
+
+        # Data Tasks
+        run_data_ingest_task,
 
         # Event Handlers
         run_case_accepted_task,

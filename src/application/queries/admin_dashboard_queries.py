@@ -127,13 +127,9 @@ class AdminDashboardQueryService:
 
     async def _get_recovery_metrics(self) -> RecoveryMetricDTO:
         """Calculate Overall Recovery Rate."""
-        # Total unique students ever at-risk (Elevated or Critical)
-        # For simplicity in this robust version, we look at current status
-        # but in production, we would join with student_status_history.
-        total_stmt = select(func.count(Student.sid)).where(
-            Student.current_risk_status != RiskStatus.NORMAL,
-        )
-        total_at_risk = (await self.session.execute(total_stmt)).scalar() or 0
+        # Total unique students who had a case (meaning they were at risk at some point)
+        total_stmt = select(func.count(func.distinct(Case.sid)))
+        total_ever_at_risk = (await self.session.execute(total_stmt)).scalar() or 0
 
         # Students recovered: previously at risk (has a case) and now NORMAL
         recovered_stmt = (
@@ -143,20 +139,17 @@ class AdminDashboardQueryService:
                 Case.sid == Student.sid,
             )
             .where(
-                and_(
-                    Student.current_risk_status == RiskStatus.NORMAL,
-                    Case.intervention_status == InterventionStatus.RESOLVED,
-                ),
+                Student.current_risk_status == RiskStatus.NORMAL,
             )
         )
         stabilized = (await self.session.execute(recovered_stmt)).scalar() or 0
 
-        rate = stabilized / total_at_risk if total_at_risk > 0 else 0.0
+        rate = stabilized / total_ever_at_risk if total_ever_at_risk > 0 else 0.0
 
         return RecoveryMetricDTO(
             recovery_rate=rate,
             stabilized_students=stabilized,
-            total_at_risk_students=total_at_risk,
+            total_at_risk_students=total_ever_at_risk,
         )
 
     async def _get_lead_time_metrics(self) -> LeadTimeMetricDTO:

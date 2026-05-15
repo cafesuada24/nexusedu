@@ -13,7 +13,7 @@ from src.domain.value_objects.status import InterventionStatus, RiskStatus
 def mock_uow():
     uow = MagicMock()
     uow.students = AsyncMock()
-    uow.activity_repo = AsyncMock()  # Wait, it's activities in UoW? Let's check
+    uow.activities = AsyncMock()
     uow.history = AsyncMock()
     uow.cases = AsyncMock()
     uow.jobs = AsyncMock()
@@ -22,6 +22,7 @@ def mock_uow():
     uow.commit = AsyncMock()
     uow.rollback = AsyncMock()
     uow.enqueue = AsyncMock()
+    uow.collect_events = MagicMock()
     return uow
 
 
@@ -33,8 +34,6 @@ def mock_engine():
 
 @pytest.fixture
 def handler(mock_uow, mock_engine):
-    # Map old repo names to UoW fields for convenience in tests if needed
-    mock_uow.activities = mock_uow.activity_repo 
     return DataCommandHandler(
         uow=mock_uow,
         anomaly_engine=mock_engine,
@@ -88,8 +87,46 @@ async def test_run_anomaly_detection_orchestration(handler, mock_uow, mock_engin
     # Verify case creation
     mock_uow.cases.add.assert_called_once()
 
+    # Verify background task enqueued
+    mock_uow.enqueue.assert_called_once_with('run_batch_case_overviews_task')
+
     # Verify engine was called with grouped data
     args, _ = mock_engine.run.call_args
     student_data = args[0]
     assert sid in student_data
     assert len(student_data[sid]) == 2
+
+
+@pytest.mark.asyncio
+async def test_handle_ingest_data(handler, mock_uow, mock_engine):
+    """Verify that handle_ingest_data enqueues students and activities and publishes event."""
+    from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
+    from src.domain.events.data_events import DataIngestedEvent
+
+    command = DataIngestionCommand(
+        data_sources=[
+            DataSourceDTO(source_type='sis', records=[{'sid': 's1'}]),
+            DataSourceDTO(source_type='lms', records=[{'sid': 's1', 'score': 10}]),
+        ]
+    )
+
+    # Mock anomaly detection
+    handler._run_anomaly_detection = AsyncMock(return_value=[(uuid.uuid4(), uuid.uuid4())])
+
+    # Execute
+    job_id = uuid.uuid4()
+    result = await handler.handle_ingest_data(command, job_id=job_id)
+
+    # Verify ingestion calls
+    mock_uow.students.ingest_students.assert_called_once()
+    mock_uow.activities.ingest_activities.assert_called_once()
+
+    # Verify event collected
+    mock_uow.collect_events.assert_called_once()
+    args, _ = mock_uow.collect_events.call_args
+    event = args[0]
+    assert isinstance(event, DataIngestedEvent)
+    assert event.job_id == job_id
+
+    assert result['results']
+    assert len(result['new_sids']) == 1

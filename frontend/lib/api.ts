@@ -629,8 +629,8 @@ export async function ingestData(
     table_name?: string;
     records: any[];
   }[],
-): Promise<void> {
-  if (dataSources.length === 0) return;
+): Promise<{ job_id: string; status: string; batch_id: string }> {
+  if (dataSources.length === 0) throw new Error("No data sources provided");
   const payload = {
     batch_id: `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     upload_timestamp: new Date().toISOString(),
@@ -655,6 +655,7 @@ export async function ingestData(
     const message = errorBody.detail || res.statusText;
     throw new Error(`Đồng bộ dữ liệu thất bại: ${message}`);
   }
+  return res.json();
 }
 
 

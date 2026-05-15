@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchDraftStatus } from "@/lib/api";
 import { toast } from "sonner";
+import { useUploads } from "@/hooks/use-uploads";
 
 interface WebSocketContextType {
     status: "connecting" | "open" | "closed";
@@ -26,6 +27,7 @@ export const useWebSocketContext = () => useContext(WebSocketContext);
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const queryClient = useQueryClient();
+    const { uploads, updateUpload } = useUploads();
     const [latestDraftCompletion, setLatestDraftCompletion] = React.useState<{
         caseId: string;
         subject: string | null;
@@ -248,55 +250,89 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     });
                     break;
 
+                case "DATA:INGESTED":
+                    const ingestPayload = payload as any;
+                    console.log("[WS] Data ingested, invalidating caches...", ingestPayload);
+                    toast.success("Data ingestion complete", {
+                        description: ingestPayload.new_cases_count > 0 
+                            ? `Ingestion finished. ${ingestPayload.new_cases_count} new at-risk cases identified.`
+                            : "Ingestion finished. No new cases identified.",
+                    });
+
+                    // Update local upload registry if we find a match
+                    if (ingestPayload.job_id) {
+                        const matchingUpload = uploads.find(u => u.jobId === ingestPayload.job_id);
+                        if (matchingUpload) {
+                            updateUpload(matchingUpload.id, { 
+                                status: "ready",
+                                // Optionally patch with real results if needed
+                            });
+                        }
+                    }
+
+                    // Invalidate caches that might have changed
+                    queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.cases.all });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.metrics.stats });
+                    break;
+
                 case "CASE:STATUS_UPDATED":
-                    console.log("[WS] Case status updated, surgical cache update...", payload);
-                    if (payload.case_id) {
+                    const statusPayload = payload as any;
+                    console.log("[WS] Case status updated, surgical cache update...", statusPayload);
+                    if (statusPayload.case_id) {
+                        toast.info("Case status updated", {
+                            description: `Case ${statusPayload.case_id.slice(0, 8)} status changed to ${statusPayload.new_status}.`,
+                        });
                         // Surgical update to all lists
                         const updater = (item: any) => ({
                             ...item,
-                            intervention_status: payload.new_status,
+                            intervention_status: statusPayload.new_status,
                             // Fat event: patch appointment details if they are in the payload
-                            ...(payload.appointment
-                                ? { appointment: payload.appointment }
+                            ...(statusPayload.appointment
+                                ? { appointment: statusPayload.appointment }
                                 : {}),
                         });
 
                         updateSurgicalCache(
                             queryKeys.cases.all,
-                            payload.case_id,
+                            statusPayload.case_id,
                             updater
                         );
                         updateSurgicalCache(
                             queryKeys.alerts.all,
-                            payload.case_id,
+                            statusPayload.case_id,
                             updater
                         );
 
                         // Invalidate specific case details if any component is listening
                         queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.detail(payload.case_id),
+                            queryKey: queryKeys.cases.detail(statusPayload.case_id),
                         });
                     }
                     break;
 
                 case "CASE:OVERVIEW_GENERATED":
-                    console.log("[WS] Case overview generated, surgical cache update...", payload);
-                    if (payload.case_id) {
+                    const overviewPayload = payload as any;
+                    console.log("[WS] Case overview generated, surgical cache update...", overviewPayload);
+                    if (overviewPayload.case_id) {
+                        toast.success("AI Case Overview generated", {
+                            description: `Academic summary for case ${overviewPayload.case_id.slice(0, 8)} is ready.`,
+                        });
                         const updater = (item: any) => ({
                             ...item,
                             ai_overview: {
-                                academic_summary: payload.academic_summary,
-                                action_keys: payload.action_keys,
+                                academic_summary: overviewPayload.academic_summary,
+                                action_keys: overviewPayload.action_keys,
                             },
                         });
 
-                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, updater);
-                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, updater);
-                        updateSurgicalCache(queryKeys.alerts.list(), payload.case_id, updater);
+                        updateSurgicalCache(queryKeys.cases.all, overviewPayload.case_id, updater);
+                        updateSurgicalCache(queryKeys.alerts.all, overviewPayload.case_id, updater);
+                        updateSurgicalCache(queryKeys.alerts.list(), overviewPayload.case_id, updater);
 
                         // Invalidate detail cache to ensure consistency
                         queryClient.invalidateQueries({
-                            queryKey: queryKeys.cases.detail(payload.case_id),
+                            queryKey: queryKeys.cases.detail(overviewPayload.case_id),
                         });
                     }
                     break;
@@ -313,6 +349,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             markDraftCompletedImmediately,
             queryClient,
             updateSurgicalCache,
+            uploads,
+            updateUpload,
         ]
     );
 

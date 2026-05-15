@@ -156,7 +156,7 @@ class ReviewCaseDTO(BaseModel):
 class QueryEmailDTO(BaseModel):
     email_id: EntityID
 
-    recipent: EmailStr
+    recipient: EmailStr
     subject: str | None = None
     body: str | None = None
     status: EmailStatus
@@ -194,3 +194,9 @@ class CaseDTO(BaseModel):
     email: QueryEmailDTO | None
     appointment: QueryAppointmentDTO | None = None
     ai_overview: CaseOverviewDTO | None = None
+    
+    # Required for API/Tests
+    points_reward: int = 0
+    draft_subject: str | None = None
+    draft_body: str | None = None
+    draft_status: str | None = None

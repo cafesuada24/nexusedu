@@ -162,7 +162,7 @@ export function CsvUploader() {
                     });
 
                     await updateUserSettings({ auto_draft_enabled: false });
-                    const ingestResponse = await ingestData(dataSources);
+                    const ingestResponse = (await ingestData(dataSources)) as any;
                     console.log("[CSV] /data/ingest response:", ingestResponse);
 
                     // Invalidate alerts query so the Alert Center reflects the new data
@@ -171,15 +171,15 @@ export function CsvUploader() {
                     });
 
                     updateUpload(id, {
-                        status: "ready",
+                        jobId: ingestResponse.job_id,
                         totalStudents: result.totalStudents,
                         totalTests: result.totalTests,
                         highRisk: result.highRisk,
                     });
-                    toast.success("Đã đồng bộ với máy chủ", {
-                        description: `${result.totalStudents.toLocaleString(
+                    toast.success("Hồ sơ đã được gửi", {
+                        description: `Đang xử lý ${result.totalStudents.toLocaleString(
                             "vi-VN",
-                        )} sinh viên đã được cập nhật hệ thống.`,
+                        )} sinh viên trong nền.`,
                     });
                 } catch (err: any) {
                     console.error("[CSV] /data/ingest failed with error:", {

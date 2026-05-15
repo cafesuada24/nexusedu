@@ -16,6 +16,7 @@ export type UploadFileMeta = {
  */
 export type UploadItem = {
   id: string
+  jobId?: string
   status: UploadStatus
   uploadedAt: string
   files: Record<SourceKey, UploadFileMeta>

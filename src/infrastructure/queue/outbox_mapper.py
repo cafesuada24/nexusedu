@@ -29,6 +29,7 @@ from src.domain.events.case_events import (
     InterventionEmailSentEvent,
     StudentBookedEvent,
 )
+from src.domain.events.data_events import DataIngestedEvent
 from src.domain.events.job_events import JobStatusChangedEvent
 from src.domain.value_objects.status import InterventionStatus, JobStatus
 
@@ -158,6 +159,19 @@ class OutboxMapper:
     @staticmethod
     def _map_to_websocket_task(event: DomainEvent) -> dict[str, Any] | None:
         """Map a domain event to a WebSocket broadcast task."""
+        if isinstance(event, DataIngestedEvent):
+            return {
+                'task_name': 'websocket_broadcast',
+                'kwargs': {
+                    'event_type': 'DATA:INGESTED',
+                    'payload': {
+                        'job_id': str(event.job_id),
+                        'results': event.results,
+                        'new_cases_count': len(event.new_sids),
+                    },
+                },
+            }
+
         if isinstance(event, CaseOverviewGeneratedEvent):
             return {
                 'task_name': 'websocket_broadcast',

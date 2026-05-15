@@ -331,8 +331,8 @@ class AdaptiveAnomalyEngine:
                 return RiskStatus.CRITICAL
 
             # 3. Trend Persistence (Sustained decline)
-            # If the multi-week trend is consistently negative
-            if avg_trend < self.config.trend_alert_threshold:
+            # If the multi-week trend is consistently negative AND current drift is also negative
+            if avg_trend < self.config.trend_alert_threshold and min_normalized_drift < 0:
                 return RiskStatus.ELEVATED
 
             # 4. Moderate Personalized Drift
