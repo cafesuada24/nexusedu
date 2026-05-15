@@ -45,6 +45,15 @@ class EmailApplicationService:
             return
 
         email = await self.uow.emails.get_by_case(case_id)
+        if email.is_sent:
+            logger.warning(
+                'email_already_sent_skipping_dispatch',
+                case_id=str(case_id),
+                email_id=str(email.email_id),
+            )
+            return
+
+
         student = await self.uow.students.get_by_id(case.sid)
 
         logger.info(

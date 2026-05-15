@@ -284,7 +284,7 @@ class SqlAlchemyActivityRepository:
             rows = [dict(r) for r in res.mappings().all()]
 
             # Group by course+week to calculate stats
-            course_week_stats: dict[tuple[int, int, int, int], list[float]] = (
+            course_week_stats: dict[tuple[str, int, int, int], list[float]] = (
                 defaultdict(list)
             )
             for r in rows:

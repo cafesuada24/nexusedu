@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime
 
 from src.domain.events.advisor_events import AdvisorCreatedEvent
-from src.domain.events.case_events import CaseAcceptedEvent
+from src.domain.events.case_events import CaseAcceptedEvent, CaseOverviewGeneratedEvent
 from src.domain.events.job_events import JobStatusChangedEvent
 from src.domain.value_objects.status import JobStatus
 from src.infrastructure.queue.outbox_mapper import OutboxMapper
@@ -22,12 +22,30 @@ def test_map_case_accepted_event():
     
     # Background task
     bg_task = next(t for t in tasks if t["task_name"] == "run_case_accepted_task")
-    assert bg_task["kwargs"]["case_id"] == case_id
-    assert bg_task["kwargs"]["advisor_id"] == advisor_id
+    assert bg_task["kwargs"]["payload"].case_id == case_id
+    assert bg_task["kwargs"]["payload"].advisor_id == advisor_id
     
     # WebSocket task
     ws_task = next(t for t in tasks if t["task_name"] == "websocket_broadcast")
     assert ws_task["kwargs"]["event_type"] == "CASE:STATUS_UPDATED"
+    assert ws_task["kwargs"]["payload"]["case_id"] == str(case_id)
+
+
+def test_map_case_overview_generated_event():
+    """Verify CaseOverviewGeneratedEvent maps to WebSocket broadcast."""
+    case_id = uuid.uuid4()
+    event = CaseOverviewGeneratedEvent(
+        case_id=case_id,
+        academic_summary="summary",
+        action_keys=["key"]
+    )
+    
+    tasks = OutboxMapper.map_to_tasks(event)
+    
+    assert len(tasks) == 1
+    ws_task = tasks[0]
+    assert ws_task["task_name"] == "websocket_broadcast"
+    assert ws_task["kwargs"]["event_type"] == "CASE:OVERVIEW_GENERATED"
     assert ws_task["kwargs"]["payload"]["case_id"] == str(case_id)
 
 
