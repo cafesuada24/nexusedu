@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { 
   BarChart3, 
   AlertTriangle, 
@@ -18,22 +19,64 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-
-const DEPARTMENT_DATA = [
-  { name: "Công nghệ thông tin", status: 85, total: 450, atRisk: 12 },
-  { name: "Kinh tế & Quản trị", status: 72, total: 600, atRisk: 45 },
-  { name: "Ngôn ngữ Anh", status: 90, total: 300, atRisk: 8 },
-  { name: "Kỹ thuật Ô tô", status: 65, total: 250, atRisk: 30 },
-]
-
-const CRITICAL_CASES = [
-  { id: "1", name: "Nguyễn Văn A", major: "CNTT", reason: "Nghỉ học > 50%", priority: "high" },
-  { id: "2", name: "Trần Thị B", major: "Kinh tế", reason: "GPA < 1.0", priority: "high" },
-  { id: "3", name: "Lê Minh C", major: "Ô tô", reason: "Cảnh báo học vụ lần 2", priority: "medium" },
-]
+import { useAdminDashboard } from "@/hooks/use-admin-dashboard"
 
 export function AdminSummaryReport() {
+  const { data: dashboardData, isLoading, isError, error } = useAdminDashboard()
+
+  React.useEffect(() => {
+    if (dashboardData) {
+      console.log("AdminSummaryReport Data:", dashboardData)
+    }
+  }, [dashboardData])
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="rounded-2xl border-primary/10 bg-white/50 shadow-sm backdrop-blur-sm dark:bg-slate-900/40">
+          <CardHeader className="pb-3">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+                <Skeleton className="h-2 w-full" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-destructive/10 bg-white/50 shadow-sm backdrop-blur-sm dark:bg-slate-900/40">
+          <CardHeader className="pb-3">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <Card className="border-destructive/20 bg-destructive/5 p-4 text-center">
+        <p className="text-xs font-medium text-destructive">Lỗi tải báo cáo: {error instanceof Error ? error.message : "Lỗi không xác định"}</p>
+      </Card>
+    )
+  }
+
+  const majorRiskData = dashboardData?.major_risk || []
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* Status by Department */}
@@ -49,18 +92,24 @@ export function AdminSummaryReport() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-5">
-            {DEPARTMENT_DATA.map((dept) => (
-              <div key={dept.name} className="flex flex-col gap-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-foreground">{dept.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{dept.atRisk} SV rủi ro</span>
-                    <span className="font-bold text-primary">{dept.status}%</span>
+            {majorRiskData.length > 0 ? (
+              majorRiskData.map((dept) => (
+                <div key={dept.major} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">{dept.major || "N/A"}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{dept.risk_count || 0} SV rủi ro</span>
+                      <span className="font-bold text-primary">{((dept.recovery_rate || 0) * 100).toFixed(0)}%</span>
+                    </div>
                   </div>
+                  <Progress value={(dept.recovery_rate || 0) * 100} className="h-2" />
                 </div>
-                <Progress value={dept.status} className="h-2" />
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <p className="text-xs text-muted-foreground">Không có dữ liệu rủi ro theo ngành</p>
               </div>
-            ))}
+            )}
           </div>
           <Button variant="ghost" size="sm" className="mt-6 w-full gap-2 rounded-xl text-muted-foreground hover:text-primary">
             Xem chi tiết báo cáo Khoa <ChevronRight className="size-4" />
@@ -68,7 +117,7 @@ export function AdminSummaryReport() {
         </CardContent>
       </Card>
 
-      {/* Critical Cases */}
+      {/* Critical Cases (Placeholder for now, keeping existing mock structure) */}
       <Card className="rounded-2xl border-destructive/10 bg-white/50 shadow-sm backdrop-blur-sm dark:bg-slate-900/40">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 font-serif text-lg">
@@ -81,7 +130,11 @@ export function AdminSummaryReport() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
-            {CRITICAL_CASES.map((item) => (
+            {[
+              { id: "1", name: "Nguyễn Văn A", major: "CNTT", reason: "Nghỉ học > 50%", priority: "high" },
+              { id: "2", name: "Trần Thị B", major: "Kinh tế", reason: "GPA < 1.0", priority: "high" },
+              { id: "3", name: "Lê Minh C", major: "Ô tô", reason: "Cảnh báo học vụ lần 2", priority: "medium" },
+            ].map((item) => (
               <div 
                 key={item.id} 
                 className="flex items-center justify-between rounded-xl border border-border/50 bg-card/50 p-3 transition-colors hover:bg-card"
@@ -115,3 +168,4 @@ export function AdminSummaryReport() {
     </div>
   )
 }
+
