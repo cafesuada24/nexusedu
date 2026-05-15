@@ -101,6 +101,7 @@ async def test_run_anomaly_detection_orchestration(handler, mock_uow, mock_engin
 async def test_handle_ingest_data(handler, mock_uow, mock_engine):
     """Verify that handle_ingest_data enqueues students and activities and publishes event."""
     from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
+    from src.domain.entities.data_ingestion import DataIngestion
     from src.domain.events.data_events import DataIngestedEvent
 
     command = DataIngestionCommand(
@@ -124,9 +125,11 @@ async def test_handle_ingest_data(handler, mock_uow, mock_engine):
     # Verify event collected
     mock_uow.collect_events.assert_called_once()
     args, _ = mock_uow.collect_events.call_args
-    event = args[0]
-    assert isinstance(event, DataIngestedEvent)
-    assert event.job_id == job_id
+    ingestion = args[0]
+    assert isinstance(ingestion, DataIngestion)
+    assert len(ingestion.domain_events) == 1
+    assert isinstance(ingestion.domain_events[0], DataIngestedEvent)
+    assert ingestion.domain_events[0].job_id == job_id
 
     assert result['results']
     assert len(result['new_sids']) == 1

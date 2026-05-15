@@ -212,8 +212,9 @@ async def reseed() -> None:
                 Case(
                     case_id=case_id,
                     sid=sid,
-                    intervention_status=InterventionStatus.NEW,
+                    intervention_status=InterventionStatus.ACCEPTED,
                     assigned_advisor_id=advisor.advisor_id,
+                    assigned_at=datetime.now(UTC),
                 ),
             )
 

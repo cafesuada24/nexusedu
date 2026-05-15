@@ -58,7 +58,7 @@ async def simulate_drop() -> None:
                     course_id='CS101',
                     course_name='Intro Course',
                     test_type='Quiz',
-                    score=random.randint(75, 90),
+                    score=random.randint(80, 95),
                     timestamp=start_date + timedelta(weeks=week-5),
                     academic_year=2026,
                     semester=1,
@@ -110,18 +110,14 @@ async def simulate_drop() -> None:
                 new_at_risk_sids.append(sid)
 
         # 5. Create NEW Case for new at-risk students
-        advisors = await session.execute(select(Advisor))
-        advisors = advisors.scalars().all()
         
         for sid in new_at_risk_sids:
             case_id = generate_uuid()
-            advisor = random.choice(advisors)
             new_case = Case(
                 case_id=case_id,
                 sid=sid,
                 risk_reason=RiskReason.GRADE_DROP,
                 intervention_status=InterventionStatus.NEW,
-                assigned_advisor_id=advisor.advisor_id,
                 created_at=datetime.now(UTC),
                 version=1,
             )

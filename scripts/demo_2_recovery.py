@@ -87,10 +87,6 @@ async def simulate_recovery() -> None:
         # Detect
         engine = ZScore()
         new_history_records, risk_statuses = engine.run(student_data, history_set)
-        
-        print(f"Detected risk statuses for {len(risk_statuses)} students.")
-        target_status = risk_statuses.get(student_a.sid)
-        print(f"Student A ({student_a.sid}) latest risk status: {target_status}")
 
         if new_history_records:
             await history_repo.batch_create_history(new_history_records)
