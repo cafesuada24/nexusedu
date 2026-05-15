@@ -53,13 +53,26 @@ def worker_task[**P, R](
             **kwargs: P.kwargs,
         ) -> R:
             # 1. Extract IDs for tracking
-            # We look for job_id and user_id in kwargs or the first arg if it's a BaseModel
             job_id = kwargs.get('job_id')
             user_id = kwargs.get('user_id')
 
-            if not job_id and args and isinstance(args[0], BaseModel):
-                job_id = getattr(args[0], 'job_id', None)
-                user_id = getattr(args[0], 'user_id', None)
+            if not job_id:
+                # Check args for BaseModel payload
+                for arg in args:
+                    if isinstance(arg, BaseModel):
+                        job_id = getattr(arg, 'job_id', None)
+                        user_id = getattr(arg, 'user_id', None)
+                        if job_id:
+                            break
+
+            if not job_id:
+                # Check kwargs values (e.g. payload=BaseModel)
+                for val in kwargs.values():
+                    if isinstance(val, BaseModel):
+                        job_id = getattr(val, 'job_id', None)
+                        user_id = getattr(val, 'user_id', None)
+                        if job_id:
+                            break
 
             task_name = func.__name__
             log = logger.new(

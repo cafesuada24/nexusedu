@@ -156,10 +156,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     socket.onmessage = (event: MessageEvent<string>) => {
       try {
+        console.debug("[WS] Raw message received:", event.data);
         const parsedMessage: WebSocketMessage = JSON.parse(
           event.data,
         );
 
+        console.info("[WS] Processed message:", parsedMessage.type, parsedMessage.payload);
         setLastMessage(parsedMessage);
         onMessageRef.current?.(parsedMessage);
       } catch (error) {

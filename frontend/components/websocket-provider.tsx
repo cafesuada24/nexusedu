@@ -73,7 +73,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     return {
                         ...oldData,
                         items: oldData.items.map((item: any) =>
-                            item.case_id === caseId ? updater(item) : item
+                            (item.case_id === caseId || item.caseId === caseId) ? updater(item) : item
                         ),
                     };
                 }
@@ -81,7 +81,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                 // 2. Handle Flat Array [...]
                 if (Array.isArray(oldData)) {
                     return oldData.map((item: any) =>
-                        item.case_id === caseId ? updater(item) : item
+                        (item.case_id === caseId || item.caseId === caseId) ? updater(item) : item
                     );
                 }
 
@@ -99,7 +99,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                 (oldData: any) => ({
                     subject: payload?.subject ?? oldData?.subject ?? null,
                     body: payload?.body ?? oldData?.body ?? null,
-                    status: "completed",
+                    status: "draft",
                     is_generating: false,
                 })
             );
@@ -108,9 +108,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             const updater = (item: any) => ({
                 ...item,
                 is_generating: false,
-                draft_status: "completed",
-                ...(payload?.subject ? { draft_subject: payload.subject } : {}),
-                ...(payload?.body ? { draft_body: payload.body } : {}),
+                isGenerating: false, // For Alert objects
+                draft_status: "draft",
+                draftStatus: "draft", // For Alert objects
+                ...(payload?.subject ? { draft_subject: payload.subject, draftSubject: payload.subject } : {}),
+                ...(payload?.body ? { draft_body: payload.body, draftBody: payload.body } : {}),
             });
 
             updateSurgicalCache(queryKeys.cases.all, caseId, updater);
@@ -141,9 +143,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             const updater = (item: any) => ({
                 ...item,
                 draft_subject: freshDraft.subject ?? null,
+                draftSubject: freshDraft.subject ?? null, // For Alert objects
                 draft_body: freshDraft.body ?? null,
+                draftBody: freshDraft.body ?? null, // For Alert objects
                 draft_status: freshDraft.status,
+                draftStatus: freshDraft.status, // For Alert objects
                 is_generating: false,
+                isGenerating: false, // For Alert objects
             });
             updateSurgicalCache(queryKeys.cases.all, caseId, updater);
             updateSurgicalCache(queryKeys.alerts.all, caseId, updater);
@@ -173,7 +179,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                         const updater = (item: any) => ({
                             ...item,
                             is_generating: true,
+                            isGenerating: true, // For Alert objects
                             draft_status: "generating",
+                            draftStatus: "generating", // For Alert objects
                         });
 
                         updateSurgicalCache(queryKeys.cases.all, startedCaseId, updater);
@@ -219,7 +227,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                         const updater = (item: any) => ({
                             ...item,
                             is_generating: false,
+                            isGenerating: false, // For Alert objects
                             draft_status: "failed",
+                            draftStatus: "failed", // For Alert objects
                         });
 
                         updateSurgicalCache(queryKeys.cases.all, failedCaseId, updater);
@@ -269,6 +279,28 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     }
                     break;
 
+                case "CASE:OVERVIEW_GENERATED":
+                    console.log("[WS] Case overview generated, surgical cache update...", payload);
+                    if (payload.case_id) {
+                        const updater = (item: any) => ({
+                            ...item,
+                            ai_overview: {
+                                academic_summary: payload.academic_summary,
+                                action_keys: payload.action_keys,
+                            },
+                        });
+
+                        updateSurgicalCache(queryKeys.cases.all, payload.case_id, updater);
+                        updateSurgicalCache(queryKeys.alerts.all, payload.case_id, updater);
+                        updateSurgicalCache(queryKeys.alerts.list(), payload.case_id, updater);
+
+                        // Invalidate detail cache to ensure consistency
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.cases.detail(payload.case_id),
+                        });
+                    }
+                    break;
+
                 // Add more cases here (e.g., NEW_ALERT)
                 default:
                     console.log("[WS] Unhandled message type:", type);
@@ -285,6 +317,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     );
 
     const { status } = useWebSocket({ onMessage: handleMessage });
+
+    React.useEffect(() => {
+        console.info(`[WS] Connection status changed: ${status}`);
+    }, [status]);
 
     return (
         <WebSocketContext.Provider value={{ status, latestDraftCompletion }}>

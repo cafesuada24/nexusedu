@@ -38,7 +38,7 @@ class Job(AggregateRoot):
                 correlation_id=self.correlation_id,
                 correlation_type=self.correlation_type,
                 user_id=user_id,
-            )
+            ),
         )
 
     def finish(self, occurred_at: datetime, user_id: EntityID | None = None) -> None:
@@ -57,7 +57,7 @@ class Job(AggregateRoot):
                 correlation_id=self.correlation_id,
                 correlation_type=self.correlation_type,
                 user_id=user_id,
-            )
+            ),
         )
 
     def fail(self, occurred_at: datetime, user_id: EntityID | None = None) -> None:
@@ -81,10 +81,19 @@ class Job(AggregateRoot):
 
     def cancel(self, occurred_at: datetime) -> None:
         """Cancel this task."""
-        if self.status in (JobStatus.PENDING, JobStatus.RUNNING):
+        if self.status not in (JobStatus.PENDING, JobStatus.RUNNING):
             raise InvalidStateTransitionError(
                 self.status.value,
                 JobStatus.CANCELLED,
             )
         self.status = JobStatus.CANCELLED
         self.ended_at = occurred_at
+        self.register_event(
+            JobStatusChangedEvent(
+                job_id=self.job_id,
+                status=self.status,
+                correlation_id=self.correlation_id,
+                correlation_type=self.correlation_type,
+                user_id=None,
+            )
+        )

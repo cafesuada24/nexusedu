@@ -12,6 +12,7 @@ from src.domain.events.case_events import (
     CaseOverviewGeneratedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
+    CaseSupportingStartedEvent,
     EmailDraftRequestedEvent,
     InterventionEmailSentEvent,
     StudentBookedEvent,
@@ -198,6 +199,12 @@ class Case(AggregateRoot):
     def start_supporting(self) -> None:
         """Advisor starts supporting the student after they booked."""
         self._transition_to(InterventionStatus.SUPPORTING)
+        self.register_event(
+            CaseSupportingStartedEvent(
+                case_id=self.case_id,
+                advisor_id=self.assigned_advisor_id,  # type: ignore
+            ),
+        )
 
     def request_resolution(self, occurred_at: datetime) -> None:
         """Mark the case as pending review from the student."""

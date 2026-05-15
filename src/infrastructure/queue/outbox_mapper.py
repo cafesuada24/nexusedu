@@ -24,12 +24,13 @@ from src.domain.events.case_events import (
     CaseOverviewGeneratedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
+    CaseSupportingStartedEvent,
     EmailDraftRequestedEvent,
     InterventionEmailSentEvent,
     StudentBookedEvent,
 )
 from src.domain.events.job_events import JobStatusChangedEvent
-from src.domain.value_objects.status import JobStatus
+from src.domain.value_objects.status import InterventionStatus, JobStatus
 
 
 class OutboxMapper:
@@ -204,16 +205,18 @@ class OutboxMapper:
             CaseResolvedEvent,
             CaseFailedEvent,
             CaseReviewRequestedEvent,
+            CaseSupportingStartedEvent,
         )
 
         if isinstance(event, case_events):
             status_map = {
-                CaseAcceptedEvent: 'ACCEPTED',
-                InterventionEmailSentEvent: 'SENT',
-                StudentBookedEvent: 'BOOKED',
-                CaseResolvedEvent: 'RESOLVED',
-                CaseFailedEvent: 'FAILED',
-                CaseReviewRequestedEvent: 'PENDING_REVIEW',
+                CaseAcceptedEvent: InterventionStatus.ACCEPTED.value,
+                InterventionEmailSentEvent: InterventionStatus.SENT.value,
+                StudentBookedEvent: InterventionStatus.BOOKED.value,
+                CaseResolvedEvent: InterventionStatus.RESOLVED.value,
+                CaseFailedEvent: InterventionStatus.FAILED.value,
+                CaseReviewRequestedEvent: InterventionStatus.PENDING_REVIEW.value,
+                CaseSupportingStartedEvent: InterventionStatus.SUPPORTING.value,
             }
 
             payload = {
