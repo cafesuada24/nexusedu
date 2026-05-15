@@ -570,6 +570,56 @@ export async function updateUserSettings(
 /*  Public API                                                             */
 /* ----------------------------------------------------------------------- */
 
+export const ResponseKpiMetricSchema = z.object({
+  avg_response_hours: z.number().nonnegative(),
+  target_hours: z.number().nonnegative().default(4.0),
+  within_kpi_rate: z.number().min(0).max(1),
+  sla_breach_count: z.number().int().nonnegative(),
+});
+
+export const RecoveryMetricSchema = z.object({
+  recovery_rate: z.number(),
+  stabilized_students: z.number().int(),
+  total_risk_students: z.number().int(),
+  avg_recovery_days: z.number(),
+});
+
+export const ImpactHistorySchema = z.object({
+  week: z.number().int().positive(),
+  xp: z.number().int().nonnegative(),
+});
+
+export const ImpactMetricSchema = z.object({
+  current_xp: z.number().int(),
+  completion_rate: z.number(),
+  ranking_position: z.number().int().nullable().optional(),
+  month: z.number().int().positive(),
+  year: z.number().int().positive(),
+  weekly_history: z.array(ImpactHistorySchema),
+});
+
+export const EmergencyDashboardSchema = z.object({
+  priority_queue: z.number().int().nonnegative(),
+  response_kpi: ResponseKpiMetricSchema,
+  activation: z.number().min(0).max(1),
+  recovery: RecoveryMetricSchema,
+  impact: ImpactMetricSchema,
+});
+
+export type EmergencyDashboard = z.infer<typeof EmergencyDashboardSchema>;
+
+/**
+ * GET /advisors/me/dashboard — returns the current advisor's dashboard metrics.
+ */
+export async function fetchAdvisorDashboard(): Promise<EmergencyDashboard> {
+  return apiCall(
+    endpoint("/advisors/me/dashboard"),
+    { method: "GET" },
+    EmergencyDashboardSchema,
+    "Không thể lấy dữ liệu dashboard",
+  );
+}
+
 /**
  * Sends multi-source data to the backend for ingestion.
  */
