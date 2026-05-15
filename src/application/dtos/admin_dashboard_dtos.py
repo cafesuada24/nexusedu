@@ -54,6 +54,21 @@ class MajorRiskMetricDTO(BaseModel):
     total_students: int
 
 
+class SystemicRiskMetricDTO(BaseModel):
+    """Metric for school-wide breadth of risk."""
+
+    avg_breadth: float = Field(..., ge=0.0, le=1.0)
+    systemic_case_count: int
+
+
+class TrendDistributionDTO(BaseModel):
+    """Metric for overall direction of student performance."""
+
+    improving: int
+    stable: int
+    declining: int
+
+
 class AdminDashboardDTO(BaseModel):
     """Aggregate DTO for the Admin Dashboard."""
 
@@ -63,4 +78,6 @@ class AdminDashboardDTO(BaseModel):
     academic_impact: AcademicImpactMetricDTO
     risk_distribution: list[RiskDistributionDTO]
     major_risk: list[MajorRiskMetricDTO]
+    systemic_risk: SystemicRiskMetricDTO | None = None
+    trend_distribution: TrendDistributionDTO | None = None
     generated_at: datetime = Field(default_factory=datetime.utcnow)

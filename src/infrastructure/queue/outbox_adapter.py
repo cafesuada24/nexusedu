@@ -22,7 +22,12 @@ class TransactionalOutboxAdapter:
         """Initialize with a database session."""
         self.session = session
 
-    async def enqueue(self, task_name: str, **kwargs: Any) -> uuid.UUID:  # noqa: ANN401
+    async def enqueue(
+        self,
+        task_name: str,
+        _job_id: str | None = None,
+        **kwargs: Any,
+    ) -> uuid.UUID:  # noqa: ANN401
         """Save task intent to the outbox table."""
         payload = pickle.dumps(kwargs)
 

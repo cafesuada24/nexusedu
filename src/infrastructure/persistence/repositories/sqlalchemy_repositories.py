@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import uuid
+from collections import defaultdict
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -87,6 +89,7 @@ if TYPE_CHECKING:
 
 # Type alias for the event collection callback used by the Unit of Work
 type EventCollector = Callable[[AggregateRoot], None]
+
 
 class SqlAlchemyStudentRepository:
     """SQLAlchemy implementation of the StudentRepository."""
@@ -253,28 +256,110 @@ class SqlAlchemyActivityRepository:
             await self.session.execute(stmt)
 
     async def get_weekly_averages(self) -> list[dict[str, Any]]:
-        """Retrieve average scores per student per week."""
-        stmt = (
-            select(
+        """Retrieve average scores per student per week, with peer statistics."""
+        # Calculate peer stats per (course, year, semester, week)
+        # We use window functions to get course-wide stats alongside individual scores
+
+        # Dialect check for SQLite (which lacks stddev in many versions)
+        is_sqlite = self.session.bind.dialect.name == 'sqlite'
+
+        if is_sqlite:
+            # Fallback for SQLite: Get raw data and calculate peer stats in memory
+            # This is acceptable for tests and small SQLite deployments
+            stmt = select(
+                Activity.sid,
+                Activity.course_id,
+                Activity.course_name,
+                Activity.academic_year,
+                Activity.semester,
+                Activity.week,
+                Activity.score,
+            ).order_by(
                 Activity.sid,
                 Activity.academic_year,
                 Activity.semester,
                 Activity.week,
-                func.avg(Activity.score).label('avg_score'),
             )
-            .group_by(
-                Activity.sid,
-                Activity.academic_year,
-                Activity.semester,
-                Activity.week,
+            res = await self.session.execute(stmt)
+            rows = [dict(r) for r in res.mappings().all()]
+
+            # Group by course+week to calculate stats
+            course_week_stats: dict[tuple[str, int, int, int], list[float]] = (
+                defaultdict(list)
             )
-            .order_by(
-                Activity.sid,
-                Activity.academic_year,
-                Activity.semester,
-                Activity.week,
+            for r in rows:
+                key = (r['course_id'], r['academic_year'], r['semester'], r['week'])
+                course_week_stats[key].append(r['score'])
+
+            # Precompute averages and std devs
+            stats_map = {}
+            for key, scores in course_week_stats.items():
+                avg = sum(scores) / len(scores)
+                if len(scores) > 1:
+                    variance = sum((x - avg) ** 2 for x in scores) / len(scores)
+                    std = math.sqrt(variance)
+                else:
+                    std = 0.0
+                stats_map[key] = (avg, std)
+
+            # Enrich rows
+            for r in rows:
+                key = (r['course_id'], r['academic_year'], r['semester'], r['week'])
+                r['course_avg'], r['course_std'] = stats_map[key]
+
+            return rows
+
+        # Production-grade SQL with window functions (e.g., PostgreSQL)
+        # Inner subquery to get activity with peer stats
+        subq = select(
+            Activity.sid,
+            Activity.course_id,
+            Activity.course_name,
+            Activity.academic_year,
+            Activity.semester,
+            Activity.week,
+            Activity.score,
+            func.avg(Activity.score)
+            .over(
+                partition_by=[
+                    Activity.course_id,
+                    Activity.academic_year,
+                    Activity.semester,
+                    Activity.week,
+                ],
             )
+            .label('course_avg'),
+            func.stddev(Activity.score)
+            .over(
+                partition_by=[
+                    Activity.course_id,
+                    Activity.academic_year,
+                    Activity.semester,
+                    Activity.week,
+                ],
+            )
+            .label('course_std'),
+        ).subquery()
+
+        # Final aggregation by student and week
+        # We return a list of all course activities for the student in that week
+        stmt = select(
+            subq.c.sid,
+            subq.c.academic_year,
+            subq.c.semester,
+            subq.c.week,
+            subq.c.course_id,
+            subq.c.course_name,
+            subq.c.score,
+            subq.c.course_avg,
+            subq.c.course_std,
+        ).order_by(
+            subq.c.sid,
+            subq.c.academic_year,
+            subq.c.semester,
+            subq.c.week,
         )
+
         res = await self.session.execute(stmt)
         return [dict(r) for r in res.mappings().all()]
 
@@ -498,7 +583,7 @@ class SqlAlchemyBadgeRepository:
             index_elements=['advisor_id', 'badge_id'],
         )
         result = await self.session.execute(stmt)
-        return result.rowcount > 0 # pyright: ignore
+        return result.rowcount > 0  # pyright: ignore
 
     async def get_advisor_stats(self, advisor_id: uuid.UUID) -> dict:
         # Get total points and action count
@@ -1065,7 +1150,6 @@ class SqlAlchemyJobRepository:
             self.collect_events_callback(domain_job)
         return domain_job
 
-
     async def find_by_correlation_id(
         self,
         correlation_id: uuid.UUID,
@@ -1117,7 +1201,6 @@ class SqlAlchemyJobRepository:
             )
         )
         await self.session.execute(stmt)
-
 
 
 class SqlAlchemyUserSettingsRepository:
@@ -1204,14 +1287,16 @@ class SqlAlchemyScheduleRepository:
         self.session = session
 
     async def get_working_hours(
-        self, advisor_id: uuid.UUID,
+        self,
+        advisor_id: uuid.UUID,
     ) -> list[DomainWorkingHours]:
         """Fetch all recurring working hour blocks for an advisor."""
         stmt = (
             select(OrmWorkingHours)
             .where(OrmWorkingHours.advisor_id == advisor_id)
             .order_by(
-                OrmWorkingHours.day_of_week.asc(), OrmWorkingHours.start_time.asc(),
+                OrmWorkingHours.day_of_week.asc(),
+                OrmWorkingHours.start_time.asc(),
             )
         )
         result = await self.session.execute(stmt)

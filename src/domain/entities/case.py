@@ -9,6 +9,7 @@ from src.domain.entities.base import AggregateRoot
 from src.domain.events.case_events import (
     CaseAcceptedEvent,
     CaseFailedEvent,
+    CaseOverviewGeneratedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
     EmailDraftRequestedEvent,
@@ -253,6 +254,14 @@ class Case(AggregateRoot):
 
         self.academic_summary = summary
         self.action_keys = keys
+
+        self.register_event(
+            CaseOverviewGeneratedEvent(
+                case_id=self.case_id,
+                academic_summary=summary,
+                action_keys=keys,
+            ),
+        )
 
     def set_initial_gpa(self, gpa: float) -> None:
         """Capture the student GPA at the start of intervention."""

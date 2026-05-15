@@ -172,4 +172,4 @@ async def test_activity_ingestion(session: AsyncSession) -> None:
 
     avgs = await repo.get_weekly_averages()
     assert len(avgs) == 1
-    assert avgs[0]['avg_score'] == 90.0
+    assert avgs[0]['score'] == 90.0
