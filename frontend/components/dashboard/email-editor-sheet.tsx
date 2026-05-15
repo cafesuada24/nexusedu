@@ -66,10 +66,10 @@ export function EmailEditorSheet({
     >(null);
     const [localSent, setLocalSent] = React.useState(false);
     const [isDirty, setIsDirty] = React.useState(false);
+    const [hasUserTypedInSession, setHasUserTypedInSession] = React.useState(false);
 
     // --- 2. Refs for Stability & Session ---
     const activeSessionId = React.useRef<string | null>(null);
-    const wasGenerating = React.useRef(false);
     // Keep refs of current values to avoid stale closures in debounced save
     const subjectRef = React.useRef(subject);
     const bodyRef = React.useRef(body);
@@ -82,20 +82,23 @@ export function EmailEditorSheet({
     const isSent = alert?.interventionStatus === "sent" || localSent;
     const draftSubject = draft?.subject || "";
     const draftBody = draft?.body || "";
+    const hasDraftCache = draft !== undefined;
     const draftIsGenerating = !!draft?.is_generating;
+    const isGenerating = hasDraftCache
+        ? draftIsGenerating
+        : !!(
+              isAiDrafting ||
+              !!alert?.isGenerating ||
+              (isFetching && !draft && !!alert?.draftJobId && !alert?.draftBody && !isError)
+          );
 
-    // --- 3. Prefer derived generation state ---
-    const isGenerating =
-        isAiDrafting ||
-        (draft !== undefined ? draftIsGenerating : !!alert?.isGenerating) ||
-        (isFetching && !!alert?.draftJobId && !alert?.draftBody && !isError);
-
-    // --- 4. Synchronization Logic (Modal Open & AI Completion Only) ---
+    // --- 4. Synchronization Logic ---
     React.useEffect(() => {
         if (!alert) {
             setCurrentAlertId(null);
             setLocalSent(false);
             setIsDirty(false);
+            setHasUserTypedInSession(false);
             setIsSaving(false);
             setSaveStatus(null);
             activeSessionId.current = null;
@@ -116,55 +119,49 @@ export function EmailEditorSheet({
             setCurrentAlertId(alert.id);
             setLocalSent(false);
             setIsDirty(false);
+            setHasUserTypedInSession(false);
             setIsSaving(false);
             setSaveStatus(null);
-            wasGenerating.current = isGenerating;
             return;
         }
-
-        // SCENARIO B: AI Generation just finished (Smart Sync)
-        if (wasGenerating.current && !isGenerating) {
+        if (hasUserTypedInSession) return;
+        if (!incomingSubject && !incomingBody) return;
+        if (
+            incomingSubject !== subjectRef.current ||
+            incomingBody !== bodyRef.current
+        ) {
             setSubject(incomingSubject);
             setBody(incomingBody);
             setIsDirty(false);
         }
-        // Keep editor in sync with fresh websocket-driven draft cache updates,
-        // but never override user edits in progress.
-        else if (
-            !isDirty &&
-            (
-                incomingSubject !== subjectRef.current ||
-                incomingBody !== bodyRef.current
-            )
-        ) {
-            setSubject(incomingSubject);
-            setBody(incomingBody);
-        }
+    }, [alert, currentAlertId, draftBody, draftSubject, hasUserTypedInSession]);
 
-        wasGenerating.current = isGenerating;
-    }, [alert, currentAlertId, draftBody, draftSubject, isGenerating]);
-
-    // Deterministic cache -> local sync for the currently opened case.
+    // Cache reification: when draft generation completes, hydrate local form immediately.
     React.useEffect(() => {
         if (!alert || alert.id !== currentAlertId) return;
-        if (isDirty) return;
-        if (!draftSubject && !draftBody) return;
+        if (hasUserTypedInSession) return;
+        if (!draft || draft.is_generating) return;
+
+        const cacheSubject = draft.subject ?? "";
+        const cacheBody = draft.body ?? "";
+        if (!cacheSubject && !cacheBody) return;
 
         if (
-            draftSubject !== subjectRef.current ||
-            draftBody !== bodyRef.current
+            cacheSubject !== subjectRef.current ||
+            cacheBody !== bodyRef.current
         ) {
-            setSubject(draftSubject);
-            setBody(draftBody);
-            wasGenerating.current = draftIsGenerating;
+            setSubject(cacheSubject);
+            setBody(cacheBody);
+            setIsDirty(false);
         }
     }, [
         alert,
         currentAlertId,
-        draftBody,
-        draftIsGenerating,
-        draftSubject,
-        isDirty,
+        draft,
+        draft?.body,
+        draft?.is_generating,
+        draft?.subject,
+        hasUserTypedInSession,
     ]);
 
     // --- 5. Action-Based Debounced Auto-Save (One-Way / Send-Only) ---
@@ -348,6 +345,7 @@ export function EmailEditorSheet({
                                     const val = e.target.value;
                                     setSubject(val);
                                     setIsDirty(true);
+                                    setHasUserTypedInSession(true);
                                     setSaveStatus(null);
                                     if (alert?.caseId) {
                                         debouncedSave(
@@ -404,7 +402,9 @@ export function EmailEditorSheet({
                                                 body ? "ghost" : "secondary"
                                             }
                                             disabled={isGenerating}
-                                            onClick={onGenerateDraft}
+                                            onClick={() => {
+                                                onGenerateDraft();
+                                            }}
                                             className={cn(
                                                 "h-7 gap-1.5 px-2 text-[11px] font-medium",
                                                 !body &&
@@ -442,6 +442,7 @@ export function EmailEditorSheet({
                                     const val = e.target.value;
                                     setBody(val);
                                     setIsDirty(true);
+                                    setHasUserTypedInSession(true);
                                     setSaveStatus(null);
                                     if (alert?.caseId) {
                                         debouncedSave(
