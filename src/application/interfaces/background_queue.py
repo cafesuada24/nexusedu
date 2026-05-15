@@ -6,7 +6,12 @@ from typing import Any, Protocol
 class BackgroundTaskQueue(Protocol):
     """Port for background task execution."""
 
-    async def enqueue(self, task_name: str, **kwargs: Any) -> Any:  # noqa: ANN401
+    async def enqueue(
+        self,
+        task_name: str,
+        _job_id: str | None = None,
+        **kwargs: Any,
+    ) -> Any:  # noqa: ANN401
         """Enqueue a task for background execution."""
         ...
 

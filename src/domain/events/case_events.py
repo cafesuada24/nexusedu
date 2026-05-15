@@ -71,3 +71,12 @@ class InterventionEmailSentEvent(DomainEvent):
     case_id: EntityID
     job_id: EntityID
     user_id: EntityID
+
+
+@dataclass(frozen=True)
+class CaseOverviewGeneratedEvent(DomainEvent):
+    """Event triggered when an AI academic overview is generated."""
+
+    case_id: EntityID
+    academic_summary: str
+    action_keys: list[str]

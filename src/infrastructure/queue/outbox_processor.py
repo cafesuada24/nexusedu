@@ -76,7 +76,11 @@ class OutboxProcessor:
                     else:
                         logger.warning('WebSocket publisher not available for outbox event', event_id=event.id)
                 else:
-                    await self.arq_queue.enqueue(event.task_name, **kwargs)
+                    await self.arq_queue.enqueue(
+                        event.task_name,
+                        _job_id=str(event.id),
+                        **kwargs,
+                    )
 
                 event.status = OutboxStatus.PROCESSED
                 event.processed_at = datetime.now(UTC)
