@@ -61,12 +61,51 @@ async def simulate_recovery() -> None:
                     week=week,
                 ))
 
-        # 4. Student A is now stable
-        student_a.current_risk_status = RiskStatus.NORMAL
-        student_a.cumulative_gpa = 3.4 # Improvement
+        # 4. Run Anomaly Detection to update statuses
+        print("Running anomaly detection...")
+        from collections import defaultdict
+        from src.domain.services.anomaly_engine.zscore import ZScore
+        from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
+            SqlAlchemyActivityRepository,
+            SqlAlchemyStatusHistoryRepository,
+            SqlAlchemyStudentRepository,
+        )
+
+        student_repo = SqlAlchemyStudentRepository(session)
+        activity_repo = SqlAlchemyActivityRepository(session)
+        history_repo = SqlAlchemyStatusHistoryRepository(session)
+
+        # Fetch all data
+        weekly_avgs = await activity_repo.get_weekly_averages()
+        existing_history = await history_repo.get_all_history()
+        history_set = {(h['sid'], h['academic_year'], h['semester'], h['week']) for h in existing_history}
+
+        student_data = defaultdict(list)
+        for avg in weekly_avgs:
+            student_data[avg['sid']].append(avg)
+
+        # Detect
+        engine = ZScore()
+        new_history_records, risk_statuses = engine.run(student_data, history_set)
+        
+        print(f"Detected risk statuses for {len(risk_statuses)} students.")
+        target_status = risk_statuses.get(student_a.sid)
+        print(f"Student A ({student_a.sid}) latest risk status: {target_status}")
+
+        if new_history_records:
+            await history_repo.batch_create_history(new_history_records)
+
+        # Apply transitions
+        for sid, latest_risk in risk_statuses.items():
+            if latest_risk == RiskStatus.NORMAL:
+                student = await student_repo.get_by_id(sid)
+                if student.current_risk_status != RiskStatus.NORMAL:
+                    student.current_risk_status = RiskStatus.NORMAL
+                    await student_repo.save(student)
+                    print(f"Student {sid} has recovered and is now NORMAL.")
 
         await session.commit()
-        print(f"\nStudent A ({student_a.sid}) has recovered and is now NORMAL.")
+        print("\nRecovery simulation complete.")
         print("\nNEXT STEP: Open the Advisor UI and Resolve the case for Student A.")
         print("Then, check the Admin Dashboard to see 'Recovery Rate' and 'Academic Impact Score'.")
 

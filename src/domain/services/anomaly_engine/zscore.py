@@ -37,15 +37,15 @@ class AdaptiveEngineConfig:
     gamma: float = 0.2
 
     # Variance regularization (shrinkage lambda)
-    lambda_peer: float = 25.0
+    lambda_peer: float = 100.0
 
     # Stability regularization for personalized volatility
-    # Equivalent to a 0.7 standard deviation floor in z-peer space
-    lambda_stability: float = 0.5
+    # Equivalent to a 1.2 standard deviation floor in z-peer space
+    lambda_stability: float = 1.5
 
     # Thresholds for volatility-aware drift (normalized_drift)
-    drift_elevated_threshold: float = -1.5
-    drift_critical_threshold: float = -3.0
+    drift_elevated_threshold: float = -2.5
+    drift_critical_threshold: float = -4.5
 
     # Thresholds for multi-week trend signals
     # EWMA of drifts. A sustained negative drift of -0.3 is significant.
@@ -301,6 +301,14 @@ class AdaptiveAnomalyEngine:
         confidence: float,
     ) -> RiskStatus:
         """Volatility-aware and persistence-aware classification policy."""
+
+        # 0. Handle Cold Start
+        # We need at least ~2 weeks of data (confidence > 0.4) to conclude a personal drop.
+        if confidence < 0.4:
+            # Fallback to absolute peer failure if it's extreme
+            if min_z_peer < self.config.peer_critical_threshold:
+                return RiskStatus.CRITICAL
+            return RiskStatus.NORMAL
 
         # 1. Absolute Peer Failure (Critical safety net)
         if min_z_peer < self.config.peer_critical_threshold:
