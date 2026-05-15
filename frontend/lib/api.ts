@@ -1065,6 +1065,54 @@ export async function deleteDayOff(do_id: string): Promise<void> {
   }
 }
 
+export const AdminDashboardSchema = z.object({
+  recovery: z.object({
+    recovery_rate: z.number().default(0),
+    stabilized_students: z.number().int().default(0),
+    total_at_risk_students: z.number().int().default(0),
+  }).default({}),
+  lead_time: z.object({
+    avg_lead_time_hours: z.number().default(0),
+    target_hours: z.number().default(4),
+    within_target_rate: z.number().default(0),
+  }).default({}),
+  nudge_activation: z.object({
+    activation_rate: z.number().default(0),
+    total_nudges_sent: z.number().int().default(0),
+    responses_received: z.number().int().default(0),
+  }).default({}),
+  academic_impact: z.object({
+    avg_gpa_before: z.number().nullish().default(0),
+    avg_gpa_after: z.number().nullish().default(0),
+    impact_score: z.number().nullish().default(0),
+  }).default({}),
+  risk_distribution: z.array(z.object({
+    label: z.string().default("Unknown"),
+    count: z.number().int().default(0),
+    percentage: z.number().default(0),
+  })).default([]),
+  major_risk: z.array(z.object({
+    major: z.string().default("Unknown"),
+    risk_count: z.number().int().default(0),
+    recovery_rate: z.number().default(0),
+  })).default([]),
+  generated_at: z.string().nullish().default(() => new Date().toISOString()),
+});
+
+export type AdminDashboardData = z.infer<typeof AdminDashboardSchema>;
+
+/**
+ * GET /admin/dashboard — returns high-level admin dashboard metrics.
+ */
+export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
+  return apiCall(
+    endpoint("/admin/dashboard"),
+    { method: "GET" },
+    AdminDashboardSchema,
+    "Không thể lấy dữ liệu dashboard admin",
+  );
+}
+
 /**
  * GET /metrics/stats — returns high-level dashboard KPIs.
  */
