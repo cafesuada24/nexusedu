@@ -6,152 +6,139 @@ Ghi lại các quyết định kỹ thuật, phân công, và brainstorming củ
 
 ---
 
-## Template
+## Các Quyết Định Kỹ Thuật (ADRs)
 
-### Quyết định kỹ thuật
+### [ADR-1] Chuyển đổi từ LangChain sang BAML — 12/04/2026
 
-```markdown
-### [ADR-N] Tiêu đề quyết định — DD/MM/YYYY
-
-**Bối cảnh:** Vấn đề cần giải quyết là gì?
+**Bối cảnh:** LLM thường trả về sai format JSON hoặc bị "prompt leakage". LangChain khó kiểm soát schema output chặt chẽ.
 
 **Các lựa chọn đã xem xét:**
-- Option A: ...
-- Option B: ...
+- Tiếp tục dùng LangChain và viết thêm các parser regex.
+- Sử dụng BAML để định nghĩa data models và type-safety trực tiếp.
 
-**Quyết định:** Chọn option nào và tại sao.
+**Quyết định:** Chọn BAML vì nó ép kiểu dữ liệu (type-safety) tốt hơn, code sạch và dễ bảo trì.
 
-**Hệ quả:** Những gì bị ảnh hưởng / trade-off.
-```
+**Hệ quả:** Tốn thời gian migrate toàn bộ logic gọi LLM cũ sang BAML nhưng giảm hẳn lỗi parsing format JSON.
 
-### Phân công
+---
 
-```markdown
-### Sprint N — DD/MM → DD/MM/YYYY
+### [ADR-2] Áp dụng Optimistic Concurrency Control (OCC) — 26/04/2026
+
+**Bối cảnh:** Khi hệ thống có nhiều cố vấn (advisor) cùng thao tác trên 1 case trên Kanban board, có nguy cơ ghi đè dữ liệu (Race Condition).
+
+**Các lựa chọn đã xem xét:**
+- Pessimistic Locking: Lock dòng trong database -> Chạy chậm, dễ bị deadlock.
+- Optimistic Concurrency Control (OCC): Dùng trường `version` để check conflict.
+
+**Quyết định:** Sử dụng OCC vì phù hợp với tính chất hệ thống phân tán, ít block người dùng.
+
+**Hệ quả:** Cập nhật database schema thêm cột `version` ở các bảng quan trọng và xử lý logic lỗi xung đột (retry/reload) ở UI.
+
+---
+
+### [ADR-3] Sử dụng Outbox Pattern cho Async Tasks — 03/05/2026
+
+**Bối cảnh:** Cần đảm bảo sau khi đặt lịch hẹn thành công (lưu vào database), thông báo/email chắc chắn phải được gửi đi, ngay cả khi dịch vụ gửi email bị sập tạm thời.
+
+**Các lựa chọn đã xem xét:**
+- Gửi trực tiếp API trong request: Rủi ro timeout, mất data nếu API bên thứ 3 lỗi.
+- Outbox Pattern: Lưu event cần thực hiện vào bảng `outbox` cùng transaction với database, sau đó background worker đọc và thực thi.
+
+**Quyết định:** Chọn Outbox Pattern.
+
+**Hệ quả:** Đảm bảo data integrity tuyệt đối nhưng hệ thống phức tạp hơn do phải chạy thêm background worker để xử lý.
+
+---
+
+### [ADR-4] Gỡ bỏ LangGraph, thay bằng Prompt Chain — 12/05/2026
+
+**Bối cảnh:** Kiến trúc LangGraph hiện tại quá phức tạp, việc quản lý state giữa các node tốn nhiều tài nguyên. Dẫn đến chi phí token cao và độ trễ (latency) chậm do chạy qua nhiều node trung gian không cần thiết.
+
+**Các lựa chọn đã xem xét:**
+- Tối ưu state và giảm số vòng lặp trong LangGraph.
+- Gỡ bỏ hoàn toàn LangGraph, thay bằng deterministic Prompt Chain.
+
+**Quyết định:** Chuyển sang Prompt Chain theo tiêu chí "Less is More". Đơn giản hóa workflow.
+
+**Hệ quả:** Giảm 40% chi phí token, tốc độ phản hồi tăng x2. Đánh đổi lại là mất đi khả năng loop/agentic phức tạp nhưng hoàn toàn phù hợp với use-case hiện tại.
+
+---
+
+### [ADR-5] Sử dụng UUIDv7 làm Khóa Chính — 12/05/2026
+
+**Bối cảnh:** Cần scale database, chuẩn bị cho hệ thống lớn. UUIDv4 bị phân mảnh index, gây chậm khi truy vấn và sắp xếp dữ liệu theo thời gian.
+
+**Các lựa chọn đã xem xét:**
+- Auto-increment ID (Int)
+- UUIDv4
+- UUIDv7
+
+**Quyết định:** Nâng cấp toàn bộ khóa chính (ID) sang UUIDv7 vì nó giữ được tính chất phân tán (phòng chống đoán ID) nhưng có khả năng tự động sắp xếp theo thời gian (time-ordered).
+
+**Hệ quả:** Chạy script migration để chuyển đổi toàn bộ data cũ sang chuẩn ID mới. 
+
+---
+
+## Phân công Công việc (Sprints)
+
+### Sprint 1 & 2 — 05/04 → 18/04/2026
+*Mục tiêu: Setup kiến trúc, UI cơ bản và Data Router.*
 
 | Task | Người làm | Deadline | Trạng thái |
 |---|---|---|---|
-| | | | |
-```
+| Cấu hình `uv` và thiết lập logging hooks AI | Trịnh Đức An | 07/04 | ✅ Xong |
+| Triển khai ETL import dữ liệu từ SIS/LMS | Hồ Sỹ Minh Hà | 10/04 | ✅ Xong |
+| Xây dựng UI/API cơ bản | Đặng Hồ Hải | 10/04 | ✅ Xong |
+| Refactor từ LangChain sang BAML framework | Trịnh Đức An | 15/04 | ✅ Xong |
+| Tích hợp PII Masking Module | Hồ Sỹ Minh Hà | 17/04 | ✅ Xong |
+| Tích hợp FastAPI Users Authentication | Đặng Hồ Hải | 18/04 | ✅ Xong |
 
-### Brainstorming
+---
 
-```markdown
-### Brainstorm: [Chủ đề] — DD/MM/YYYY
+### Sprint 3 & 4 — 19/04 → 02/05/2026
+*Mục tiêu: Kanban, Email Node, Gamification và Student Modal.*
 
-**Câu hỏi:** ...
+| Task | Người làm | Deadline | Trạng thái |
+|---|---|---|---|
+| Xây dựng giao diện Kanban Board V1 | Đặng Hồ Hải | 22/04 | ✅ Xong |
+| Tạo script Mock Data Generator | Trịnh Đức An | 24/04 | ✅ Xong |
+| Node AI tự động soạn thảo Email | Hồ Sỹ Minh Hà | 25/04 | ✅ Xong |
+| Hệ thống Gamification & Point Ledger | Trịnh Đức An | 29/04 | ✅ Xong |
+| Xử lý OCC Race Condition cho Kanban | Hồ Sỹ Minh Hà | 01/05 | ✅ Xong |
+| Student Profile Modal & Auto-save debounce | Đặng Hồ Hải | 02/05 | ✅ Xong |
+
+---
+
+### Sprint 5 & 6 — 03/05 → 12/05/2026
+*Mục tiêu: Scheduling, Mobile-first & Tối ưu Hiệu năng.*
+
+| Task | Người làm | Deadline | Trạng thái |
+|---|---|---|---|
+| Thuật toán tính toán và đặt Slot Lịch hẹn | Hồ Sỹ Minh Hà | 06/05 | ✅ Xong |
+| Tích hợp Outbox Pattern cho DB | Trịnh Đức An | 08/05 | ✅ Xong |
+| Responsive UI (Mobile-First) cho màn hình nhỏ | Đặng Hồ Hải | 10/05 | ✅ Xong |
+| Nâng cấp UUIDv7 toàn hệ thống | Trịnh Đức An | 12/05 | ✅ Xong |
+| Thay thế LangGraph bằng Prompt Chain | Hồ Sỹ Minh Hà | 12/05 | ✅ Xong |
+| Real-time Notification qua Websocket | Đặng Hồ Hải | 12/05 | ✅ Xong |
+
+---
+
+## Brainstorming
+
+### Brainstorm: Tối ưu hiển thị Kanban trên Mobile — 08/05/2026
+
+**Câu hỏi:** Làm sao để hiển thị một Kanban board nhiều cột trên màn hình điện thoại (mobile) mà không làm vỡ layout hay gây khó chịu cho trải nghiệm người dùng?
 
 **Các ý tưởng:**
-- Ý tưởng 1: ...
-- Ý tưởng 2: ...
+- **Ý tưởng 1 (Đặng Hồ Hải):** Chuyển từ dạng bảng sang dạng danh sách accordion. Khi người dùng bấm vào một trạng thái (New, Accepted...), nó sẽ xổ xuống danh sách sinh viên tương ứng.
+- **Ý tưởng 2 (Trịnh Đức An):** Dùng tính năng CSS Snap Scrolling (cuộn theo khấc). Mỗi lần vuốt ngang sẽ tự động "snap" hiển thị trọn vẹn 1 cột duy nhất chiếm toàn màn hình.
+- **Ý tưởng 3 (Hồ Sỹ Minh Hà):** Thêm một thanh filter dropdown trên cùng để chọn cột muốn xem, ẩn các cột còn lại đi.
 
-**Kết luận:** ...
-```
-
----
-
-### [ADR-3] Workflow Simplification and Langfuse Monitoring — 25/04/2026
-
-**Bối cảnh:** Workflow LangGraph hiện tại quá phức tạp, tốn nhiều token và chậm do có nhiều bước trung gian (Determiner, Visualization). Cần giám sát hiệu năng và chi phí của agent.
-
-**Các lựa chọn đã xem xét:**
-- **Remove Determiner**: Để Planner quyết định hướng đi cuối cùng ngay từ đầu (e.g. trả lời trực tiếp hoặc soạn email). Giảm 1 bước gọi LLM sau khi có kết quả SQL.
-- **Prune Unused Nodes**: Loại bỏ node Visualization và Export vì không nằm trong yêu cầu cốt lõi hiện tại.
-- **Langfuse Monitoring**: Sử dụng `CallbackHandler` của Langfuse để theo dõi trace, token usage và latency.
-
-**Quyết định:** 
-- Loại bỏ node `determiner` và `viz_agent`.
-- Cập nhật `RouterPlan` schema để Planner chọn `next_action_after_sql`.
-- Tích hợp `LangfuseCallbackHandler` vào graph invocation.
-
-**Hệ quả:** Workflow chạy nhanh hơn, tốn ít token hơn. Tuy nhiên, tính năng tạo biểu đồ tự động đã bị loại bỏ (có thể khôi phục sau nếu cần). Cần cấu hình `LANGFUSE_PUBLIC_KEY` và `LANGFUSE_SECRET_KEY` trong environment.
-
----
-
-### [ADR-1] Dùng TypeScript thay vì Python — 30/03/2026
-
-**Bối cảnh:** Cả nhóm cần chọn 1 ngôn ngữ chính để xây dựng agent. Có 2 thành viên quen Python, 1 thành viên quen TypeScript.
-
-**Các lựa chọn đã xem xét:**
-- **Python**: Ecosystem ML tốt hơn, syntax đơn giản, thành viên quen hơn.
-- **TypeScript**: Type safety, dễ refactor khi project lớn, nhiều library AI mới ra bản TS trước.
-
-**Quyết định:** Chọn TypeScript vì project này focus vào agent architecture, không cần ML library nặng. Type safety sẽ giúp bắt lỗi sớm hơn khi codebase phình ra.
-
-**Hệ quả:** 2 thành viên Python cần học TypeScript cơ bản (ước tính 1 tuần). Sẽ không dùng được `langchain` Python trực tiếp.
-
----
-
-### [ADR-2] Lưu conversation history bằng file JSON — 03/04/2026
-
-**Bối cảnh:** Agent cần nhớ context giữa các lần chạy. Cần chọn storage.
-
-**Các lựa chọn đã xem xét:**
-- **In-memory array**: Đơn giản nhất nhưng mất khi restart.
-- **File JSON**: Persistent, không cần setup, dễ inspect bằng tay.
-- **SQLite**: Có thể query, tốt cho production nhưng overkill cho prototype.
-- **Redis**: Fast nhưng cần chạy thêm service.
-
-**Quyết định:** File JSON cho giai đoạn prototype. Thiết kế interface `MemoryStore` để sau này swap sang SQLite không cần sửa logic agent.
-
-**Hệ quả:** Không query được theo thời gian hay user. Chấp nhận được ở giai đoạn này.
-
----
-
-### Sprint 1 — 31/03 → 06/04/2026
-
-| Task | Người làm | Deadline | Trạng thái |
-|---|---|---|---|
-| Setup TypeScript project + CI | Văn A | 01/04 | ✅ Xong |
-| Implement agent loop cơ bản | Thị B | 02/04 | ✅ Xong |
-| Tool: `search_web` (Brave API) | Văn C | 03/04 | ✅ Xong |
-| Tool: `read_file`, `write_file` | Thị B | 05/04 | ✅ Xong |
-| Conversation memory (JSON) | Văn A | 06/04 | ✅ Xong |
-| README + setup docs | Văn C | 06/04 | ✅ Xong |
-
----
-
-### Sprint 2 — 07/04 → 13/04/2026
-
-| Task | Người làm | Deadline | Trạng thái |
-|---|---|---|---|
-| Fix infinite loop: thêm `max_iterations` | Thị B | 08/04 | 🔄 Đang làm |
-| Tool: `run_tests` (chạy pytest) | Văn C | 10/04 | ⏳ Chờ |
-| Sliding window memory | Văn A | 09/04 | ⏳ Chờ |
-| Demo prep + slides | Cả nhóm | 13/04 | ⏳ Chờ |
-
----
-
-### Brainstorm: Tính năng cho demo — 05/04/2026
-
-**Câu hỏi:** Demo tuần tới nên show gì để ấn tượng nhất trong 5 phút?
-
-**Các ý tưởng:**
-- **Ý tưởng 1 (Văn A):** Cho agent đọc 1 file Python có bug, tự fix, rồi chạy test để verify. Trực quan, dễ hiểu.
-- **Ý tưởng 2 (Thị B):** Agent tự build 1 tính năng nhỏ từ mô tả bằng tiếng Việt. Show khả năng hiểu ngôn ngữ tự nhiên.
-- **Ý tưởng 3 (Văn C):** Agent review PR, comment vào từng dòng code có vấn đề. Gần với use case thực tế nhất.
-
-**Pros/Cons:**
-| Ý tưởng | Pros | Cons |
+**Phân tích (Pros/Cons):**
+| Ý tưởng | Ưu điểm | Nhược điểm |
 |---|---|---|
-| Fix bug | Dễ làm, chắc chắn chạy được | Ít "wow" hơn |
-| Build từ mô tả | Ấn tượng nhất | Có thể fail nếu prompt phức tạp |
-| Review PR | Thực tế, liên quan trực tiếp đến khóa học | Cần setup GitHub webhook |
+| Accordion List | Tiết kiệm không gian | Không còn cảm giác "Kanban" kéo thả |
+| CSS Snap Scrolling | Giữ được form Kanban, vuốt rất mượt | Khó implement thao tác kéo thả card qua lại giữa các cột trên màn hình cảm ứng |
+| Dropdown Filter | Dễ code, chắc chắn không vỡ layout | Phải bấm nhiều thao tác để xem tổng quan |
 
-**Kết luận:** Chọn ý tưởng 1 (fix bug) cho demo chính vì đảm bảo. Nếu còn thời gian sẽ show thêm ý tưởng 2 như bonus.
-
----
-
-### Bug quan trọng: Tool call loop vô hạn — 04/04/2026
-
-**Triệu chứng:** Agent gọi `search_web` liên tục không dừng khi tool trả về lỗi network.
-
-**Root cause:** Không có stop condition khi tool raise exception. Agent nhận `"error": "timeout"` nhưng interpret là cần thử lại.
-
-**Fix:** Thêm 2 điều kiện dừng:
-1. `max_iterations = 10` — hard stop sau 10 vòng
-2. Nếu tool trả về lỗi 3 lần liên tiếp → dừng và báo user
-
-**Code thay đổi:** `src/agent.ts` lines 45-67
-
-**Học được:** Luôn thiết kế stop condition trước khi implement retry logic.
+**Kết luận:** Chọn **Ý tưởng 2 (Snap Scrolling)** để làm layout chính vì cảm giác hiện đại và mượt mà. Kết hợp thêm **Ý tưởng 1** cho thao tác chuyển trạng thái (trên mobile thay vì kéo thả thì sẽ bấm nút menu ở card để chọn cột cần chuyển). Sử dụng Tailwind class `snap-x` và `snap-mandatory` để implement.
