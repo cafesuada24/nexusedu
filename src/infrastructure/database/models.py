@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime, time
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
@@ -16,7 +17,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    JSON,
     LargeBinary,
     MetaData,
     String,
@@ -37,6 +37,7 @@ from src.domain.value_objects.status import (
     JobStatus,
     MeetingMethod,
     OutboxStatus,
+    RiskReason,
     RiskStatus,
 )
 
@@ -168,6 +169,7 @@ class Student(Base):
         index=True,
     )
     major: Mapped[str] = mapped_column(String, default='Unknown')
+    cumulative_gpa: Mapped[float | None] = mapped_column(Double)
     current_risk_status: Mapped[RiskStatus] = mapped_column(
         Enum(RiskStatus),
         default=RiskStatus.NORMAL,
@@ -417,6 +419,8 @@ class InterventionEmail(Base):
         nullable=False,
         index=True,
     )  # 'draft', 'sent'
+    is_nudge: Mapped[bool] = mapped_column(Boolean, default=False)
+    responded_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime,
         server_default=func.now(),
@@ -485,6 +489,12 @@ class Case(Base):
         nullable=False,
         index=True,
     )
+    risk_reason: Mapped[RiskReason] = mapped_column(
+        Enum(RiskReason),
+        default=RiskReason.UNKNOWN,
+        nullable=False,
+        index=True,
+    )
     intervention_status: Mapped[InterventionStatus] = mapped_column(
         Enum(InterventionStatus),
         default=InterventionStatus.NEW,
@@ -497,7 +507,10 @@ class Case(Base):
         index=True,
     )
     assigned_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    first_interaction_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    initial_gpa: Mapped[float | None] = mapped_column(Double)
+    final_gpa: Mapped[float | None] = mapped_column(Double)
     version: Mapped[int] = mapped_column(Integer, default=0)
     assigned_advisor_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,

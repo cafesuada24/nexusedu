@@ -46,6 +46,8 @@ class Scope(StrEnum):
     ADVISORS_READ = 'advisors:read'
     ADVISORS_WRITE = 'advisors:write'
 
+    ADMIN_DASHBOARD = 'admin:dashboard'
+
     DATA_INGEST = 'data:ingest'
     JOBS_READ = 'jobs:read'
     QUERY_EXECUTE = 'query:execute'
@@ -109,7 +111,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         user_db: BaseUserDatabase[User, uuid.UUID],
         user_settings_db: UserSettingsRepository,
         uow: UnitOfWork,
-    ):
+    ) -> None:
+        """Initialize the user manager with required repositories."""
         super().__init__(user_db)
         self._user_setting_db = user_settings_db
         self._uow = uow

@@ -64,6 +64,13 @@ class CaseCommandHandler:
 
             case.assign_advisor(advisor.advisor_id, command.accepted_at)
 
+            # Capture initial GPA snapshot
+            recent_perf = await self.uow.students.get_recent_performance(case.sid)
+            if recent_perf:
+                # Calculate average of recent scores as initial GPA proxy
+                avg_score = sum(p['score'] for p in recent_perf) / len(recent_perf)
+                case.set_initial_gpa(avg_score)
+
             # Ensure email record is created before events are published
             new_email = InterventionEmail(case_id=case.case_id)
             await self.uow.emails.add(new_email)
@@ -157,6 +164,10 @@ class CaseCommandHandler:
             email = await self.uow.emails.find_by_case(case_id=case.case_id)
             if email is None or not email.is_ready_to_send:
                 raise EmailUnavailableError(case.case_id)
+
+            # Mark as nudge if it's the first interaction
+            if case.first_interaction_at is None:
+                email.is_nudge = True
 
             # 1. Fetch student PII to get email
             student = await self.uow.students.get_by_id(case.sid)
@@ -293,6 +304,12 @@ class CaseCommandHandler:
                 notes=command.notes,
             )
 
+            # Record student response to nudge
+            email = await self.uow.emails.find_by_case(case.case_id)
+            if email and email.is_nudge and email.responded_at is None:
+                email.responded_at = datetime.now(UTC)
+                await self.uow.emails.save(email)
+
             await self.uow.cases.save(case)
             await self.uow.commit()
 
@@ -340,11 +357,18 @@ class CaseCommandHandler:
                 StudentSatisfaction.VERY_BAD,
             )
 
+            # Capture final GPA snapshot
+            final_gpa = None
+            recent_perf = await self.uow.students.get_recent_performance(case.sid)
+            if recent_perf:
+                final_gpa = sum(p['score'] for p in recent_perf) / len(recent_perf)
+
             case.finalize_resolution(
                 datetime.now(UTC),
                 satisfaction=command.satisfaction,
                 comment=command.comment,
                 is_failed=is_failed,
+                final_gpa=final_gpa,
             )
 
             await self.uow.cases.save(case)

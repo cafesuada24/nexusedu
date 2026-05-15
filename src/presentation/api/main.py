@@ -19,6 +19,7 @@ from src.presentation.api.auth import auth_backend, fastapi_users
 from src.presentation.api.lifecycle import lifespan
 from src.presentation.api.middleware.rate_limit import rate_limit_middleware
 from src.presentation.api.routes import (
+    admin,
     advisors,
     cases,
     data,
@@ -214,6 +215,7 @@ api_v1_router.include_router(cases.router)
 api_v1_router.include_router(advisors.router)
 api_v1_router.include_router(metrics.router)
 api_v1_router.include_router(students.router)
+api_v1_router.include_router(admin.router)
 api_v1_router.include_router(websocket.router)
 
 app.include_router(api_v1_router)
