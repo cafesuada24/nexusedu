@@ -10,6 +10,11 @@ variable "project" {
   default     = "nexusedu"
 }
 
+variable "vm_type" {
+  type    = string
+  default = "e2-medium"
+}
+
 variable "region" {
   description = "The GCP region"
   type        = string
@@ -32,4 +37,10 @@ variable "db_password" {
   description = "Password for the database user"
   type        = string
   sensitive   = true
+}
+
+variable "db_name" {
+  description = "Database name"
+  type        = string
+  default     = "nexusedu"
 }

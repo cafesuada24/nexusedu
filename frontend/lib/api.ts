@@ -382,20 +382,6 @@ function getApiBase(): string {
   return "http://127.0.0.1:8000/api/v1";
 }
 
-
-  // On the server, we can talk directly to the backend URL to avoid double-proxying.
-  const env = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (env && env.trim()) {
-    const base = env.trim().replace(/\/+$/, "");
-    if (base.startsWith("/")) {
-      return `http://localhost:8000${base}`;
-    }
-    return base;
-  }
-
-  return (new URL("http://localhost:8000/api/v1")).origin.replace("://localhost", "://127.0.0.1");
-}
-
 export function endpoint(path: string): string {
   const base = getApiBase();
   // Ensure we don't create double slashes

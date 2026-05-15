@@ -10,7 +10,7 @@ resource "google_service_account" "app" {
 
 resource "google_compute_instance" "api" {
   name         = "${var.project}-api"
-  machine_type = "e2-micro"
+  machine_type = var.vm_type
   zone         = var.zone
 
   boot_disk {
