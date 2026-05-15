@@ -19,6 +19,7 @@ class Student(AggregateRoot):
     last_notified_timestamp: datetime | None
     current_risk_status: RiskStatus
     last_notified_satisfaction: int | None
+    cumulative_gpa: float | None = None
 
     def update_risk(self, status: RiskStatus) -> None:
         """Update the student's risk status."""

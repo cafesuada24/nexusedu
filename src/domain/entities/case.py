@@ -20,7 +20,11 @@ from src.domain.exceptions import (
     InvalidStateTransitionError,
     ValidationError,
 )
-from src.domain.value_objects.status import InterventionStatus, MeetingMethod
+from src.domain.value_objects.status import (
+    InterventionStatus,
+    MeetingMethod,
+    RiskReason,
+)
 
 _INTERVENTION_STATUS_TRANSITION = {
     InterventionStatus.NEW: [InterventionStatus.ACCEPTED, InterventionStatus.DISMISSED],
@@ -51,6 +55,8 @@ _INTERVENTION_STATUS_TRANSITION = {
     InterventionStatus.EXPIRED: [],
 }
 
+MAX_ACTION_KEYS = 3
+
 
 @dataclass
 class Case(AggregateRoot):
@@ -58,14 +64,18 @@ class Case(AggregateRoot):
 
     sid: EntityID
     case_id: EntityID = field(default_factory=generate_uuid)
+    risk_reason: RiskReason = RiskReason.UNKNOWN
     intervention_status: InterventionStatus = InterventionStatus.NEW
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     assigned_at: datetime | None = None
+    first_interaction_at: datetime | None = None
     closed_at: datetime | None = None
     assigned_advisor_id: EntityID | None = None
     appointment: Appointment | None = None
     academic_summary: str | None = None
     action_keys: list[str] | None = None
+    initial_gpa: float | None = None
+    final_gpa: float | None = None
     version: int = field(default=0)
 
     @property
@@ -145,6 +155,9 @@ class Case(AggregateRoot):
     def record_email_sent(self, job_id: EntityID, user_id: EntityID) -> None:
         """Record that an intervention email has been dispatched."""
         self.mark_as_sent()
+        if self.first_interaction_at is None:
+            self.first_interaction_at = datetime.now(UTC)
+
         self.register_event(
             InterventionEmailSentEvent(
                 case_id=self.case_id,
@@ -162,6 +175,9 @@ class Case(AggregateRoot):
     ) -> None:
         """Student booked an appointment."""
         self._transition_to(InterventionStatus.BOOKED)
+        if self.first_interaction_at is None:
+            self.first_interaction_at = datetime.now(UTC)
+
         self.appointment = Appointment(
             case_id=self.case_id,
             appointment_time=appointment_time,
@@ -199,6 +215,7 @@ class Case(AggregateRoot):
         satisfaction: str | None = None,
         comment: str | None = None,
         is_failed: bool = False,
+        final_gpa: float | None = None,
     ) -> None:
         """Mark the case as resolved or failed after review."""
         next_status = (
@@ -206,6 +223,7 @@ class Case(AggregateRoot):
         )
         self._transition_to(next_status)
         self.closed_at = occurred_at
+        self.final_gpa = final_gpa
 
         if is_failed:
             self.register_event(
@@ -230,11 +248,24 @@ class Case(AggregateRoot):
 
     def set_ai_overview(self, summary: str, keys: list[str]) -> None:
         """Enrich the case with an AI-generated academic overview."""
-        if len(keys) > 3:
-            raise ValidationError('Action keys cannot exceed 3 items.')
+        if len(keys) > MAX_ACTION_KEYS:
+            raise ValidationError(f'Action keys cannot exceed {MAX_ACTION_KEYS} items.')
 
         self.academic_summary = summary
         self.action_keys = keys
+
+    def set_initial_gpa(self, gpa: float) -> None:
+        """Capture the student GPA at the start of intervention."""
+        if self.intervention_status != InterventionStatus.NEW:
+            raise InvalidStateTransitionError(
+                current_status=self.intervention_status.value,
+                attempted_action='set_initial_gpa',
+            )
+        self.initial_gpa = gpa
+
+    def set_risk_reason(self, reason: RiskReason) -> None:
+        """Set the reason for student risk."""
+        self.risk_reason = reason
 
     def _transition_to(self, next_status: InterventionStatus) -> None:
         """The 'Bouncer' that enforces the matrix."""

@@ -12,6 +12,19 @@ class RiskStatus(StrEnum):
     UNKNOWN = 'Unknown'
 
 
+class RiskReason(StrEnum):
+    """Primary reason for student risk."""
+
+    GRADE_DROP = 'grade_drop'
+    LOW_ATTENDANCE = 'low_attendance'
+    MISSING_ASSIGNMENTS = 'missing_assignments'
+    LOW_ENGAGEMENT = 'low_engagement'
+    FINANCIAL_STRESS = 'financial_stress'
+    PERSONAL_ISSUES = 'personal_issues'
+    OTHER = 'other'
+    UNKNOWN = 'unknown'
+
+
 class InterventionStatus(StrEnum):
     """Student intervention status levels."""
 

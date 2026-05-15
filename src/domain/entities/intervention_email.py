@@ -24,6 +24,8 @@ class InterventionEmail(AggregateRoot):
     subject: str | None = None
     body: str | None = None
     sent_at: datetime | None = None
+    is_nudge: bool = False
+    responded_at: datetime | None = None
     version: int = 0
 
     @property
