@@ -16,6 +16,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { cn } from "@/lib/utils";
 import { type StudentRow } from "@/lib/csv";
@@ -280,8 +290,14 @@ function CardActions({
 }) {
     const hasGoals = a.goals.length > 0;
     const isActuallyDrafting = isAiDrafting || a.isGenerating;
+    const [pendingAction, setPendingAction] = React.useState<{
+        status: CaseStatus;
+        toastMessage: string;
+        description: string;
+    } | null>(null);
 
-    if (a.status === "new") {
+    const renderActions = () => {
+        if (a.status === "new") {
         return (
             <div className="mt-3 flex flex-col gap-2">
                 <Button
@@ -298,11 +314,13 @@ function CardActions({
                     size="sm"
                     disabled={isAcceptingCase}
                     className="h-10 w-full rounded-lg text-sm font-medium"
-                    onClick={() => {
-                        if (window.confirm(`Bạn có chắc chắn muốn tiếp nhận ca của ${a.name}?`)) {
-                            onMove("accepted", `Đã nhận ca của ${a.name}`);
-                        }
-                    }}
+                    onClick={() =>
+                        setPendingAction({
+                            status: "accepted",
+                            toastMessage: `Đã nhận ca của ${a.name}`,
+                            description: `Bạn có chắc chắn muốn tiếp nhận ca của ${a.name}?`,
+                        })
+                    }
                 >
                     {isAcceptingCase ? (
                         <>
@@ -355,11 +373,13 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() => {
-                        if (window.confirm(`Bạn có chắc chắn muốn bắt đầu hỗ trợ ${a.name}?`)) {
-                            onMove("in_progress", `Bắt đầu hỗ trợ ${a.name}`);
-                        }
-                    }}
+                    onClick={() =>
+                        setPendingAction({
+                            status: "in_progress",
+                            toastMessage: `Bắt đầu hỗ trợ ${a.name}`,
+                            description: `Bạn có chắc chắn muốn bắt đầu hỗ trợ ${a.name}?`,
+                        })
+                    }
                 >
                     <Handshake className="size-4" />
                     Bắt đầu hỗ trợ
@@ -383,11 +403,13 @@ function CardActions({
                 <Button
                     size="sm"
                     className="h-10 flex-1 rounded-lg text-sm font-medium"
-                    onClick={() => {
-                        if (window.confirm(`Bạn có chắc chắn muốn giải quyết và đóng ca của ${a.name}?`)) {
-                            onMove("resolved", `Đã đóng case của ${a.name}`);
-                        }
-                    }}
+                    onClick={() =>
+                        setPendingAction({
+                            status: "resolved",
+                            toastMessage: `Đã đóng case của ${a.name}`,
+                            description: `Bạn có chắc chắn muốn giải quyết và đóng ca của ${a.name}?`,
+                        })
+                    }
                 >
                     <CheckCircle2 className="size-4" />
                     Giải quyết
@@ -446,5 +468,43 @@ function CardActions({
         <p className="mt-3 text-[12px] italic text-success">
             ✓ Đã giải quyết xong · {relativeTime(a.movedAt)}
         </p>
+    );
+    };
+
+    return (
+        <>
+            {renderActions()}
+            <AlertDialog
+                open={!!pendingAction}
+                onOpenChange={(open) => {
+                    if (!open) setPendingAction(null);
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Xác nhận hành động</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingAction?.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Hủy</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (pendingAction) {
+                                    onMove(
+                                        pendingAction.status,
+                                        pendingAction.toastMessage,
+                                    );
+                                }
+                                setPendingAction(null);
+                            }}
+                        >
+                            Xác nhận
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
