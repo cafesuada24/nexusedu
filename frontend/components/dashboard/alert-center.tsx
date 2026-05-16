@@ -241,7 +241,7 @@ export function AlertCenter() {
 
         // Sorting for "Đã chấp nhận" (Accepted) column
         // Priority 1: Risk Status (High > Medium)
-        // Priority 2: Time moved (Newest first)
+        // Priority 2: Time moved (Oldest first -> Appends newest to bottom)
         map.accepted.sort((a, b) => {
             const weightA = a.severity === "high" ? 2 : 1;
             const weightB = b.severity === "high" ? 2 : 1;
@@ -252,7 +252,7 @@ export function AlertCenter() {
 
             const timeA = a.movedAt ?? 0;
             const timeB = b.movedAt ?? 0;
-            return timeB - timeA;
+            return timeA - timeB;
         });
 
         map.scheduled.sort((a, b) => {
