@@ -29,11 +29,11 @@ export default function OverviewPage() {
           </div>
           <div className="flex flex-col">
             <h1 className="font-serif text-2xl font-bold tracking-tight md:text-3xl">
-              {isAdmin ? "Strategic Overview" : "Tổng quan"}
+              {isAdmin ? "Tổng quan Chiến lược" : "Tổng quan"}
             </h1>
             {isAdmin && (
               <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                School Board Control Center
+                Trung tâm Điều hành Ban giám hiệu
               </p>
             )}
           </div>
@@ -45,7 +45,7 @@ export default function OverviewPage() {
               <Button asChild variant="outline" size="sm" className="rounded-xl border-primary/20 text-primary">
                 <Link href="/dashboard/metrics" className="gap-2">
                   <BarChartHorizontal className="size-4" />
-                  Full Reports
+                  Báo cáo chi tiết
                 </Link>
               </Button>
               <Button asChild size="sm" className="rounded-xl">
