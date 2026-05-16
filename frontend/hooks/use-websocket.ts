@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { getWsUrl } from "@/lib/api";
 
 export interface WebSocketMessage<T = unknown> {
   type: string;
@@ -77,30 +78,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   const buildWebSocketUrl = useCallback(
     () => {
-      // Explicit WS URL has highest priority
-      if (process.env.NEXT_PUBLIC_WS_URL) {
-        return process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, "");
-      }
-
-      const apiBaseUrl = (
-        process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
-      ).replace(/\/+$/, "");
-
-      // Absolute API URL
-      if (apiBaseUrl.startsWith("http")) {
-        const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
-
-        return `${wsBaseUrl}/ws`;
-      }
-
-      const protocol =
-        window.location.protocol === "https:"
-          ? "wss:"
-          : "ws:";
-
-      const host = window.location.host;
-
-      return `${protocol}//${host}/api/v1/ws`;
+      return getWsUrl();
     },
     [],
   );
