@@ -62,10 +62,9 @@
     --sidebar-border: oklch(0.92 0.008 260);
     --sidebar-ring: oklch(0.546 0.215 262.881);
 
-    /* Font fallback variables used when next/font is disabled for faster dev builds */
-    --font-inter: Inter, "Inter Fallback", ui-sans-serif, system-ui;
-    --font-playfair:
-        "Playfair Display", "Playfair Display Fallback", ui-serif, Georgia;
+    /* Font variables — next/font/google injects the real values at runtime */
+    --font-jakarta: "Plus Jakarta Sans", ui-sans-serif, system-ui;
+    --font-jetbrains: "JetBrains Mono", ui-monospace, monospace;
 }
 
 .dark {
@@ -121,10 +120,9 @@
 }
 
 @theme inline {
-    --font-sans: var(--font-inter), "Inter Fallback", ui-sans-serif, system-ui;
-    --font-serif:
-        var(--font-playfair), "Playfair Display Fallback", ui-serif, Georgia;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-sans: var(--font-jakarta);
+    --font-serif: ui-serif, Georgia, serif;
+    --font-mono: var(--font-jetbrains);
 
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -185,6 +183,22 @@
     body {
         @apply bg-background text-foreground antialiased;
         overflow-x: hidden;
+        font-feature-settings: "rlig" 1, "calt" 1, "kern" 1;
+        text-rendering: optimizeLegibility;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 700;
+        letter-spacing: -0.025em;
+        line-height: 1.15;
+    }
+
+    h1 { font-weight: 800; letter-spacing: -0.03em; }
+    h2 { font-weight: 700; letter-spacing: -0.025em; }
+    h3 { font-weight: 600; letter-spacing: -0.02em; }
+
+    p {
+        line-height: 1.65;
     }
 }
 

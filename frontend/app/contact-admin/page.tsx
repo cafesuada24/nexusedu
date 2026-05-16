@@ -1,15 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Inter } from "next/font/google";
 import { ArrowLeft, ShieldCheck, UserPlus, Mail, Building2, ChevronRight, Info } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
-
 export default function ContactAdminPage() {
   return (
-    <div className={`hero-gradient min-h-screen bg-background dark:bg-slate-950 text-slate-900 dark:text-slate-100 ${inter.variable} font-sans transition-colors duration-300 flex flex-col`}>
+    <div className="hero-gradient min-h-screen bg-background dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300 flex flex-col">
       <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-5 md:px-6">
         <Link
           href="/login"

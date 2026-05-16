@@ -1,12 +1,8 @@
 import { Metadata } from "next";
 import Link from "next/link";
 import { memo } from "react";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import { SampleCSVBlock } from "@/components/landing/sample-csv-block";
 import { ArrowLeft } from "lucide-react";
-
-const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
-const mono = JetBrains_Mono({ subsets: ["latin", "vietnamese"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: "Hướng dẫn CSV | NexusEdu",
@@ -39,7 +35,7 @@ const DataTable = memo(({ fields }: { fields: { field: string; type: string; des
       <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
         {fields.map((row) => (
           <tr key={row.field} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-            <td className={`px-6 py-3 text-xs text-slate-700 dark:text-slate-200 ${mono.className}`}>{row.field}</td>
+            <td className={`px-6 py-3 text-xs text-slate-700 dark:text-slate-200 font-mono`}>{row.field}</td>
             <td className="px-6 py-3"><TypeBadge type={row.type} /></td>
             <td className="px-6 py-3 text-slate-500 dark:text-slate-400 font-medium leading-relaxed">{row.desc}</td>
           </tr>
@@ -82,7 +78,7 @@ d079df0e-bbdd-472c-9544-51b188a40d35,35bd9e50-f8fd-4a19-8e4e-30ab0302e8f6,C106,S
   ];
 
   return (
-    <div className={`min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 ${inter.variable} font-sans transition-colors duration-300`}>
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <div className="container mx-auto py-12 px-4 md:px-6 max-w-5xl">
         <Link href="/" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors mb-8">
           <ArrowLeft size={16} className="mr-2" />
@@ -104,7 +100,7 @@ d079df0e-bbdd-472c-9544-51b188a40d35,35bd9e50-f8fd-4a19-8e4e-30ab0302e8f6,C106,S
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Dữ liệu LMS</h2>
             <p className="mt-2 text-slate-500 dark:text-slate-400 mb-8 font-medium">Chứa thông tin về hoạt động học tập, điểm số và tiến độ của sinh viên.</p>
             <DataTable fields={lmsFields} />
-            <div className={`mt-6 ${mono.className}`}>
+            <div className={`mt-6 font-mono`}>
               <SampleCSVBlock title="lms_data.csv" data={lmsSample} filename="lms_data.csv" />
             </div>
           </section>
@@ -113,7 +109,7 @@ d079df0e-bbdd-472c-9544-51b188a40d35,35bd9e50-f8fd-4a19-8e4e-30ab0302e8f6,C106,S
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Dữ liệu SIS</h2>
             <p className="mt-2 text-slate-500 dark:text-slate-400 mb-8 font-medium">Chứa thông tin cá nhân và tình trạng quản lý của sinh viên.</p>
             <DataTable fields={sisFields} />
-            <div className={`mt-6 ${mono.className}`}>
+            <div className={`mt-6 font-mono`}>
               <SampleCSVBlock title="sis_data.csv" data={sisSample} filename="sis_data.csv" />
             </div>
           </section>

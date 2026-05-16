@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Inter } from "next/font/google";
 import { ArrowLeft, Mail, Clock, Copy, Check } from "lucide-react";
-
-const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
 
 export default function ContactPage() {
   const [copied, setCopied] = useState(false);
@@ -17,7 +14,7 @@ export default function ContactPage() {
   };
 
   return (
-    <div className={`min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 ${inter.variable} font-sans transition-colors duration-300`}>
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       {/* Ambient Background Glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-400/10 dark:bg-blue-600/5 blur-[100px] rounded-full" />

@@ -1,11 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-// We intentionally avoid next/font/google in dev to reduce server-side
-// font fetching overhead. Fonts are provided via CSS variables in
-// globals.css (fallback to system fonts).
+const fontSans = Plus_Jakarta_Sans({
+  subsets: ["latin", "latin-ext", "vietnamese"],
+  variable: "--font-jakarta",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  weight: ["400", "500"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "NexusEdu — Hệ sinh thái AI hỗ trợ đào tạo và quản lý sinh viên",
@@ -36,7 +47,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning className={`${fontSans.variable} ${fontMono.variable}`}>
       <head />
       <body className="font-sans antialiased bg-background" suppressHydrationWarning>
         <Providers>{children}</Providers>

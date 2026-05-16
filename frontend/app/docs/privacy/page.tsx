@@ -1,9 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Inter } from "next/font/google";
 import { ArrowLeft, Shield, Lock, Eye, Server } from "lucide-react";
-
-const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Bảo mật và Quyền riêng tư | NexusEdu",
@@ -12,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className={`min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 ${inter.variable} font-sans transition-colors duration-300`}>
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <div className="container mx-auto py-12 px-4 md:px-6 max-w-4xl">
         <Link href="/" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors mb-8">
           <ArrowLeft size={16} className="mr-2" />
