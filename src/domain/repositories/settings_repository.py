@@ -3,10 +3,19 @@
 from typing import Protocol
 
 from src.core.identifiers import EntityID
+from src.domain.entities.settings import UserSettings
 
 
 class UserSettingsRepository(Protocol):
     """Interface for user settings data operations."""
+
+    async def get_by_user_id(self, user_id: EntityID) -> UserSettings:
+        """Retrieve settings for a specific user."""
+        ...
+
+    async def save(self, settings: UserSettings) -> None:
+        """Save user settings."""
+        ...
 
     async def get_auto_draft_enabled(self, user_id: EntityID) -> bool:
         """Check if auto-drafting is enabled for a user."""

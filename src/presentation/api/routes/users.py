@@ -53,8 +53,13 @@ async def get_my_settings(
     ],
 ) -> UserSettingsRead:
     """Get the current authenticated user's settings."""
-    auto_draft = await settings_repo.get_auto_draft_enabled(user.id)
-    return UserSettingsRead(auto_draft_enabled=auto_draft)
+    settings = await settings_repo.get_by_user_id(user.id)
+    return UserSettingsRead(
+        auto_draft_enabled=settings.auto_draft_enabled,
+        ai_tone=settings.ai_tone,
+        signature=settings.signature,
+        safety_rules=settings.safety_rules,
+    )
 
 
 @router.patch('/me/settings', response_model=UserSettingsRead)
@@ -66,11 +71,25 @@ async def update_my_settings(
     ],
 ) -> UserSettingsRead:
     """Update the current authenticated user's settings."""
-    if update.auto_draft_enabled is not None:
-        await settings_repo.update_auto_draft_enabled(user.id, update.auto_draft_enabled)
+    settings = await settings_repo.get_by_user_id(user.id)
 
-    auto_draft = await settings_repo.get_auto_draft_enabled(user.id)
-    return UserSettingsRead(auto_draft_enabled=auto_draft)
+    if update.auto_draft_enabled is not None:
+        settings.update_auto_draft(update.auto_draft_enabled)
+    if update.ai_tone is not None:
+        settings.update_ai_tone(update.ai_tone)
+    if update.signature is not None:
+        settings.update_signature(update.signature)
+    if update.safety_rules is not None:
+        settings.update_safety_rules(update.safety_rules)
+
+    await settings_repo.save(settings)
+
+    return UserSettingsRead(
+        auto_draft_enabled=settings.auto_draft_enabled,
+        ai_tone=settings.ai_tone,
+        signature=settings.signature,
+        safety_rules=settings.safety_rules,
+    )
 
 
 @router.patch('/{user_id}', response_model=UserRead)

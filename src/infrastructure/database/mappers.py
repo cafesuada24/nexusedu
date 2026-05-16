@@ -19,6 +19,7 @@ from src.domain.entities.point_ledger import (
 )
 from src.domain.entities.schedule import DayOff as DomainDayOff
 from src.domain.entities.schedule import WorkingHours as DomainWorkingHours
+from src.domain.entities.settings import UserSettings as DomainUserSettings
 from src.domain.entities.student import Student as DomainStudent
 from src.domain.value_objects.status import (
     EmailStatus,
@@ -52,10 +53,35 @@ from src.infrastructure.database.models import (
 from src.infrastructure.database.models import (
     Student as OrmStudent,
 )
+from src.infrastructure.database.models import (
+    UserSettings as OrmUserSettings,
+)
 
 
 class DataMapper:
     """Static mapping methods for domain-infrastructure conversion."""
+
+    @staticmethod
+    def to_domain_user_settings(orm_settings: OrmUserSettings) -> DomainUserSettings:
+        """Map ORM UserSettings to Domain UserSettings."""
+        return DomainUserSettings(
+            user_id=orm_settings.user_id,
+            auto_draft_enabled=orm_settings.auto_draft_enabled,
+            ai_tone=orm_settings.ai_tone,
+            signature=orm_settings.signature,
+            safety_rules=orm_settings.safety_rules,
+        )
+
+    @staticmethod
+    def to_orm_user_settings(domain_settings: DomainUserSettings) -> OrmUserSettings:
+        """Map Domain UserSettings to ORM UserSettings."""
+        return OrmUserSettings(
+            user_id=domain_settings.user_id,
+            auto_draft_enabled=domain_settings.auto_draft_enabled,
+            ai_tone=domain_settings.ai_tone,
+            signature=domain_settings.signature,
+            safety_rules=domain_settings.safety_rules,
+        )
 
     @staticmethod
     def to_domain_ledger(

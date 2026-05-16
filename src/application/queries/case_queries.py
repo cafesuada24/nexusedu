@@ -3,6 +3,7 @@
 
 from src.application.dtos.case_dtos import (
     CaseDTO,
+    CaseOverviewDTO,
     GetAllCasesQuery,
     GetAssignedQuery,
     GetUnassignedQuery,
@@ -113,6 +114,12 @@ class CaseQueryHandler:
                 notes=case.appointment.notes,
             )
             if case.appointment
+            else None,
+            ai_overview=CaseOverviewDTO(
+                academic_summary=case.academic_summary,
+                action_keys=case.action_keys or [],
+            )
+            if case.academic_summary
             else None,
         )
 

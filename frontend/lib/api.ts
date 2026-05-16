@@ -234,6 +234,9 @@ export type UserRead = z.infer<typeof UserReadSchema>;
 
 export const UserSettingsSchema = z.object({
   auto_draft_enabled: z.boolean(),
+  ai_tone: z.string(),
+  signature: z.string().nullable(),
+  safety_rules: z.array(z.string()),
 });
 export type UserSettings = z.infer<typeof UserSettingsSchema>;
 
@@ -598,7 +601,7 @@ export async function getUserSettings(): Promise<UserSettings> {
  * PATCH /users/me/settings — updates current user settings.
  */
 export async function updateUserSettings(
-  settings: Pick<UserSettings, "auto_draft_enabled">,
+  settings: Partial<UserSettings>,
 ): Promise<UserSettings> {
   return apiCall(
     endpoint("/users/me/settings"),

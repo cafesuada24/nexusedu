@@ -240,6 +240,13 @@ class CaseCommandHandler:
                 if not student_data.student_name:
                     raise StudentNameMissingError(case.sid)
 
+                # Fetch advisor and their settings for personalized AI tone and rules
+                if not case.assigned_advisor_id:
+                    raise AdvisorNotFoundError('No advisor assigned to this case.')
+
+                advisor = await self.uow.advisors.get_by_id(case.assigned_advisor_id)
+                settings = await self.uow.user_settings.get_by_user_id(advisor.user_id)
+
                 # 2. Fetch performance data (Deterministic Fetching)
                 perf_raw = await self.uow.students.get_recent_performance(case.sid)
                 if not perf_raw:
@@ -258,6 +265,8 @@ class CaseCommandHandler:
                 ) = await self.email_drafting_service.generate_draft(
                     student_data.student_name,
                     context_str,
+                    ai_tone=settings.ai_tone,
+                    safety_rules=settings.safety_rules,
                 )
 
                 # 4. Persistent storage: Update the existing placeholder

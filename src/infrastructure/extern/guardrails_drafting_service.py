@@ -26,6 +26,8 @@ class GuardrailsEmailDraftingService:
         self,
         student_name: str,
         performance_context: str,
+        ai_tone: str = 'warm',
+        safety_rules: list[str] | None = None,
     ) -> tuple[str, str]:
 
         # 1. Mask PII in input
@@ -33,9 +35,11 @@ class GuardrailsEmailDraftingService:
         masked_context = self._pii_masker.mask(performance_context)
         self._validate_input_masking(performance_context, masked_context)
 
+        safety_rules_str = '\n'.join([f'- {r}' for r in (safety_rules or [])])
         user_intent = (
-            'Generate a short, supportive email to a student whose grades '
-            'have dropped. Use a curious and empathetic tone.'
+            f'Generate a short, supportive email to a student whose grades '
+            f'have dropped. Use a {ai_tone} tone. '
+            f'You MUST strictly follow these additional safety rules:\n{safety_rules_str}'
         )
 
         try:

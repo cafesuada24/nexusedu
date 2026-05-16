@@ -110,12 +110,17 @@ async def test_send_intervention_email_success(
 
     mock_advisor = MagicMock()
     mock_advisor.email = "advisor@example.com"
+    mock_advisor.user_id = uuid.uuid4()
+
+    mock_settings = MagicMock()
+    mock_settings.signature = "-- Best regards"
 
     # Explicitly set AsyncMocks
     mock_uow.cases.get_by_id = AsyncMock(return_value=mock_case)
     mock_uow.emails.get_by_case = AsyncMock(return_value=mock_email)
     mock_uow.students.get_by_id = AsyncMock(return_value=mock_student)
     mock_uow.advisors.get_by_id = AsyncMock(return_value=mock_advisor)
+    mock_uow.user_settings.get_by_user_id = AsyncMock(return_value=mock_settings)
 
     # Execute
     await service.send_intervention_email(case_id, job_id, user_id)
@@ -124,7 +129,7 @@ async def test_send_intervention_email_success(
     mock_email_sending_service.send_email.assert_called_once_with(
         to_email="student@example.com",
         subject="Subject",
-        body="Body",
+        body="Body\n\n-- Best regards",
         reply_to="advisor@example.com",
     )
     

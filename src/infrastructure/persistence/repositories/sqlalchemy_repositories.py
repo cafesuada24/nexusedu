@@ -40,6 +40,7 @@ from src.domain.exceptions import (
     UserIsNotAnAdvisorError,
     WorkingHoursNotFoundError,
 )
+from src.domain.entities.settings import UserSettings as DomainUserSettings
 from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
@@ -1213,16 +1214,50 @@ class SqlAlchemyUserSettingsRepository:
         """Initialize with a SQLAlchemy async session."""
         self.session = session
 
-    async def get_auto_draft_enabled(self, user_id: uuid.UUID) -> bool:
-        """Check if auto-drafting is enabled for a user."""
-        stmt = select(UserSettings.auto_draft_enabled).where(
+    async def get_by_user_id(self, user_id: uuid.UUID) -> DomainUserSettings:
+        """Retrieve settings for a specific user."""
+        stmt = select(UserSettings).where(
             UserSettings.user_id == user_id,
         )
         result = await self.session.execute(stmt)
-        value = result.scalar_one_or_none()
+        orm_settings = result.scalar_one_or_none()
 
-        # Lazy initialization: return True (default) if no setting exists
-        return True if value is None else value
+        if orm_settings is None:
+            # Return default domain object if no record exists in DB
+            return DomainUserSettings.create_default(user_id)
+
+        return DataMapper.to_domain_user_settings(orm_settings)
+
+    async def save(self, settings: DomainUserSettings) -> None:
+        """Save user settings."""
+        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
+        values = {
+            'user_id': settings.user_id,
+            'auto_draft_enabled': settings.auto_draft_enabled,
+            'ai_tone': settings.ai_tone,
+            'signature': settings.signature,
+            'safety_rules': settings.safety_rules,
+        }
+
+        stmt = upsert_stmt(
+            dialect_name=dialect,
+            table=UserSettings,
+            records=[values],
+            index_elements=['user_id'],
+            update_mapping={
+                'auto_draft_enabled': settings.auto_draft_enabled,
+                'ai_tone': settings.ai_tone,
+                'signature': settings.signature,
+                'safety_rules': settings.safety_rules,
+            },
+        )
+
+        await self.session.execute(stmt)
+
+    async def get_auto_draft_enabled(self, user_id: uuid.UUID) -> bool:
+        """Check if auto-drafting is enabled for a user."""
+        settings = await self.get_by_user_id(user_id)
+        return settings.auto_draft_enabled
 
     async def update_auto_draft_enabled(
         self,
@@ -1230,28 +1265,14 @@ class SqlAlchemyUserSettingsRepository:
         enabled: bool,
     ) -> None:
         """Update the auto-drafting setting for a user."""
-        # Upsert logic
-        dialect = self.session.bind.dialect.name if self.session.bind else 'sqlite'
-        values = {'user_id': user_id, 'auto_draft_enabled': enabled}
-
-        stmt = upsert_stmt(
-            dialect_name=dialect,
-            table=UserSettings,
-            records=[values],
-            index_elements=['user_id'],
-            update_mapping={'auto_draft_enabled': enabled},
-        )
-
-        await self.session.execute(stmt)
+        settings = await self.get_by_user_id(user_id)
+        settings.update_auto_draft(enabled)
+        await self.save(settings)
 
     async def create_user_settings(self, user_id: uuid.UUID) -> None:
         """Create a new default settings for an user."""
-        new_settings = UserSettings(
-            user_id=user_id,
-            auto_draft_enabled=True,
-        )
-
-        self.session.add(new_settings)
+        settings = DomainUserSettings.create_default(user_id)
+        await self.save(settings)
 
 
 class SqlAlchemyPointLedgerRepository:

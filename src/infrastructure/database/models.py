@@ -147,6 +147,20 @@ class UserSettings(Base):
         default=True,
         nullable=False,
     )
+    signature: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    ai_tone: Mapped[str] = mapped_column(
+        String,
+        default='warm',
+        nullable=False,
+    )
+    safety_rules: Mapped[list[str]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
 
     user: Mapped[User] = relationship(
         'User',
