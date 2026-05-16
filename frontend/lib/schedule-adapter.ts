@@ -85,7 +85,6 @@ export function generateDiffCommands(
     start_time: string;
     end_time: string;
     timezone: string;
-    slotId: string;
   }> = [];
 
   for (const d of DAYS) {
@@ -97,7 +96,6 @@ export function generateDiffCommands(
           start_time: `${slot.from}:00`,
           end_time: `${slot.to}:00`,
           timezone: nextFe.timezone,
-          slotId: slot.id,
         });
       }
     }
@@ -107,10 +105,9 @@ export function generateDiffCommands(
   for (const beWh of prevBe.working_hours) {
     const match = targetWhs.find(
       (t) =>
-        t.slotId === beWh.id || // either ID matches
-        (t.day_of_week === beWh.day_of_week && // or exact time matches
-          t.start_time === beWh.start_time &&
-          t.end_time === beWh.end_time)
+        t.day_of_week === beWh.day_of_week &&
+        t.start_time === beWh.start_time &&
+        t.end_time === beWh.end_time
     );
 
     if (!match) {
@@ -122,10 +119,9 @@ export function generateDiffCommands(
   for (const t of targetWhs) {
     const isExisting = prevBe.working_hours.some(
       (beWh) =>
-        beWh.id === t.slotId ||
-        (beWh.day_of_week === t.day_of_week &&
-          beWh.start_time === t.start_time &&
-          beWh.end_time === t.end_time)
+        beWh.day_of_week === t.day_of_week &&
+        beWh.start_time === t.start_time &&
+        beWh.end_time === t.end_time
     );
     if (!isExisting) {
       commands.addWorkingHours.push({
