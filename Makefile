@@ -1,6 +1,11 @@
 # Default to development environment if not specified
 ENV ?= dev
 
+# Normalize ENV
+ifeq ($(ENV),production)
+    override ENV := prod
+endif
+
 # Define variables based on the environment
 ifeq ($(ENV), prod)
     PROFILE = prod
