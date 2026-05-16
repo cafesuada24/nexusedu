@@ -56,6 +56,7 @@ class EmailApplicationService:
 
         student = await self.uow.students.get_by_id(case.sid)
         advisor = await self.uow.advisors.get_by_id(case.assigned_advisor_id)
+        settings = await self.uow.user_settings.get_by_user_id(advisor.user_id)
 
         logger.info(
             'dispatching_intervention_email',
@@ -64,10 +65,14 @@ class EmailApplicationService:
             advisor_email=advisor.email if advisor else None,
         )
 
+        final_body = email.body
+        if settings.signature:
+            final_body = f"{final_body}\n\n{settings.signature}"
+
         await self.email_sending_service.send_email(
             to_email=student.email,
             subject=email.subject,
-            body=email.body,
+            body=final_body,
             reply_to=advisor.email if advisor else None,
         )
 

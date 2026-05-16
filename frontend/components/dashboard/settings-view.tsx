@@ -14,6 +14,8 @@ import {
     Monitor,
     Sun,
     Moon,
+    X,
+    Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -41,6 +43,9 @@ import {
     type AdvisorProfileUpdate,
     fetchAdvisorProfile,
     updateAdvisorProfile,
+    getUserSettings,
+    updateUserSettings,
+    type UserSettings,
 } from "@/lib/api";
 import {
     Form,
@@ -89,8 +94,6 @@ const sessions = [
 ];
 
 export function SettingsView() {
-    const [tone, setTone] = React.useState("warm");
-
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
 
@@ -102,6 +105,11 @@ export function SettingsView() {
     const { data: profile, isLoading: isProfileLoading } = useQuery({
         queryKey: ["advisor-profile"],
         queryFn: fetchAdvisorProfile,
+    });
+
+    const { data: settings, isLoading: isSettingsLoading } = useQuery({
+        queryKey: ["user-settings"],
+        queryFn: getUserSettings,
     });
 
     const updateProfileMutation = useMutation({
@@ -118,6 +126,34 @@ export function SettingsView() {
             });
         },
     });
+
+    const updateSettingsMutation = useMutation({
+        mutationFn: updateUserSettings,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["user-settings"] });
+        },
+        onError: (err: any) => {
+            toast.error("Lỗi", {
+                description: err.message || "Không thể cập nhật cài đặt.",
+            });
+        },
+    });
+
+    const removeSafetyRule = (index: number) => {
+        if (!settings) return;
+        const newRules = settings.safety_rules.filter((_, i) => i !== index);
+        updateSettingsMutation.mutate({ safety_rules: newRules });
+    };
+
+    const addSafetyRule = () => {
+        if (!settings) return;
+        const newRule = prompt("Nhập quy tắc an toàn mới:");
+        if (newRule && newRule.trim()) {
+            updateSettingsMutation.mutate({
+                safety_rules: [...settings.safety_rules, newRule.trim()],
+            });
+        }
+    };
 
     const form = useForm<AdvisorProfileUpdate>({
         resolver: zodResolver(AdvisorProfileUpdateSchema),
@@ -380,9 +416,20 @@ export function SettingsView() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-6">
+                        {isSettingsLoading ? (
+                            <div className="space-y-4">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-24 w-full" />
+                            </div>
+                        ) : (
+                        <>
                         <div className="grid gap-1.5">
                             <Label htmlFor="tone">Giọng văn AI</Label>
-                            <Select value={tone} onValueChange={setTone}>
+                            <Select 
+                                value={settings?.ai_tone || "warm"} 
+                                onValueChange={(val) => updateSettingsMutation.mutate({ ai_tone: val })}
+                                disabled={updateSettingsMutation.isPending}
+                            >
                                 <SelectTrigger id="tone" className="rounded-lg">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -406,9 +453,18 @@ export function SettingsView() {
                             <Textarea
                                 id="signature"
                                 className="min-h-24 rounded-lg font-mono text-xs"
-                                defaultValue={`Thân mến,\nTS. Lê Thị Hà\nKhoa CNTT · NexusEdu University\n+84 912 345 678`}
+                                placeholder="Thân mến, ..."
+                                defaultValue={settings?.signature || ""}
+                                onBlur={(e) => {
+                                    if (e.target.value !== settings?.signature) {
+                                        updateSettingsMutation.mutate({ signature: e.target.value });
+                                    }
+                                }}
+                                disabled={updateSettingsMutation.isPending}
                             />
                         </div>
+                        </>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -420,28 +476,40 @@ export function SettingsView() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-3 text-sm">
-                        {[
-                            "Không tiết lộ điểm số của sinh viên khác",
-                            "Luôn gọi sinh viên theo đúng tên và đại từ đã khai báo",
-                            "Không dùng ngôn ngữ đe doạ hay phán xét",
-                            "Luôn đề xuất ít nhất 1 hành động cụ thể sinh viên có thể làm",
-                            "Luôn kèm link đặt lịch 1-1 nếu mức rủi ro > trung bình",
-                            "Không gửi quá 2 email/tuần cho cùng một sinh viên",
-                        ].map((r, i) => (
-                            <div key={i} className="flex items-start gap-2.5">
+                        {isSettingsLoading ? (
+                            <div className="space-y-2">
+                                {[1,2,3,4].map(i => <Skeleton key={i} className="h-5 w-full" />)}
+                            </div>
+                        ) : (
+                        <>
+                        {(settings?.safety_rules || []).map((r, i) => (
+                            <div key={i} className="group flex items-start gap-2.5">
                                 <div className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
                                     <Check className="size-3" />
                                 </div>
-                                <p className="leading-relaxed">{r}</p>
+                                <p className="flex-1 leading-relaxed">{r}</p>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-6 opacity-0 group-hover:opacity-100"
+                                    onClick={() => removeSafetyRule(i)}
+                                    disabled={updateSettingsMutation.isPending}
+                                >
+                                    <X className="size-3" />
+                                </Button>
                             </div>
                         ))}
                         <Button
                             variant="outline"
                             size="sm"
                             className="mt-1 rounded-lg"
+                            onClick={addSafetyRule}
+                            disabled={updateSettingsMutation.isPending}
                         >
                             Thêm quy tắc tuỳ chỉnh
                         </Button>
+                        </>
+                        )}
                     </CardContent>
                 </Card>
             </TabsContent>

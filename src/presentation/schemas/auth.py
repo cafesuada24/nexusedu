@@ -2,7 +2,10 @@
 
 import uuid
 
+from typing import Literal
+
 from fastapi_users import schemas
+from pydantic import Field
 
 from src.presentation.api.auth import UserRole
 
@@ -37,9 +40,15 @@ class UserSettingsRead(schemas.BaseModel):
     """Schema for reading user settings."""
 
     auto_draft_enabled: bool
+    ai_tone: str
+    signature: str | None
+    safety_rules: list[str]
 
 
 class UserSettingsUpdate(schemas.BaseModel):
     """Schema for updating user settings."""
 
     auto_draft_enabled: bool | None = None
+    ai_tone: Literal['warm', 'formal', 'direct', 'motivational'] | None = None
+    signature: str | None = None
+    safety_rules: list[str] | None = None
