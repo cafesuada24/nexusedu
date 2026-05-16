@@ -1,7 +1,7 @@
 "use server"
 
 import { cookies } from "next/headers"
-import { endpoint, withTimeout } from "@/lib/api"
+import { endpoint, withTimeout, getApiBase } from "@/lib/api"
 import { logger } from "@/lib/logger"
 
 export async function loginAction(username: string, password: string) {
@@ -10,13 +10,7 @@ export async function loginAction(username: string, password: string) {
     form.append("username", username)
     form.append("password", password)
 
-    // Using a hardcoded url or reading from env correctly since it's on the server
-    const rawBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL
-    if (!rawBaseUrl && process.env.NODE_ENV === "production") {
-      logger.error("NEXT_PUBLIC_API_BASE_URL is missing in production environment!")
-    }
-    
-    const baseUrl = rawBaseUrl || "http://localhost:8000/api/v1"
+    const baseUrl = getApiBase()
     const url = `${baseUrl.replace(/\/+$/, "")}/auth/jwt/login`
 
     logger.debug({ username, url }, "Attempting login to backend")
@@ -88,7 +82,7 @@ export async function loginAction(username: string, password: string) {
 
 export async function logoutAction() {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1"
+    const baseUrl = getApiBase()
     const url = `${baseUrl.replace(/\/+$/, "")}/auth/jwt/logout`
     
     const cookieStore = await cookies()

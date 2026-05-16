@@ -361,7 +361,7 @@ const INGEST_TIMEOUT_MS = 60_000;
 //     return "/api/v1";
 //   }
 
-function getApiBase(): string {
+export function getApiBase(): string {
   // Lấy giá trị từ biến môi trường đã cấu hình trên Vercel
   const envBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
 
@@ -375,6 +375,10 @@ function getApiBase(): string {
   // Cấu hình cho Server-side (giữ nguyên hoặc tối ưu)
   if (envBase && envBase.trim()) {
     return envBase.trim().replace(/\/+$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not set in production!");
   }
 
   return "http://127.0.0.1:8000/api/v1";
