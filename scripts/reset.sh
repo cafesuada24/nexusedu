@@ -12,7 +12,9 @@ fi
 ENV_VAL=${ENVIRONMENT:-development}
 ENV=${1:-$ENV_VAL}
 
+# Normalize ENV
 if [ "$ENV" = "production" ] || [ "$ENV" = "prod" ]; then
+    ENV="prod"
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "WARNING: YOU ARE ABOUT TO RESET THE PRODUCTION DATABASE!"
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -26,6 +28,7 @@ if [ "$ENV" = "production" ] || [ "$ENV" = "prod" ]; then
     API_SVC="api"
     WORKER_SVC="worker"
 else
+    ENV="dev"
     PROFILE="dev"
     API_SVC="api-dev"
     WORKER_SVC="worker-dev"
