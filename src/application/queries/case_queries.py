@@ -6,9 +6,11 @@ from src.application.dtos.case_dtos import (
     CaseOverviewDTO,
     GetAllCasesQuery,
     GetAssignedQuery,
+    GetCaseTakenSlotsQuery,
     GetUnassignedQuery,
     QueryAppointmentDTO,
     QueryEmailDTO,
+    TakenSlotDTO,
 )
 from src.application.dtos.pagination import PagedResponse
 from src.application.interfaces.case_query_service import CaseQueryService
@@ -146,4 +148,17 @@ class CaseQueryHandler:
             created_at=email.created_at,
             body=email.body,
             subject=email.subject,
+        )
+
+    async def handle_get_case_taken_slots(
+        self,
+        query: GetCaseTakenSlotsQuery,
+    ) -> list[TakenSlotDTO]:
+        """Return all booked slots for the advisor assigned to this case on a given date."""
+        case = await self.__case_repo.find_by_id(query.case_id)
+        if case is None or case.assigned_advisor_id is None:
+            return []
+        return await self._case_query_service.find_taken_slots(
+            advisor_id=case.assigned_advisor_id,
+            date=query.date,
         )

@@ -1,5 +1,6 @@
 """Case query service implementation."""
 
+from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
 
 from sqlalchemy import Select, desc, func, select
@@ -10,6 +11,7 @@ from src.application.dtos.case_dtos import (
     CaseOverviewDTO,
     QueryAppointmentDTO,
     QueryEmailDTO,
+    TakenSlotDTO,
 )
 from src.application.dtos.pagination import PagedResponse, PaginationMetadata
 from src.domain.services.gamification import GamificationService
@@ -193,3 +195,33 @@ class SqlAlchemyCaseQueryService:
                 has_next=offset + len(tasks) < total_count,
             ),
         )
+
+    async def find_taken_slots(
+        self,
+        advisor_id: UUID,
+        date: date,
+    ) -> list[TakenSlotDTO]:
+        """Return all booked appointment slots for an advisor on a given date (UTC+7)."""
+        # Convert the local date (UTC+7) to a UTC range for the DB query.
+        # UTC+7 midnight → UTC = previous day 17:00; end of day → next day 17:00.
+        day_start_utc = datetime.combine(date, time.min, tzinfo=UTC) - timedelta(hours=7)
+        day_end_utc = datetime.combine(date, time.max, tzinfo=UTC) - timedelta(hours=7)
+
+        stmt = (
+            select(OrmAppointment.appointment_time, OrmAppointment.duration_minutes)
+            .join(OrmCase, OrmCase.case_id == OrmAppointment.case_id)
+            .where(
+                OrmCase.assigned_advisor_id == advisor_id,
+                OrmAppointment.appointment_time >= day_start_utc,
+                OrmAppointment.appointment_time <= day_end_utc,
+            )
+        )
+        result = await self.session.execute(stmt)
+        rows = result.all()
+        return [
+            TakenSlotDTO(
+                start_time=row[0].astimezone(UTC),
+                end_time=(row[0] + timedelta(minutes=row[1])).astimezone(UTC),
+            )
+            for row in rows
+        ]

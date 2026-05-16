@@ -1,8 +1,9 @@
 """Case query service interface."""
 
+from datetime import date
 from typing import Protocol
 
-from src.application.dtos.case_dtos import CaseDTO
+from src.application.dtos.case_dtos import CaseDTO, TakenSlotDTO
 from src.application.dtos.pagination import PagedResponse
 from src.core.identifiers import EntityID
 
@@ -25,4 +26,12 @@ class CaseQueryService(Protocol):
         offset: int,
     ) -> PagedResponse[CaseDTO]:
         """Find all cases."""
+        ...
+
+    async def find_taken_slots(
+        self,
+        advisor_id: EntityID,
+        date: date,
+    ) -> list[TakenSlotDTO]:
+        """Find all booked appointment slots for an advisor on a given date."""
         ...

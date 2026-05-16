@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import AwareDatetime, BaseModel, EmailStr, FutureDatetime
 
@@ -120,6 +120,14 @@ class GetAllCasesQuery:
     offset: int = 0
 
 
+@dataclass(frozen=True)
+class GetCaseTakenSlotsQuery:
+    """Query to retrieve taken appointment slots for an advisor on a given date."""
+
+    case_id: EntityID
+    date: date
+
+
 # ==========================
 # ========== DTOs ==========
 # ==========================
@@ -168,6 +176,13 @@ class QueryAppointmentDTO(BaseModel):
     duration_minutes: int
     meeting_method: MeetingMethod
     notes: str | None
+
+
+class TakenSlotDTO(BaseModel):
+    """A time slot already booked by another student for the same advisor."""
+
+    start_time: AwareDatetime
+    end_time: AwareDatetime
 
 class CaseOverviewDTO(BaseModel):
     """DTO for AI-generated academic overview of a case."""

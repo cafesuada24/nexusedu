@@ -29,7 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useScheduleQuery } from "@/hooks/use-schedule-query";
 import { generateSlotsForDate, isDateOff } from "@/lib/schedule";
-import { confirmBooking, SlotTakenError } from "@/lib/api";
+import { confirmBooking, fetchTakenSlots, SlotTakenError } from "@/lib/api";
 
 type Mode = "video" | "inperson";
 
@@ -42,11 +42,33 @@ export function BookingView({ caseId }: { caseId: string }) {
     const [stage, setStage] = React.useState<"pick" | "syncing" | "done">(
         "pick",
     );
+    const [takenSlots, setTakenSlots] = React.useState<Set<string>>(new Set());
 
     const slotsForDate = React.useMemo(
         () => (date ? generateSlotsForDate(date, schedule) : []),
         [date, schedule],
     );
+
+    React.useEffect(() => {
+        if (!date) return;
+        let cancelled = false;
+        const dateStr = format(date, "yyyy-MM-dd");
+        fetchTakenSlots(caseId, dateStr).then((slots) => {
+            if (cancelled) return;
+            const taken = new Set(
+                slots.map((s) => {
+                    const utcDate = new Date(s.start_time);
+                    const h = ((utcDate.getUTCHours() + 7) % 24)
+                        .toString()
+                        .padStart(2, "0");
+                    const m = utcDate.getUTCMinutes().toString().padStart(2, "0");
+                    return `${h}:${m}`;
+                }),
+            );
+            setTakenSlots(taken);
+        });
+        return () => { cancelled = true; };
+    }, [date, caseId]);
 
     const confirm = async () => {
         if (!date || !slot) return;
@@ -219,6 +241,7 @@ export function BookingView({ caseId }: { caseId: string }) {
                         onSelect={(d) => {
                             setDate(d);
                             setSlot(null);
+                            setTakenSlots(new Set());
                         }}
                         disabled={(d) => d < today || isDateOff(d, schedule)}
                         className="rounded-xl border border-border bg-card p-3"
@@ -251,20 +274,31 @@ export function BookingView({ caseId }: { caseId: string }) {
                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                                 {slotsForDate.map((s) => {
                                     const selected = s === slot;
+                                    const taken = takenSlots.has(s);
                                     return (
                                         <button
                                             key={s}
                                             type="button"
-                                            onClick={() => setSlot(s)}
+                                            onClick={() => !taken && setSlot(s)}
                                             aria-pressed={selected}
+                                            disabled={taken}
+                                            title={taken ? "Khung giờ đã được đặt" : undefined}
                                             className={cn(
-                                                "h-10 rounded-xl border text-sm font-medium transition-all",
-                                                !selected &&
+                                                "relative h-10 rounded-xl border text-sm font-medium transition-all",
+                                                taken &&
+                                                    "cursor-not-allowed border-border/40 bg-muted/40 text-muted-foreground/50",
+                                                !taken && !selected &&
                                                     "border-border hover:border-primary/50 hover:bg-primary/5",
-                                                selected &&
+                                                !taken && selected &&
                                                     "border-primary bg-primary text-primary-foreground shadow-sm",
                                             )}
                                         >
+                                            {taken && (
+                                                <span
+                                                    aria-hidden
+                                                    className="pointer-events-none absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-muted-foreground/40"
+                                                />
+                                            )}
                                             {s}
                                         </button>
                                     );

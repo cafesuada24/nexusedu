@@ -1391,6 +1391,33 @@ export async function confirmBooking(
   throw new Error(`Xác nhận đặt lịch thất bại [${res.status}]: ${detail}`);
 }
 
+export type TakenSlot = { start_time: string; end_time: string };
+
+const TakenSlotSchema = z.object({
+  start_time: z.string(),
+  end_time: z.string(),
+});
+
+/**
+ * GET /cases/{case_id}/taken-slots?date=YYYY-MM-DD
+ * Public endpoint — no auth required.
+ */
+export async function fetchTakenSlots(
+  case_id: string,
+  date: string,
+): Promise<TakenSlot[]> {
+  const trimmed = case_id.trim();
+  const url = `${endpoint(`/cases/${encodeURIComponent(trimmed)}/taken-slots`)}?date=${encodeURIComponent(date)}`;
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(url, { method: "GET", suppressUnauthorizedEvent: true }, signal),
+    DEFAULT_TIMEOUT_MS,
+  );
+  if (!res.ok) return [];
+  const json = await res.json();
+  return z.array(TakenSlotSchema).parse(json);
+}
+
 /**
  * POST /cases/{case_id}/supporting — advisor starts the supporting session
  * (BOOKED → SUPPORTING). Requires advisor auth.

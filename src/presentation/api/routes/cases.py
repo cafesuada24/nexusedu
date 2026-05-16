@@ -1,6 +1,6 @@
 """API routes for Student Case management."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -21,11 +21,13 @@ from src.application.dtos.case_dtos import (
     ActionResponseDTO,
     CaseDTO,
     GetAllCasesQuery,
+    GetCaseTakenSlotsQuery,
     QueryEmailDTO,
     ResolveCaseCommand,
     ReviewCaseDTO,
     SendEmailResponseDTO,
     StartSupportingCommand,
+    TakenSlotDTO,
     TriggerDraftDTO,
 )
 from src.application.dtos.pagination import PagedResponse
@@ -102,6 +104,20 @@ async def get_case_details(
 ) -> CaseDTO:
     """Retrieve full details of a specific case, including associated emails."""
     return await query_handler.handle_get_case_details(case_id)
+
+
+@router.get('/{case_id}/taken-slots')
+async def get_case_taken_slots(
+    case_id: UUID,
+    date: Annotated[date, Query(description='Date to check (YYYY-MM-DD, UTC+7)')],
+    query_handler: Annotated[CaseQueryHandler, Depends(get_case_query_handler)],
+) -> list[TakenSlotDTO]:
+    """Return booked slots for the advisor assigned to this case on a given date.
+
+    Public endpoint — no authentication required.
+    """
+    query = GetCaseTakenSlotsQuery(case_id=case_id, date=date)
+    return await query_handler.handle_get_case_taken_slots(query)
 
 
 @router.post('/{case_id}/email/draft')
