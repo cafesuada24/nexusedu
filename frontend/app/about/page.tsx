@@ -1,9 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Inter } from "next/font/google";
 import { ArrowLeft, Heart, Zap, Users, ShieldCheck, GraduationCap, Target, Sparkles } from "lucide-react";
-
-const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Về NexusEdu | Sứ mệnh của chúng tôi",
@@ -12,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className={`min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 ${inter.variable} font-sans transition-colors duration-300`}>
+    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       {/* Hero Section with Ambient Glow */}
       <div className="relative overflow-hidden pt-12 pb-24 md:pt-20 md:pb-32">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-blue-400/20 dark:bg-blue-600/10 blur-[120px] rounded-full -z-10" />
