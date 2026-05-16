@@ -15,7 +15,6 @@ project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
 from src.core.identifiers import generate_uuid
-from scripts.utils import require_dev_only
 from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
@@ -41,14 +40,9 @@ from src.presentation.schemas.auth import UserCreate
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
-@require_dev_only
-async def reseed() -> None:
-    """Drops all tables, recreates schema, and seeds data from CSV files."""
-    logger.info('Initializing new database schema...')
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-
+async def seed_data() -> None:
+    """Seeds data from CSV files into the existing database schema."""
+    
     # Load Advisors
     logger.info('Importing advisors...')
     adv_df = pd.read_csv('data/v2_advisors.csv')
@@ -123,27 +117,32 @@ async def reseed() -> None:
                 )
 
         # Create default admin user
-        logger.info('Creating default admin user (admin@example.com / password123)...')
+        logger.info('Creating default admin user (dev@gmail.com / dev)...')
         user_db = SQLAlchemyUserDatabase(session, User)
         user_settings_repo = SqlAlchemyUserSettingsRepository(session)
         from src.infrastructure.persistence.sqlalchemy_uow import SqlAlchemyUnitOfWork
         uow = SqlAlchemyUnitOfWork(session)
         user_manager = UserManager(user_db, user_settings_repo, uow)
-        user = await user_manager.create(
-            UserCreate(email='dev@gmail.com', password='dev'), safe=True,
-        )
-        adv = await user_manager.create(
-            UserCreate(email='adv@gmail.com', password='adv'), safe=True,
-        )
-        # Update role to admin
-        from sqlalchemy import update
+        
+        # Check if users already exist to avoid duplicates
+        from sqlalchemy import select
+        existing_user = await session.execute(select(User).where(User.email == 'dev@gmail.com'))
+        if not existing_user.scalar_one_or_none():
+            user = await user_manager.create(
+                UserCreate(email='dev@gmail.com', password='dev'), safe=True,
+            )
+            adv = await user_manager.create(
+                UserCreate(email='adv@gmail.com', password='adv'), safe=True,
+            )
+            # Update role to admin
+            from sqlalchemy import update
 
-        await session.execute(
-            update(User).where(User.id == user.id).values(role=UserRole.ADMIN.value),
-        )
-        await session.execute(
-            update(User).where(User.id == adv.id).values(role=UserRole.ADVISOR.value),
-        )
+            await session.execute(
+                update(User).where(User.id == user.id).values(role=UserRole.ADMIN.value),
+            )
+            await session.execute(
+                update(User).where(User.id == adv.id).values(role=UserRole.ADVISOR.value),
+            )
 
         await session.commit()
 
@@ -181,6 +180,15 @@ async def reseed() -> None:
         if new_history_records:
             await history_repo.batch_create_history(new_history_records)
 
+        # DEBUG: Print risk statuses for non-Normal students
+        print("\n--- NON-NORMAL RISK STATUSES ---")
+        student_names_map = {s.sid: s.student_name for s in students}
+        for sid, status in risk_statuses.items():
+            if status != RiskStatus.NORMAL:
+                name = student_names_map.get(sid, "Unknown")
+                print(f"{name}: {status}")
+        print("---------------------------\n")
+
         # 5. Transition student statuses and identify new at-risk students
         new_at_risk_sids = []
         for sid, latest_risk in risk_statuses.items():
@@ -191,8 +199,6 @@ async def reseed() -> None:
             if not student:
                 continue
 
-            # In the current model, intervention_status is on Case, not Student.
-            # Use 'save' method which exists in the repository
             student.current_risk_status = latest_risk
             await student_repo.save(student)
             new_at_risk_sids.append(sid)
@@ -221,11 +227,10 @@ async def reseed() -> None:
 
         if cases:
             session.add_all(cases)
-            await session.flush()  # To get task IDs if needed
+            await session.flush()
 
             logger.info('Seeding point ledger...')
             ledger_entries = []
-            # Complete some random tasks (simulated by adding points)
             for _ in range(20):
                 case_obj = random.choice(cases)
                 aid = case_obj.assigned_advisor_id
@@ -246,8 +251,8 @@ async def reseed() -> None:
             logger.info('No cases to seed.')
         await session.commit()
 
-    logger.info('Reseed complete.')
+    logger.info('Data seeding complete.')
 
 
 if __name__ == '__main__':
-    asyncio.run(reseed())
+    asyncio.run(seed_data())

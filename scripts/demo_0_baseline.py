@@ -78,7 +78,7 @@ def generate_baseline() -> None:
     pd.DataFrame([]).to_csv('data/v2_student_status_history.csv', index=False)
 
     print("\nBaseline CSVs generated.")
-    print("NEXT STEP: Run 'uv run python scripts/reseed_all.py' to initialize the database.")
+    print("NEXT STEP: Run './scripts/reseed_all.sh' to initialize the database.")
 
 if __name__ == '__main__':
     generate_baseline()

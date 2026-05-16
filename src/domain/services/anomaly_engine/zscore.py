@@ -37,23 +37,23 @@ class AdaptiveEngineConfig:
     gamma: float = 0.2
 
     # Variance regularization (shrinkage lambda)
-    lambda_peer: float = 100.0
+    lambda_peer: float = 25.0
 
     # Stability regularization for personalized volatility
     # Equivalent to a 1.2 standard deviation floor in z-peer space
     lambda_stability: float = 1.5
 
     # Thresholds for volatility-aware drift (normalized_drift)
-    drift_elevated_threshold: float = -2.5
-    drift_critical_threshold: float = -4.5
+    drift_elevated_threshold: float = -1.5
+    drift_critical_threshold: float = -2.2
 
     # Thresholds for multi-week trend signals
     # EWMA of drifts. A sustained negative drift of -0.3 is significant.
     trend_alert_threshold: float = -0.3
 
     # Thresholds for peer-relative classification (absolute safety net)
-    peer_failure_threshold: float = -2.5
-    peer_critical_threshold: float = -4.0
+    peer_failure_threshold: float = -1.5
+    peer_critical_threshold: float = -2.0
 
     # Confidence constant
     confidence_k: float = 0.5
@@ -221,7 +221,7 @@ class AdaptiveAnomalyEngine:
             total_score += m.score
 
             profile = profiles[m.domain]
-
+            
             # 1. Drift Calculation
             drift = 0.0
             normalized_drift = 0.0
