@@ -38,11 +38,13 @@ from src.application.queries.case_queries import (
 )
 from src.core.config import config
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
+from src.infrastructure.queue.outbox_processor import OutboxProcessor
 from src.presentation.api.auth import Scope, User, require_scope
 from src.presentation.dependencies.providers import (
     get_case_command_handler,
     get_case_query_handler,
     get_idempotency_repository,
+    get_outbox_processor,
 )
 from src.presentation.schemas.request import BookAppointmentRequest, UpdateEmailRequest
 
@@ -292,6 +294,7 @@ async def submit_case_review(
     token: Annotated[str, Query(...)],
     request: ReviewCaseDTO,
     command_handler: Annotated[CaseCommandHandler, Depends(get_case_command_handler)],
+    outbox_processor: Annotated[OutboxProcessor, Depends(get_outbox_processor)],
 ) -> ActionResponseDTO:
     """Student submits a review for a case resolution."""
     try:
@@ -317,6 +320,13 @@ async def submit_case_review(
         comment=request.comment,
     )
     await command_handler.handle_submit_case_review(command)
+
+    # Flush outbox ngay để CASE:STATUS_UPDATED tới advisor browser trong cùng
+    # request — bypass độ trễ 0-1s của cron poller. Cron vẫn retry như safety net.
+    try:
+        await outbox_processor.process_pending_events()
+    except Exception:
+        logger.exception('Immediate outbox flush failed; cron poller will retry')
 
     return ActionResponseDTO(
         status='success',
