@@ -16,6 +16,8 @@ import {
     Moon,
     X,
     Trash2,
+    Save,
+    Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -56,6 +58,13 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 const integrations = [
     {
@@ -96,6 +105,10 @@ const sessions = [
 export function SettingsView() {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
+    const [safetyRuleDialogOpen, setSafetyRuleDialogOpen] = React.useState(false);
+    const [newRuleText, setNewRuleText] = React.useState("");
+    const [aiTone, setAiTone] = React.useState("warm");
+    const [aiSignature, setAiSignature] = React.useState("");
 
     React.useEffect(() => {
         setMounted(true);
@@ -130,6 +143,7 @@ export function SettingsView() {
     const updateSettingsMutation = useMutation({
         mutationFn: updateUserSettings,
         onSuccess: () => {
+            toast.success("Thành công", { description: "Đã cập nhật quy tắc AI." });
             queryClient.invalidateQueries({ queryKey: ["user-settings"] });
         },
         onError: (err: any) => {
@@ -139,20 +153,31 @@ export function SettingsView() {
         },
     });
 
+    React.useEffect(() => {
+        if (settings) {
+            setAiTone(settings.ai_tone || "warm");
+            setAiSignature(settings.signature || "");
+        }
+    }, [settings]);
+
     const removeSafetyRule = (index: number) => {
         if (!settings) return;
         const newRules = settings.safety_rules.filter((_, i) => i !== index);
         updateSettingsMutation.mutate({ safety_rules: newRules });
     };
 
-    const addSafetyRule = () => {
-        if (!settings) return;
-        const newRule = prompt("Nhập quy tắc an toàn mới:");
-        if (newRule && newRule.trim()) {
-            updateSettingsMutation.mutate({
-                safety_rules: [...settings.safety_rules, newRule.trim()],
-            });
-        }
+    const openAddSafetyRule = () => {
+        setNewRuleText("");
+        setSafetyRuleDialogOpen(true);
+    };
+
+    const confirmAddSafetyRule = () => {
+        if (!settings || !newRuleText.trim()) return;
+        updateSettingsMutation.mutate({
+            safety_rules: [...settings.safety_rules, newRuleText.trim()],
+        });
+        setSafetyRuleDialogOpen(false);
+        setNewRuleText("");
     };
 
     const form = useForm<AdvisorProfileUpdate>({
@@ -189,6 +214,7 @@ export function SettingsView() {
     const profileLabelClass = "text-slate-700 font-semibold dark:text-slate-300";
 
     return (
+        <>
         <Tabs defaultValue="profile" className="gap-6">
             <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border/60 bg-muted/40 p-1">
                 <TabsTrigger
@@ -228,10 +254,31 @@ export function SettingsView() {
             <TabsContent value="profile" className="grid gap-6">
                 <Card className="stripe-sky rounded-2xl border-accent-sky/15 bg-gradient-to-br from-accent-sky/22 via-accent-sky/10 to-card dark:border-slate-800 dark:bg-slate-950/50 dark:from-slate-950/90 dark:via-slate-950/70 dark:to-slate-900/50">
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2">
-                            <User className="size-4 text-primary" />
-                            Thông tin cố vấn
-                        </CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2">
+                                <User className="size-4 text-primary" />
+                                Thông tin cố vấn
+                            </CardTitle>
+                            <Button
+                                type="submit"
+                                form="settings-profile-form"
+                                size="sm"
+                                className="h-9 rounded-lg bg-blue-600 px-4 font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:opacity-60"
+                                disabled={isProfileLoading || updateProfileMutation.isPending}
+                            >
+                                {updateProfileMutation.isPending ? (
+                                    <>
+                                        <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                        Đang lưu...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="size-4" />
+                                        Lưu hồ sơ
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent className="grid gap-5">
                         {isProfileLoading ? (
@@ -425,10 +472,10 @@ export function SettingsView() {
                         <>
                         <div className="grid gap-1.5">
                             <Label htmlFor="tone">Giọng văn AI</Label>
-                            <Select 
-                                value={settings?.ai_tone || "warm"} 
-                                onValueChange={(val) => updateSettingsMutation.mutate({ ai_tone: val })}
-                                disabled={updateSettingsMutation.isPending}
+                            <Select
+                                value={aiTone}
+                                onValueChange={(val) => setAiTone(val)}
+                                disabled={isSettingsLoading}
                             >
                                 <SelectTrigger id="tone" className="rounded-lg">
                                     <SelectValue />
@@ -454,14 +501,29 @@ export function SettingsView() {
                                 id="signature"
                                 className="min-h-24 rounded-lg font-mono text-xs"
                                 placeholder="Thân mến, ..."
-                                defaultValue={settings?.signature || ""}
-                                onBlur={(e) => {
-                                    if (e.target.value !== settings?.signature) {
-                                        updateSettingsMutation.mutate({ signature: e.target.value });
-                                    }
-                                }}
-                                disabled={updateSettingsMutation.isPending}
+                                value={aiSignature}
+                                onChange={(e) => setAiSignature(e.target.value)}
+                                disabled={isSettingsLoading}
                             />
+                        </div>
+                        <div className="flex justify-end pt-2">
+                            <Button
+                                onClick={() => updateSettingsMutation.mutate({ ai_tone: aiTone, signature: aiSignature })}
+                                disabled={isSettingsLoading || updateSettingsMutation.isPending}
+                                className="h-10 rounded-lg bg-blue-600 px-5 font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700 disabled:opacity-60"
+                            >
+                                {updateSettingsMutation.isPending ? (
+                                    <>
+                                        <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                        Đang lưu...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="size-4" />
+                                        Lưu quy tắc AI
+                                    </>
+                                )}
+                            </Button>
                         </div>
                         </>
                         )}
@@ -503,9 +565,10 @@ export function SettingsView() {
                             variant="outline"
                             size="sm"
                             className="mt-1 rounded-lg"
-                            onClick={addSafetyRule}
+                            onClick={openAddSafetyRule}
                             disabled={updateSettingsMutation.isPending}
                         >
+                            <Plus className="size-3.5" />
                             Thêm quy tắc tuỳ chỉnh
                         </Button>
                         </>
@@ -745,5 +808,59 @@ export function SettingsView() {
                 </Card>
             </TabsContent>
         </Tabs>
+
+        <Dialog open={safetyRuleDialogOpen} onOpenChange={setSafetyRuleDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <ShieldCheck className="size-4 text-success" />
+                        Thêm quy tắc an toàn
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-3 py-2">
+                    <Label htmlFor="new-safety-rule" className="text-slate-700 font-semibold dark:text-slate-300">
+                        Nội dung quy tắc
+                    </Label>
+                    <Input
+                        id="new-safety-rule"
+                        placeholder="Ví dụ: Không đề xuất bỏ học hoặc nghỉ học dài hạn..."
+                        value={newRuleText}
+                        onChange={(e) => setNewRuleText(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") confirmAddSafetyRule();
+                        }}
+                        className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-slate-900 placeholder:text-slate-400 shadow-sm focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:ring-offset-0 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-100 dark:placeholder:text-slate-500"
+                        autoFocus
+                    />
+                </div>
+                <DialogFooter className="gap-2">
+                    <Button
+                        variant="outline"
+                        className="rounded-lg"
+                        onClick={() => setSafetyRuleDialogOpen(false)}
+                    >
+                        Huỷ
+                    </Button>
+                    <Button
+                        className="rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                        onClick={confirmAddSafetyRule}
+                        disabled={!newRuleText.trim() || updateSettingsMutation.isPending}
+                    >
+                        {updateSettingsMutation.isPending ? (
+                            <>
+                                <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                                Đang thêm...
+                            </>
+                        ) : (
+                            <>
+                                <Plus className="size-4" />
+                                Thêm quy tắc
+                            </>
+                        )}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }
