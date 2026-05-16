@@ -98,11 +98,11 @@ export function AdminSummaryReport() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground">{dept.major || "N/A"}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{dept.risk_count || 0} SV rủi ro</span>
-                      <span className="font-bold text-primary">{((dept.recovery_rate || 0) * 100).toFixed(0)}%</span>
+                      <span className="text-xs text-muted-foreground">{dept.total_students || 0} SV tổng</span>
+                      <span className="font-bold text-destructive">{((dept.risk_percentage || 0) * 100).toFixed(0)}% rủi ro</span>
                     </div>
                   </div>
-                  <Progress value={(dept.recovery_rate || 0) * 100} className="h-2" />
+                  <Progress value={(dept.risk_percentage || 0) * 100} className="h-2" indicatorClassName="bg-destructive" />
                 </div>
               ))
             ) : (

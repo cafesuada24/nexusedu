@@ -41,7 +41,7 @@ class AcademicImpactMetricDTO(BaseModel):
 class RiskDistributionDTO(BaseModel):
     """Distribution of risk reasons."""
 
-    reason: str
+    label: str
     count: int
     percentage: float
 
