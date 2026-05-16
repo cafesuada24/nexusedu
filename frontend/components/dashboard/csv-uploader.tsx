@@ -41,6 +41,12 @@ import { queryKeys } from "@/lib/query-keys";
 import { Dropzone, HintLine, type StagedMap } from "./csv-uploader/dropzone";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useUploads } from "@/hooks/use-uploads";
+import {
+    getPersistentState,
+    setPersistentState,
+    clearAllPersistentState,
+} from "@/lib/indexeddb";
 
 type LMSRecord = ReturnType<typeof csvToLMSRecords>[number];
 type SISRecord = ReturnType<typeof csvToSISRecords>[number];
@@ -87,21 +93,63 @@ function cleanupErrorMessage(raw: string): string {
 export function CsvUploader() {
     const { user } = useAuth();
     const queryClient = useQueryClient();
+    const { addUpload, updateUpload } = useUploads();
 
     const [staged, setStaged] = React.useState<StagedMap>({});
     const [draggingOver, setDraggingOver] = React.useState<SourceKey | null>(
         null,
     );
     const [confirming, setConfirming] = React.useState(false);
+
     const [inflight, setInflight] = React.useState<InflightStatus>({
         kind: "idle",
     });
+
     const [uploaded, setUploaded] = React.useState<UploadedContent | null>(
         null,
     );
-    const [selectedSource, setSelectedSource] = React.useState<SourceKey>("LMS");
+
+    const [selectedSource, setSelectedSource] = React.useState<SourceKey>(
+        "LMS",
+    );
+
+    // 1. Load from IndexedDB on mount
+    React.useEffect(() => {
+        async function load() {
+            const [s, i, u] = await Promise.all([
+                getPersistentState<StagedMap>("staged"),
+                getPersistentState<InflightStatus>("inflight"),
+                getPersistentState<UploadedContent>("uploaded"),
+            ]);
+            if (s) setStaged(s);
+            if (i) setInflight(i);
+            if (u) setUploaded(u);
+        }
+        load();
+    }, []);
+
+    // 2. Persist to IndexedDB on change
+    React.useEffect(() => {
+        setPersistentState("staged", staged);
+    }, [staged]);
+
+    React.useEffect(() => {
+        setPersistentState("inflight", inflight);
+    }, [inflight]);
+
+    React.useEffect(() => {
+        setPersistentState("uploaded", uploaded);
+    }, [uploaded]);
 
     const isAdmin = user?.role === "admin";
+
+    const reset = async () => {
+        setStaged({});
+        setInflight({ kind: "idle" });
+        setUploaded(null);
+        await clearAllPersistentState();
+        toast.info("Đã xóa dữ liệu tạm thời");
+    };
 
     // Auto-hide the success card after a short delay.
     React.useEffect(() => {
@@ -144,16 +192,19 @@ export function CsvUploader() {
             };
             reader.readAsText(file);
         },
-        [isAdmin],
+        [isAdmin, setStaged],
     );
 
-    const removeStaged = (source: SourceKey) => {
-        setStaged((prev) => {
-            const next = { ...prev };
-            delete next[source];
-            return next;
-        });
-    };
+    const removeStaged = React.useCallback(
+        (source: SourceKey) => {
+            setStaged((prev) => {
+                const next = { ...prev };
+                delete next[source];
+                return next;
+            });
+        },
+        [setStaged],
+    );
 
     const lmsStaged = staged.LMS;
     const sisStaged = staged.SIS;
@@ -171,8 +222,21 @@ export function CsvUploader() {
         const lmsText = lmsStaged.text;
         const sisText = sisStaged.text;
 
+        const uploadId = Date.now().toString();
+
         setConfirming(true);
         setInflight({ kind: "processing", lmsName, sisName });
+
+        // Add to local registry immediately
+        addUpload({
+            id: uploadId,
+            status: "processing",
+            uploadedAt: new Date().toISOString(),
+            files: {
+                LMS: { fileName: lmsName, sizeKB: lmsStaged.sizeKB },
+                SIS: { fileName: sisName, sizeKB: sisStaged.sizeKB },
+            },
+        });
 
         // Reset zones immediately so the user can stage the next pair.
         setStaged({});
@@ -185,6 +249,10 @@ export function CsvUploader() {
                     "Bộ dữ liệu không có dòng hợp lệ (thiếu cột sid hoặc score).";
                 setInflight({ kind: "error", message });
                 toast.error("Bộ dữ liệu không có dữ liệu hợp lệ");
+                updateUpload(uploadId, {
+                    status: "error",
+                    errorMessage: message,
+                });
                 return;
             }
 
@@ -206,11 +274,14 @@ export function CsvUploader() {
                 try {
                     console.log("[CSV] Submitting data sources:", {
                         sourceCount: dataSources.length,
-                        sources: dataSources.map(s => ({
+                        sources: dataSources.map((s) => ({
                             type: s.source_type,
                             recordCount: s.records.length,
                         })),
-                        totalRecords: dataSources.reduce((sum, s) => sum + s.records.length, 0),
+                        totalRecords: dataSources.reduce(
+                            (sum, s) => sum + s.records.length,
+                            0,
+                        ),
                     });
 
                     await updateUserSettings({ auto_draft_enabled: false });
@@ -221,17 +292,29 @@ export function CsvUploader() {
                     queryClient.invalidateQueries({
                         queryKey: queryKeys.alerts.list(),
                     });
+                    queryClient.invalidateQueries({
+                        queryKey: queryKeys.cases.all,
+                    });
 
-                    updateUpload(id, {
+                    updateUpload(uploadId, {
                         jobId: ingestResponse.job_id,
                         totalStudents: result.totalStudents,
                         totalTests: result.totalTests,
                         highRisk: result.highRisk,
                     });
-                    toast.success("Hồ sơ đã được gửi", {
-                        description: `Đang xử lý ${result.totalStudents.toLocaleString(
+
+                    setUploaded({ lmsName, sisName, lmsRecords, sisRecords });
+
+                    setInflight({
+                        kind: "ready",
+                        totalStudents: result.totalStudents,
+                        highRisk: result.highRisk,
+                    });
+
+                    toast.success("Nhập dữ liệu hoàn tất", {
+                        description: `Quá trình nhập dữ liệu đã kết thúc. Đã xác định được ${result.highRisk.toLocaleString(
                             "vi-VN",
-                        )} sinh viên trong nền.`,
+                        )} ca có nguy cơ mới.`,
                     });
                 } catch (err: any) {
                     console.error("[CSV] /data/ingest failed with error:", {
@@ -240,57 +323,35 @@ export function CsvUploader() {
                         stack: err.stack,
                     });
 
-                    let errorMessage =
-                        err.message || "Không thể đồng bộ với máy chủ.";
-                    if (err.detail) {
-                        if (Array.isArray(err.detail)) {
-                            errorMessage = err.detail
-                                .map((d: any) => d.msg || d.message)
-                                .join(", ");
-                        } else {
-                            errorMessage =
-                                typeof err.detail === "string"
-                                    ? err.detail
-                                    : JSON.stringify(err.detail);
-                        }
-                    }
+                    const errorMessage = extractErrorMessage(err);
 
-                    updateUpload(id, {
+                    updateUpload(uploadId, {
                         status: "error",
                         errorMessage,
                     });
+
+                    setInflight({ kind: "error", message: errorMessage });
                     toast.error("Đồng bộ thất bại", {
                         description: errorMessage,
                     });
                 }
+            } else {
+                const message = "Không tìm thấy dữ liệu trong file CSV.";
+                setInflight({ kind: "error", message });
+                updateUpload(uploadId, {
+                    status: "error",
+                    errorMessage: message,
+                });
             }
-
-            await updateUserSettings({ auto_draft_enabled: false });
-            await ingestData(dataSources);
-
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.alerts.list(),
-            });
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.cases.all,
-            });
-
-            setUploaded({ lmsName, sisName, lmsRecords, sisRecords });
-
-            setInflight({
-                kind: "ready",
-                totalStudents: result.totalStudents,
-                highRisk: result.highRisk,
-            });
-            toast.success("Đã đồng bộ với máy chủ", {
-                description: `${result.totalStudents.toLocaleString(
-                    "vi-VN",
-                )} sinh viên đã được cập nhật hệ thống.`,
-            });
         } catch (err) {
             const message = cleanupErrorMessage(extractErrorMessage(err));
             setInflight({ kind: "error", message });
             toast.error("Đồng bộ thất bại", { description: message });
+
+            updateUpload(uploadId, {
+                status: "error",
+                errorMessage: message,
+            });
         } finally {
             setConfirming(false);
         }
@@ -342,13 +403,22 @@ export function CsvUploader() {
                             <UploadCloud className="size-4 text-primary" />
                             <p className="text-sm font-semibold">LMS + SIS</p>
                         </div>
-                        <button
-                            type="button"
-                            onClick={useSampleForBoth}
-                            className="text-xs font-medium text-primary hover:underline"
-                        >
-                            Dữ liệu mẫu
-                        </button>
+                        <div className="flex items-center gap-4">
+                            <button
+                                type="button"
+                                onClick={reset}
+                                className="text-xs font-medium text-destructive/80 hover:text-destructive hover:underline transition-colors"
+                            >
+                                Làm mới
+                            </button>
+                            <button
+                                type="button"
+                                onClick={useSampleForBoth}
+                                className="text-xs font-medium text-primary hover:underline"
+                            >
+                                Dữ liệu mẫu
+                            </button>
+                        </div>
                     </div>
 
                     {/* Two parallel dropzones with a chained link icon between them */}
