@@ -41,6 +41,7 @@ from src.domain.repositories.student_repository import StudentRepository
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
 from src.domain.services.gamification import GamificationService
 from src.infrastructure.database.session import get_async_session
+from src.infrastructure.queue.outbox_processor import OutboxProcessor
 
 
 async def get_container(
@@ -211,6 +212,13 @@ async def get_case_command_handler(
 ) -> CaseCommandHandler:
     """Dependency provider for the CaseCommandHandler."""
     return container.get_case_command_handler()
+
+
+async def get_outbox_processor(
+    container: Annotated[Container, Depends(get_container)],
+) -> OutboxProcessor:
+    """Dependency provider for the OutboxProcessor."""
+    return container.outbox_processor
 
 
 async def get_schedule_command_handler(
