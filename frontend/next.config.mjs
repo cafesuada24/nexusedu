@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 function getApiOrigin() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1"
+  if (!process.env.NEXT_PUBLIC_API_BASE_URL && process.env.NODE_ENV === "production") {
+    console.warn("⚠️ [next.config] NEXT_PUBLIC_API_BASE_URL is missing. Rewrites might fail in production.")
+  }
   try {
     const url = new URL(baseUrl)
     return url.origin

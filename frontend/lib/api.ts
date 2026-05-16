@@ -366,11 +366,9 @@ function getApiBase(): string {
   const envBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
 
   if (typeof window !== "undefined") {
-    // Nếu có biến môi trường, dùng biến đó làm Base URL tuyệt đối
-    if (envBase && envBase.trim()) {
-      return envBase.trim().replace(/\/+$/, "");
-    }
-    // Nếu không có, mới quay về dùng đường dẫn tương đối (chỉ dùng khi có proxy/rewrite)
+    // ALWAYS use the relative path on the client.
+    // This ensures requests go through proxy.ts for token injection
+    // and next.config.mjs for rewrites to the backend.
     return "/api/v1";
   }
 
