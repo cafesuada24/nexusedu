@@ -92,7 +92,9 @@ export function useAlerts() {
     },
     enabled: isMounted && isAuthenticated,
     refetchOnWindowFocus: true,
-    refetchInterval: 30000,
+    // Event-driven via WebSocket `CASE:STATUS_UPDATED`; refetch chỉ khi user
+    // quay lại tab. Không polling định kỳ để giảm tải server.
+    refetchInterval: false,
     retry: false,
   });
 }
