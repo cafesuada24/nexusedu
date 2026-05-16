@@ -51,11 +51,12 @@ export function BookingView({ caseId }: { caseId: string }) {
 
     React.useEffect(() => {
         if (!date) return;
+        let cancelled = false;
         const dateStr = format(date, "yyyy-MM-dd");
         fetchTakenSlots(caseId, dateStr).then((slots) => {
+            if (cancelled) return;
             const taken = new Set(
                 slots.map((s) => {
-                    // Convert UTC ISO string → HH:MM in UTC+7
                     const utcDate = new Date(s.start_time);
                     const h = ((utcDate.getUTCHours() + 7) % 24)
                         .toString()
@@ -66,6 +67,7 @@ export function BookingView({ caseId }: { caseId: string }) {
             );
             setTakenSlots(taken);
         });
+        return () => { cancelled = true; };
     }, [date, caseId]);
 
     const confirm = async () => {
