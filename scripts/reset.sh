@@ -3,18 +3,34 @@
 
 set -e
 
-# Detect environment or default to dev
-ENV=${1:-dev}
-PROFILE=$([ "$ENV" = "prod" ] && echo "prod" || echo "dev")
-API_SVC=$([ "$ENV" = "prod" ] && echo "api" || echo "api-dev")
-
-# Determine DB target (prioritize cloud-sql-proxy if present, otherwise db)
-DB_SERVICE=$(docker compose --profile "$PROFILE" ps --services | grep -q "^cloud-sql-proxy$" && echo "cloud-sql-proxy" || echo "db")
-
 # Load environment variables if .env exists
 if [ -f .env ]; then
     export $(grep -v '^#' .env | sed 's/#.*//' | xargs)
 fi
+
+# Detect environment or default to dev
+ENV_VAL=${ENVIRONMENT:-development}
+ENV=${1:-$ENV_VAL}
+
+if [ "$ENV" = "production" ] || [ "$ENV" = "prod" ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "WARNING: YOU ARE ABOUT TO RESET THE PRODUCTION DATABASE!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    read -p "Are you absolutely sure? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Reset cancelled."
+        exit 1
+    fi
+    PROFILE="prod"
+    API_SVC="api"
+else
+    PROFILE="dev"
+    API_SVC="api-dev"
+fi
+
+# Determine DB target (prioritize cloud-sql-proxy if present, otherwise db)
+DB_SERVICE=$(docker compose --profile "$PROFILE" ps --services 2>/dev/null | grep -q "^cloud-sql-proxy$" && echo "cloud-sql-proxy" || echo "db")
 
 DB_USER=${POSTGRES_USER:-nexusedu_user}
 DB_NAME=${POSTGRES_DB:-nexusedu}
@@ -22,7 +38,7 @@ DB_NAME=${POSTGRES_DB:-nexusedu}
 echo "Stopping application services..."
 docker compose --profile "$PROFILE" stop "$API_SVC"
 
-echo "Resetting PostgreSQL database: $DB_NAME using service: $DB_SERVICE..."
+echo "Resetting PostgreSQL database: $DB_NAME using service: $DB_SERVICE (Env: $ENV)..."
 
 # Function to execute psql commands based on the target service
 run_psql() {
@@ -43,6 +59,7 @@ echo "Running migrations..."
 make migrate ENV="$ENV"
 
 echo "Seeding default users..."
+# Inside the container, the venv is already in the PATH and uv is not present in the runtime image.
 docker compose --profile "$PROFILE" exec -T "$API_SVC" env PYTHONPATH=. python scripts/create_user.py --email dev@gmail.com --password dev --role admin
 docker compose --profile "$PROFILE" exec -T "$API_SVC" env PYTHONPATH=. python scripts/create_user.py --email adv@gmail.com --password adv --role advisor
 

@@ -3,18 +3,19 @@ import os
 import random
 import sys
 import uuid
+import logging
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
 import pandas as pd
-
-from src.core.identifiers import generate_uuid
+from dateutil import parser
 
 # Add project root to sys.path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-from dateutil import parser
+from src.core.identifiers import generate_uuid
+from scripts.utils import require_dev_only
 from src.infrastructure.persistence.repositories.sqlalchemy_repositories import (
     SqlAlchemyActivityRepository,
     SqlAlchemyAdvisorRepository,
@@ -37,19 +38,19 @@ from src.infrastructure.database.session import async_session_maker, engine
 from src.presentation.api.auth import SQLAlchemyUserDatabase, UserManager, UserRole
 from src.presentation.schemas.auth import UserCreate
 
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
+@require_dev_only
 async def reseed() -> None:
     """Drops all tables, recreates schema, and seeds data from CSV files."""
-    print('Stopping API (if running)...')
-    os.system('pkill -f uvicorn')
-
-    print('Initializing new database schema...')
+    logger.info('Initializing new database schema...')
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
     # Load Advisors
-    print('Importing advisors...')
+    logger.info('Importing advisors...')
     adv_df = pd.read_csv('data/v2_advisors.csv')
     advisors = [
         Advisor(**{**row, 'advisor_id': uuid.UUID(row['advisor_id'])})
@@ -57,7 +58,7 @@ async def reseed() -> None:
     ]
 
     # Load Students
-    print('Importing students...')
+    logger.info('Importing students...')
     stu_df = pd.read_csv('data/v2_students.csv')
     students = [
         Student(
@@ -75,7 +76,7 @@ async def reseed() -> None:
     ]
 
     # Load Activities
-    print('Importing activities...')
+    logger.info('Importing activities...')
     act_df = pd.read_csv('data/v2_activities.csv')
     activities = [
         Activity(
@@ -95,7 +96,7 @@ async def reseed() -> None:
         session.add_all(activities)
 
         # Seed default working hours for all advisors
-        print('Seeding default working hours (Mon-Fri, 9:00-11:00 and 14:00-17:00 UTC+7)...')
+        logger.info('Seeding default working hours (Mon-Fri, 9:00-11:00 and 14:00-17:00 UTC+7)...')
         for advisor in advisors:
             for day in range(5):
                 # Morning session
@@ -122,7 +123,7 @@ async def reseed() -> None:
                 )
 
         # Create default admin user
-        print('Creating default admin user (admin@example.com / password123)...')
+        logger.info('Creating default admin user (admin@example.com / password123)...')
         user_db = SQLAlchemyUserDatabase(session, User)
         user_settings_repo = SqlAlchemyUserSettingsRepository(session)
         from src.infrastructure.persistence.sqlalchemy_uow import SqlAlchemyUnitOfWork
@@ -146,7 +147,7 @@ async def reseed() -> None:
 
         await session.commit()
 
-        print('Running anomaly detection...')
+        logger.info('Running anomaly detection...')
         from collections import defaultdict
 
         from src.domain.services.anomaly_engine.zscore import ZScore
@@ -196,11 +197,11 @@ async def reseed() -> None:
             await student_repo.save(student)
             new_at_risk_sids.append(sid)
 
-        print(
+        logger.info(
             f"Anomaly detection complete. {len(new_at_risk_sids)} students identified as 'new' at-risk.",
         )
 
-        print('Seeding cases and tasks...')
+        logger.info('Seeding cases and tasks...')
         # Create cases for at-risk students
         from src.domain.value_objects.status import InterventionStatus, TaskStatus
 
@@ -222,7 +223,7 @@ async def reseed() -> None:
             session.add_all(cases)
             await session.flush()  # To get task IDs if needed
 
-            print('Seeding point ledger...')
+            logger.info('Seeding point ledger...')
             ledger_entries = []
             # Complete some random tasks (simulated by adding points)
             for _ in range(20):
@@ -242,10 +243,10 @@ async def reseed() -> None:
 
             session.add_all(ledger_entries)
         else:
-            print('No cases to seed.')
+            logger.info('No cases to seed.')
         await session.commit()
 
-    print('Reseed complete.')
+    logger.info('Reseed complete.')
 
 
 if __name__ == '__main__':
