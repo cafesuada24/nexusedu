@@ -158,9 +158,9 @@ class CaseQueryHandler:
     ) -> list[TakenSlotDTO]:
         """Return all booked slots for the advisor assigned to this case on a given date."""
         case = await self.__case_repo.find_by_id(query.case_id)
-        if case is None or not case.is_assigned:
+        if case is None or case.assigned_advisor_id is None:
             return []
         return await self._case_query_service.find_taken_slots(
-            advisor_id=case.assigned_advisor_id,  # pyright: ignore[reportArgumentType]
+            advisor_id=case.assigned_advisor_id,
             date=query.date,
         )
