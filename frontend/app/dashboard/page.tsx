@@ -42,12 +42,6 @@ export default function OverviewPage() {
         <div className="flex flex-wrap gap-2">
           {isAdmin ? (
             <>
-              <Button asChild variant="outline" size="sm" className="rounded-xl border-primary/20 text-primary">
-                <Link href="/dashboard/metrics" className="gap-2">
-                  <BarChartHorizontal className="size-4" />
-                  Báo cáo chi tiết
-                </Link>
-              </Button>
               <Button asChild size="sm" className="rounded-xl">
                 <Link href="/dashboard/import">
                   <Upload className="size-4" />

@@ -5,7 +5,6 @@ import {
     LayoutDashboard,
     FileSpreadsheet,
     BellRing,
-    BarChart3,
     LifeBuoy,
     Settings,
     CalendarClock,
@@ -64,12 +63,6 @@ const baseMainNav: NavItem[] = [
         label: "Lịch làm việc",
         icon: CalendarClock,
         tone: "indigo",
-    },
-    {
-        href: "/dashboard/metrics",
-        label: "Báo cáo BGH",
-        icon: BarChart3,
-        tone: "primary",
     },
     {
         href: "/dashboard/advisors",
