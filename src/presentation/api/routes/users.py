@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
+from src.domain.services.safety_rule_guard import SafetyRuleGuard
 from src.presentation.api.auth import (
     Scope,
     User,
@@ -23,6 +24,7 @@ from src.presentation.api.auth import (
 from src.presentation.dependencies.providers import (
     get_idempotency_repository,
     get_user_settings_repository,
+    get_container,
 )
 from src.presentation.schemas.auth import (
     UserRead,
@@ -69,6 +71,10 @@ async def update_my_settings(
     settings_repo: Annotated[
         UserSettingsRepository, Depends(get_user_settings_repository),
     ],
+    safety_guard: Annotated[
+        SafetyRuleGuard,
+        Depends(lambda c=Depends(get_container): c.safety_rule_guard),
+    ],
 ) -> UserSettingsRead:
     """Update the current authenticated user's settings."""
     settings = await settings_repo.get_by_user_id(user.id)
@@ -80,6 +86,8 @@ async def update_my_settings(
     if update.signature is not None:
         settings.update_signature(update.signature)
     if update.safety_rules is not None:
+        # Validate rules before updating
+        safety_guard.validate(update.safety_rules)
         settings.update_safety_rules(update.safety_rules)
 
     await settings_repo.save(settings)

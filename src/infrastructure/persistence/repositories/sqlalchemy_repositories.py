@@ -1269,9 +1269,9 @@ class SqlAlchemyUserSettingsRepository:
         settings.update_auto_draft(enabled)
         await self.save(settings)
 
-    async def create_user_settings(self, user_id: uuid.UUID) -> None:
+    async def create_user_settings(self, user_id: uuid.UUID, name: str | None = None) -> None:
         """Create a new default settings for an user."""
-        settings = DomainUserSettings.create_default(user_id)
+        settings = DomainUserSettings.create_default(user_id, name)
         await self.save(settings)
 
 

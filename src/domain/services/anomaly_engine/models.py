@@ -68,7 +68,7 @@ class StudentDomainProfile(BaseModel):
             # 3. Update Baseline Volatility (EWMA Variance)
             # Use squared deviation from the PRIOR mean for variance estimate
             # (Standard EWMA variance formula)
-            squared_dev = (z_peer - self.ewma_z_peer) ** 2
+            squared_dev = drift**2
             self.ewma_variance = (alpha * squared_dev) + ((1 - alpha) * self.ewma_variance)
             
             # 4. Update Trend (longer-memory EWMA of drifts)

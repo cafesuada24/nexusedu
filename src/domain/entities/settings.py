@@ -40,19 +40,20 @@ class UserSettings(AggregateRoot):
         self.safety_rules = rules
 
     @classmethod
-    def create_default(cls, user_id: UUID) -> 'UserSettings':
+    def create_default(cls, user_id: UUID, name: str | None = None) -> 'UserSettings':
         """Create default settings for a new user."""
+        signature_name = name if name else 'Academic Advisor'
         return cls(
             user_id=user_id,
             auto_draft_enabled=True,
             ai_tone='warm',
-            signature=None,
+            signature=f'Best regards,\n{signature_name}\nAcademic Advisor',
             safety_rules=[
-                "Không tiết lộ điểm số của sinh viên khác",
-                "Luôn gọi sinh viên theo đúng tên và đại từ đã khai báo",
-                "Không dùng ngôn ngữ đe doạ hay phán xét",
-                "Luôn đề xuất ít nhất 1 hành động cụ thể sinh viên có thể làm",
-                "Luôn kèm link đặt lịch 1-1 nếu mức rủi ro > trung bình",
-                "Không gửi quá 2 email/tuần cho cùng một sinh viên",
+                "Maintain a supportive, curious, and non-punitive tone at all times.",
+                "Protect student privacy: Never include specific grades or full PII of other students.",
+                "Avoid shaming or judgmental language; focus on growth and support.",
+                "Provide at least one clear, actionable next step for the student.",
+                "Always offer a 1-on-1 meeting link if the student's risk level is high.",
+                "Keep messages concise, warm, and student-centered.",
             ],
         )

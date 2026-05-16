@@ -95,6 +95,8 @@ class DataCommandHandler:
 
         # 5. Transition student statuses and identify new at-risk students
         new_at_risk_sids: list[tuple[EntityID, EntityID]] = []
+        students_with_prior_history = {h['sid'] for h in existing_history}
+
         for sid, latest_risk in risk_statuses.items():
             student = await self.uow.students.get_by_id(sid)
             if not student:
@@ -105,6 +107,15 @@ class DataCommandHandler:
             await self.uow.students.save(student)
 
             if latest_risk == RiskStatus.NORMAL:
+                continue
+
+            # Policy: Baseline Establishment
+            # If a student is seen for the first time in this ingestion (no prior history),
+            # we treat this ingestion as their baseline establishment phase and skip
+            # raising cases, even if the engine identifies a relative anomaly.
+            # We still allow CRITICAL alerts to pass through as a safety net.
+            is_new_student = sid not in students_with_prior_history
+            if is_new_student and latest_risk != RiskStatus.CRITICAL:
                 continue
 
             active_case = await self.uow.cases.get_active_case(sid)

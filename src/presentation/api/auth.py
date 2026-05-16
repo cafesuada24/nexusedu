@@ -38,6 +38,7 @@ from src.presentation.dependencies.providers import (
 
 logger = structlog.get_logger(__name__)
 
+
 class Scope(StrEnum):
     """Granular permissions (capabilities) in the system."""
 
@@ -125,11 +126,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     ) -> None:
         """Callback triggered after a user successfully registers."""
         logger.info('User registered', user_id=user.id)
-        await self._user_setting_db.create_user_settings(user.id)
+
+        # Derive name from email if not provided (placeholder for registration form name)
+        name = user.email.split('@')[0].replace('.', ' ').replace('_', ' ').capitalize()
+        await self._user_setting_db.create_user_settings(user.id, name=name)
 
         if user.role == UserRole.ADVISOR.value:
             # Ensure an advisor profile exists and is linked
-            name = user.email.split('@')[0].capitalize()
             async with self._uow:
                 advisor_id, created = await self._uow.advisors.upsert_advisor_for_user(
                     user.id,
@@ -158,7 +161,16 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
         """Callback triggered after a user is updated."""
         if user.role == UserRole.ADVISOR.value:
             # Ensure an advisor profile exists and is linked
-            name = user.email.split('@')[0].capitalize()
+            name = (
+                user.email.split('@')[0]
+                .replace('.', ' ')
+                .replace('_', ' ')
+                .capitalize()
+            )
+
+            # Ensure settings exist (idempotent)
+            await self._user_setting_db.create_user_settings(user.id, name=name)
+
             async with self._uow:
                 advisor_id, created = await self._uow.advisors.upsert_advisor_for_user(
                     user.id,

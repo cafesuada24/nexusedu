@@ -32,18 +32,21 @@ async def test_run_batch_case_overviews_task_fan_out():
     with patch("src.infrastructure.workers.framework.decorators.async_session_maker", side_effect=mock_session_maker):
         with patch("src.infrastructure.workers.framework.decorators.Container") as MockContainer:
             container = MockContainer.return_value
-            task_queue = AsyncMock()
-            container.task_queue = task_queue
+            uow = AsyncMock()
+            uow.__aenter__.return_value = uow
+            container.uow = uow
             
             # Run task
             await run_batch_case_overviews_task(ctx)
             
-            # Verify fan-out
-            task_queue.enqueue.assert_called_once()
-            args = task_queue.enqueue.call_args
-            assert args[0][0] == 'run_generate_case_overview_task'
-            assert isinstance(args[0][1], GenerateCaseOverviewPayload)
-            assert args[0][1].case_id == case_id
+            # Verify fan-out via UoW
+            uow.enqueue.assert_called_once()
+            call_args = uow.enqueue.call_args
+            assert call_args.args[0] == 'run_generate_case_overview_task'
+            payload = call_args.kwargs['payload']
+            assert isinstance(payload, GenerateCaseOverviewPayload)
+            assert payload.case_id == case_id
+            uow.commit.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_run_generate_case_overview_task_success():
