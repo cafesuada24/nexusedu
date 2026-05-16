@@ -7,7 +7,7 @@ from src.core.identifiers import generate_uuid
 
 # Constants
 MAIN_ADVISOR_ID = '3a42d761-0e11-45c8-81bb-d0cde691fc5b' # Advisor 0
-NUM_STUDENTS = 10
+NUM_STUDENTS = 50
 SEMESTERS = [
     {'year': 2025, 'sem': 1, 'name': 'Fall 2025', 'start': datetime(2025, 9, 1, tzinfo=UTC)},
     {'year': 2026, 'sem': 2, 'name': 'Spring 2026', 'start': datetime(2026, 2, 1, tzinfo=UTC)},
@@ -21,12 +21,23 @@ STUDENT_PROFILES = [
     {'name': 'SLA Breach Student', 'pattern': 'breach'},
     {'name': 'No Activation Student', 'pattern': 'no_activation'},
     {'name': 'Activated Student', 'pattern': 'activated'},
-    {'name': 'Current Critical Student', 'pattern': 'current_critical'},
-    {'name': 'Current Elevated Student', 'pattern': 'current_elevated'},
-    {'name': 'Normal Student A', 'pattern': 'normal'},
-    {'name': 'Normal Student B', 'pattern': 'normal'},
-    {'name': 'Normal Student C', 'pattern': 'normal'},
+    # Exactly 5 Critical Patterns for Current Semester (Spring 2026)
+    {'name': 'Critical Student 1', 'pattern': 'current_critical'},
+    {'name': 'Critical Student 2', 'pattern': 'current_critical'},
+    {'name': 'Critical Student 3', 'pattern': 'current_critical'},
+    {'name': 'Critical Student 4', 'pattern': 'current_critical'},
+    {'name': 'Critical Student 5', 'pattern': 'current_critical'},
+    # Exactly 5 Elevated Patterns for Current Semester (Spring 2026)
+    {'name': 'Elevated Student 1', 'pattern': 'current_elevated'},
+    {'name': 'Elevated Student 2', 'pattern': 'current_elevated'},
+    {'name': 'Elevated Student 3', 'pattern': 'current_elevated'},
+    {'name': 'Elevated Student 4', 'pattern': 'current_elevated'},
+    {'name': 'Elevated Student 5', 'pattern': 'current_elevated'},
 ]
+
+# Add background normal students to reach NUM_STUDENTS
+for i in range(len(STUDENT_PROFILES), NUM_STUDENTS):
+    STUDENT_PROFILES.append({'name': f'Normal Student {i}', 'pattern': 'normal'})
 
 def generate_dashboard_data():
     students = []
@@ -118,11 +129,11 @@ def generate_dashboard_data():
             sid = profile['sid']
             pattern = profile['pattern']
             
-            # Determine Risk Status for this semester
+            # Determine Risk Status for this semester (for legacy history records)
             risk_status = 'Normal'
             if pattern == 'recovered' and sem_name == 'Fall 2025':
                 risk_status = 'Critical'
-            elif pattern == 'persistent':
+            elif pattern == 'persistent' and sem_name == 'Fall 2025':
                 risk_status = 'Critical'
             elif pattern == 'breach' and sem_name == 'Fall 2025':
                 risk_status = 'Elevated'
@@ -152,16 +163,48 @@ def generate_dashboard_data():
                 'status_recorded_at': (sem_start + timedelta(weeks=8)).isoformat()
             })
 
-            # Activities
-            base_score = 80 if risk_status == 'Normal' else 40
+            # Activities Generation with complex temporal patterns
             for w in range(1, 13):
+                # Default: Normal student (Stable around 80 with some noise)
+                score = 80 + random.randint(-8, 8)
+
+                if sem_name in ['Fall 2025', 'Spring 2026']:
+                    if risk_status == 'Critical':
+                        if pattern == 'current_critical' and sem_name == 'Spring 2026':
+                            # Sudden Subtle Drop: Drops from 85 to 35 (Near failure, but Critical)
+                            if w >= 6:
+                                score = 35.0
+                            else:
+                                score = 85.0
+                        elif pattern == 'recovered' and sem_name == 'Fall 2025':
+                            # Recovered Pattern: Drops to 60, then climbs back after week 8
+                            if w < 8:
+                                score = 60.0
+                            else:
+                                score = 80.0
+                        else:
+                            # Persistent Critical: Consistently underperforming
+                            score = 35.0
+                    
+                    elif risk_status == 'Elevated':
+                        if pattern == 'current_elevated' and sem_name == 'Spring 2026':
+                            # Gradual Subtle Decline: Starts at 85, ends at 55
+                            if w >= 4:
+                                drop = (w - 3) * 3.5
+                                score = 85.0 - drop
+                            else:
+                                score = 85.0
+                        else:
+                            # Generic Elevated: Consistently mediocre
+                            score = 55.0
+
                 activities.append({
                     'activity_id': str(generate_uuid()),
                     'sid': sid,
                     'course_id': 'CS101',
                     'course_name': 'Intro to CS',
                     'test_type': 'Quiz',
-                    'score': base_score + random.randint(-5, 10),
+                    'score': float(score),
                     'timestamp': (sem_start + timedelta(weeks=w)).isoformat(),
                     'academic_year': y,
                     'semester': s,

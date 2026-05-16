@@ -68,13 +68,8 @@ class AdminDashboardQueryService:
 
         stmt = select(
             func.avg(latest_history_subq.c.systemic_breadth),
-            func.count(latest_history_subq.c.sid),
-        ).where(
-            and_(
-                latest_history_subq.c.rn == 1,
-                latest_history_subq.c.systemic_breadth > 0.5,
-            )
-        )
+            func.count(case((latest_history_subq.c.systemic_breadth > 0.5, 1))),
+        ).where(latest_history_subq.c.rn == 1)
 
         result = (await self.session.execute(stmt)).first()
         avg_breadth = float(result[0]) if result and result[0] is not None else 0.0
@@ -154,33 +149,35 @@ class AdminDashboardQueryService:
 
     async def _get_lead_time_metrics(self) -> LeadTimeMetricDTO:
         """Calculate School-wide Lead Time."""
-        # AVG(first_interaction_at - created_at)
-        diff = (
-            func.extract('epoch', Case.first_interaction_at - Case.created_at) / 3600.0
-        )
+        # Fetch created_at and first_interaction_at for cases that have an interaction
         stmt = select(
-            func.avg(diff),
-            func.count(Case.case_id),
+            Case.created_at,
+            Case.first_interaction_at,
         ).where(Case.first_interaction_at.is_not(None))
 
-        result = (await self.session.execute(stmt)).first()
-        avg_hours = float(result[0]) if result and result[0] is not None else 0.0
-        total_cases = result[1] if result else 0
+        results = (await self.session.execute(stmt)).all()
+        total_cases = len(results)
 
-        # Within target (4h)
-        target_stmt = select(func.count(Case.case_id)).where(
-            and_(
-                Case.first_interaction_at.is_not(None),
-                diff <= TARGET_LEAD_TIME_HOURS,
-            ),
-        )
-        within_target = (await self.session.execute(target_stmt)).scalar() or 0
-        rate = within_target / total_cases if total_cases > 0 else 1.0
+        if total_cases == 0:
+            return LeadTimeMetricDTO(
+                avg_lead_time_hours=0.0,
+                target_hours=TARGET_LEAD_TIME_HOURS,
+                within_target_rate=1.0,
+            )
+
+        total_hours = 0.0
+        within_target = 0
+        for created_at, first_interaction_at in results:
+            delta = first_interaction_at - created_at
+            hours = delta.total_seconds() / 3600.0
+            total_hours += hours
+            if hours <= TARGET_LEAD_TIME_HOURS:
+                within_target += 1
 
         return LeadTimeMetricDTO(
-            avg_lead_time_hours=avg_hours,
+            avg_lead_time_hours=total_hours / total_cases,
             target_hours=TARGET_LEAD_TIME_HOURS,
-            within_target_rate=rate,
+            within_target_rate=within_target / total_cases,
         )
 
     async def _get_nudge_activation_metrics(self) -> NudgeActivationMetricDTO:
@@ -246,9 +243,9 @@ class AdminDashboardQueryService:
 
         return [
             RiskDistributionDTO(
-                reason=str(row[0]),
+                label=str(row[0]),
                 count=row[1],
-                percentage=row[1] / total,
+                percentage=(row[1] / total) * 100.0,
             )
             for row in results
         ]

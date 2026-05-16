@@ -13,9 +13,10 @@ Many scripts here are **destructive** (e.g., they drop tables or reset the datab
 Always run these scripts using `uv run python` from the project root.
 
 ### Seeding and Reseting
-- **`reseed_all.py`**: Drops all tables and seeds the database from `data/*.csv`. **(Dev only)**
+- **`reseed_all.sh`**: Robust shell script that drops the schema, runs migrations, and seeds data. **(Supports Dev & Prod)**
+- **`seed_data.py`**: Python script called by `reseed_all.sh` to populate data from `data/*.csv`.
 - **`reseed_dashboard.py`**: Seeds specific data for the admin dashboard. **(Dev only)**
-- **`reset.sh`**: A shell script that drops the database at the PostgreSQL level, recreates it, runs migrations, and seeds default users.
+- **`reset.sh`**: Legacy shell script that drops the database at the PostgreSQL level.
 
 ### User Management
 - **`create_user.py`**: Create a new user with a specific role.

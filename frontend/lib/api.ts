@@ -1140,9 +1140,18 @@ export const AdminDashboardSchema = z.object({
   })).default([]),
   major_risk: z.array(z.object({
     major: z.string().default("Unknown"),
-    risk_count: z.number().int().default(0),
-    recovery_rate: z.number().default(0),
+    total_students: z.number().int().default(0),
+    risk_percentage: z.number().default(0),
   })).default([]),
+  systemic_risk: z.object({
+    avg_breadth: z.number().default(0),
+    systemic_case_count: z.number().int().default(0),
+  }).nullish(),
+  trend_distribution: z.object({
+    improving: z.number().int().default(0),
+    stable: z.number().int().default(0),
+    declining: z.number().int().default(0),
+  }).nullish(),
   generated_at: z.string().nullish().default(() => new Date().toISOString()),
 });
 
