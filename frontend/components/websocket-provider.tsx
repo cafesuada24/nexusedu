@@ -16,11 +16,13 @@ interface WebSocketContextType {
         body: string | null;
         sequence: number;
     } | null;
+    lastMessage: WebSocketMessage | null;
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
     status: "closed",
     latestDraftCompletion: null,
+    lastMessage: null,
 });
 
 export const useWebSocketContext = () => useContext(WebSocketContext);
@@ -34,6 +36,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         body: string | null;
         sequence: number;
     } | null>(null);
+    const [lastMessage, setLastMessage] = React.useState<WebSocketMessage | null>(null);
     const getCaseIdFromJobPayload = React.useCallback((rawPayload: unknown) => {
         const payload = (rawPayload ?? {}) as Record<string, any>;
         const rootCaseId = payload.case_id ?? payload.caseId;
@@ -171,6 +174,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         async (message: WebSocketMessage) => {
             const { type, payload } = message;
             console.log("[WS] Received message:", type, payload);
+            setLastMessage(message);
 
             switch (type) {
                 case "JOB:STARTED":
@@ -303,6 +307,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                             statusPayload.case_id,
                             updater
                         );
+                        updateSurgicalCache(
+                            queryKeys.alerts.list(),
+                            statusPayload.case_id,
+                            updater
+                        );
 
                         // Invalidate specific case details if any component is listening
                         queryClient.invalidateQueries({
@@ -361,7 +370,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }, [status]);
 
     return (
-        <WebSocketContext.Provider value={{ status, latestDraftCompletion }}>
+        <WebSocketContext.Provider value={{ status, latestDraftCompletion, lastMessage }}>
             {children}
         </WebSocketContext.Provider>
     );
