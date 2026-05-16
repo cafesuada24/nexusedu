@@ -106,11 +106,11 @@ export function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 1. Strategic Pulse (Top Row) */}
+      {/* 1. Nhịp độ Chiến lược (Top Row) */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
-            Strategic Pulse
+            Nhịp độ Chiến lược
           </h2>
           <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
             <Clock className="size-3" />
@@ -118,7 +118,7 @@ export function AdminDashboard() {
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Card 1: Overall Recovery Rate */}
+          {/* Card 1: Tỷ lệ Phục hồi Tổng thể */}
           <Card className="relative overflow-hidden border-primary/20 bg-primary/5 transition-all hover:shadow-md">
             <CardContent className="flex flex-col gap-4 p-6">
               <div className="flex items-start justify-between">
@@ -127,12 +127,12 @@ export function AdminDashboard() {
                     <ShieldCheck className="size-6" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold tracking-widest text-primary uppercase">Overall Recovery Rate</span>
+                    <span className="text-xs font-bold tracking-widest text-primary uppercase">Tỷ lệ Phục hồi Tổng thể</span>
                     <div className="flex items-baseline gap-2">
                       <span className="font-serif text-5xl font-black text-primary">{recoveryRate}%</span>
                       <div className="flex items-center gap-1 text-sm font-bold text-success">
                         <TrendingUp className="size-4" />
-                        Live
+                        Trực tiếp
                       </div>
                     </div>
                   </div>
@@ -141,12 +141,12 @@ export function AdminDashboard() {
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
                   <span>{recovery.stabilized_students || 0} / {recovery.total_at_risk_students || 0} SV ổn định</span>
-                  <span>Target: 85%</span>
+                  <span>Mục tiêu: 85%</span>
                 </div>
                 <Progress value={(recovery.recovery_rate || 0) * 100} className="h-2 bg-primary/10" indicatorClassName="bg-primary" />
               </div>
               <p className="text-xs text-muted-foreground">
-                Formula: (Stable Students / Total At-Risk). Significant growth in technical departments.
+                Công thức: (Sinh viên ổn định / Tổng số rủi ro). Tăng trưởng đáng kể ở các khoa kỹ thuật.
               </p>
             </CardContent>
           </Card>
@@ -159,43 +159,43 @@ export function AdminDashboard() {
                   <Timer className="size-6" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold tracking-widest text-success uppercase">School-wide Lead Time</span>
+                  <span className="text-xs font-bold tracking-widest text-success uppercase">Thời gian Phản hồi Toàn trường</span>
                   <div className="flex items-baseline gap-2">
                     <span className="font-serif text-5xl font-black text-success">{(lead_time.avg_lead_time_hours || 0).toFixed(1)}</span>
-                    <span className="text-xl font-bold text-success/80">hours</span>
+                    <span className="text-xl font-bold text-success/80">giờ</span>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-4 rounded-xl border border-success/20 bg-white/50 p-3 dark:bg-slate-900/40">
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-success uppercase">KPI Performance</span>
+                    <span className="text-success uppercase">Hiệu suất KPI</span>
                     <span className="text-success">&lt; {lead_time.target_hours || 4}h</span>
                   </div>
                   <Progress value={(lead_time.within_target_rate || 0) * 100} className="h-1.5 bg-success/10" indicatorClassName="bg-success" />
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Compliance</p>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Mức độ Tuân thủ</p>
                   <p className="text-lg font-black text-success leading-none">{complianceRate}%</p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Maintaining sub-{lead_time.target_hours || 4}h response ensures critical intervention during peak exam weeks.
+                Duy trì phản hồi dưới {lead_time.target_hours || 4}h đảm bảo can thiệp kịp thời trong các tuần thi cao điểm.
               </p>
             </CardContent>
           </Card>
         </div>
       </section>
 
-      {/* 2. Impact Results (Middle Row) */}
+      {/* 2. Tác động Chiến lược (Middle Row) */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
-            Strategic Impact
+            Tác động Chiến lược
           </h2>
           <div className="flex items-center gap-2">
             <div className="size-2 rounded-full bg-success animate-pulse" />
-            <span className="text-[10px] font-bold text-success uppercase tracking-tighter">Live System Data</span>
+            <span className="text-[10px] font-bold text-success uppercase tracking-tighter">Dữ liệu Hệ thống Trực tiếp</span>
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -204,7 +204,7 @@ export function AdminDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 font-serif text-sm">
                 <BrainCircuit className="size-4 text-primary" />
-                Nudge Activation Rate
+                Tỷ lệ Kích hoạt Nhắc nhở
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -215,8 +215,8 @@ export function AdminDashboard() {
               <div className="space-y-3">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase">
-                    <span>AI Engagement</span>
-                    <span>{Number(activationRate) > 40 ? "High" : "Normal"}</span>
+                    <span>Mức độ Tương tác AI</span>
+                    <span>{Number(activationRate) > 40 ? "Cao" : "Bình thường"}</span>
                   </div>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
@@ -231,7 +231,7 @@ export function AdminDashboard() {
                   </div>
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  Effectiveness of AI-generated content across the system. % of students respond after automated Nudge.
+                  Hiệu quả của nội dung do AI tạo ra trên toàn hệ thống. % sinh viên phản hồi sau Nhắc nhở tự động.
                 </p>
               </div>
             </CardContent>
@@ -243,11 +243,11 @@ export function AdminDashboard() {
               <CardTitle className="flex items-center justify-between font-serif text-sm">
                 <div className="flex items-center gap-2">
                   <BarChart3 className="size-4 text-primary" />
-                  Academic Impact
+                  Tác động Học thuật
                 </div>
                 {academic_impact.impact_score !== undefined && (
                   <Badge variant="outline" className="rounded-md bg-primary/5 text-primary border-primary/20 text-[10px] px-1.5 py-0 h-5">
-                    Impact: {academic_impact.impact_score}
+                    Tác động: {academic_impact.impact_score}
                   </Badge>
                 )}
               </CardTitle>
@@ -269,11 +269,11 @@ export function AdminDashboard() {
               <div className="flex items-center justify-center gap-4 text-[10px] font-bold uppercase">
                 <div className="flex items-center gap-1.5">
                   <div className="size-2 rounded-sm bg-slate-400" />
-                  <span className="text-muted-foreground">Before (GPA)</span>
+                  <span className="text-muted-foreground">Trước (GPA)</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="size-2 rounded-sm bg-primary" />
-                  <span className="text-primary">After (GPA)</span>
+                  <span className="text-primary">Sau (GPA)</span>
                 </div>
               </div>
             </CardContent>
@@ -284,7 +284,7 @@ export function AdminDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 font-serif text-sm">
                 <PieChartIcon className="size-4 text-primary" />
-                Risk Distribution
+                Phân bổ Rủi ro
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
