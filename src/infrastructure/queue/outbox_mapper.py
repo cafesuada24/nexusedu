@@ -238,11 +238,14 @@ class OutboxMapper:
                 'new_status': status_map[type(event)],
             }
 
-            # Optional advisor context
+            # Targeted delivery only when the event carries an actual User.id.
+            # `advisor_id` is the Advisor entity PK, NOT User.id — using it as
+            # the WS routing key would silently drop the message because the
+            # WebSocketManager indexes connections by User.id. Broadcast in
+            # that case; frontend `updateSurgicalCache` filters by case_id so
+            # there is no info leak.
             user_id = None
-            if hasattr(event, 'advisor_id'):
-                user_id = event.advisor_id
-            elif hasattr(event, 'user_id'):
+            if hasattr(event, 'user_id'):
                 user_id = event.user_id
 
             # Appointment specifics
