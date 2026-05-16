@@ -1,8 +1,6 @@
 """Query handlers for case-related operations."""
 
 
-from datetime import date
-
 from src.application.dtos.case_dtos import (
     CaseDTO,
     CaseOverviewDTO,
