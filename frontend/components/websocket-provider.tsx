@@ -16,11 +16,13 @@ interface WebSocketContextType {
         body: string | null;
         sequence: number;
     } | null;
+    lastMessage: WebSocketMessage | null;
 }
 
 const WebSocketContext = createContext<WebSocketContextType>({
     status: "closed",
     latestDraftCompletion: null,
+    lastMessage: null,
 });
 
 export const useWebSocketContext = () => useContext(WebSocketContext);
@@ -34,6 +36,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         body: string | null;
         sequence: number;
     } | null>(null);
+    const [lastMessage, setLastMessage] = React.useState<WebSocketMessage | null>(null);
     const getCaseIdFromJobPayload = React.useCallback((rawPayload: unknown) => {
         const payload = (rawPayload ?? {}) as Record<string, any>;
         const rootCaseId = payload.case_id ?? payload.caseId;
@@ -171,6 +174,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         async (message: WebSocketMessage) => {
             const { type, payload } = message;
             console.log("[WS] Received message:", type, payload);
+            setLastMessage(message);
 
             switch (type) {
                 case "JOB:STARTED":
@@ -194,7 +198,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     if (startedJobType === "email_draft") {
                         toast.info("Generating email draft...");
                     } else if (startedJobType === "email_send") {
-                        toast.info("Sending intervention email...");
+                        // toast.info("Sending intervention email...");
                     }
                     break;
 
@@ -216,7 +220,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                             });
                         }
                     } else if (completedJobType === "email_send") {
-                        toast.success("Intervention email sent successfully!");
+                        // toast.success("Intervention email sent successfully!");
                     }
                     break;
 
@@ -280,9 +284,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     const statusPayload = payload as any;
                     console.log("[WS] Case status updated, surgical cache update...", statusPayload);
                     if (statusPayload.case_id) {
-                        toast.info("Case status updated", {
-                            description: `Case ${statusPayload.case_id.slice(0, 8)} status changed to ${statusPayload.new_status}.`,
-                        });
+                        // toast.info("Case status updated", {
+                        //     description: `Case ${statusPayload.case_id.slice(0, 8)} status changed to ${statusPayload.new_status}.`,
+                        // });
                         // Surgical update to all lists
                         const updater = (item: any) => ({
                             ...item,
@@ -300,6 +304,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                         );
                         updateSurgicalCache(
                             queryKeys.alerts.all,
+                            statusPayload.case_id,
+                            updater
+                        );
+                        updateSurgicalCache(
+                            queryKeys.alerts.list(),
                             statusPayload.case_id,
                             updater
                         );
@@ -361,7 +370,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     }, [status]);
 
     return (
-        <WebSocketContext.Provider value={{ status, latestDraftCompletion }}>
+        <WebSocketContext.Provider value={{ status, latestDraftCompletion, lastMessage }}>
             {children}
         </WebSocketContext.Provider>
     );

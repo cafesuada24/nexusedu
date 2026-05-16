@@ -13,7 +13,8 @@ export interface WebSocketMessage<T = unknown> {
 
 type ConnectionStatus = "connecting" | "open" | "closed";
 
-const RECONNECT_DELAY = 5_000;
+const RECONNECT_DELAY = 1_000; // Base delay for exponential backoff
+const MAX_RECONNECT_DELAY = 30_000; // Maximum delay between reconnections
 const NORMAL_CLOSE_CODE = 1000;
 const UNAUTHORIZED_CLOSE_CODE = 4003;
 
@@ -32,6 +33,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     useState<ConnectionStatus>("closed");
 
   const socketRef = useRef<WebSocket | null>(null);
+  const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -55,6 +57,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const disconnect = useCallback(
     (code: number = NORMAL_CLOSE_CODE) => {
       manuallyClosedRef.current = true;
+      reconnectAttemptRef.current = 0;
 
       clearReconnectTimeout();
 
@@ -85,7 +88,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         .find((row) => row.startsWith("nexusedu_ws_token="))
         ?.split("=")[1];
 
-      return getWsUrl(token);
+      let url = getWsUrl(token);
+
+      // Surgical fix: Ensure /api/v1 prefix is present if missing on localhost:8000
+      if (url.includes("localhost:8000") && !url.includes("/api/v1/")) {
+        url = url.replace("/ws", "/api/v1/ws");
+      }
+
+      return url;
     },
     [],
   );
@@ -130,6 +140,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       // Ensure we only update status if this is still the current socket
       if (socketRef.current === socket) {
         setStatus("open");
+        reconnectAttemptRef.current = 0; // Reset attempts on successful connection
         console.info("[WS] Connected successfully");
       }
     };
@@ -177,10 +188,16 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         return;
       }
 
-      console.debug("[WS] Scheduling reconnect...");
+      const delay = Math.min(
+        RECONNECT_DELAY * Math.pow(2, reconnectAttemptRef.current),
+        MAX_RECONNECT_DELAY
+      );
+
+      console.debug(`[WS] Scheduling reconnect in ${delay}ms (attempt ${reconnectAttemptRef.current + 1})...`);
       reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectAttemptRef.current += 1;
         connect();
-      }, RECONNECT_DELAY);
+      }, delay);
     };
   }, [
     isAuthenticated,
