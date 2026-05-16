@@ -29,6 +29,9 @@ import {
     analyzeCsv,
     csvToLMSRecords,
     csvToSISRecords,
+    validateLMSCsv,
+    validateSISCsv,
+    type CsvValidationResult,
     mergeCsv,
     LMS_SAMPLE_CSV,
     SIS_SAMPLE_CSV,
@@ -219,6 +222,19 @@ export function CsvUploader() {
         () => (sisStaged?.text ? csvToSISRecords(sisStaged.text) : null),
         [sisStaged],
     );
+
+    const lmsValidation = React.useMemo(
+        () => (lmsStaged?.text ? validateLMSCsv(lmsStaged.text) : null),
+        [lmsStaged],
+    );
+    const sisValidation = React.useMemo(
+        () => (sisStaged?.text ? validateSISCsv(sisStaged.text) : null),
+        [sisStaged],
+    );
+
+    const hasValidationError =
+        (lmsValidation?.missingColumns.length ?? 0) > 0 ||
+        (sisValidation?.missingColumns.length ?? 0) > 0;
 
     const handleConfirm = async () => {
         if (!isAdmin) {
@@ -476,6 +492,18 @@ export function CsvUploader() {
                         />
                     </div>
 
+                    {/* Validation summaries */}
+                    {(lmsValidation || sisValidation) && (
+                        <div className="mt-3 flex flex-col gap-1.5">
+                            {lmsValidation && (
+                                <ValidationSummary label="LMS" result={lmsValidation} />
+                            )}
+                            {sisValidation && (
+                                <ValidationSummary label="SIS" result={sisValidation} />
+                            )}
+                        </div>
+                    )}
+
                     {/* Hint + Confirm row */}
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                         <HintLine staged={staged} />
@@ -483,10 +511,10 @@ export function CsvUploader() {
                             type="button"
                             size="sm"
                             onClick={handleConfirm}
-                            disabled={!bothReady || confirming}
+                            disabled={!bothReady || confirming || hasValidationError}
                             className={cn(
                                 "rounded-xl gap-1.5 transition-all",
-                                bothReady && !confirming
+                                bothReady && !confirming && !hasValidationError
                                     ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20 hover:bg-primary/90"
                                     : "",
                             )}
@@ -607,6 +635,43 @@ export function CsvUploader() {
                         </p>
                     </CardContent>
                 </Card>
+            )}
+        </div>
+    );
+}
+
+function ValidationSummary({
+    label,
+    result,
+}: {
+    label: string;
+    result: CsvValidationResult;
+}) {
+    const hasError = result.missingColumns.length > 0;
+    const hasSkipped = result.skippedRows > 0;
+    if (!hasError && !hasSkipped) return null;
+
+    return (
+        <div className="flex flex-col gap-1">
+            {hasError && (
+                <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                    <AlertCircle className="size-3.5 shrink-0" />
+                    <span>
+                        File <strong>{label}</strong> thiếu cột bắt buộc:{" "}
+                        <strong>{result.missingColumns.join(", ")}</strong>
+                    </span>
+                </div>
+            )}
+            {hasSkipped && (
+                <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                    <AlertCircle className="size-3.5 shrink-0 text-warning" />
+                    <span>
+                        File <strong>{label}</strong>:{" "}
+                        {result.skippedRows.toLocaleString("vi-VN")}/
+                        {result.totalRows.toLocaleString("vi-VN")} dòng bị bỏ
+                        qua (thiếu sid hoặc score không hợp lệ)
+                    </span>
+                </div>
             )}
         </div>
     );
