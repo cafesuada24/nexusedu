@@ -4,6 +4,7 @@ import * as React from "react"
 import { Trophy } from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 import { fetchAdvisorPoints } from "@/lib/api"
+import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
 import {
   Tooltip,
@@ -17,11 +18,17 @@ interface AdvisorScoreProps {
 }
 
 export function AdvisorScore({ className }: AdvisorScoreProps) {
+  const { user } = useAuth()
+  const isAdvisor = user?.role === "advisor"
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["advisor-points"],
     queryFn: fetchAdvisorPoints,
     refetchInterval: 30000, // Refresh every 30 seconds
+    enabled: isAdvisor,
   })
+
+  if (!isAdvisor) return null
 
   if (isLoading) {
     return (
