@@ -210,6 +210,16 @@ export function CsvUploader() {
     const sisStaged = staged.SIS;
     const bothReady = Boolean(lmsStaged && sisStaged);
 
+    // Parse staged files immediately for preview — recomputes only when the file changes.
+    const stagedLmsRecords = React.useMemo(
+        () => (lmsStaged?.text ? csvToLMSRecords(lmsStaged.text) : null),
+        [lmsStaged],
+    );
+    const stagedSisRecords = React.useMemo(
+        () => (sisStaged?.text ? csvToSISRecords(sisStaged.text) : null),
+        [sisStaged],
+    );
+
     const handleConfirm = async () => {
         if (!isAdmin) {
             toast.error("Chỉ Quản trị viên mới có quyền nhập dữ liệu");
@@ -238,6 +248,12 @@ export function CsvUploader() {
             },
         });
 
+        // Snapshot parsed records before clearing staged so the preview stays
+        // visible during the async submission instead of flashing a placeholder.
+        const lmsRecords = csvToLMSRecords(lmsText);
+        const sisRecords = csvToSISRecords(sisText);
+        setUploaded({ lmsName, sisName, lmsRecords, sisRecords });
+
         // Reset zones immediately so the user can stage the next pair.
         setStaged({});
 
@@ -255,9 +271,6 @@ export function CsvUploader() {
                 });
                 return;
             }
-
-            const lmsRecords = csvToLMSRecords(lmsText);
-            const sisRecords = csvToSISRecords(sisText);
 
             const dataSources: {
                 source_type: "sis" | "lms" | "custom";
@@ -302,8 +315,6 @@ export function CsvUploader() {
                         totalTests: result.totalTests,
                         highRisk: result.highRisk,
                     });
-
-                    setUploaded({ lmsName, sisName, lmsRecords, sisRecords });
 
                     setInflight({
                         kind: "ready",
@@ -497,7 +508,54 @@ export function CsvUploader() {
                 onDismiss={() => setInflight({ kind: "idle" })}
             />
 
-            {uploaded ? (
+            {stagedLmsRecords || stagedSisRecords ? (
+                // Show preview for whichever files are already staged.
+                <>
+                    {stagedLmsRecords && stagedSisRecords && (
+                        <Tabs
+                            value={selectedSource}
+                            onValueChange={(v) =>
+                                setSelectedSource(v as SourceKey)
+                            }
+                        >
+                            <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-grid">
+                                <TabsTrigger value="LMS" className="gap-1.5">
+                                    LMS
+                                    <span className="text-[10.5px] text-muted-foreground">
+                                        {stagedLmsRecords.length.toLocaleString("vi-VN")}
+                                    </span>
+                                </TabsTrigger>
+                                <TabsTrigger value="SIS" className="gap-1.5">
+                                    SIS
+                                    <span className="text-[10.5px] text-muted-foreground">
+                                        {stagedSisRecords.length.toLocaleString("vi-VN")}
+                                    </span>
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    )}
+
+                    {stagedLmsRecords &&
+                        (selectedSource === "LMS" || !stagedSisRecords) && (
+                            <UploadedFileCard
+                                title="Nội dung file LMS"
+                                fileName={lmsStaged!.file.name}
+                                rows={stagedLmsRecords}
+                                columns={LMS_COLUMNS}
+                            />
+                        )}
+                    {stagedSisRecords &&
+                        (selectedSource === "SIS" || !stagedLmsRecords) && (
+                            <UploadedFileCard
+                                title="Nội dung file SIS"
+                                fileName={sisStaged!.file.name}
+                                rows={stagedSisRecords}
+                                columns={SIS_COLUMNS}
+                            />
+                        )}
+                </>
+            ) : uploaded ? (
+                // Fall back to last confirmed upload when no file is staged.
                 <>
                     <Tabs
                         value={selectedSource}
@@ -509,17 +567,13 @@ export function CsvUploader() {
                             <TabsTrigger value="LMS" className="gap-1.5">
                                 LMS
                                 <span className="text-[10.5px] text-muted-foreground">
-                                    {uploaded.lmsRecords.length.toLocaleString(
-                                        "vi-VN",
-                                    )}
+                                    {uploaded.lmsRecords.length.toLocaleString("vi-VN")}
                                 </span>
                             </TabsTrigger>
                             <TabsTrigger value="SIS" className="gap-1.5">
                                 SIS
                                 <span className="text-[10.5px] text-muted-foreground">
-                                    {uploaded.sisRecords.length.toLocaleString(
-                                        "vi-VN",
-                                    )}
+                                    {uploaded.sisRecords.length.toLocaleString("vi-VN")}
                                 </span>
                             </TabsTrigger>
                         </TabsList>
