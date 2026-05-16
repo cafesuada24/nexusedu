@@ -108,10 +108,14 @@ async def test_send_intervention_email_success(
     mock_student.email = "student@example.com"
     mock_student.current_risk_status = RiskStatus.CRITICAL
 
+    mock_advisor = MagicMock()
+    mock_advisor.email = "advisor@example.com"
+
     # Explicitly set AsyncMocks
     mock_uow.cases.get_by_id = AsyncMock(return_value=mock_case)
     mock_uow.emails.get_by_case = AsyncMock(return_value=mock_email)
     mock_uow.students.get_by_id = AsyncMock(return_value=mock_student)
+    mock_uow.advisors.get_by_id = AsyncMock(return_value=mock_advisor)
 
     # Execute
     await service.send_intervention_email(case_id, job_id, user_id)
@@ -121,6 +125,7 @@ async def test_send_intervention_email_success(
         to_email="student@example.com",
         subject="Subject",
         body="Body",
+        reply_to="advisor@example.com",
     )
     
     # Verify persistence

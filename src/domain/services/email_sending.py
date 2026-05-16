@@ -10,6 +10,7 @@ class EmailSendingService(Protocol):
         to_email: str,
         subject: str,
         body: str,
+        reply_to: str | None = None,
     ) -> None:
         """Send an email to a recipient."""
         ...
