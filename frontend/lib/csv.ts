@@ -2452,6 +2452,58 @@ export function csvToSISRecords(text: string): Array<{
     return out;
 }
 
+/* ----------------------------------------------------------------------- */
+/*  CSV validation                                                         */
+/* ----------------------------------------------------------------------- */
+
+export type CsvValidationResult = {
+    /** Required columns that could not be detected in the header row. Blocks confirm when non-empty. */
+    missingColumns: string[];
+    /** Rows skipped during parsing (empty sid or unparseable score). */
+    skippedRows: number;
+    /** Total data rows in the file (excluding the header). */
+    totalRows: number;
+};
+
+export function validateLMSCsv(text: string): CsvValidationResult {
+    const { headers, rows } = parseCsv(text);
+    const missingColumns: string[] = [];
+
+    const sidCol = findCol(headers, ["sid", "studentid", "student_id", "mssv"]);
+    const scoreCol = findCol(headers, ["score", "diem"]);
+    if (!sidCol) missingColumns.push("sid");
+    if (!scoreCol) missingColumns.push("score");
+
+    let skippedRows = 0;
+    if (sidCol && scoreCol) {
+        for (const r of rows) {
+            const sid = r[sidCol]?.trim();
+            const score = toNumber(r[scoreCol]);
+            if (!sid || score === undefined) skippedRows++;
+        }
+    }
+
+    return { missingColumns, skippedRows, totalRows: rows.length };
+}
+
+export function validateSISCsv(text: string): CsvValidationResult {
+    const { headers, rows } = parseCsv(text);
+    const missingColumns: string[] = [];
+
+    const sidCol = findCol(headers, ["sid", "studentid", "student_id", "mssv"]);
+    if (!sidCol) missingColumns.push("sid");
+
+    let skippedRows = 0;
+    if (sidCol) {
+        for (const r of rows) {
+            const sid = r[sidCol]?.trim();
+            if (!sid) skippedRows++;
+        }
+    }
+
+    return { missingColumns, skippedRows, totalRows: rows.length };
+}
+
 /**
  * Re-parses a CSV text into the canonical Advisor record shape.
  */
