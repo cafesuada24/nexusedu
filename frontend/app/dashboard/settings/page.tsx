@@ -1,28 +1,16 @@
-import { Settings as SettingsIcon, Save } from "lucide-react"
+import { Settings as SettingsIcon } from "lucide-react"
 import { SettingsView } from "@/components/dashboard/settings-view"
-import { Button } from "@/components/ui/button"
 
 export default function SettingsPage() {
   return (
     <div className="flex w-full flex-1 flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-xl bg-accent-slate/10 text-accent-slate ring-1 ring-accent-slate/20 shadow-sm shadow-accent-slate/10">
-            <SettingsIcon className="size-5" />
-          </div>
-          <h1 className="font-serif text-2xl font-bold tracking-tight md:text-3xl">
-            Cài đặt
-          </h1>
+      <div className="flex items-center gap-3">
+        <div className="grid size-10 place-items-center rounded-xl bg-accent-slate/10 text-accent-slate ring-1 ring-accent-slate/20 shadow-sm shadow-accent-slate/10">
+          <SettingsIcon className="size-5" />
         </div>
-        <Button
-          size="sm"
-          className="h-10 rounded-lg bg-blue-600 px-4 font-semibold text-white shadow-sm shadow-blue-600/30 transition-colors hover:bg-blue-700"
-          type="submit"
-          form="settings-profile-form"
-        >
-          <Save className="size-4" />
-          Lưu
-        </Button>
+        <h1 className="font-serif text-2xl font-bold tracking-tight md:text-3xl">
+          Cài đặt
+        </h1>
       </div>
       <div
         aria-hidden
