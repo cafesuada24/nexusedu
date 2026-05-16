@@ -78,7 +78,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   const buildWebSocketUrl = useCallback(
     () => {
-      return getWsUrl();
+      if (typeof window === "undefined") return "";
+      
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("nexusedu_ws_token="))
+        ?.split("=")[1];
+
+      return getWsUrl(token);
     },
     [],
   );

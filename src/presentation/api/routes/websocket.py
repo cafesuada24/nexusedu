@@ -27,12 +27,18 @@ async def get_ws_current_user(
         Depends(get_user_manager),
     ],
 ) -> User | None:
-    """Dependency to authenticate WebSocket connections via cookies."""
+    """Dependency to authenticate WebSocket connections via cookies or query params."""
     strategy = get_jwt_strategy()
 
+    # Try cookie first
     token = websocket.cookies.get('nexusedu_auth_token')
 
+    # Fallback to query parameter for cross-origin connections
     if not token:
+        token = websocket.query_params.get('token')
+
+    if not token:
+        logger.warning('WebSocket connection attempt without token')
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
         )

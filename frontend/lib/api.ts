@@ -384,28 +384,40 @@ export function getApiBase(): string {
   return "http://127.0.0.1:8000/api/v1";
 }
 
-export function getWsUrl(): string {
+export function getWsUrl(token?: string | null): string {
   // Explicit WS URL has highest priority
-  if (process.env.NEXT_PUBLIC_WS_URL) {
-    return process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, "");
-  }
+  let wsUrl = process.env.NEXT_PUBLIC_WS_URL
+    ? process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, "")
+    : "";
 
-  const base = getApiBase();
+  if (!wsUrl) {
+    const base = getApiBase();
 
-  // If getApiBase returns a relative path (client-side), build absolute WS URL from window.location
-  if (!base.startsWith("http")) {
-    if (typeof window === "undefined") {
-      // Server-side fallback if somehow called there without an absolute base
-      return "ws://127.0.0.1:8000/api/v1/ws";
+    // If getApiBase returns a relative path (client-side), build absolute WS URL from window.location
+    if (!base.startsWith("http")) {
+      if (typeof window === "undefined") {
+        // Server-side fallback if somehow called there without an absolute base
+        wsUrl = "ws://127.0.0.1:8000/api/v1/ws";
+      } else {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
+        // base is likely "/api/v1"
+        wsUrl = `${protocol}//${host}${base.replace(/\/+$/, "")}/ws`;
+      }
+    } else {
+      // If base is absolute, just swap http -> ws
+      wsUrl = base.replace(/^http/, "ws").replace(/\/+$/, "") + "/ws";
     }
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    // base is likely "/api/v1"
-    return `${protocol}//${host}${base.replace(/\/+$/, "")}/ws`;
   }
 
-  // If base is absolute, just swap http -> ws
-  return base.replace(/^http/, "ws").replace(/\/+$/, "") + "/ws";
+  // Append token if provided
+  if (token) {
+    const url = new URL(wsUrl);
+    url.searchParams.set("token", token);
+    return url.toString();
+  }
+
+  return wsUrl;
 }
 
 export function endpoint(path: string): string {
