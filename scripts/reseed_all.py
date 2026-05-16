@@ -205,7 +205,6 @@ async def reseed() -> None:
         from src.domain.value_objects.status import InterventionStatus, TaskStatus
 
         cases = []
-        tasks = []
         for sid in new_at_risk_sids:
             case_id = generate_uuid()
             advisor = random.choice(advisors)
@@ -213,52 +212,37 @@ async def reseed() -> None:
                 Case(
                     case_id=case_id,
                     sid=sid,
-                    intervention_status=InterventionStatus.NEW,
+                    intervention_status=InterventionStatus.ACCEPTED,
                     assigned_advisor_id=advisor.advisor_id,
+                    assigned_at=datetime.now(UTC),
                 ),
             )
 
-            # Standard tasks (simulated, no Task model)
-            # standard_tasks = [
-            #     ('send_email', 10),
-            #     ('student_book', 20),
-            #     ('resolve_case', 50),
-            #     ('review_draft', 5),
-            # ]
-            # for action_type, points in standard_tasks:
-            #     tasks.append(
-            #         Task(
-            #             task_id=generate_uuid(),
-            #             case_id=case_id,
-            #             action_type=action_type,
-            #             status=TaskStatus.PENDING.value,
-            #             points_reward=points,
-            #         ),
-            #     )
+        if cases:
+            session.add_all(cases)
+            await session.flush()  # To get task IDs if needed
 
-        session.add_all(cases)
-        # session.add_all(tasks)  # Task model is currently disabled
-        await session.flush()  # To get task IDs if needed
+            print('Seeding point ledger...')
+            ledger_entries = []
+            # Complete some random tasks (simulated by adding points)
+            for _ in range(20):
+                case_obj = random.choice(cases)
+                aid = case_obj.assigned_advisor_id
+                
+                ledger_entries.append(
+                    PointLedger(
+                        id=generate_uuid(),
+                        advisor_id=aid,
+                        case_id=case_obj.case_id,
+                        action='system_seeded_intervention',
+                        points=random.randint(5, 50),
+                        earned_at=datetime.now(UTC) - timedelta(days=random.randint(0, 7)),
+                    ),
+                )
 
-        print('Seeding point ledger...')
-        ledger_entries = []
-        # Complete some random tasks (simulated by adding points)
-        for _ in range(20):
-            case_obj = random.choice(cases)
-            aid = case_obj.assigned_advisor_id
-            
-            ledger_entries.append(
-                PointLedger(
-                    id=generate_uuid(),
-                    advisor_id=aid,
-                    case_id=case_obj.case_id,
-                    action='system_seeded_intervention',
-                    points=random.randint(5, 50),
-                    earned_at=datetime.now(UTC) - timedelta(days=random.randint(0, 7)),
-                ),
-            )
-
-        session.add_all(ledger_entries)
+            session.add_all(ledger_entries)
+        else:
+            print('No cases to seed.')
         await session.commit()
 
     print('Reseed complete.')

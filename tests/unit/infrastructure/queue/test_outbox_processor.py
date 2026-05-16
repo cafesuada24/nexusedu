@@ -57,7 +57,11 @@ async def test_process_background_task(
     await processor.process_pending_events()
 
     # Verify ARQ called
-    arq_queue.enqueue.assert_called_once_with("test_task", arg="val")
+    arq_queue.enqueue.assert_called_once_with(
+        "test_task",
+        _job_id=str(event.id),
+        arg="val",
+    )
 
     # Verify event status updated
     await test_db_session.refresh(event)

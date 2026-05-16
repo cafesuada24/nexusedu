@@ -361,16 +361,14 @@ const INGEST_TIMEOUT_MS = 60_000;
 //     return "/api/v1";
 //   }
 
-function getApiBase(): string {
+export function getApiBase(): string {
   // Lấy giá trị từ biến môi trường đã cấu hình trên Vercel
   const envBase = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL;
 
   if (typeof window !== "undefined") {
-    // Nếu có biến môi trường, dùng biến đó làm Base URL tuyệt đối
-    if (envBase && envBase.trim()) {
-      return envBase.trim().replace(/\/+$/, "");
-    }
-    // Nếu không có, mới quay về dùng đường dẫn tương đối (chỉ dùng khi có proxy/rewrite)
+    // ALWAYS use the relative path on the client.
+    // This ensures requests go through proxy.ts for token injection
+    // and next.config.mjs for rewrites to the backend.
     return "/api/v1";
   }
 
@@ -379,21 +377,47 @@ function getApiBase(): string {
     return envBase.trim().replace(/\/+$/, "");
   }
 
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("CRITICAL: NEXT_PUBLIC_API_BASE_URL is not set in production!");
+  }
+
   return "http://127.0.0.1:8000/api/v1";
 }
 
+export function getWsUrl(token?: string | null): string {
+  // Explicit WS URL has highest priority
+  let wsUrl = process.env.NEXT_PUBLIC_WS_URL
+    ? process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, "")
+    : "";
 
-  // On the server, we can talk directly to the backend URL to avoid double-proxying.
-  const env = process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (env && env.trim()) {
-    const base = env.trim().replace(/\/+$/, "");
-    if (base.startsWith("/")) {
-      return `http://localhost:8000${base}`;
+  if (!wsUrl) {
+    const base = getApiBase();
+
+    // If getApiBase returns a relative path (client-side), build absolute WS URL from window.location
+    if (!base.startsWith("http")) {
+      if (typeof window === "undefined") {
+        // Server-side fallback if somehow called there without an absolute base
+        wsUrl = "ws://127.0.0.1:8000/api/v1/ws";
+      } else {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
+        // base is likely "/api/v1"
+        wsUrl = `${protocol}//${host}${base.replace(/\/+$/, "")}/ws`;
+      }
+    } else {
+      // If base is absolute, just swap http -> ws
+      wsUrl = base.replace(/^http/, "ws").replace(/\/+$/, "") + "/ws";
     }
-    return base;
   }
 
-  return (new URL("http://localhost:8000/api/v1")).origin.replace("://localhost", "://127.0.0.1");
+  // Append token if provided
+  if (token) {
+    const url = new URL(wsUrl);
+    url.searchParams.set("token", token);
+    return url.toString();
+  }
+
+  return wsUrl;
 }
 
 export function endpoint(path: string): string {
@@ -651,8 +675,8 @@ export async function ingestData(
     table_name?: string;
     records: any[];
   }[],
-): Promise<void> {
-  if (dataSources.length === 0) return;
+): Promise<{ job_id: string; status: string; batch_id: string }> {
+  if (dataSources.length === 0) throw new Error("No data sources provided");
   const payload = {
     batch_id: `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     upload_timestamp: new Date().toISOString(),
@@ -677,6 +701,7 @@ export async function ingestData(
     const message = errorBody.detail || res.statusText;
     throw new Error(`Đồng bộ dữ liệu thất bại: ${message}`);
   }
+  return res.json();
 }
 
 

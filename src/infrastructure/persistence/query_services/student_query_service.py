@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy import cast, desc, func, select, Double
+from sqlalchemy import Double, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.pagination import PagedResponse, PaginationMetadata
@@ -13,7 +13,7 @@ from src.application.dtos.student_dtos import (
     TermMetricsDTO,
 )
 from src.domain.value_objects.status import InterventionStatus
-from src.infrastructure.database.models import Activity
+from src.infrastructure.database.models import Activity, StudentStatusHistory
 from src.infrastructure.database.models import Case as OrmCase
 from src.infrastructure.database.models import Student as OrmStudent
 
@@ -31,13 +31,37 @@ class SqlAlchemyStudentQueryService:
         offset: int = 0,
     ) -> PagedResponse[StudentDTO]:
         """Retrieve a paginated list of students."""
+        # Subquery to get the latest history record for each student
+        # We use a window function for compatibility with both SQLite and Postgres
+        latest_history_subq = select(
+            StudentStatusHistory.sid,
+            StudentStatusHistory.trend_score,
+            StudentStatusHistory.confidence,
+            StudentStatusHistory.systemic_breadth,
+            func.row_number()
+            .over(
+                partition_by=StudentStatusHistory.sid,
+                order_by=[
+                    desc(StudentStatusHistory.academic_year),
+                    desc(StudentStatusHistory.semester),
+                    desc(StudentStatusHistory.week),
+                ],
+            )
+            .label('rn'),
+        ).subquery()
+        history_alias = (
+            select(latest_history_subq).where(latest_history_subq.c.rn == 1).subquery()
+        )
+
         # Join with the most recent open case if it exists
-        # We use a subquery or outer join to get an active case
         stmt = (
             select(
                 OrmStudent,
                 OrmCase.case_id.label('active_case_id'),
                 OrmCase.intervention_status,
+                history_alias.c.trend_score,
+                history_alias.c.confidence,
+                history_alias.c.systemic_breadth,
             )
             .outerjoin(
                 OrmCase,
@@ -55,6 +79,7 @@ class SqlAlchemyStudentQueryService:
                     )
                 ),
             )
+            .outerjoin(history_alias, OrmStudent.sid == history_alias.c.sid)
             .order_by(desc(OrmStudent.last_notified_timestamp), OrmStudent.student_name)
         )
 
@@ -70,6 +95,9 @@ class SqlAlchemyStudentQueryService:
             orm_student = row[0]
             active_case_id = row[1]
             intervention_status = row[2]
+            trend = row[3]
+            confidence = row[4]
+            breadth = row[5]
 
             students.append(
                 StudentDTO(
@@ -82,6 +110,9 @@ class SqlAlchemyStudentQueryService:
                     last_notified_at=orm_student.last_notified_timestamp,
                     active_case_id=active_case_id,
                     is_generating=False,
+                    current_trend=trend,
+                    confidence_score=confidence,
+                    is_systemic=(breadth > 0.5) if breadth is not None else False,
                 ),
             )
 
@@ -97,11 +128,34 @@ class SqlAlchemyStudentQueryService:
 
     async def get_student(self, sid: UUID) -> StudentDTO:
         """Retrieve a single student by ID."""
+        latest_history_subq = select(
+            StudentStatusHistory.sid,
+            StudentStatusHistory.trend_score,
+            StudentStatusHistory.confidence,
+            StudentStatusHistory.systemic_breadth,
+            func.row_number()
+            .over(
+                partition_by=StudentStatusHistory.sid,
+                order_by=[
+                    desc(StudentStatusHistory.academic_year),
+                    desc(StudentStatusHistory.semester),
+                    desc(StudentStatusHistory.week),
+                ],
+            )
+            .label('rn'),
+        ).subquery()
+        history_alias = (
+            select(latest_history_subq).where(latest_history_subq.c.rn == 1).subquery()
+        )
+
         stmt = (
             select(
                 OrmStudent,
                 OrmCase.case_id.label('active_case_id'),
                 OrmCase.intervention_status,
+                history_alias.c.trend_score,
+                history_alias.c.confidence,
+                history_alias.c.systemic_breadth,
             )
             .outerjoin(
                 OrmCase,
@@ -119,6 +173,7 @@ class SqlAlchemyStudentQueryService:
                     )
                 ),
             )
+            .outerjoin(history_alias, OrmStudent.sid == history_alias.c.sid)
             .where(OrmStudent.sid == sid)
         )
 
@@ -131,6 +186,9 @@ class SqlAlchemyStudentQueryService:
         orm_student = row[0]
         active_case_id = row[1]
         intervention_status = row[2]
+        trend = row[3]
+        confidence = row[4]
+        breadth = row[5]
 
         return StudentDTO(
             sid=orm_student.sid,
@@ -142,6 +200,9 @@ class SqlAlchemyStudentQueryService:
             last_notified_at=orm_student.last_notified_timestamp,
             active_case_id=active_case_id,
             is_generating=False,
+            current_trend=trend,
+            confidence_score=confidence,
+            is_systemic=(breadth > 0.5) if breadth is not None else False,
         )
 
     async def get_student_term_metrics(
@@ -197,16 +258,13 @@ class SqlAlchemyStudentQueryService:
         term_metrics_rows = metrics_res.all()
 
         # 2. Get course metrics for all relevant terms in one query
-        courses_stmt = (
-            select(
-                Activity.academic_year,
-                Activity.semester,
-                Activity.course_id,
-                Activity.course_name,
-                func.avg(Activity.score).label('avg_score'),
-            )
-            .where(Activity.sid == sid)
-        )
+        courses_stmt = select(
+            Activity.academic_year,
+            Activity.semester,
+            Activity.course_id,
+            Activity.course_name,
+            func.avg(Activity.score).label('avg_score'),
+        ).where(Activity.sid == sid)
         if academic_year:
             courses_stmt = courses_stmt.where(Activity.academic_year == academic_year)
         if semester:

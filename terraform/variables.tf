@@ -6,22 +6,13 @@ variable "project_id" {
 
 variable "project" {
   description = "Project name"
-  type = string
-  default = "nexusedu"
+  type        = string
+  default     = "nexusedu"
 }
 
-variable "public_subnet_cidr" {
-  type = string
-  default = "10.0.1.0/24"
-}
-
-variable "private_subnet_cidr" {
-  type = string
-  default = "10.0.2.0/24"
-}
-
-variable "admin_ip_cidr" {
-  type = string
+variable "vm_type" {
+  type    = string
+  default = "e2-medium"
 }
 
 variable "region" {
@@ -48,20 +39,8 @@ variable "db_password" {
   sensitive   = true
 }
 
-variable "db_instance_name" {
-  description = "Name of the Cloud SQL instance"
+variable "db_name" {
+  description = "Database name"
   type        = string
-  default     = "nexusedu-db"
-}
-
-variable "vm_name" {
-  description = "Name of the Compute Engine VM"
-  type        = string
-  default     = "nexusedu-api-server"
-}
-
-variable "vm_machine_type" {
-  description = "Machine type for the VM"
-  type        = string
-  default     = "e2-standard-2"
+  default     = "nexusedu"
 }

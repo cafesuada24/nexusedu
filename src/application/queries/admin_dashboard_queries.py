@@ -1,8 +1,6 @@
 """Query service for the Admin Dashboard."""
 
-from datetime import UTC, datetime, timedelta
-
-from sqlalchemy import Float, and_, cast, func, select
+from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.admin_dashboard_dtos import (
@@ -13,13 +11,19 @@ from src.application.dtos.admin_dashboard_dtos import (
     NudgeActivationMetricDTO,
     RecoveryMetricDTO,
     RiskDistributionDTO,
+    SystemicRiskMetricDTO,
+    TrendDistributionDTO,
 )
 from src.domain.value_objects.status import (
     InterventionStatus,
-    RiskReason,
     RiskStatus,
 )
-from src.infrastructure.database.models import Case, InterventionEmail, Student
+from src.infrastructure.database.models import (
+    Case,
+    InterventionEmail,
+    Student,
+    StudentStatusHistory,
+)
 
 TARGET_LEAD_TIME_HOURS = 4.0
 
@@ -40,42 +44,120 @@ class AdminDashboardQueryService:
             academic_impact=await self._get_academic_impact_metrics(),
             risk_distribution=await self._get_risk_distribution(),
             major_risk=await self._get_major_risk_metrics(),
+            systemic_risk=await self._get_systemic_risk_metrics(),
+            trend_distribution=await self._get_trend_distribution(),
+        )
+
+    async def _get_systemic_risk_metrics(self) -> SystemicRiskMetricDTO:
+        """Calculate School-wide Breadth Metrics."""
+        # Latest breadth per student
+        latest_history_subq = select(
+            StudentStatusHistory.sid,
+            StudentStatusHistory.systemic_breadth,
+            func.row_number()
+            .over(
+                partition_by=StudentStatusHistory.sid,
+                order_by=[
+                    desc(StudentStatusHistory.academic_year),
+                    desc(StudentStatusHistory.semester),
+                    desc(StudentStatusHistory.week),
+                ],
+            )
+            .label('rn'),
+        ).subquery()
+
+        stmt = select(
+            func.avg(latest_history_subq.c.systemic_breadth),
+            func.count(latest_history_subq.c.sid),
+        ).where(
+            and_(
+                latest_history_subq.c.rn == 1,
+                latest_history_subq.c.systemic_breadth > 0.5,
+            )
+        )
+
+        result = (await self.session.execute(stmt)).first()
+        avg_breadth = float(result[0]) if result and result[0] is not None else 0.0
+        count = int(result[1]) if result else 0
+
+        return SystemicRiskMetricDTO(avg_breadth=avg_breadth, systemic_case_count=count)
+
+    async def _get_trend_distribution(self) -> TrendDistributionDTO:
+        """Calculate overall trend direction of the student population."""
+        # Latest trend per student
+        latest_history_subq = select(
+            StudentStatusHistory.sid,
+            StudentStatusHistory.trend_score,
+            func.row_number()
+            .over(
+                partition_by=StudentStatusHistory.sid,
+                order_by=[
+                    desc(StudentStatusHistory.academic_year),
+                    desc(StudentStatusHistory.semester),
+                    desc(StudentStatusHistory.week),
+                ],
+            )
+            .label('rn'),
+        ).subquery()
+
+        stmt = select(
+            func.count(case((latest_history_subq.c.trend_score > 0.1, 1))),
+            func.count(case((latest_history_subq.c.trend_score < -0.1, 1))),
+            func.count(
+                case(
+                    (
+                        and_(
+                            latest_history_subq.c.trend_score >= -0.1,
+                            latest_history_subq.c.trend_score <= 0.1,
+                        ),
+                        1,
+                    )
+                )
+            ),
+        ).where(latest_history_subq.c.rn == 1)
+
+        result = (await self.session.execute(stmt)).first()
+        improving = int(result[0]) if result else 0
+        declining = int(result[1]) if result else 0
+        stable = int(result[2]) if result else 0
+
+        return TrendDistributionDTO(
+            improving=improving, declining=declining, stable=stable
         )
 
     async def _get_recovery_metrics(self) -> RecoveryMetricDTO:
         """Calculate Overall Recovery Rate."""
-        # Total unique students ever at-risk (Elevated or Critical)
-        # For simplicity in this robust version, we look at current status
-        # but in production, we would join with student_status_history.
-        total_stmt = select(func.count(Student.sid)).where(
-            Student.current_risk_status != RiskStatus.NORMAL,
-        )
-        total_at_risk = (await self.session.execute(total_stmt)).scalar() or 0
+        # Total unique students who had a case (meaning they were at risk at some point)
+        total_stmt = select(func.count(func.distinct(Case.sid)))
+        total_ever_at_risk = (await self.session.execute(total_stmt)).scalar() or 0
 
         # Students recovered: previously at risk (has a case) and now NORMAL
-        recovered_stmt = select(func.count(func.distinct(Case.sid))).join(
-            Student,
-            Case.sid == Student.sid,
-        ).where(
-            and_(
+        recovered_stmt = (
+            select(func.count(func.distinct(Case.sid)))
+            .join(
+                Student,
+                Case.sid == Student.sid,
+            )
+            .where(
                 Student.current_risk_status == RiskStatus.NORMAL,
-                Case.intervention_status == InterventionStatus.RESOLVED,
-            ),
+            )
         )
         stabilized = (await self.session.execute(recovered_stmt)).scalar() or 0
 
-        rate = stabilized / total_at_risk if total_at_risk > 0 else 0.0
+        rate = stabilized / total_ever_at_risk if total_ever_at_risk > 0 else 0.0
 
         return RecoveryMetricDTO(
             recovery_rate=rate,
             stabilized_students=stabilized,
-            total_at_risk_students=total_at_risk,
+            total_at_risk_students=total_ever_at_risk,
         )
 
     async def _get_lead_time_metrics(self) -> LeadTimeMetricDTO:
         """Calculate School-wide Lead Time."""
         # AVG(first_interaction_at - created_at)
-        diff = func.extract('epoch', Case.first_interaction_at - Case.created_at) / 3600.0
+        diff = (
+            func.extract('epoch', Case.first_interaction_at - Case.created_at) / 3600.0
+        )
         stmt = select(
             func.avg(diff),
             func.count(Case.case_id),
@@ -178,16 +260,24 @@ class AdminDashboardQueryService:
             Student.major,
             func.count(Student.sid),
         ).group_by(Student.major)
-        total_by_major = {row[0]: row[1] for row in (await self.session.execute(total_stmt)).all()}
+        total_by_major = {
+            row[0]: row[1] for row in (await self.session.execute(total_stmt)).all()
+        }
 
         # At-risk students per major
-        risk_stmt = select(
-            Student.major,
-            func.count(Student.sid),
-        ).where(
-            Student.current_risk_status != RiskStatus.NORMAL,
-        ).group_by(Student.major)
-        risk_by_major = {row[0]: row[1] for row in (await self.session.execute(risk_stmt)).all()}
+        risk_stmt = (
+            select(
+                Student.major,
+                func.count(Student.sid),
+            )
+            .where(
+                Student.current_risk_status != RiskStatus.NORMAL,
+            )
+            .group_by(Student.major)
+        )
+        risk_by_major = {
+            row[0]: row[1] for row in (await self.session.execute(risk_stmt)).all()
+        }
 
         all_majors = set(total_by_major.keys()) | set(risk_by_major.keys())
 
@@ -195,7 +285,9 @@ class AdminDashboardQueryService:
             MajorRiskMetricDTO(
                 major=major,
                 total_students=total_by_major.get(major, 0),
-                risk_percentage=risk_by_major.get(major, 0) / total_by_major[major] if total_by_major.get(major, 0) > 0 else 0.0,
+                risk_percentage=risk_by_major.get(major, 0) / total_by_major[major]
+                if total_by_major.get(major, 0) > 0
+                else 0.0,
             )
             for major in all_majors
         ]

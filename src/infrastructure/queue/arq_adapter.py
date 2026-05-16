@@ -14,9 +14,14 @@ class ArqTaskQueueAdapter(BackgroundTaskQueue):
         """Initialize the adapter with an ARQ pool."""
         self.arq_pool = arq_pool
 
-    async def enqueue(self, task_name: str, **kwargs: Any) -> Any:  # noqa: ANN401
+    async def enqueue(
+        self,
+        task_name: str,
+        _job_id: str | None = None,
+        **kwargs: Any,
+    ) -> Any:  # noqa: ANN401
         """Enqueue a task into the ARQ pool."""
-        return await self.arq_pool.enqueue_job(task_name, **kwargs)
+        return await self.arq_pool.enqueue_job(task_name, _job_id=_job_id, **kwargs)
 
     async def is_available(self) -> bool:
         """Check if Redis is reachable."""

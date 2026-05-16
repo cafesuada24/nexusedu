@@ -1,3 +1,9 @@
+x-dep-base: &dep-base
+  redis:
+    condition: service_healthy
+  otel-collector:
+    condition: service_started
+
 x-app-base: &app-base
   build:
     context: .
@@ -5,13 +11,6 @@ x-app-base: &app-base
     - .env
   volumes:
     - ./data:/app/data
-  depends_on:
-    db:
-      condition: service_healthy
-    redis:
-      condition: service_healthy
-    otel-collector:
-      condition: service_started
   networks:
     - nexusedu-net
   restart: unless-stopped
@@ -26,8 +25,14 @@ x-app-base: &app-base
       max-file: "3"
 
 services:
-  api:
+  # =========================
+  # development services
+  # =========================
+
+  api-dev:
     <<: *app-base
+    profiles: ["dev"]
+    container_name: nexusedu-api-dev
     ports:
       - "8000:8000"
     command:
@@ -38,6 +43,7 @@ services:
         "0.0.0.0",
         "--port",
         "8000",
+        "--reload",
       ]
     healthcheck:
       test:
@@ -52,27 +58,52 @@ services:
       retries: 5
       start_period: 15s
 
-  worker:
+    depends_on:
+      <<: *dep-base
+      db:
+        condition: service_started
+
+  worker-dev:
     <<: *app-base
-    command: ["arq", "src.infrastructure.workers.worker.WorkerSettings"]
+    profiles: ["dev"]
+    container_name: nexusedu-worker-dev
+    command:
+      [
+        "watchfiles",
+        "arq src.infrastructure.workers.worker.WorkerSettings",
+      ]
+
+    depends_on:
+      <<: *dep-base
+      db:
+        condition: service_started
+
+  mailpit:
+    profiles: ["dev"]
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - nexusedu-net
+    restart: unless-stopped
 
   db:
     image: postgres:16-alpine
+    profiles: ["dev"]
     env_file:
       - .env
-    # expose:
-    #   - "5432"
-    ports:
-      - "127.0.0.1:5432:5432"
+    expose:
+      - "5432"
     environment:
-      POSTGRES_INITDB_ARGS: "--data-checksums"
+      postgres_initdb_args: "--data-checksums"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB",
+          "pg_isready -u $$postgres_user -d $$postgres_db",
         ]
       interval: 5s
       timeout: 5s
@@ -91,8 +122,119 @@ services:
         max-size: "10m"
         max-file: "3"
 
+
+  # =========================
+  # production services
+  # =========================
+
+  api:
+    <<: *app-base
+    profiles: ["prod"]
+    container_name: nexusedu-api
+  
+    expose:
+      - "8000"
+
+    command:
+      [
+        "gunicorn",
+        "src.presentation.api.main:app",
+        "--worker-class",
+        "uvicorn.workers.UvicornWorker",
+        "--workers",
+        "2",
+        "--bind",
+        "0.0.0.0:8000",
+        "--access-logfile",
+        "-",
+        "--error-logfile",
+        "-",
+        "--timeout",
+        "60",
+        "--graceful-timeout",
+        "30",
+        "--keep-alive",
+        "5",
+      ]
+
+    read_only: true
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+    depends_on:
+      <<: *dep-base
+      cloud-sql-proxy:
+        condition: service_started
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["prod"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - nexusedu-net
+    depends_on:
+      - api
+
+  worker:
+    <<: *app-base
+    profiles: ["prod"]
+    container_name: nexusedu-worker
+    command:
+      ["arq", "src.infrastructure.workers.worker.WorkerSettings"]
+    read_only: true
+
+    depends_on:
+      <<: *dep-base
+      cloud-sql-proxy:
+        condition: service_started
+
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.18.3
+    profiles: ["prod"]
+    expose:
+      - "5432"
+    command:
+      - "--address=0.0.0.0"
+      - "${CLOUD_SQL_CONNECTION_NAME}"
+    networks:
+      - nexusedu-net
+    restart: unless-stopped
+
+    env_file:
+      - .env
+    tmpfs:
+      - /tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # =========================
+  # shared infrastructure
+  # =========================
+
   redis:
     image: redis:alpine
+    profiles: ["dev", "prod"]
     env_file:
       - .env
     expose:
@@ -136,6 +278,7 @@ services:
         max-file: "3"
 
   prometheus:
+    profiles: ["dev"]
     image: prom/prometheus:latest
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -151,48 +294,29 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  mailpit:
-    image: axllent/mailpit:latest
-    ports:
-      - "1025:1025"
-      - "8025:8025"
-    networks:
-      - nexusedu-net
-    restart: unless-stopped
 
   jaeger:
+    profiles: ["dev"]
     image: jaegertracing/all-in-one:latest
     ports:
       - "16686:16686"
     environment:
-      COLLECTOR_OTLP_ENABLED: "true"
-      METRICS_STORAGE_TYPE: "prometheus"
-      PROMETHEUS_SERVER_URL: "http://prometheus:9090"
-      PROMETHEUS_QUERY_SUPPORT_SPAN_METRICS_CONNECTOR: "true"
-      PROMETHEUS_QUERY_NAMESPACE: "traces_span_metrics"
-      PROMETHEUS_QUERY_NORMALIZE_CALLS: "true"
-      PROMETHEUS_QUERY_NORMALIZE_DURATION: "true"
+      collector_otlp_enabled: "true"
+      metrics_storage_type: "prometheus"
+      prometheus_server_url: "http://prometheus:9090"
+      prometheus_query_support_span_metrics_connector: "true"
+      prometheus_query_namespace: "traces_span_metrics"
+      prometheus_query_normalize_calls: "true"
+      prometheus_query_normalize_duration: "true"
     depends_on:
       prometheus:
         condition: service_started
     networks:
       - nexusedu-net
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   otel-collector:
+    profiles: ["dev", "prod"]
     image: otel/opentelemetry-collector-contrib:latest
     command: ["--config=/etc/otel-collector-config.yaml"]
     ports:
@@ -203,18 +327,13 @@ services:
     depends_on:
       prometheus:
         condition: service_started
+        required: false
       jaeger:
         condition: service_started
+        required: false
     networks:
       - nexusedu-net
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 networks:
   nexusedu-net:
@@ -224,3 +343,5 @@ volumes:
   postgres_data:
   redis_data:
   prometheus_data:
+  caddy_data:
+  caddy_config:

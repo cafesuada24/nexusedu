@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
+import { getWsUrl } from "@/lib/api";
 
 export interface WebSocketMessage<T = unknown> {
   type: string;
@@ -77,35 +78,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   const buildWebSocketUrl = useCallback(
     () => {
-      // Explicit WS URL has highest priority
-      if (process.env.NEXT_PUBLIC_WS_URL) {
-        return process.env.NEXT_PUBLIC_WS_URL.replace(/\/+$/, "");
-      }
+      if (typeof window === "undefined") return "";
+      
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("nexusedu_ws_token="))
+        ?.split("=")[1];
 
-      const apiBaseUrl = (
-        process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
-      ).replace(/\/+$/, "");
-
-      // Absolute API URL
-      if (apiBaseUrl.startsWith("http")) {
-        const wsBaseUrl = apiBaseUrl.replace(/^http/, "ws");
-
-        return `${wsBaseUrl}/ws`;
-      }
-
-      // Fallback
-      const isDev = process.env.NODE_ENV === "development";
-
-      const protocol =
-        window.location.protocol === "https:"
-          ? "wss:"
-          : "ws:";
-
-      const host = isDev
-        ? "localhost:8000"
-        : window.location.host;
-
-      return `${protocol}//${host}/api/v1/ws`;
+      return getWsUrl(token);
     },
     [],
   );
@@ -156,10 +136,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     socket.onmessage = (event: MessageEvent<string>) => {
       try {
+        console.debug("[WS] Raw message received:", event.data);
         const parsedMessage: WebSocketMessage = JSON.parse(
           event.data,
         );
 
+        console.info("[WS] Processed message:", parsedMessage.type, parsedMessage.payload);
         setLastMessage(parsedMessage);
         onMessageRef.current?.(parsedMessage);
       } catch (error) {

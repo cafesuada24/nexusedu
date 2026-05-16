@@ -112,10 +112,14 @@ export function AuthProvider({
           error,
         )
       } finally {
-        isLoggingOut.current = false
+      isLoggingOut.current = false
 
-        window.location.href = "/login"
+      // Clear WS token
+      document.cookie = "nexusedu_ws_token=; path=/; max-age=0";
+
+      window.location.href = "/login"
       }
+
     },
     [],
   )
@@ -217,6 +221,12 @@ export function AuthProvider({
         }
 
         console.debug("[AUTH] Login action success, refetching profile...");
+
+        // Store non-httpOnly token for WebSocket use
+        if (result.token) {
+          document.cookie = `nexusedu_ws_token=${result.token}; path=/; max-age=${60 * 60 * 8}; SameSite=Lax`;
+        }
+
         await refetch()
 
         toast.success(

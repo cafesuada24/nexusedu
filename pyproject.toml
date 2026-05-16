@@ -37,6 +37,7 @@ dependencies = [
     "opentelemetry-instrumentation-redis>=0.48b0",
     "opentelemetry-exporter-otlp>=1.27.0",
     "psycopg[binary]>=3.3.4",
+    "gunicorn>=26.0.0",
 ]
 # dependencies = []
 
