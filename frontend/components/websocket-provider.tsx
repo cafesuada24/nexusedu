@@ -6,7 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { fetchDraftStatus } from "@/lib/api";
 import { toast } from "sonner";
-import { useUploads } from "@/hooks/use-uploads";
 
 interface WebSocketContextType {
     status: "connecting" | "open" | "closed";
@@ -29,7 +28,6 @@ export const useWebSocketContext = () => useContext(WebSocketContext);
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const queryClient = useQueryClient();
-    const { uploads, updateUpload } = useUploads();
     const [latestDraftCompletion, setLatestDraftCompletion] = React.useState<{
         caseId: string;
         subject: string | null;
@@ -263,17 +261,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                             : "Ingestion finished. No new cases identified.",
                     });
 
-                    // Update local upload registry if we find a match
-                    if (ingestPayload.job_id) {
-                        const matchingUpload = uploads.find(u => u.jobId === ingestPayload.job_id);
-                        if (matchingUpload) {
-                            updateUpload(matchingUpload.id, { 
-                                status: "ready",
-                                // Optionally patch with real results if needed
-                            });
-                        }
-                    }
-
                     // Invalidate caches that might have changed
                     queryClient.invalidateQueries({ queryKey: queryKeys.alerts.all });
                     queryClient.invalidateQueries({ queryKey: queryKeys.cases.all });
@@ -358,8 +345,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             markDraftCompletedImmediately,
             queryClient,
             updateSurgicalCache,
-            uploads,
-            updateUpload,
         ]
     );
 
