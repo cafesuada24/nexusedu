@@ -4,11 +4,13 @@ import time
 from datetime import UTC, datetime
 
 import pandas as pd
+import numpy as np
 
 from src.core.identifiers import generate_uuid
 
 # Constants
-NUM_STUDENTS = 100
+NUM_STUDENTS = 50
+NUM_ANOMALY_STUDENTS = 10
 NUM_COURSES = 10
 YEARS = [1, 2, 3, 4]
 SEMESTERS = [1, 2]
@@ -41,30 +43,44 @@ TEST_TYPES = [
     {'type': 'Final', 'weight': 0.4},
 ]
 
+# Failure Profiles for Anomaly Students
+# 1-5: Critical
+# 6-10: Elevated
+FAILURE_PROFILES = {
+    0: 'extreme_peer_failure',  # Critical: Score < 15
+    1: 'sudden_collapse',      # Critical: Drop 90 -> 20
+    2: 'systemic_decline',     # Critical: Drop in > 50% domains
+    3: 'zero_activity',        # Critical: Score 0
+    4: 'extreme_drift',        # Critical: Drop > 4.5 std dev
+    5: 'gradual_trend',        # Elevated: Sustained negative drift
+    6: 'moderate_drift',       # Elevated: Drop 80 -> 55
+    7: 'moderate_peer_failure',# Elevated: Score ~45
+    8: 'single_course_drop',   # Elevated: Significant failure in one domain
+    9: 'sustained_low',        # Elevated: Borderline results
+}
 
 def generate_mock_data():
     # 1. Generate Students (SIS data)
     students = []
     for i in range(NUM_STUDENTS):
-        sid = generate_uuid()
+        sid = str(generate_uuid())
         name = f'Student {i}'
-        profile = random.choices(
-            ['steady', 'improving', 'degrading'], weights=[0.6, 0.2, 0.2],
-        )[0]
         
-        # Determine risk status: will be assigned based on performance later
-        risk_status = 'Normal'
+        # Determine if this student is an anomaly
+        anomaly_profile = None
+        if i < NUM_ANOMALY_STUDENTS:
+            anomaly_profile = FAILURE_PROFILES[i]
             
         students.append(
             {
-                'sid': str(sid),
+                'sid': sid,
                 'student_name': name,
                 'email': f'student_{i}@university.edu',
                 'major': random.choice(MAJORS),
-                'current_risk_status': risk_status,
+                'current_risk_status': 'Normal',
                 'last_notified_timestamp': None,
                 'last_notified_satisfaction': 0,
-                'profile': profile,  # Temporary for score generation
+                'anomaly_profile': anomaly_profile, # Temporary
             },
         )
 
@@ -75,9 +91,6 @@ def generate_mock_data():
     courses = [
         {'id': f'C{100 + i}', 'name': name} for i, name in enumerate(COURSE_NAMES)
     ]
-
-    # Assign 10 students as "at-risk" profile
-    at_risk_sids = [s['sid'] for s in random.sample(students, 10)]
 
     for year in YEARS:
         for semester in SEMESTERS:
@@ -90,31 +103,40 @@ def generate_mock_data():
 
                 for course in semester_courses:
                     for week in range(1, WEEKS_PER_SEMESTER + 1):
-                        # Not every week has a test
-                        if random.random() > 0.4:  # 60% chance of an activity each week
-                            # Determine base score based on profile and year
-                            profile = student['profile']
-                            if student['sid'] in at_risk_sids:
-                                base_score = 25 + random.randint(-10, 10) # Consistently low scores
-                            elif profile == 'degrading':
-                                base_score = (
-                                    90
-                                    - (year * 10)
-                                    - (week * 0.5)
-                                    + random.randint(-5, 5)
-                                )
-                            elif profile == 'improving':
-                                base_score = (
-                                    60
-                                    + (year * 8)
-                                    + (week * 0.3)
-                                    + random.randint(-5, 5)
-                                )
-                            else:
-                                base_score = 75 + random.randint(-10, 10)
+                        # 60% chance of an activity each week
+                        if random.random() > 0.4:
+                            base_score = 80.0 + random.normalvariate(0, 5)
+                            
+                            # Apply anomaly patterns in the last year, last semester, last 4 weeks
+                            is_final_period = (year == 4 and semester == 2 and week >= 13)
+                            profile = student['anomaly_profile']
+                            
+                            if is_final_period and profile:
+                                if profile == 'extreme_peer_failure':
+                                    base_score = random.uniform(5, 15)
+                                elif profile == 'sudden_collapse':
+                                    base_score = 20.0 + random.uniform(-5, 5)
+                                elif profile == 'systemic_decline':
+                                    base_score = 55.0 + random.uniform(-5, 5) # Multi-domain drop
+                                elif profile == 'zero_activity':
+                                    base_score = 0.0
+                                elif profile == 'extreme_drift':
+                                    base_score = 30.0 # From 80 to 30 is ~5 std devs if std=10
+                                elif profile == 'gradual_trend':
+                                    # Week 13: 70, Week 14: 65, Week 15: 60, Week 16: 55
+                                    base_score = 85 - (week - 12) * 7.5
+                                elif profile == 'moderate_drift':
+                                    base_score = 55.0 + random.uniform(-5, 5)
+                                elif profile == 'moderate_peer_failure':
+                                    base_score = 45.0 + random.uniform(-5, 5)
+                                elif profile == 'single_course_drop':
+                                    # Only affect one course ID specifically
+                                    if course['id'] == semester_courses[0]['id']:
+                                        base_score = 30.0
+                                elif profile == 'sustained_low':
+                                    base_score = 65.0 + random.uniform(-5, 5)
 
                             final_score = max(0.0, min(100.0, float(base_score)))
-
                             activity_type = random.choice(TEST_TYPES)['type']
 
                             activities.append(
@@ -131,29 +153,43 @@ def generate_mock_data():
                                         + (week * 7 * 24 * 3600)
                                         + random.randint(0, 86400),
                                         tz=UTC,
-                                    ),
+                                    ).isoformat(),
                                     'academic_year': year,
                                     'semester': semester,
                                     'week': week,
                                 },
                             )
 
-    # Remove 'profile' from student records before saving
-    for s in students:
-        del s['profile']
+    # 3. Calculate Course Peer Statistics (avg and std)
+    df_activities = pd.DataFrame(activities)
+    
+    # Group by academic_year, semester, week, and course_id to get stats
+    stats = df_activities.groupby(['academic_year', 'semester', 'week', 'course_id'])['score'].agg(['mean', 'std']).reset_index()
+    stats.columns = ['academic_year', 'semester', 'week', 'course_id', 'course_avg', 'course_std']
+    
+    # Fill NaN std (if only one student in a course/week) with a default
+    stats['course_std'] = stats['course_std'].fillna(10.0)
+    
+    # Merge stats back to activities
+    df_activities = df_activities.merge(stats, on=['academic_year', 'semester', 'week', 'course_id'], how='left')
 
-    return students, activities
+    # Remove temporary 'anomaly_profile' from student records
+    for s in students:
+        if 'anomaly_profile' in s:
+            del s['anomaly_profile']
+
+    return students, df_activities
 
 
 if __name__ == '__main__':
-    students, activities = generate_mock_data()
+    students, df_activities = generate_mock_data()
 
     os.makedirs('data', exist_ok=True)
 
     # Save to individual files
     pd.DataFrame(students).to_csv('data/v2_students.csv', index=False)
-    pd.DataFrame(activities).to_csv('data/v2_activities.csv', index=False)
+    df_activities.to_csv('data/v2_activities.csv', index=False)
 
     print(f'Generated {len(students)} students.')
-    print(f'Generated {len(activities)} activities.')
+    print(f'Generated {len(df_activities)} activities.')
     print('Files saved to data/v2_students.csv and data/v2_activities.csv')

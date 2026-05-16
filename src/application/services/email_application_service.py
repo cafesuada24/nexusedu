@@ -55,17 +55,20 @@ class EmailApplicationService:
 
 
         student = await self.uow.students.get_by_id(case.sid)
+        advisor = await self.uow.advisors.get_by_id(case.assigned_advisor_id)
 
         logger.info(
             'dispatching_intervention_email',
             case_id=str(case_id),
             email=student.email,
+            advisor_email=advisor.email if advisor else None,
         )
 
         await self.email_sending_service.send_email(
             to_email=student.email,
             subject=email.subject,
             body=email.body,
+            reply_to=advisor.email if advisor else None,
         )
 
         # 2. Update state atomically

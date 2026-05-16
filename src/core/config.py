@@ -37,6 +37,8 @@ class AppConfig(BaseSettings):
     smtp_user: str | None = None
     smtp_password: str | None = None
     smtp_from_email: str
+    smtp_use_tls: bool = False
+    smtp_start_tls: bool = False
 
 
 class DevConfig(AppConfig):
@@ -87,6 +89,8 @@ class ProdConfig(AppConfig):
     smtp_user: str | None = None
     smtp_password: str | None = None
     smtp_from_email: str
+    smtp_use_tls: bool = False
+    smtp_start_tls: bool = False
 
 
 # Load environment variables from .env file

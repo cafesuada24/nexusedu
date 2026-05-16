@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import os
 import uuid
+import logging
 from datetime import time
 from pathlib import Path
 import pandas as pd
@@ -13,6 +14,7 @@ import sys
 
 sys.path.append(str(project_root))
 
+from scripts.utils import require_dev_only
 from src.core.identifiers import generate_uuid
 from src.infrastructure.database.models import (
     Activity,
@@ -35,11 +37,14 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
 )
 from src.infrastructure.persistence.sqlalchemy_uow import SqlAlchemyUnitOfWork
 
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
+@require_dev_only
 async def reseed_dashboard(reset: bool = False) -> None:
     """Seeds data from dashboard mock CSV files. Optionally drops and recreates tables."""
     if reset:
-        print('Resetting database schema...')
+        logger.info('Resetting database schema...')
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
@@ -50,14 +55,14 @@ async def reseed_dashboard(reset: bool = False) -> None:
         uow = SqlAlchemyUnitOfWork(session)
         user_manager = UserManager(user_db, user_settings_repo, uow)
 
-        print('Importing advisors and creating users...')
+        logger.info('Importing advisors and creating users...')
         adv_df = pd.read_csv('data/v2_advisors.csv')
         advisors = []
         for _, row in adv_df.iterrows():
             user_id = uuid.UUID(row['user_id'])
             try:
                 # To ensure the ID matches what's in the CSV, we'll use a direct manual insert
-                print(f'Creating user for {row["email"]} with ID {user_id}...')
+                logger.info(f'Creating user for {row["email"]} with ID {user_id}...')
 
                 # Check if user exists
                 from sqlalchemy import select
@@ -66,7 +71,7 @@ async def reseed_dashboard(reset: bool = False) -> None:
                     select(User).where(User.email == row['email'])
                 )
                 if res.scalar_one_or_none():
-                    print(f'User {row["email"]} already exists, skipping creation.')
+                    logger.info(f'User {row["email"]} already exists, skipping creation.')
                 else:
                     # Manually insert with fixed ID and hashed password
                     hashed_password = user_manager.password_helper.hash('password')
@@ -84,10 +89,10 @@ async def reseed_dashboard(reset: bool = False) -> None:
                     # Initialize settings
                     await user_settings_repo.create_user_settings(user_id)
                     await session.commit()
-                    print(f'Created user with ID {user_id}')
+                    logger.info(f'Created user with ID {user_id}')
             except Exception as e:
                 await session.rollback()
-                print(f'Error creating user {row["email"]}: {e}')
+                logger.error(f'Error creating user {row["email"]}: {e}')
 
             advisor_data = row.to_dict()
             advisor_data['advisor_id'] = uuid.UUID(advisor_data['advisor_id'])

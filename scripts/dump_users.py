@@ -1,43 +1,29 @@
-import os
-import sqlite3
+import asyncio
 import sys
-from urllib.parse import urlparse
+from pathlib import Path
+from sqlalchemy import select
 
+# Add project root to sys.path
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
 
-def dump_users() -> None:
-    """Dumps user data from the local SQLite database."""
-    # Respect DATABASE_URL if set, otherwise default to data/app.db
-    db_url = os.environ.get('DATABASE_URL', 'sqlite+aiosqlite:///./data/app.db')
+from src.infrastructure.database.models import User
+from src.infrastructure.database.session import async_session_maker
 
-    # Parse the SQLite path from the URL
-    if db_url.startswith('sqlite'):
-        # Handle sqlite+aiosqlite:///./data/app.db or sqlite:///data/app.db
-        db_path = db_url.split('///')[-1]
-        if db_path.startswith('./'):
-            db_path = db_path[2:]
-    else:
-        print(f"Error: DATABASE_URL {db_url} is not a SQLite database.")
-        return
-
+async def dump_users() -> None:
+    """Dumps user data from the database using the centralized session."""
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute('SELECT id, email, is_active, role FROM user')
-        users = cursor.fetchall()
+        async with async_session_maker() as session:
+            result = await session.execute(select(User))
+            users = result.scalars().all()
 
-        print('ID | Email | Active | Role')
-        print('-' * 60)
-        for u in users:
-            print(f'{u[0]} | {u[1]} | {u[2]} | {u[3]}')
+            print(f"{'ID':<36} | {'Email':<30} | {'Active':<6} | {'Role':<10}")
+            print("-" * 90)
+            for u in users:
+                print(f"{str(u.id):<36} | {u.email:<30} | {str(u.is_active):<6} | {u.role:<10}")
 
-    except sqlite3.OperationalError as e:
-        print(f'Error: Could not open database at {db_path}. Ensure it exists.')
-        print(f'Details: {e}')
     except Exception as e:
-        print(f'An unexpected error occurred: {e}')
-    finally:
-        if 'conn' in locals():
-            conn.close()
+        print(f"Error: Could not dump users. {e}")
 
 if __name__ == '__main__':
-    dump_users()
+    asyncio.run(dump_users())

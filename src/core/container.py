@@ -235,6 +235,8 @@ class Container:
             user=config.smtp_user,
             password=config.smtp_password,
             from_email=config.smtp_from_email,
+            use_tls=config.smtp_use_tls,
+            start_tls=config.smtp_start_tls,
         )
 
     @cached_property

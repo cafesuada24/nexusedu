@@ -8,37 +8,59 @@ if [ -f .env ]; then
     export $(grep -v '^#' .env | sed 's/#.*//' | xargs)
 fi
 
-DB_USER=${POSTGRES_USER:-myuser}
-DB_NAME=${POSTGRES_DB:-a20app}
+# Detect environment or default to dev
+ENV_VAL=${ENVIRONMENT:-development}
+ENV=${1:-$ENV_VAL}
 
-echo "Stopping application services to close connections..."
-docker compose stop api worker
+if [ "$ENV" = "production" ] || [ "$ENV" = "prod" ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "WARNING: YOU ARE ABOUT TO RESET THE PRODUCTION DATABASE!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    read -p "Are you absolutely sure? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Reset cancelled."
+        exit 1
+    fi
+    PROFILE="prod"
+    API_SVC="api"
+else
+    PROFILE="dev"
+    API_SVC="api-dev"
+fi
 
-echo "Resetting PostgreSQL database: $DB_NAME..."
-# Terminate other connections if any (just in case)
-docker compose exec -T db psql -U "$DB_USER" -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" || true
+# Determine DB target (prioritize cloud-sql-proxy if present, otherwise db)
+DB_SERVICE=$(docker compose --profile "$PROFILE" ps --services 2>/dev/null | grep -q "^cloud-sql-proxy$" && echo "cloud-sql-proxy" || echo "db")
+
+DB_USER=${POSTGRES_USER:-nexusedu_user}
+DB_NAME=${POSTGRES_DB:-nexusedu}
+
+echo "Stopping application services..."
+docker compose --profile "$PROFILE" stop "$API_SVC"
+
+echo "Resetting PostgreSQL database: $DB_NAME using service: $DB_SERVICE (Env: $ENV)..."
+
+# Function to execute psql commands based on the target service
+run_psql() {
+    docker compose --profile "$PROFILE" exec -T "$DB_SERVICE" psql -U "$DB_USER" -d "$1" -c "$2"
+}
+
+# Terminate connections
+run_psql postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();" || true
+
 # Drop and recreate
-docker compose exec -T db psql -U "$DB_USER" -d postgres -c "DROP DATABASE IF EXISTS $DB_NAME;"
-docker compose exec -T db psql -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME;"
+run_psql postgres "DROP DATABASE IF EXISTS $DB_NAME;"
+run_psql postgres "CREATE DATABASE $DB_NAME;"
 
 echo "Starting application services..."
-docker compose start api worker
-
-# Give services a moment to start
-echo "Waiting for database to be ready..."
-until docker compose exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME" > /dev/null 2>&1; do
-  sleep 1
-done
+docker compose --profile "$PROFILE" start "$API_SVC"
 
 echo "Running migrations..."
-make migrate
-
-# echo "Seeding dashboard data..."
-# docker compose exec api env PYTHONPATH=. python scripts/reseed_dashboard.py
+make migrate ENV="$ENV"
 
 echo "Seeding default users..."
-# Run seeding inside the container
-docker compose exec api env PYTHONPATH=. python scripts/create_user.py --email dev@gmail.com --password dev --role admin
-docker compose exec api env PYTHONPATH=. python scripts/create_user.py --email adv@gmail.com --password adv --role advisor
+# Inside the container, the venv is already in the PATH and uv is not present in the runtime image.
+docker compose --profile "$PROFILE" exec -T "$API_SVC" env PYTHONPATH=. python scripts/create_user.py --email dev@gmail.com --password dev --role admin
+docker compose --profile "$PROFILE" exec -T "$API_SVC" env PYTHONPATH=. python scripts/create_user.py --email adv@gmail.com --password adv --role advisor
 
 echo "Database reset successfully."
