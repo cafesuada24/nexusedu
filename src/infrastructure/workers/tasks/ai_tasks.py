@@ -52,12 +52,14 @@ async def run_batch_case_overviews_task(ctx: TaskContext) -> None:
         count=len(case_ids),
     )
 
-    # 2. Fan-out: Enqueue individual tasks
-    for case_id in case_ids:
-        await ctx.container.task_queue.enqueue(
-            'run_generate_case_overview_task',
-            payload=GenerateCaseOverviewPayload(case_id=case_id),
-        )
+    # 2. Fan-out: Enqueue individual tasks atomically
+    async with ctx.uow:
+        for case_id in case_ids:
+            await ctx.uow.enqueue(
+                'run_generate_case_overview_task',
+                payload=GenerateCaseOverviewPayload(case_id=case_id),
+            )
+        await ctx.uow.commit()
 
     ctx.logger.info('enqueued_individual_ai_overview_tasks', count=len(case_ids))
 

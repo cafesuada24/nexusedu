@@ -39,6 +39,16 @@ def upsert_stmt(
         ...     update_cols=['name']
         ... )
     """
+    # Deduplicate records based on index_elements, keeping the last occurrence.
+    # PostgreSQL raises an error if an ON CONFLICT DO UPDATE command affects a row
+    # more than once in the same statement.
+    if records and index_elements:
+        unique_records = {}
+        for record in records:
+            key = tuple(record.get(col) for col in index_elements)
+            unique_records[key] = record
+        records = list(unique_records.values())
+
     if dialect_name == 'postgresql':
         stmt = pg_insert(table).values(records)
         if update_cols:

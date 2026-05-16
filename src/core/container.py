@@ -53,9 +53,13 @@ from src.domain.services.availability import AdvisorAvailabilityService
 from src.domain.services.email_drafting import EmailDraftingService
 from src.domain.services.email_sending import EmailSendingService
 from src.domain.services.gamification import GamificationService
+from src.domain.services.safety_rule_guard import SafetyRuleGuard
 from src.infrastructure.extern.email_sender import AioSmtpEmailSender
 from src.infrastructure.extern.guardrails_drafting_service import (
     GuardrailsEmailDraftingService,
+)
+from src.infrastructure.extern.guardrails_safety_rule_guard import (
+    GuardrailsSafetyRuleGuard,
 )
 from src.infrastructure.extern.presidio_pii_masker import PresidioPiiMasker
 from src.infrastructure.persistence.query_services.advisor_metrics_query_service import (
@@ -248,6 +252,11 @@ class Container:
     def pii_masker(self) -> PiiMasker:
         """PII masking service."""
         return PresidioPiiMasker()
+
+    @cached_property
+    def safety_rule_guard(self) -> SafetyRuleGuard:
+        """Safety rule guard service."""
+        return GuardrailsSafetyRuleGuard(pii_masker=self.pii_masker)
 
     @cached_property
     def email_drafting_service(self) -> EmailDraftingService:

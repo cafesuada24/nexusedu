@@ -25,6 +25,6 @@ class UserSettingsRepository(Protocol):
         """Update the auto-drafting setting for a user."""
         ...
 
-    async def create_user_settings(self, user_id: EntityID) -> None:
+    async def create_user_settings(self, user_id: EntityID, name: str | None = None) -> None:
         """Create a new user settings."""
         ...
