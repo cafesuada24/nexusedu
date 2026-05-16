@@ -198,7 +198,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     if (startedJobType === "email_draft") {
                         toast.info("Generating email draft...");
                     } else if (startedJobType === "email_send") {
-                        toast.info("Sending intervention email...");
+                        // toast.info("Sending intervention email...");
                     }
                     break;
 
@@ -220,7 +220,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                             });
                         }
                     } else if (completedJobType === "email_send") {
-                        toast.success("Intervention email sent successfully!");
+                        // toast.success("Intervention email sent successfully!");
                     }
                     break;
 
@@ -284,9 +284,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     const statusPayload = payload as any;
                     console.log("[WS] Case status updated, surgical cache update...", statusPayload);
                     if (statusPayload.case_id) {
-                        toast.info("Case status updated", {
-                            description: `Case ${statusPayload.case_id.slice(0, 8)} status changed to ${statusPayload.new_status}.`,
-                        });
+                        // toast.info("Case status updated", {
+                        //     description: `Case ${statusPayload.case_id.slice(0, 8)} status changed to ${statusPayload.new_status}.`,
+                        // });
                         // Surgical update to all lists
                         const updater = (item: any) => ({
                             ...item,
