@@ -38,6 +38,7 @@ import { AlertSearch } from "./alert-center/alert-search";
 import { KanbanColumn } from "./alert-center/kanban-column";
 import { StudentDetailModal } from "./alert-center/student-detail-modal";
 import { EmailEditorSheet } from "./email-editor-sheet";
+import { useWebSocketContext } from "@/components/websocket-provider";
 
 export function AlertCenter() {
     const { state: sidebarState } = useSidebar();
@@ -84,9 +85,27 @@ export function AlertCenter() {
     const { data: remoteAlerts = [], isLoading } = useAlerts();
     const { mutate: updateStatus } = useUpdateAlertStatus();
     const queryClient = useQueryClient();
+    const { lastMessage } = useWebSocketContext();
+
+    // Listen for case status updates from WebSocket to trigger a real-time UI refresh.
+    // This ensures cases move to columns like "Đã đặt hẹn" (scheduled) instantly
+    // when the student books an appointment or the backend updates the status.
+    React.useEffect(() => {
+        if (!lastMessage) return;
+
+        if (lastMessage.type === "CASE:STATUS_UPDATED") {
+            const payload = lastMessage.payload as any;
+            if (payload?.case_id) {
+                console.log("[AlertCenter] Triggering real-time refresh for case:", payload.case_id);
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.alerts.all,
+                });
+            }
+        }
+    }, [lastMessage, queryClient]);
 
     const [localAlertState, setLocalAlertState] = React.useState<
-        Record<string, { goals: Goal[] }>
+        Record<string, { goals: Goal[]; acceptedAt?: number }>
     >({});
 
     React.useEffect(() => {
@@ -132,11 +151,14 @@ export function AlertCenter() {
                         ? "accepted"
                         : baseStatus;
 
-                const movedAt = r.sent_at
-                    ? Math.floor(new Date(r.sent_at).getTime() / 1000)
-                    : r.created_at
-                      ? Math.floor(new Date(r.created_at).getTime() / 1000)
-                      : now;
+                const localState = localAlertState[r.sid || ""];
+                const movedAt = localState?.acceptedAt
+                    ? localState.acceptedAt
+                    : r.sent_at
+                      ? Math.floor(new Date(r.sent_at).getTime() / 1000)
+                      : r.created_at
+                        ? Math.floor(new Date(r.created_at).getTime() / 1000)
+                        : now;
 
                 return {
                     id: r.sid || `missing-${Math.random()}`,
@@ -494,6 +516,14 @@ export function AlertCenter() {
                 });
                 return;
             }
+
+            setLocalAlertState((prev) => ({
+                ...prev,
+                [sid]: {
+                    ...(prev[sid] || { goals: [] }),
+                    acceptedAt: Math.floor(Date.now() / 1000),
+                },
+            }));
 
             setAcceptingCaseById((prev) => ({ ...prev, [a.id]: true }));
             setAiDraftErrorById((prev) => {
