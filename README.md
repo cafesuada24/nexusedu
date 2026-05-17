@@ -4,6 +4,13 @@
 
 ---
 
+## Links & Resources
+- **Live Demo**: [Application URL](https://a20-app-007.vercel.app)
+- **Pitch Deck**: [Link to Pitch Deck](https://docs.google.com/presentation/d/14oAJp1MUL2MmgAbsKcX1-nsxUtN04VDo/edit?usp=sharing&ouid=100201767592210803393&rtpof=true&sd=true)
+- **Video Demo**: [Link to Video Demo](https://youtu.be/ihI0M3DhjL0?feature=shared)
+
+---
+
 ## Key Features
 
 ### AI-Driven Intelligence
