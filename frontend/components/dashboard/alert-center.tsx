@@ -477,7 +477,7 @@ export function AlertCenter() {
                                     sid: profile.id,
                                     student_name: profile.name,
                                     email: profile.email,
-                                    major: profile.major || "Unknown",
+                                    major: "Unknown",
                                     current_risk_status:
                                         a.severity === "high"
                                             ? "Critical"
