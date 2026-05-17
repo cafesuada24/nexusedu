@@ -31,6 +31,7 @@ from src.application.exceptions import ConcurrencyError
 from src.core.config import config
 from src.core.identifiers import generate_uuid
 from src.domain.entities.base import AggregateRoot
+from src.domain.entities.settings import UserSettings as DomainUserSettings
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseNotFoundError,
@@ -40,12 +41,10 @@ from src.domain.exceptions import (
     UserIsNotAnAdvisorError,
     WorkingHoursNotFoundError,
 )
-from src.domain.entities.settings import UserSettings as DomainUserSettings
 from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
 )
-from src.infrastructure.database.config import DB_REGISTRY
 from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
