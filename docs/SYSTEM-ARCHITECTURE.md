@@ -51,7 +51,25 @@ The system employs a centralized persistence strategy using PostgreSQL for trans
 
 ---
 
-## 6. Key Technical Stack
+## 6. AI Workflow: The Intelligence Layer
+The system's intelligence layer manages the transition from raw data anomalies to supportive human intervention.
+
+### AI Workflow Diagram
+![AI Workflow Diagram](../images/architecture/ai-workflow.png)
+
+### AI Lifecycle & Guardrails
+1.  **Detection**: The `AdaptiveAnomalyEngine` identifies "silent slips" based on longitudinal performance drift.
+2.  **Input Guardrail (PII Masking)**: Before any data leaves the secure environment, the **Presidio PII Masker** redacts sensitive personal information (Names, IDs, Contact Info), ensuring only anonymized academic context is sent to the LLM.
+3.  **Synthesis & Structural Guardrail**: **BAML** manages the prompt orchestration with Gemini 1.5 Flash Lite. BAML enforces strict schema validation (via Pydantic), ensuring the AI output is always correctly formatted and free of conversational "filler."
+4.  **Output Guardrail (Semantic & Invariant Checks)**: Generated drafts are passed through rigorous local checks in the `GuardrailsEmailDraftingService`:
+    *   **Semantic Tone Validation**: A heuristic engine scans the text for punitive words (e.g., "failure", "probation") to prevent academic shaming.
+    *   **Invariant Verification**: Ensures all placeholders (e.g., `{{STUDENT_NAME}}`) are safely interpolated before the draft is finalized.
+5.  **Human-in-the-Loop**: The final and most critical guardrail is the **Advisor Review**. No AI-generated content is sent to a student without a human "stamp of approval."
+6.  **Execution**: Once cleared by all guards, the nudge is delivered, and the advisor is rewarded for their intervention.
+
+---
+
+## 7. Key Technical Stack
 *   **Frontend**: Next.js 16, Tailwind CSS, Shadcn UI.
 *   **Backend**: Python 3.12, FastAPI.
 *   **Database**: PostgreSQL 16 (Managed via Cloud SQL).
