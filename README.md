@@ -67,8 +67,7 @@
 │   ├── core/           # Configs, logging, and centralized constants
 │   ├── domain/         # Core entities, value objects, and exceptions (DDD)
 │   ├── infrastructure/ # Persistence, Redis, and external adapters
-│   ├── presentation/   # FastAPI entry points, schemas, and DI
-│   └── worker.py       # Background task processor (ARQ)
+│   └── presentation/   # FastAPI entry points, schemas, and DI
 ├── frontend/
 │   ├── app/            # Next.js App Router (pages & actions)
 │   ├── components/     # Reusable UI components
@@ -76,12 +75,12 @@
 │   ├── lib/            # Shared logic, API client, and constants
 │   ├── public/         # Static assets (logos, icons)
 │   └── styles/         # Global styles and Tailwind configuration
+├── terraform/          # Cloud deployment config
 ├── scripts/            # CLI tools for dev (seeding, user creation)
 ├── alembic/            # Database migration history
 ├── data/               # Sample institutional datasets (SIS/LMS)
-├── docs/               # System architecture and product documentation
-├── JOURNAL.md          # Reconstructed 6-week project journey
-└── WORKLOG.md          # Technical decisions and task assignments
+├── tests/              # Backend testcases
+└── docs/               # System architecture and product documentation
 ```
 
 ---
@@ -91,7 +90,8 @@
 ### Prerequisites
 - Python 3.12+ (managed by `uv`)
 - Node.js 20+
-- Docker (required for Redis and Mailpit via `manage_app.sh`)
+- Docker & Docker compose
+- Terraform
 
 ### 1. Repository Setup
 ```bash
@@ -137,6 +137,7 @@ npm install
 ### Backend
 ```bash
 # Start all backend services
+export ENV=dev # prod for production
 make start
 
 # Stop all services
@@ -161,7 +162,7 @@ npm run dev
 ---
 
 ## Team
-- **Hồ Sỹ Minh Hà**: Backend & AI Lead
+- **Hồ Sỹ Minh Hà**: Backend & AI Lead & DevOps
 - **Đặng Hồ Hải & Trịnh Đức An**: Frontend & UX Specialist
 
 ---
