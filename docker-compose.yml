@@ -93,8 +93,8 @@ services:
     profiles: ["dev"]
     env_file:
       - .env
-    expose:
-      - "5432"
+    ports:
+      - "5432:5432"
     environment:
       postgres_initdb_args: "--data-checksums"
     volumes:
@@ -227,6 +227,17 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["prod"]
+    command:
+      - tunnel
+      - --url
+      - http://caddy:80
+
+    networks:
+      - nexusedu-net
 
   # =========================
   # shared infrastructure
