@@ -5,7 +5,6 @@ description = "An agent assistant."
 readme = "README.md"
 requires-python = ">=3.12" # ">=3.12"
 dependencies = [
-    "duckdb>=1.5.1",
     "pandas>=3.0.2",
     "plotly>=6.7.0",
     "python-dotenv>=1.2.2",

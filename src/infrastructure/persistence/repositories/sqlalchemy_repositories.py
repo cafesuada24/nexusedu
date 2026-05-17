@@ -31,6 +31,7 @@ from src.application.exceptions import ConcurrencyError
 from src.core.config import config
 from src.core.identifiers import generate_uuid
 from src.domain.entities.base import AggregateRoot
+from src.domain.entities.settings import UserSettings as DomainUserSettings
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseNotFoundError,
@@ -40,7 +41,6 @@ from src.domain.exceptions import (
     UserIsNotAnAdvisorError,
     WorkingHoursNotFoundError,
 )
-from src.domain.entities.settings import UserSettings as DomainUserSettings
 from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
@@ -82,10 +82,10 @@ if TYPE_CHECKING:
     from src.domain.entities.intervention_email import (
         InterventionEmail as DomainInterventionEmail,
     )
+    from src.domain.entities.job import Job
     from src.domain.entities.notification import (
         Notification as DomainNotification,
     )
-    from src.domain.entities.job import Job
     from src.domain.entities.point_ledger import PointLedger as DomainLedger
     from src.domain.entities.schedule import DayOff as DomainDayOff
     from src.domain.entities.schedule import WorkingHours as DomainWorkingHours
@@ -668,10 +668,6 @@ class SqlAlchemyMetadataRepository:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with session."""
         self.session = session
-
-    async def get_db_registry(self) -> list[DBDescription]:
-        """Get the available database registry."""
-        return DB_REGISTRY
 
     async def list_tables(self, db_id: str) -> list[str]:
         """List tables using SQLAlchemy inspection."""
