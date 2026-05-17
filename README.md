@@ -147,9 +147,9 @@ npm run dev
 ---
 
 ## Documentation
-- **[JOURNAL.md](./JOURNAL.md)**: Follow the product journey and weekly milestones.
-- **[WORKLOG.md](./WORKLOG.md)**: Review technical decisions (ADRs) and architectural changes.
-- **[Architecture](./docs/system_architecture.md)**: Deep dive into the DDD and CQRS implementation.
+- **[JOURNAL.md](./docs/JOURNAL.md)**: Follow the product journey and weekly milestones.
+- **[WORKLOG.md](./docs/WORKLOG.md)**: Review technical decisions (ADRs) and architectural changes.
+- **[Architecture](./docs/SYSTEM-ARCHITECTURE.md)**: Deep dive into the DDD and CQRS implementation.
 
 ---
 
