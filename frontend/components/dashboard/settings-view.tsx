@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { useTheme } from "next-themes";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -105,6 +106,8 @@ const sessions = [
 export function SettingsView() {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
+    const { user } = useAuth();
+    const isAdvisor = user?.role === "advisor";
     const [safetyRuleDialogOpen, setSafetyRuleDialogOpen] = React.useState(false);
     const [newRuleText, setNewRuleText] = React.useState("");
     const [aiTone, setAiTone] = React.useState("warm");
@@ -118,6 +121,7 @@ export function SettingsView() {
     const { data: profile, isLoading: isProfileLoading } = useQuery({
         queryKey: ["advisor-profile"],
         queryFn: fetchAdvisorProfile,
+        enabled: isAdvisor,
     });
 
     const { data: settings, isLoading: isSettingsLoading } = useQuery({
@@ -215,14 +219,16 @@ export function SettingsView() {
 
     return (
         <>
-        <Tabs defaultValue="profile" className="gap-6">
+        <Tabs defaultValue={isAdvisor ? "profile" : "ai"} className="gap-6">
             <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-border/60 bg-muted/40 p-1">
-                <TabsTrigger
-                    value="profile"
-                    className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm"
-                >
-                    <User className="size-4" /> Hồ sơ
-                </TabsTrigger>
+                {isAdvisor && (
+                    <TabsTrigger
+                        value="profile"
+                        className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm"
+                    >
+                        <User className="size-4" /> Hồ sơ
+                    </TabsTrigger>
+                )}
 
                 <TabsTrigger
                     value="ai"
@@ -251,6 +257,7 @@ export function SettingsView() {
             </TabsList>
 
             {/* Profile */}
+            {isAdvisor && (
             <TabsContent value="profile" className="grid gap-6">
                 <Card className="stripe-sky rounded-2xl border-accent-sky/15 bg-gradient-to-br from-accent-sky/22 via-accent-sky/10 to-card dark:border-slate-800 dark:bg-slate-950/50 dark:from-slate-950/90 dark:via-slate-950/70 dark:to-slate-900/50">
                     <CardHeader className="pb-3">
@@ -452,6 +459,7 @@ export function SettingsView() {
                     </CardContent>
                 </Card>
             </TabsContent>
+            )}
 
             {/* AI */}
             <TabsContent value="ai" className="grid gap-6 lg:grid-cols-3">
