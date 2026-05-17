@@ -10,7 +10,7 @@ endif
 ifeq ($(ENV), prod)
     PROFILE = prod
     API_SVC = api
-    ENV_FILE = .env.production
+    ENV_FILE = .env
 else
     PROFILE = dev
     API_SVC = api-dev
