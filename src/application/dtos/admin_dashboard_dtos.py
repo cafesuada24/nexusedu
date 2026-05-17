@@ -1,9 +1,9 @@
 """DTOs for the Admin Dashboard."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt, PositiveInt
 
 
 class RecoveryMetricDTO(BaseModel):
@@ -75,20 +75,20 @@ class AdvisorAdminMetricRowDTO(BaseModel):
     advisor_id: UUID
     name: str
     faculty: str | None
-    active_cases: int
-    total_cases: int
-    avg_resolution_days: float | None
-    avg_lead_time_hours: float | None
-    meeting_hours: float
-    outreach_success_rate: float
-    recovery_rate: float
+    active_cases: NonNegativeInt
+    total_cases: NonNegativeInt
+    avg_resolution_days: NonNegativeInt | None = None
+    avg_lead_time_hours: NonNegativeInt | None = None
+    meeting_hours: NonNegativeFloat
+    outreach_success_rate: float = Field(..., ge=0.0, le=1.0)
+    recovery_rate: float = Field(..., ge=0.0, le=1.0)
 
 
 class AdvisorAdminMetricsResponseDTO(BaseModel):
     """Aggregate DTO for advisor performance metrics."""
 
     advisors: list[AdvisorAdminMetricRowDTO]
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class AdminDashboardDTO(BaseModel):
@@ -102,4 +102,4 @@ class AdminDashboardDTO(BaseModel):
     major_risk: list[MajorRiskMetricDTO]
     systemic_risk: SystemicRiskMetricDTO | None = None
     trend_distribution: TrendDistributionDTO | None = None
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
