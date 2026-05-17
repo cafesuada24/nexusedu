@@ -69,6 +69,28 @@ class TrendDistributionDTO(BaseModel):
     declining: int
 
 
+class AdvisorAdminMetricRowDTO(BaseModel):
+    """Detailed performance metrics for a single advisor."""
+
+    advisor_id: UUID
+    name: str
+    faculty: str | None
+    active_cases: int
+    total_cases: int
+    avg_resolution_days: float | None
+    avg_lead_time_hours: float | None
+    meeting_hours: float
+    outreach_success_rate: float
+    recovery_rate: float
+
+
+class AdvisorAdminMetricsResponseDTO(BaseModel):
+    """Aggregate DTO for advisor performance metrics."""
+
+    advisors: list[AdvisorAdminMetricRowDTO]
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class AdminDashboardDTO(BaseModel):
     """Aggregate DTO for the Admin Dashboard."""
 

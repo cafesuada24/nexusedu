@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.dtos.admin_dashboard_dtos import (
     AcademicImpactMetricDTO,
     AdminDashboardDTO,
+    AdvisorAdminMetricRowDTO,
+    AdvisorAdminMetricsResponseDTO,
     LeadTimeMetricDTO,
     MajorRiskMetricDTO,
     NudgeActivationMetricDTO,
@@ -15,10 +17,13 @@ from src.application.dtos.admin_dashboard_dtos import (
     TrendDistributionDTO,
 )
 from src.domain.value_objects.status import (
+    EmailStatus,
     InterventionStatus,
     RiskStatus,
 )
 from src.infrastructure.database.models import (
+    Advisor,
+    Appointment,
     Case,
     InterventionEmail,
     Student,
@@ -34,6 +39,137 @@ class AdminDashboardQueryService:
     def __init__(self, session: AsyncSession) -> None:
         """Initialize with an active database session."""
         self.session = session
+
+    async def get_advisor_performance_metrics(self) -> AdvisorAdminMetricsResponseDTO:
+        """Fetch performance metrics for all advisors."""
+        # 1. Get all advisors
+        advisors_stmt = select(Advisor).order_by(Advisor.name)
+        advisors = (await self.session.execute(advisors_stmt)).scalars().all()
+
+        # 2. Get all cases with relevant data for metrics
+        cases_stmt = (
+            select(
+                Case.case_id,
+                Case.assigned_advisor_id,
+                Case.intervention_status,
+                Case.created_at,
+                Case.closed_at,
+                Case.first_interaction_at,
+                Appointment.duration_minutes,
+                Student.sid,
+                Student.current_risk_status,
+                InterventionEmail.status.label('email_status'),
+                Appointment.appointment_id,
+            )
+            .select_from(Case)
+            .outerjoin(Student, Case.sid == Student.sid)
+            .outerjoin(Appointment, Case.case_id == Appointment.case_id)
+            .outerjoin(InterventionEmail, Case.case_id == InterventionEmail.case_id)
+            .where(Case.assigned_advisor_id.is_not(None))
+        )
+        case_data = (await self.session.execute(cases_stmt)).all()
+
+        # 3. Aggregate in Python for database-agnostic calculations
+        metrics_map = {
+            adv.advisor_id: {
+                'active_cases': 0,
+                'total_cases': 0,
+                'resolution_seconds': [],
+                'lead_time_seconds': [],
+                'meeting_minutes': 0.0,
+                'recovered_students': set(),
+                'total_students': set(),
+                'outreach_success_cases': set(),
+                'outreach_attempt_cases': set(),
+            }
+            for adv in advisors
+        }
+
+        for row in case_data:
+            adv_id = row.assigned_advisor_id
+            if adv_id not in metrics_map:
+                continue
+
+            stats = metrics_map[adv_id]
+            stats['total_cases'] += 1
+            if row.intervention_status not in (
+                InterventionStatus.RESOLVED,
+                InterventionStatus.FAILED,
+                InterventionStatus.DISMISSED,
+            ):
+                stats['active_cases'] += 1
+
+            # Resolution Time
+            if row.closed_at and row.created_at:
+                delta = row.closed_at - row.created_at
+                stats['resolution_seconds'].append(delta.total_seconds())
+
+            # Lead Time
+            if row.first_interaction_at and row.created_at:
+                delta = row.first_interaction_at - row.created_at
+                stats['lead_time_seconds'].append(delta.total_seconds())
+
+            # Meeting Minutes
+            if row.duration_minutes:
+                stats['meeting_minutes'] += float(row.duration_minutes)
+
+            # Recovery and Total Students
+            if row.sid:
+                stats['total_students'].add(row.sid)
+                if row.current_risk_status == RiskStatus.NORMAL:
+                    stats['recovered_students'].add(row.sid)
+
+            # Outreach Effectiveness
+            if row.email_status == EmailStatus.SENT:
+                stats['outreach_attempt_cases'].add(row.case_id)
+                if row.appointment_id:
+                    stats['outreach_success_cases'].add(row.case_id)
+
+        # 4. Convert to DTOs
+        rows = []
+        for adv in advisors:
+            stats = metrics_map[adv.advisor_id]
+
+            avg_res_days = None
+            if stats['resolution_seconds']:
+                avg_res_days = (
+                    sum(stats['resolution_seconds']) / len(stats['resolution_seconds'])
+                ) / 86400.0
+
+            avg_lead_hours = None
+            if stats['lead_time_seconds']:
+                avg_lead_hours = (
+                    sum(stats['lead_time_seconds']) / len(stats['lead_time_seconds'])
+                ) / 3600.0
+
+            recovery_rate = 0.0
+            if stats['total_students']:
+                recovery_rate = len(stats['recovered_students']) / len(
+                    stats['total_students'],
+                )
+
+            outreach_rate = 0.0
+            if stats['outreach_attempt_cases']:
+                outreach_rate = len(stats['outreach_success_cases']) / len(
+                    stats['outreach_attempt_cases'],
+                )
+
+            rows.append(
+                AdvisorAdminMetricRowDTO(
+                    advisor_id=adv.advisor_id,
+                    name=adv.name,
+                    faculty=adv.faculty,
+                    active_cases=stats['active_cases'],
+                    total_cases=stats['total_cases'],
+                    avg_resolution_days=avg_res_days,
+                    avg_lead_time_hours=avg_lead_hours,
+                    meeting_hours=stats['meeting_minutes'] / 60.0,
+                    outreach_success_rate=outreach_rate,
+                    recovery_rate=recovery_rate,
+                ),
+            )
+
+        return AdvisorAdminMetricsResponseDTO(advisors=rows)
 
     async def get_dashboard_data(self) -> AdminDashboardDTO:
         """Fetch and aggregate all dashboard metrics."""
