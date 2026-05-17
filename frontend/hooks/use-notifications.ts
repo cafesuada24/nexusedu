@@ -1,75 +1,102 @@
 "use client";
 
 import * as React from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
+import { 
+  fetchNotifications, 
+  markNotificationAsRead as apiMarkAsRead, 
+  markAllNotificationsAsRead as apiMarkAllAsRead,
+  Notification
+} from "@/lib/api";
+import { toast } from "sonner";
 
-export type Notification = {
-  id: string;
-  title: string;
-  message: string;
-  timestamp: string;
-  isRead: boolean;
-  type?: "info" | "warning" | "success" | "error";
-};
-
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  {
-    id: "1",
-    title: "Cảnh báo rủi ro mới",
-    message: "Sinh viên Nguyễn Văn An có dấu hiệu rủi ro cao trong tuần này.",
-    timestamp: "2 phút trước",
-    isRead: false,
-    type: "warning",
-  },
-  {
-    id: "2",
-    title: "Lịch hẹn sắp tới",
-    message: "Bạn có buổi tư vấn với lớp K21 vào lúc 14:00 hôm nay.",
-    timestamp: "1 giờ trước",
-    isRead: false,
-    type: "info",
-  },
-  {
-    id: "3",
-    title: "Cập nhật dữ liệu thành công",
-    message: "Dữ liệu điểm thi học kỳ 1 đã được đồng bộ hoàn tất.",
-    timestamp: "5 giờ trước",
-    isRead: true,
-    type: "success",
-  },
-  {
-    id: "4",
-    title: "Báo cáo hàng tuần",
-    message: "Báo cáo tổng hợp tuần 15 đã sẵn sàng để xem.",
-    timestamp: "Hôm qua",
-    isRead: true,
-    type: "info",
-  },
-];
+export type { Notification };
 
 export function useNotifications() {
-  const [notifications, setNotifications] = React.useState<Notification[]>(
-    INITIAL_NOTIFICATIONS
-  );
+  const queryClient = useQueryClient();
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.notifications.list(),
+    queryFn: fetchNotifications,
+    refetchInterval: 30000, // Poll every 30 seconds as a fallback
+  });
+
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
+
+  const markAsReadMutation = useMutation({
+    mutationFn: apiMarkAsRead,
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.list() });
+      const previousData = queryClient.getQueryData(queryKeys.notifications.list());
+      
+      queryClient.setQueryData(queryKeys.notifications.list(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          unreadCount: Math.max(0, old.unreadCount - 1),
+          notifications: old.notifications.map((n: Notification) => 
+            n.id === id ? { ...n, isRead: true } : n
+          ),
+        };
+      });
+
+      return { previousData };
+    },
+    onError: (err, id, context) => {
+      queryClient.setQueryData(queryKeys.notifications.list(), context?.previousData);
+      toast.error("Không thể đánh dấu đã đọc");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+    },
+  });
+
+  const markAllAsReadMutation = useMutation({
+    mutationFn: apiMarkAllAsRead,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.notifications.list() });
+      const previousData = queryClient.getQueryData(queryKeys.notifications.list());
+      
+      queryClient.setQueryData(queryKeys.notifications.list(), (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          unreadCount: 0,
+          notifications: old.notifications.map((n: Notification) => ({ ...n, isRead: true })),
+        };
+      });
+
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(queryKeys.notifications.list(), context?.previousData);
+      toast.error("Không thể đánh dấu tất cả đã đọc");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+    },
+  });
 
   const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+    markAsReadMutation.mutate(id);
   };
 
   const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    markAllAsReadMutation.mutate();
   };
 
   const clearNotifications = () => {
-    setNotifications([]);
+    // This is a local-only operation in the original mock, 
+    // we'll just invalidate for now or we could implement a DELETE all if needed.
+    queryClient.setQueryData(queryKeys.notifications.list(), { notifications: [], unreadCount: 0 });
   };
 
   return {
     notifications,
     unreadCount,
+    isLoading,
     markAsRead,
     markAllAsRead,
     clearNotifications,

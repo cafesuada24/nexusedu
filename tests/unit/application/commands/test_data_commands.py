@@ -17,6 +17,8 @@ def mock_uow():
     uow.history = AsyncMock()
     uow.cases = AsyncMock()
     uow.jobs = AsyncMock()
+    uow.advisors = AsyncMock()
+    uow.notification = AsyncMock()
     uow.__aenter__.return_value = uow
     uow.__aexit__.return_value = None
     uow.commit = AsyncMock()
@@ -103,6 +105,7 @@ async def test_handle_ingest_data(handler, mock_uow, mock_engine):
     from src.application.dtos.data_dtos import DataIngestionCommand, DataSourceDTO
     from src.domain.entities.data_ingestion import DataIngestion
     from src.domain.events.data_events import DataIngestedEvent
+    from src.domain.events.case_events import CasePublishedEvent
 
     command = DataIngestionCommand(
         data_sources=[
@@ -112,7 +115,13 @@ async def test_handle_ingest_data(handler, mock_uow, mock_engine):
     )
 
     # Mock anomaly detection
-    handler._run_anomaly_detection = AsyncMock(return_value=[(uuid.uuid4(), uuid.uuid4())])
+    new_case_id = uuid.uuid4()
+    handler._run_anomaly_detection = AsyncMock(return_value=[(uuid.uuid4(), new_case_id)])
+
+    # Mock advisors
+    mock_advisor = MagicMock()
+    mock_advisor.user_id = uuid.uuid4()
+    mock_uow.advisors.list_all.return_value = [mock_advisor]
 
     # Execute
     job_id = uuid.uuid4()
@@ -127,9 +136,17 @@ async def test_handle_ingest_data(handler, mock_uow, mock_engine):
     args, _ = mock_uow.collect_events.call_args
     ingestion = args[0]
     assert isinstance(ingestion, DataIngestion)
-    assert len(ingestion.domain_events) == 1
+    assert len(ingestion.domain_events) == 2
     assert isinstance(ingestion.domain_events[0], DataIngestedEvent)
-    assert ingestion.domain_events[0].job_id == job_id
+    assert isinstance(ingestion.domain_events[1], CasePublishedEvent)
+    assert ingestion.domain_events[1].count == 1
+    assert ingestion.domain_events[1].case_ids == [new_case_id]
+
+    # Verify notifications created for advisors
+    mock_uow.notification.add.assert_called_once()
+    notification = mock_uow.notification.add.call_args[0][0]
+    assert notification.user_id == mock_advisor.user_id
+    assert "New Cases Published" in notification.title
 
     assert result['results']
     assert len(result['new_sids']) == 1

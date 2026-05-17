@@ -21,6 +21,7 @@ from src.application.interfaces.unit_of_work import UnitOfWork
 from src.core.identifiers import generate_uuid
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
+from src.domain.entities.notification import Notification
 from src.domain.exceptions import (
     AdvisorNotFoundError,
     CaseAlreadyClosedError,
@@ -35,6 +36,10 @@ from src.domain.exceptions import (
 )
 from src.domain.services.availability import AdvisorAvailabilityService
 from src.domain.services.email_drafting import EmailDraftingService
+from src.domain.value_objects.status import (
+    NotificationPriority,
+    NotificationType,
+)
 from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 logger = structlog.get_logger(__name__)
@@ -62,7 +67,6 @@ class CaseCommandHandler:
             advisor = await self.uow.advisors.find_by_user_id(command.user_id)
             if advisor is None:
                 raise UserIsNotAnAdvisorError(command.user_id)
-
 
             # Capture initial GPA snapshot
             recent_perf = await self.uow.students.get_recent_performance(case.sid)
@@ -315,6 +319,24 @@ class CaseCommandHandler:
                 notes=command.notes,
             )
 
+            # Notify the assigned advisor
+            if case.assigned_advisor_id:
+                advisor = await self.uow.advisors.get_by_id(case.assigned_advisor_id)
+                student = await self.uow.students.get_by_id(case.sid)
+                notification = Notification(
+                    user_id=advisor.user_id,
+                    type=NotificationType.SUCCESS,
+                    title='Student Booked Appointment',
+                    body=f'Student {student.student_name} has booked an appointment for case {case.case_id}.',
+                    priority=NotificationPriority.HIGH,
+                    payload={
+                        'case_id': str(case.case_id),
+                        'appointment_time': command.appointment_time.isoformat(),
+                    },
+                )
+                notification.create()
+                await self.uow.notification.add(notification)
+
             # Record student response to nudge
             email = await self.uow.emails.find_by_case(case.case_id)
             if email and email.is_nudge and email.responded_at is None:
@@ -381,6 +403,31 @@ class CaseCommandHandler:
                 is_failed=is_failed,
                 final_gpa=final_gpa,
             )
+
+            # Notify the assigned advisor
+            if case.assigned_advisor_id:
+                advisor = await self.uow.advisors.get_by_id(case.assigned_advisor_id)
+                student = await self.uow.students.get_by_id(case.sid)
+
+                status_text = 'failed' if is_failed else 'resolved'
+                notif_type = (
+                    NotificationType.WARNING if is_failed else NotificationType.SUCCESS
+                )
+
+                notification = Notification(
+                    user_id=advisor.user_id,
+                    type=notif_type,
+                    title=f'Case Review Submitted: {status_text.capitalize()}',
+                    body=f'Student {student.student_name} has reviewed case {case.case_id} as {status_text}. Satisfaction: {command.satisfaction.value}.',
+                    priority=NotificationPriority.NORMAL,
+                    payload={
+                        'case_id': str(case.case_id),
+                        'satisfaction': command.satisfaction.value,
+                        'is_failed': is_failed,
+                    },
+                )
+                notification.create()
+                await self.uow.notification.add(notification)
 
             await self.uow.cases.save(case)
             await self.uow.commit()

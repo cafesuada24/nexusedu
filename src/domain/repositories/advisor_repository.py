@@ -38,6 +38,10 @@ class AdvisorRepository(Protocol):
         """Retrieve an advisor by their associated user ID."""
         ...
 
+    async def list_all(self) -> list[Advisor]:
+        """Retrieve all registered advisors."""
+        ...
+
     async def save(self, advisor: Advisor) -> None:
         """Update an existing advisor."""
         ...

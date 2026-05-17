@@ -54,6 +54,7 @@ from src.infrastructure.database.models import (
     BackgroundJobTracker,
     IdempotencyKey,
     InterventionEmail,
+    Notification,
     PointLedger,
     Student,
     StudentStatusHistory,
@@ -80,6 +81,9 @@ if TYPE_CHECKING:
     from src.domain.entities.case import Case as DomainCase
     from src.domain.entities.intervention_email import (
         InterventionEmail as DomainInterventionEmail,
+    )
+    from src.domain.entities.notification import (
+        Notification as DomainNotification,
     )
     from src.domain.entities.job import Job
     from src.domain.entities.point_ledger import PointLedger as DomainLedger
@@ -470,6 +474,12 @@ class SqlAlchemyAdvisorRepository:
         if advisor is None:
             raise UserIsNotAnAdvisorError(user_id=user_id)
         return advisor
+
+    async def list_all(self) -> list[DomainAdvisor]:
+        """Retrieve all registered advisors."""
+        stmt = select(OrmAdvisor)
+        result = await self.session.execute(stmt)
+        return [DataMapper.to_domain_advisor(a) for a in result.scalars().all()]
 
     async def save(self, advisor: DomainAdvisor) -> None:
         if self.collect_events_callback:
@@ -1387,3 +1397,83 @@ class SqlAlchemyScheduleRepository:
         """Delete a day off."""
         stmt = delete(OrmDayOff).where(OrmDayOff.id == do_id)
         await self.session.execute(stmt)
+
+
+class SqlAlchemyNotificationRepository:
+    """SQLAlchemy implementation of the NotificationRepository."""
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        collect_events_callback: EventCollector | None = None,
+    ) -> None:
+        """Initialize with a SQLAlchemy async session."""
+        self.session = session
+        self.collect_events_callback = collect_events_callback
+
+    async def add(self, notification: DomainNotification) -> None:
+        """Save a new notification."""
+        if self.collect_events_callback:
+            self.collect_events_callback(notification)
+
+        orm_notification = DataMapper.to_orm_notification(notification)
+        self.session.add(orm_notification)
+
+    async def get_by_id(self, notification_id: uuid.UUID) -> DomainNotification | None:
+        """Find a notification by its ID."""
+        stmt = select(Notification).where(Notification.id == notification_id)
+        result = await self.session.execute(stmt)
+        orm_notification = result.scalar_one_or_none()
+        if not orm_notification:
+            return None
+
+        domain_notification = DataMapper.to_domain_notification(orm_notification)
+        if self.collect_events_callback:
+            self.collect_events_callback(domain_notification)
+        return domain_notification
+
+    async def list_by_user(
+        self,
+        user_id: uuid.UUID,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[DomainNotification]:
+        """List notifications for a specific user, sorted by creation date."""
+        stmt = (
+            select(Notification)
+            .where(Notification.user_id == user_id)
+            .order_by(desc(Notification.created_at))
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self.session.execute(stmt)
+        return [DataMapper.to_domain_notification(n) for n in result.scalars().all()]
+
+    async def mark_as_read(self, notification_id: uuid.UUID) -> None:
+        """Mark a notification as read."""
+        stmt = (
+            update(Notification)
+            .where(Notification.id == notification_id)
+            .values(is_read=True)
+        )
+        await self.session.execute(stmt)
+
+    async def mark_all_as_read(self, user_id: uuid.UUID) -> None:
+        """Mark all notifications for a user as read."""
+        stmt = (
+            update(Notification)
+            .where(Notification.user_id == user_id)
+            .values(is_read=True)
+        )
+        await self.session.execute(stmt)
+
+    async def count_unread(self, user_id: uuid.UUID) -> int:
+        """Count unread notifications for a user."""
+        stmt = (
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.user_id == user_id)
+            .where(Notification.is_read == False)  # noqa: E712
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar() or 0

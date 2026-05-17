@@ -26,6 +26,7 @@ from src.presentation.api.routes import (
     health,
     jobs,
     metrics,
+    notifications,
     students,
     users,
     websocket,
@@ -214,6 +215,7 @@ api_v1_router.include_router(data.router)
 api_v1_router.include_router(cases.router)
 api_v1_router.include_router(advisors.router)
 api_v1_router.include_router(metrics.router)
+api_v1_router.include_router(notifications.router)
 api_v1_router.include_router(students.router)
 api_v1_router.include_router(admin.router)
 api_v1_router.include_router(websocket.router)

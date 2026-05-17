@@ -82,6 +82,14 @@ class InterventionEmailSentEvent(DomainEvent):
 
 
 @dataclass(frozen=True)
+class CasePublishedEvent(DomainEvent):
+    """Event triggered when a batch of new cases is published."""
+
+    count: int
+    case_ids: list[EntityID]
+
+
+@dataclass(frozen=True)
 class CaseOverviewGeneratedEvent(DomainEvent):
     """Event triggered when an AI academic overview is generated."""
 

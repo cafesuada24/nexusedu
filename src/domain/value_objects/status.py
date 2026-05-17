@@ -81,3 +81,21 @@ class MeetingMethod(StrEnum):
 
     ONLINE = 'online'
     IN_PERSON = 'in_person'
+
+
+class NotificationType(StrEnum):
+    """Types of notifications."""
+
+    INFO = 'info'
+    WARNING = 'warning'
+    SUCCESS = 'success'
+    ERROR = 'error'
+
+
+class NotificationPriority(StrEnum):
+    """Priority levels for notifications."""
+
+    LOW = 'low'
+    NORMAL = 'normal'
+    HIGH = 'high'
+    URGENT = 'urgent'
