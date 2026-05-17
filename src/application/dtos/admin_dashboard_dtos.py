@@ -1,9 +1,9 @@
 """DTOs for the Admin Dashboard."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 
 class RecoveryMetricDTO(BaseModel):
@@ -69,6 +69,17 @@ class TrendDistributionDTO(BaseModel):
     declining: int
 
 
+class CriticalCaseDTO(BaseModel):
+    """A high-priority case requiring leadership attention."""
+
+    case_id: UUID
+    student_name: str
+    major: str | None
+    risk_reason: str
+    priority: str  # 'high' or 'medium'
+    breadth_score: float | None
+
+
 class AdvisorAdminMetricRowDTO(BaseModel):
     """Detailed performance metrics for a single advisor."""
 
@@ -88,7 +99,7 @@ class AdvisorAdminMetricsResponseDTO(BaseModel):
     """Aggregate DTO for advisor performance metrics."""
 
     advisors: list[AdvisorAdminMetricRowDTO]
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: AwareDatetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class AdminDashboardDTO(BaseModel):
@@ -102,4 +113,5 @@ class AdminDashboardDTO(BaseModel):
     major_risk: list[MajorRiskMetricDTO]
     systemic_risk: SystemicRiskMetricDTO | None = None
     trend_distribution: TrendDistributionDTO | None = None
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    critical_cases: list[CriticalCaseDTO] = Field(default_factory=list[CriticalCaseDTO])
+    generated_at: AwareDatetime = Field(default_factory=lambda: datetime.now(UTC))
