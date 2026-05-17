@@ -227,7 +227,6 @@ auth.db
 auth.db-journal
 
 .ai-log/
-<<<<<<< Updated upstream
 
 # Database files
 *.db
@@ -236,8 +235,13 @@ data/*.db
 # Alembic
 alembic/versions/__pycache__/
 alembic/__pycache__/
-=======
+
 node_modules/
-.ai-log/session.jsonl
->>>>>>> Stashed changes
+
+# Large model/data files
+*.whl
+en_core_web_*
+
+# Local scratch files
+scratch.py
 .gitnexus
