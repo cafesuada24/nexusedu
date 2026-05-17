@@ -22,6 +22,7 @@ from src.core.identifiers import generate_uuid
 from src.domain.entities.intervention_email import InterventionEmail
 from src.domain.entities.job import Job
 from src.domain.exceptions import (
+    AdvisorNotFoundError,
     CaseAlreadyClosedError,
     CaseNotFoundError,
     EmailUnavailableError,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -61,21 +61,21 @@ class StudentDomainProfile(BaseModel):
         else:
             # 1. Calculate drift from prior baseline
             drift = z_peer - self.ewma_z_peer
-            
+
             # 2. Update Baseline Mean
             self.ewma_z_peer = (alpha * z_peer) + ((1 - alpha) * self.ewma_z_peer)
-            
+
             # 3. Update Baseline Volatility (EWMA Variance)
             # Use squared deviation from the PRIOR mean for variance estimate
             # (Standard EWMA variance formula)
             squared_dev = (z_peer - self.ewma_z_peer) ** 2
             self.ewma_variance = (alpha * squared_dev) + ((1 - alpha) * self.ewma_variance)
-            
+
             # 4. Update Trend (longer-memory EWMA of drifts)
             self.ewma_drift = (gamma * drift) + ((1 - gamma) * self.ewma_drift)
-        
+
         self.observation_count += 1
-        self.last_updated_at = datetime.now()
+        self.last_updated_at = datetime.now(UTC)
 
 
 class EvaluationResult(BaseModel):
@@ -86,7 +86,7 @@ class EvaluationResult(BaseModel):
     academic_year: int
     semester: int
     week: int
-    
+
     # Statistical signals
     avg_score: float
     avg_z_peer: float         # Mean performance relative to peers
@@ -95,11 +95,11 @@ class EvaluationResult(BaseModel):
     trend_score: float        # Multi-week trend signal (EWMA of drifts)
     confidence: float         # Statistical confidence (0.0 to 1.0)
     systemic_breadth: float   # Ratio of domains showing negative drift (0.0 to 1.0)
-    
+
     # Classification
     risk_status: RiskStatus
     is_anomaly: bool = False
-    
+
     # Metadata for persistence/debugging
     metadata: dict[str, float | str] = Field(default_factory=dict)
 
