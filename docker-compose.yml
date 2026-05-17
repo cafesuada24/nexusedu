@@ -228,6 +228,17 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["prod"]
+    command:
+      - tunnel
+      - --url
+      - http://caddy:80
+
+    networks:
+      - nexusedu-net
+
   # =========================
   # shared infrastructure
   # =========================
