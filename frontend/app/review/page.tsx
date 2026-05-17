@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { FeedbackView } from "@/components/feedback/feedback-view"
 import { PublicBookingHeader } from "@/components/booking/public-header"
 import Link from "next/link"
-import { ADVISOR_META, DEFAULT_ADVISOR_META } from "@/lib/static-content"
+import { ADVISOR_META } from "@/lib/static-content"
 
 function decodeJwtPayload(
   token: string,
@@ -76,7 +76,7 @@ export default async function PublicFeedbackPage({
             </p>
           </div>
 
-          <FeedbackView token={raw} advisorName={advisorName} />
+          <FeedbackView token={raw} />
 
           <p className="text-xs text-muted-foreground">
             Nếu bạn không phải là người nhận được yêu cầu đánh giá này, bạn có
