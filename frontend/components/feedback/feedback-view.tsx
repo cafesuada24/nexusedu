@@ -36,6 +36,11 @@ export function FeedbackView({ token }: { token: string }) {
   const [submitting, setSubmitting] = React.useState<Submitting>("none")
   const [stage, setStage] = React.useState<Stage>("form")
   const active = hovered || rating
+  const mountedRef = React.useRef(true)
+
+  React.useEffect(() => {
+    return () => { mountedRef.current = false }
+  }, [])
 
   const handleResolved = async () => {
     if (rating === 0) {
@@ -46,9 +51,9 @@ export function FeedbackView({ token }: { token: string }) {
     try {
       await submitFeedback(token, toSatisfaction(rating, true), comment.trim() || null)
       await new Promise((r) => setTimeout(r, 400))
-      setStage("done_resolved")
+      if (mountedRef.current) setStage("done_resolved")
     } catch {
-      setSubmitting("none")
+      if (mountedRef.current) setSubmitting("none")
       toast.error("Không thể gửi xác nhận. Vui lòng thử lại sau.")
     }
   }
