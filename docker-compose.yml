@@ -329,10 +329,12 @@ services:
   otel-collector:
     profiles: ["dev", "prod"]
     image: otel/opentelemetry-collector-contrib:latest
+    container_name: nexusedu-otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
-    ports:
-      - "4317:4317"
-      - "4318:4318"
+    expose:
+      - "4317" # gRPC
+      - "4318" # HTTP
+      - "8889" # Prometheus metrics
     volumes:
       - ./infra/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     depends_on:
@@ -345,6 +347,16 @@ services:
     networks:
       - nexusedu-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "otelcol-contrib", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   nexusedu-net:
