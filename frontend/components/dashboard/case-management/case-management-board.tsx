@@ -34,7 +34,6 @@ import { StudentDetailModal } from "@/components/dashboard/alert-center/student-
 const INTERVENTION_LABEL: Record<BackendInterventionStatus, string> = {
     new: "Mới",
     accepted: "Đã nhận",
-    notified: "Đã thông báo",
     sent: "Đã gửi email",
     booked: "Đã đặt hẹn",
     supporting: "Đang hỗ trợ",
@@ -48,7 +47,6 @@ const INTERVENTION_LABEL: Record<BackendInterventionStatus, string> = {
 const INTERVENTION_TONE: Record<BackendInterventionStatus, string> = {
     new: "bg-red-500/10 text-red-600 ring-red-500/20 dark:text-red-300",
     accepted: "bg-muted/40 text-muted-foreground ring-border/60",
-    notified: "bg-muted/40 text-muted-foreground ring-border/60",
     sent: "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-300",
     booked: "bg-green-500/10 text-green-700 ring-green-500/25 dark:text-green-300",
     supporting:
