@@ -333,6 +333,23 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                     }
                     break;
 
+                case "NOTIFICATION:PUSH":
+                    const notification = payload as any;
+                    console.log("[WS] Notification created, invalidating list...", notification);
+                    
+                    // Invalidate notifications list to fetch the new one
+                    queryClient.invalidateQueries({
+                        queryKey: queryKeys.notifications.all,
+                    });
+
+                    // Optional: show a toast for high priority notifications
+                    if (notification.priority === "high" || notification.priority === "urgent") {
+                        toast(notification.title, {
+                            description: notification.message,
+                        });
+                    }
+                    break;
+
                 // Add more cases here (e.g., NEW_ALERT)
                 default:
                     console.log("[WS] Unhandled message type:", type);

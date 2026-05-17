@@ -16,12 +16,16 @@ from src.application.dtos.worker_payloads.gamification_payloads import (
     CaseResolvedPayload,
     StudentBookedPayload,
 )
+from src.application.dtos.worker_payloads.notification_payloads import (
+    NotificationPushPayload,
+)
 from src.domain.events.advisor_events import AdvisorCreatedEvent
 from src.domain.events.base import DomainEvent
 from src.domain.events.case_events import (
     CaseAcceptedEvent,
     CaseFailedEvent,
     CaseOverviewGeneratedEvent,
+    CasePublishedEvent,
     CaseResolvedEvent,
     CaseReviewRequestedEvent,
     CaseSupportingStartedEvent,
@@ -31,7 +35,12 @@ from src.domain.events.case_events import (
 )
 from src.domain.events.data_events import DataIngestedEvent
 from src.domain.events.job_events import JobStatusChangedEvent
-from src.domain.value_objects.status import InterventionStatus, JobStatus
+from src.domain.events.notification_events import NotificationPushEvent
+from src.domain.value_objects.status import (
+    InterventionStatus,
+    JobStatus,
+)
+from src.domain.value_objects.student_satisfaction import StudentSatisfaction
 
 
 class OutboxMapper:
@@ -125,7 +134,7 @@ class OutboxMapper:
                         case_id=event.case_id,
                         advisor_id=event.advisor_id,
                         occurred_at=event.occurred_at,
-                        satisfaction=event.satisfaction,
+                        satisfaction=event.satisfaction or StudentSatisfaction.NORMAL,
                         comment=event.comment,
                     ),
                 },
@@ -159,6 +168,24 @@ class OutboxMapper:
     @staticmethod
     def _map_to_websocket_task(event: DomainEvent) -> dict[str, Any] | None:
         """Map a domain event to a WebSocket broadcast task."""
+        if isinstance(event, NotificationPushEvent):
+            return {
+                'task_name': 'websocket_broadcast',
+                'kwargs': {
+                    'event_type': 'NOTIFICATION:PUSH',
+                    'payload': NotificationPushPayload(
+                        type=event.type,
+                        title=event.title,
+                        message=event.message,
+                        priority=event.priority,
+                        payload=event.payload,
+                        timestamp=event.occurred_at,
+                    ).model_dump(),
+                    'user_id': event.user_id,
+                },
+            }
+
+
         if isinstance(event, DataIngestedEvent):
             return {
                 'task_name': 'websocket_broadcast',
@@ -168,6 +195,18 @@ class OutboxMapper:
                         'job_id': str(event.job_id),
                         'results': event.results,
                         'new_cases_count': len(event.new_sids),
+                    },
+                },
+            }
+
+        if isinstance(event, CasePublishedEvent):
+            return {
+                'task_name': 'websocket_broadcast',
+                'kwargs': {
+                    'event_type': 'CASE:PUBLISHED',
+                    'payload': {
+                        'count': event.count,
+                        'case_ids': [str(cid) for cid in event.case_ids],
                     },
                 },
             }

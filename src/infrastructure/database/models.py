@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid  # noqa: TC003
 from datetime import UTC, date, datetime, time
+from typing import Any
 
 from fastapi_users_db_sqlalchemy import SQLAlchemyBaseUserTableUUID
 from sqlalchemy import (
@@ -36,6 +37,8 @@ from src.domain.value_objects.status import (
     InterventionStatus,
     JobStatus,
     MeetingMethod,
+    NotificationPriority,
+    NotificationType,
     OutboxStatus,
     RiskReason,
     RiskStatus,
@@ -656,3 +659,43 @@ class OutboxEvent(Base):
         index=True,
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Notification(Base):
+    """Persistent user notifications."""
+
+    __tablename__ = 'notifications'
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        default=generate_uuid,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey('user.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    type: Mapped[NotificationType] = mapped_column(
+        Enum(NotificationType),
+        default=NotificationType.INFO,
+        nullable=False,
+    )
+    priority: Mapped[NotificationPriority] = mapped_column(
+        Enum(NotificationPriority),
+        default=NotificationPriority.NORMAL,
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime,
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    # Relationships
+    user: Mapped[User] = relationship('User', uselist=False)

@@ -1269,6 +1269,41 @@ export const StudentMetricsResponseSchema = z.object({
 
 export type StudentMetricsResponse = z.infer<typeof StudentMetricsResponseSchema>;
 
+export const NotificationSchema = z
+  .object({
+    id: z.string().uuid(),
+    type: z.string(),
+    title: z.string(),
+    message: z.string(),
+    priority: z.string(),
+    isRead: z.boolean(),
+    payload: z.record(z.any()),
+    timestamp: z.string(),
+  })
+  .transform((data) => ({
+    id: data.id,
+    title: data.title,
+    message: data.message,
+    isRead: data.isRead,
+    type: data.type,
+    priority: data.priority,
+    timestamp: data.timestamp,
+    payload: data.payload,
+  }));
+
+export type Notification = z.infer<typeof NotificationSchema>;
+
+export const NotificationListSchema = z
+  .object({
+    notifications: z.array(NotificationSchema),
+    unreadCount: z.number().nonnegative(),
+  })
+  .transform((data) => ({
+    notifications: data.notifications,
+    unreadCount: data.unreadCount,
+  }));
+
+export type NotificationList = z.infer<typeof NotificationListSchema>;
 
 /**
  * GET /students/{sid}/metrics/terms — returns academic metrics by term.
@@ -1280,9 +1315,64 @@ export async function fetchStudentMetrics(
     endpoint(`/students/${encodeURIComponent(sid)}/metrics/terms`),
     { method: "GET" },
     StudentMetricsResponseSchema,
-    "Không thể lấy dữ liệu học tập",
+    "Không thể lấy chỉ số học tập",
   );
 }
+
+/**
+ * GET /notifications — returns list of notifications for current user.
+ */
+export async function fetchNotifications(): Promise<NotificationList> {
+  return apiCall(
+    endpoint("/notifications"),
+    { method: "GET" },
+    NotificationListSchema,
+    "Không thể lấy danh sách thông báo",
+  );
+}
+
+/**
+ * PATCH /notifications/{id}/read — marks a notification as read.
+ */
+export async function markNotificationAsRead(id: string): Promise<void> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint(`/notifications/${encodeURIComponent(id)}/read`),
+        { method: "PATCH" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể đánh dấu thông báo đã đọc: ${message}`);
+  }
+}
+
+/**
+ * POST /notifications/read-all — marks all notifications as read.
+ */
+export async function markAllNotificationsAsRead(): Promise<void> {
+  const res = await withTimeout(
+    (signal) =>
+      authFetch(
+        endpoint("/notifications/read-all"),
+        { method: "POST" },
+        signal,
+      ),
+    DEFAULT_TIMEOUT_MS,
+  );
+
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const message = errorBody.detail || res.statusText;
+    throw new Error(`Không thể đánh dấu tất cả thông báo đã đọc: ${message}`);
+  }
+}
+
 
 
 /**

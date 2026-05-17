@@ -25,12 +25,13 @@ from src.application.interfaces.student_query_service import StudentQueryService
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
+from src.application.queries.notification_queries import NotificationQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
+from src.application.services.case_application_service import CaseApplicationService
+from src.application.services.email_application_service import EmailApplicationService
 from src.application.services.gamification_application_service import (
     GamificationApplicationService,
 )
-from src.application.services.email_application_service import EmailApplicationService
-from src.application.services.case_application_service import CaseApplicationService
 from src.application.services.websocket_publisher import WebSocketEventPublisher
 from src.core.config import config
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -42,6 +43,7 @@ from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.metadata_repository import MetadataRepository
 from src.domain.repositories.metrics_repository import MetricsRepository
+from src.domain.repositories.notification_repository import NotificationRepository
 from src.domain.repositories.point_ledger_repository import PointLedgerRepository
 from src.domain.repositories.schedule_repository import ScheduleRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
@@ -90,6 +92,7 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
     SqlAlchemyJobRepository,
     SqlAlchemyMetadataRepository,
     SqlAlchemyMetricsRepository,
+    SqlAlchemyNotificationRepository,
     SqlAlchemyPointLedgerRepository,
     SqlAlchemyScheduleRepository,
     SqlAlchemyStatusHistoryRepository,
@@ -168,6 +171,11 @@ class Container:
     def job_repo(self) -> JobRepository:
         """Job repository."""
         return SqlAlchemyJobRepository(self.session)
+
+    @cached_property
+    def notification_repo(self) -> NotificationRepository:
+        """Notification repository."""
+        return SqlAlchemyNotificationRepository(self.session)
 
     @cached_property
     def user_settings_repo(self) -> UserSettingsRepository:
@@ -374,6 +382,10 @@ class Container:
     def get_metrics_query_handler(self) -> MetricsQueryHandler:
         """Metrics query handler."""
         return MetricsQueryHandler(self.metrics_repo)
+
+    def get_notification_query_handler(self) -> NotificationQueryHandler:
+        """Notification query handler."""
+        return NotificationQueryHandler(self.notification_repo)
 
     def get_student_query_handler(self) -> StudentQueryHandler:
         """Student query handler."""

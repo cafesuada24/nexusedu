@@ -19,6 +19,7 @@ from src.infrastructure.persistence.repositories.sqlalchemy_repositories import 
     SqlAlchemyEmailRepository,
     SqlAlchemyIdempotencyRepository,
     SqlAlchemyJobRepository,
+    SqlAlchemyNotificationRepository,
     SqlAlchemyPointLedgerRepository,
     SqlAlchemyScheduleRepository,
     SqlAlchemyStatusHistoryRepository,
@@ -71,6 +72,10 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.idempotency = SqlAlchemyIdempotencyRepository(self.session)
         self.user_settings = SqlAlchemyUserSettingsRepository(self.session)
         self.point_ledger = SqlAlchemyPointLedgerRepository(self.session)
+        self.notification = SqlAlchemyNotificationRepository(
+            self.session,
+            collect_events_callback=self.collect_events,
+        )
 
     async def __aenter__(self) -> Self:
         """Begin the unit of work."""

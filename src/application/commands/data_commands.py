@@ -9,9 +9,16 @@ from src.application.interfaces.unit_of_work import UnitOfWork
 from src.core.identifiers import EntityID, generate_uuid
 from src.domain.entities.case import Case
 from src.domain.entities.data_ingestion import DataIngestion
+from src.domain.entities.notification import Notification
+from src.domain.events.case_events import CasePublishedEvent
 from src.domain.events.data_events import DataIngestedEvent
 from src.domain.services.anomaly_engine.anomaly_engine import AnomalyEngine
-from src.domain.value_objects.status import InterventionStatus, RiskStatus
+from src.domain.value_objects.status import (
+    InterventionStatus,
+    NotificationPriority,
+    NotificationType,
+    RiskStatus,
+)
 
 
 class DataCommandHandler:
@@ -59,6 +66,32 @@ class DataCommandHandler:
                     results=results,
                 ),
             )
+
+            # Raise CasePublishedEvent and notify advisors if new cases were found
+            if new_sids:
+                case_ids = [cid for _, cid in new_sids]
+                ingestion.register_event(
+                    CasePublishedEvent(
+                        count=len(new_sids),
+                        case_ids=case_ids,
+                    ),
+                )
+
+                # Create notifications for all advisors
+                all_advisors = await self.uow.advisors.list_all()
+                for advisor in all_advisors:
+                    if advisor.user_id:
+                        notification = Notification(
+                            user_id=advisor.user_id,
+                            type=NotificationType.INFO,
+                            title='New Cases Published',
+                            body=f'{len(new_sids)} new intervention cases have been identified and are ready for review.',
+                            priority=NotificationPriority.NORMAL,
+                            payload={'case_ids': [str(cid) for cid in case_ids]},
+                        )
+                        notification.create()
+                        await self.uow.notification.add(notification)
+
             self.uow.collect_events(ingestion)
             await self.uow.commit()
 

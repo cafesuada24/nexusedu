@@ -27,6 +27,10 @@ export const queryKeys = {
     leaderboard: (window?: string) => ["advisors", "leaderboard", { window }] as const,
     dashboard: () => ["advisors", "dashboard"] as const,
   },
+  notifications: {
+    all: ["notifications"] as const,
+    list: () => [...queryKeys.notifications.all, "list"] as const,
+  },
   jobs: {
     status: (jobId: string) => ["jobs", "status", jobId] as const,
   },

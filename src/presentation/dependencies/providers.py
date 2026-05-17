@@ -23,6 +23,7 @@ from src.application.interfaces.unit_of_work import UnitOfWork
 from src.application.queries.advisor_queries import AdvisorQueryHandler
 from src.application.queries.case_queries import CaseQueryHandler
 from src.application.queries.metrics_queries import MetricsQueryHandler
+from src.application.queries.notification_queries import NotificationQueryHandler
 from src.application.queries.student_queries import StudentQueryHandler
 from src.core.container import Container
 from src.domain.repositories.activity_repository import ActivityRepository
@@ -34,6 +35,7 @@ from src.domain.repositories.idempotency_repository import IdempotencyRepository
 from src.domain.repositories.job_repository import JobRepository
 from src.domain.repositories.metadata_repository import MetadataRepository
 from src.domain.repositories.metrics_repository import MetricsRepository
+from src.domain.repositories.notification_repository import NotificationRepository
 from src.domain.repositories.point_ledger_repository import PointLedgerRepository
 from src.domain.repositories.settings_repository import UserSettingsRepository
 from src.domain.repositories.status_history_repository import StatusHistoryRepository
@@ -124,6 +126,13 @@ async def get_job_repository(
 ) -> JobRepository:
     """Dependency provider for the JobRepository."""
     return container.job_repo
+
+
+async def get_notification_repository(
+    container: Annotated[Container, Depends(get_container)],
+) -> NotificationRepository:
+    """Dependency provider for the NotificationRepository."""
+    return container.notification_repo
 
 
 async def get_user_settings_repository(
@@ -254,6 +263,13 @@ async def get_metrics_query_handler(
 ) -> MetricsQueryHandler:
     """Dependency provider for the MetricsQueryHandler."""
     return container.get_metrics_query_handler()
+
+
+async def get_notification_query_handler(
+    container: Annotated[Container, Depends(get_container)],
+) -> NotificationQueryHandler:
+    """Dependency provider for the NotificationQueryHandler."""
+    return container.get_notification_query_handler()
 
 
 async def get_student_query_handler(

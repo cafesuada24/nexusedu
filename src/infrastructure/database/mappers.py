@@ -11,6 +11,9 @@ from src.domain.entities.intervention_email import (
     InterventionEmail as DomainInterventionEmail,
 )
 from src.domain.entities.job import Job as DomainJob
+from src.domain.entities.notification import (
+    Notification as DomainNotification,
+)
 from src.domain.entities.point_ledger import (
     PointLedger as DomainLedger,
 )
@@ -46,6 +49,9 @@ from src.infrastructure.database.models import (
 )
 from src.infrastructure.database.models import (
     InterventionEmail as OrmInterventionEmail,
+)
+from src.infrastructure.database.models import (
+    Notification as OrmNotification,
 )
 from src.infrastructure.database.models import (
     PointLedger as OrmLedger,
@@ -275,4 +281,34 @@ class DataMapper:
             status=orm_case.status,
             started_at=orm_case.started_at,
             ended_at=orm_case.completed_at,
+        )
+
+    @staticmethod
+    def to_domain_notification(orm_notification: OrmNotification) -> DomainNotification:
+        """Map ORM Notification to Domain Notification."""
+        return DomainNotification(
+            id=orm_notification.id,
+            user_id=orm_notification.user_id,
+            type=orm_notification.type,
+            priority=orm_notification.priority,
+            title=orm_notification.title,
+            body=orm_notification.body,
+            payload=orm_notification.payload or {},
+            is_read=orm_notification.is_read,
+            created_at=orm_notification.created_at,
+        )
+
+    @staticmethod
+    def to_orm_notification(domain_notification: DomainNotification) -> OrmNotification:
+        """Map Domain Notification to ORM Notification."""
+        return OrmNotification(
+            id=domain_notification.id,
+            user_id=domain_notification.user_id,
+            type=domain_notification.type,
+            priority=domain_notification.priority,
+            title=domain_notification.title,
+            body=domain_notification.body,
+            payload=domain_notification.payload,
+            is_read=domain_notification.is_read,
+            created_at=domain_notification.created_at,
         )
