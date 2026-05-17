@@ -93,8 +93,8 @@ services:
     profiles: ["dev"]
     env_file:
       - .env
-    expose:
-      - "5432"
+    ports:
+      - "5432:5432"
     environment:
       postgres_initdb_args: "--data-checksums"
     volumes:
