@@ -1,9 +1,8 @@
 """Query service for the Admin Dashboard."""
 
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, case, desc, func, select
+from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.application.dtos.admin_dashboard_dtos import (
@@ -438,8 +437,6 @@ class AdminDashboardQueryService:
         # 2. OR systemic breadth > 0.8
         # 3. OR unassigned/unaccepted cases older than 24 hours
 
-        from datetime import datetime, timedelta, UTC
-
         threshold_24h = datetime.now(UTC) - timedelta(hours=24)
 
         # Get latest systemic breadth per student
@@ -474,7 +471,7 @@ class AdminDashboardQueryService:
                     Case.intervention_status != InterventionStatus.RESOLVED,
                     Case.intervention_status != InterventionStatus.DISMISSED,
                     latest_history_subq.c.rn == 1,
-                    func.or_(
+                    or_(
                         Student.current_risk_status == RiskStatus.CRITICAL,
                         latest_history_subq.c.systemic_breadth > 0.8,
                         and_(
@@ -482,7 +479,7 @@ class AdminDashboardQueryService:
                             Case.created_at < threshold_24h,
                         ),
                     ),
-                )
+                ),
             )
             .order_by(desc(latest_history_subq.c.systemic_breadth), Case.created_at)
             .limit(5)
