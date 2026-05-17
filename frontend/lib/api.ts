@@ -36,6 +36,7 @@ export class SlotTakenError extends Error {
 export const BackendInterventionStatusSchema = z.enum([
   "new",
   "accepted",
+  "notified",
   "booked",
   "sent",
   "supporting",
