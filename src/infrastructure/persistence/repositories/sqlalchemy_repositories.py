@@ -45,7 +45,6 @@ from src.domain.value_objects.status import (
     InterventionStatus,
     RiskStatus,
 )
-from src.infrastructure.database.config import DB_REGISTRY
 from src.infrastructure.database.mappers import DataMapper
 from src.infrastructure.database.models import (
     Activity,
