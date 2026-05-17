@@ -33,6 +33,9 @@ connectors:
           - 10s
 
 exporters:
+  googlecloud:
+    log:
+      default_log_name: opentelemetry.io/collector-export
   otlp/jaeger:
     endpoint: jaeger:4317
     tls:
@@ -51,8 +54,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp/jaeger, spanmetrics]
+      exporters: [otlp/jaeger, spanmetrics, googlecloud]
     metrics:
       receivers: [spanmetrics]
       processors: [batch]
-      exporters: [prometheus]
+      exporters: [prometheus, googlecloud]

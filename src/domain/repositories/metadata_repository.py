@@ -15,10 +15,6 @@ class DBDescription(TypedDict):
 class MetadataRepository(Protocol):
     """Interface for retrieving database metadata."""
 
-    async def get_db_registry(self) -> list[DBDescription]:
-        """Get the available database registry."""
-        ...
-
     async def list_tables(self, db_id: str) -> list[str]:
         """List tables in the database."""
         ...
