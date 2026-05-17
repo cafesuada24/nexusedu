@@ -226,9 +226,9 @@ export function getEmailPreview(body: string): string {
 export function toBackendStatus(s: CaseStatus): BackendInterventionStatus {
     switch (s) {
         case "new":
-            return "notified";
+            return "new";
         case "accepted":
-            return "notified";
+            return "accepted";
         case "scheduled":
             return "booked";
         case "in_progress":
