@@ -12,6 +12,7 @@ class DomainError(Exception):
 
     pass
 
+
 class InvalidActionError(Exception):
     """Raised when an user trying to perform an invalid action."""
 
@@ -43,16 +44,19 @@ class CaseNotFoundError(CaseError):
             ),
         )
 
+
 class InvalidStateTransitionError(CaseError):
     """Raised when an invalid state transition happened."""
 
     def __init__(self, current_status: str, attempted_action: str):
-        self.message = f"Cannot transite to {attempted_action} because the current status is {current_status}."
+        self.message = f'Cannot transite to {attempted_action} because the current status is {current_status}.'
         super().__init__(self.message)
+
 
 class CaseNotYetAcceptedError(CaseError):
     def __init__(self, case_id: EntityID):
-        super().__init__(f"Action denied: Case {case_id} must be accepted first.")
+        super().__init__(f'Action denied: Case {case_id} must be accepted first.')
+
 
 class CaseAlreadyClosedError(CaseError):
     """Raised when an advisor trying to work on an unavailable case."""
@@ -60,17 +64,20 @@ class CaseAlreadyClosedError(CaseError):
     def __init__(self, case_id: EntityID) -> None:
         super().__init__(f"Case with with id '{case_id}' is closed.")
 
+
 class EmailUnavailableError(DomainError):
     """Raised when an advisor tries to send an unavailable email."""
 
     def __init__(self, case_id: EntityID) -> None:
         super().__init__(f"Email for the case with id '{case_id}' is not available.")
 
+
 class EmptyEmailError(DomainError):
     """Raised when an advisor tries to send an empty email."""
 
     def __init__(self, case_id: EntityID) -> None:
         super().__init__(f"Email for the case with id '{case_id}' is empty.")
+
 
 class EmailNotFoundError(DomainError):
     def __init__(self, case_id: EntityID):
@@ -81,30 +88,35 @@ class EmailNotFoundError(DomainError):
             ),
         )
 
+
 class MissingReceipentInformationError(DomainError):
     """Raised when the recipent information is missing."""
+
 
 class DraftGenerationError(DomainError):
     """Base exception for email draft generation failures."""
 
+
 class ToxicityDetectedError(DraftGenerationError):
     """Raised when toxic content or hate speech is detected in the draft."""
 
+
 class TonePolicyViolationError(DraftGenerationError):
     """Raised when the draft violates the empathetic tone policy."""
-
-
 
 
 # =============================
 # ========== STUDENT ==========
 # =============================
 
+
 class StudentError(DomainError):
     """Base error for Student."""
 
+
 class StudentEmailNotFoundError(CaseError):
     """"""
+
 
 class StudentNotFoundError(StudentError):
     """Raised when a student is not found."""
@@ -117,17 +129,20 @@ class StudentNotFoundError(StudentError):
             ),
         )
 
+
 class MissingPerformanceDataError(StudentError):
     """Raised when a student lacks recent performance data for email generation."""
 
     def __init__(self, student_id: EntityID):
-        super().__init__(f"Student {student_id} has no recent performance data.")
+        super().__init__(f'Student {student_id} has no recent performance data.')
+
 
 class StudentNameMissingError(StudentError):
     """Raised when a student name is missing."""
 
     def __init__(self, student_id: EntityID):
-        super().__init__(f"Student {student_id} is missing a name.")
+        super().__init__(f'Student {student_id} is missing a name.')
+
 
 # ==========================
 # ========== TASK ==========
@@ -173,7 +188,7 @@ class TimeSlotUnavailableError(AppointmentError):
 
     def __init__(self, advisor_id: EntityID, requested_time: datetime) -> None:
         super().__init__(
-            f"Advisor {advisor_id} is not available at {requested_time}.",
+            f'Advisor {advisor_id} is not available at {requested_time}.',
         )
 
 
@@ -234,18 +249,26 @@ class UnauthorizedError(DomainError):
 
     pass
 
+
 # =========================
 # ========== Job ==========
 # =========================
+
 
 class JobError(DomainError):
     """Base error for job."""
 
     pass
 
+
 class JobNotFoundError(JobError):
     """Raised when a job is not found."""
-    def __init__(self, job_id: EntityID | None = None, correlation_id: EntityID | None = None) -> None:
+
+    def __init__(
+        self,
+        job_id: EntityID | None = None,
+        correlation_id: EntityID | None = None,
+    ) -> None:
         if job_id is not None:
             msg = _NOT_FOUND_MESSAGE_TEMPLATE.format(
                 entity='job',
@@ -257,6 +280,17 @@ class JobNotFoundError(JobError):
                 id=correlation_id,
             )
         else:
-            raise ValueError("Expected one of (job_id, correlation_id) provided.")
+            raise ValueError('Expected one of (job_id, correlation_id) provided.')
 
         super().__init__(msg)
+
+
+# ====================================
+# ========== ADMIN DASHBOARD =========
+# ====================================
+
+
+class AdminDashboardError(DomainError):
+    """Base error for Admin Dashboard operations."""
+
+    pass

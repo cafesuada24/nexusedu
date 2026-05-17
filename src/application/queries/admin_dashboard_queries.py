@@ -1,5 +1,8 @@
 """Query service for the Admin Dashboard."""
 
+from datetime import UTC, datetime
+from typing import Any
+
 from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +20,7 @@ from src.application.dtos.admin_dashboard_dtos import (
     SystemicRiskMetricDTO,
     TrendDistributionDTO,
 )
+from src.domain.exceptions import AdminDashboardError
 from src.domain.value_objects.status import (
     EmailStatus,
     InterventionStatus,
