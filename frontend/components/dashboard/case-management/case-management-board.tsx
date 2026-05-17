@@ -96,9 +96,9 @@ function toAlert(row: TaskItem): Alert {
     const now = Math.floor(Date.now() / 1000);
     const severity: Alert["severity"] = (row.current_risk_status || "")
         .toLowerCase()
-        .includes("elevated")
-        ? "medium"
-        : "high";
+        .includes("critical")
+        ? "high"
+        : "medium";
     return {
         id: row.sid,
         caseId: row.case_id,

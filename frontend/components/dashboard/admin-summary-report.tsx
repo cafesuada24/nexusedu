@@ -76,6 +76,7 @@ export function AdminSummaryReport() {
   }
 
   const majorRiskData = dashboardData?.major_risk || []
+  const criticalCases = dashboardData?.critical_cases || []
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -117,7 +118,7 @@ export function AdminSummaryReport() {
         </CardContent>
       </Card>
 
-      {/* Critical Cases (Placeholder for now, keeping existing mock structure) */}
+      {/* Critical Cases */}
       <Card className="rounded-2xl border-destructive/10 bg-white/50 shadow-sm backdrop-blur-sm dark:bg-slate-900/40">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 font-serif text-lg">
@@ -130,35 +131,37 @@ export function AdminSummaryReport() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-3">
-            {[
-              { id: "1", name: "Nguyễn Văn A", major: "CNTT", reason: "Nghỉ học > 50%", priority: "high" },
-              { id: "2", name: "Trần Thị B", major: "Kinh tế", reason: "GPA < 1.0", priority: "high" },
-              { id: "3", name: "Lê Minh C", major: "Ô tô", reason: "Cảnh báo học vụ lần 2", priority: "medium" },
-            ].map((item) => (
-              <div 
-                key={item.id} 
-                className="flex items-center justify-between rounded-xl border border-border/50 bg-card/50 p-3 transition-colors hover:bg-card"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "grid size-9 place-items-center rounded-lg",
-                    item.priority === "high" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"
-                  )}>
-                    <Users className="size-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{item.name}</p>
-                    <p className="text-[11px] text-muted-foreground">{item.major} • {item.reason}</p>
-                  </div>
-                </div>
-                <Badge 
-                  variant={item.priority === "high" ? "destructive" : "secondary"}
-                  className="rounded-md px-2 py-0 text-[10px] uppercase tracking-wider"
+            {criticalCases.length > 0 ? (
+              criticalCases.map((item) => (
+                <div 
+                  key={item.case_id} 
+                  className="flex items-center justify-between rounded-xl border border-border/50 bg-card/50 p-3 transition-colors hover:bg-card"
                 >
-                  {item.priority === "high" ? "Khẩn cấp" : "Trung bình"}
-                </Badge>
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "grid size-9 place-items-center rounded-lg",
+                      item.priority === "high" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"
+                    )}>
+                      <Users className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{item.student_name}</p>
+                      <p className="text-[11px] text-muted-foreground">{item.major} • {item.risk_reason}</p>
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={item.priority === "high" ? "destructive" : "secondary"}
+                    className="rounded-md px-2 py-0 text-[10px] uppercase tracking-wider"
+                  >
+                    {item.priority === "high" ? "Khẩn cấp" : "Trung bình"}
+                  </Badge>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <p className="text-xs text-muted-foreground">Hiện không có case trọng điểm cần xử lý</p>
               </div>
-            ))}
+            )}
           </div>
           <Button variant="outline" size="sm" className="mt-6 w-full gap-2 rounded-xl border-destructive/20 text-destructive hover:bg-destructive/5 hover:text-destructive">
             Mở danh sách xử lý trọng điểm <ChevronRight className="size-4" />

@@ -170,9 +170,9 @@ export function AlertCenter() {
                     summary: r.current_risk_status || "Unknown risk",
                     severity: (r.current_risk_status || "")
                         .toLowerCase()
-                        .includes("elevated")
-                        ? ("medium" as const)
-                        : ("high" as const),
+                        .includes("critical")
+                        ? ("high" as const)
+                        : ("medium" as const),
                     subject: "",
                     body: "",
                     lastContactedAt: null,

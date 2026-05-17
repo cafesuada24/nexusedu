@@ -11,6 +11,7 @@ from src.application.dtos.admin_dashboard_dtos import (
     AdminDashboardDTO,
     AdvisorAdminMetricRowDTO,
     AdvisorAdminMetricsResponseDTO,
+    CriticalCaseDTO,
     LeadTimeMetricDTO,
     MajorRiskMetricDTO,
     NudgeActivationMetricDTO,
@@ -186,6 +187,7 @@ class AdminDashboardQueryService:
             major_risk=await self._get_major_risk_metrics(),
             systemic_risk=await self._get_systemic_risk_metrics(),
             trend_distribution=await self._get_trend_distribution(),
+            critical_cases=await self._get_critical_cases(),
         )
 
     async def _get_systemic_risk_metrics(self) -> SystemicRiskMetricDTO:
@@ -427,4 +429,77 @@ class AdminDashboardQueryService:
                 else 0.0,
             )
             for major in all_majors
+        ]
+
+    async def _get_critical_cases(self) -> list[CriticalCaseDTO]:
+        """Fetch high-priority cases requiring leadership attention."""
+        # Selection criteria:
+        # 1. Critical risk status
+        # 2. OR systemic breadth > 0.8
+        # 3. OR unassigned/unaccepted cases older than 24 hours
+
+        from datetime import datetime, timedelta, UTC
+
+        threshold_24h = datetime.now(UTC) - timedelta(hours=24)
+
+        # Get latest systemic breadth per student
+        latest_history_subq = select(
+            StudentStatusHistory.sid,
+            StudentStatusHistory.systemic_breadth,
+            func.row_number()
+            .over(
+                partition_by=StudentStatusHistory.sid,
+                order_by=[
+                    desc(StudentStatusHistory.academic_year),
+                    desc(StudentStatusHistory.semester),
+                    desc(StudentStatusHistory.week),
+                ],
+            )
+            .label('rn'),
+        ).subquery()
+
+        stmt = (
+            select(
+                Case.case_id,
+                Student.student_name,
+                Student.major,
+                Case.risk_reason,
+                Student.current_risk_status,
+                latest_history_subq.c.systemic_breadth,
+            )
+            .join(Student, Case.sid == Student.sid)
+            .outerjoin(latest_history_subq, Student.sid == latest_history_subq.c.sid)
+            .where(
+                and_(
+                    Case.intervention_status != InterventionStatus.RESOLVED,
+                    Case.intervention_status != InterventionStatus.DISMISSED,
+                    latest_history_subq.c.rn == 1,
+                    func.or_(
+                        Student.current_risk_status == RiskStatus.CRITICAL,
+                        latest_history_subq.c.systemic_breadth > 0.8,
+                        and_(
+                            Case.intervention_status == InterventionStatus.NEW,
+                            Case.created_at < threshold_24h,
+                        ),
+                    ),
+                )
+            )
+            .order_by(desc(latest_history_subq.c.systemic_breadth), Case.created_at)
+            .limit(5)
+        )
+
+        results = (await self.session.execute(stmt)).all()
+
+        return [
+            CriticalCaseDTO(
+                case_id=row[0],
+                student_name=row[1],
+                major=row[2],
+                risk_reason=str(row[3]),
+                priority='high'
+                if row[4] == RiskStatus.CRITICAL or (row[5] or 0) > 0.9
+                else 'medium',
+                breadth_score=float(row[5]) if row[5] is not None else None,
+            )
+            for row in results
         ]

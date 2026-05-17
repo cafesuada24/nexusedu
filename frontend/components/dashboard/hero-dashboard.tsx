@@ -38,16 +38,17 @@ export function HeroDashboard() {
 
   const priorityCount = React.useMemo(() => {
     return alerts.filter((alert) => {
-      // Logic: Only count alerts in the 'New' column that are also 'High Risk'
-      // A case is truly 'new' only if it hasn't been assigned to an advisor yet.
+      // A student belongs in the Priority Queue if they are at CRITICAL Risk
+      // AND their case is still "Waiting for intervention" (New or Accepted).
       if ((alert.intervention_status || "").toLowerCase() === "dismissed") return false
       
       const baseStatus = fromBackendStatus(alert.intervention_status)
-      const isNew = baseStatus === "new" && !alert.assigned_advisor_id
+      const isWaiting = baseStatus === "new" || baseStatus === "accepted"
       
-      const isHighRisk = !(alert.current_risk_status || "").toLowerCase().includes("elevated")
+      const risk = (alert.current_risk_status || "").toLowerCase()
+      const isCritical = risk.includes("critical")
       
-      return isNew && isHighRisk
+      return isWaiting && isCritical
     }).length
   }, [alerts])
 
